@@ -58,6 +58,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/members/{sn}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 멤버 1건 조회. 없으면 404 */
+        get: operations["member"];
+        put?: never;
+        post?: never;
+        /** 멤버 삭제 (MemberDeleted). 멤버 프로필도 지운다. Run · 리뷰 등 기록이 있으면 409 (보관 = status archived) */
+        delete: operations["delete"];
+        options?: never;
+        head?: never;
+        /** 멤버 부분 수정 (MemberUpdated). 모르는 상태는 422, 없으면 404 */
+        patch: operations["edit"];
+        trace?: never;
+    };
+    "/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 프로필 목록 (번호순). `kind`로 거른다 */
+        get: operations["list"];
+        put?: never;
+        /** 프로필 생성 (ProfileCreated) */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{sn}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 1건 조회. 없으면 404 */
+        get: operations["read"];
+        put?: never;
+        post?: never;
+        /** 삭제 (ProfileDeleted). 성공 204, 없으면 404, 멤버가 쓰는 중이면 409 (하위 설정은 CASCADE) */
+        delete: operations["remove"];
+        options?: never;
+        head?: never;
+        /** 부분 수정 (ProfileUpdated). 없으면 404 */
+        patch: operations["update"];
+        trace?: never;
+    };
+    "/profiles/{sn}/caps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 하위 매핑 조회: 스킬 · MCP · 도구 정책 (편집은 별도 Task). 프로필이 없으면 404 */
+        get: operations["caps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects": {
         parameters: {
             query?: never;
@@ -268,6 +341,24 @@ export interface paths {
         patch: operations["update"];
         trace?: never;
     };
+    "/tasks/{sn}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 멤버 배정 (AssignAgent → AgentAssigned · assign_by = user). 없는 멤버 422, 보관된 멤버 409. Run은 만들지 않는다 */
+        post: operations["assign"];
+        /** 배정 해제 (AgentUnassigned · member_sn = NULL) */
+        delete: operations["unassign"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{sn}/move": {
         parameters: {
             query?: never;
@@ -303,10 +394,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 팀 목록 (sort → 번호순) */
+        get: operations["list"];
+        put?: never;
+        /** 팀 생성 (TeamCreated) */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{sn}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 팀 1건 조회. 없으면 404 */
+        get: operations["read"];
+        put?: never;
+        post?: never;
+        /** 팀 삭제 (TeamDeleted). 멤버와 멤버 프로필도 지운다. Run 기록이 있는 멤버가 있으면 409 */
+        delete: operations["remove"];
+        options?: never;
+        head?: never;
+        /** 팀 부분 수정 (TeamUpdated). 없으면 404 */
+        patch: operations["update"];
+        trace?: never;
+    };
+    "/teams/{sn}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 팀 멤버 목록 (sort → 번호순). 팀이 없으면 404 */
+        get: operations["members"];
+        put?: never;
+        /** 멤버 추가 (MemberCreated). 템플릿이 없으면 422, draft · 보관 · live 버전 없음은 409, 템플릿 없이 role_name도 없으면 422 */
+        post: operations["add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 템플릿 목록 (보관 제외 · sort → 번호순) */
+        get: operations["templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/templates/{sn}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 템플릿 1건 조회. 없으면 404 */
+        get: operations["template"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description AssignAgent 요청 본문 */
+        AssignBody: {
+            /**
+             * Format: int64
+             * @description 배정할 멤버 (Agent profile 아님)
+             */
+            member_sn: number;
+        };
+        /** @description 프로필 하위 매핑 (조회 전용) */
+        Caps: {
+            mcps: components["schemas"]["McpLink"][];
+            skills: components["schemas"]["SkillLink"][];
+            tools: components["schemas"]["ToolRule"][];
+        };
         /** @description 에러 응답 본문 (OpenAPI 공통 에러 스키마) */
         ErrorBody: {
             /** @description 에러 코드 (예: not_found, invalid_ref) */
@@ -360,10 +554,142 @@ export interface components {
             status?: string | null;
             title?: string | null;
         };
+        /** @description 프로필의 MCP 연결 */
+        McpLink: {
+            /** @description installed | accessible */
+            access_mode: string;
+            /** Format: int64 */
+            mcp_sn: number;
+        };
+        /** @description 멤버 (API 응답 형태) */
+        Member: {
+            color?: string | null;
+            create_at: string;
+            /** @description orch | task | wait */
+            first_task_mode: string;
+            icon?: string | null;
+            /** Format: int64 */
+            is_orch: number;
+            name: string;
+            /** Format: int64 */
+            profile_sn: number;
+            role_name: string;
+            /** Format: int64 */
+            sn: number;
+            /** Format: int64 */
+            sort: number;
+            /** @description running | waiting | idle | paused | archived */
+            status: string;
+            /** Format: int64 */
+            team_sn: number;
+            /** Format: int64 */
+            template_sn?: number | null;
+            /** Format: int64 */
+            template_version?: number | null;
+            update_at: string;
+        };
+        /** @description 멤버 추가 요청 본문. template_sn이 있으면 live 버전 프로필을 복사하고 역할 · 아이콘 · 색을 템플릿에서 가져온다 */
+        MemberNew: {
+            color?: string | null;
+            /** @description orch | task | wait, 생략하면 orch */
+            first_task_mode?: string | null;
+            icon?: string | null;
+            name: string;
+            /** @description 템플릿 없이 만들 때 필수 (있으면 템플릿 값을 덮어쓴다) */
+            role_name?: string | null;
+            /** Format: int64 */
+            template_sn?: number | null;
+        };
+        /** @description 멤버 수정 요청 본문. 보낸 필드만 바꾼다 */
+        MemberPatch: {
+            color?: string | null;
+            first_task_mode?: string | null;
+            icon?: string | null;
+            name?: string | null;
+            role_name?: string | null;
+            /** Format: int64 */
+            sort?: number | null;
+            /** @description running | waiting | idle | paused | archived */
+            status?: string | null;
+        };
         /** @description MoveTask 요청 본문 */
         MoveBody: {
             /** @description 옮겨갈 상태 */
             status: string;
+        };
+        /** @description 에이전트 프로필 (API 응답 형태) */
+        Profile: {
+            /** Format: int64 */
+            auto_retry_max: number;
+            /** Format: int64 */
+            connection_sn?: number | null;
+            /** Format: int64 */
+            context_warn_percent: number;
+            create_at: string;
+            /** @description auto | low | medium | high */
+            effort: string;
+            /** @description bot | personal · null = 워크스페이스 기본 */
+            github_mode?: string | null;
+            /** @description workspace | template | member */
+            kind: string;
+            /** Format: int64 */
+            model_sn?: number | null;
+            /** @description allowlist | open | off */
+            network_mode: string;
+            /** @description use | ignore */
+            repo_rule_mode: string;
+            /** Format: int64 */
+            run_time_limit_min?: number | null;
+            /** Format: int64 */
+            run_token_limit?: number | null;
+            /** Format: int64 */
+            runtime_sn?: number | null;
+            /** @description resume_task | new_run */
+            session_mode: string;
+            /** Format: int64 */
+            sn: number;
+            /**
+             * Format: int64
+             * @description 1(읽기 전용) ~ 4(자율)
+             */
+            trust_level: number;
+            update_at: string;
+            /** Format: int64 */
+            wid: number;
+            workdir?: string | null;
+        };
+        /** @description 생성 요청 본문. 설정값은 DB 기본값으로 시작하고 PATCH로 바꾼다 */
+        ProfileNew: {
+            /** @description workspace | template | member, 생략하면 workspace */
+            kind?: string | null;
+        };
+        /** @description 수정 요청 본문. 보낸 필드만 바꾼다 (이벤트 payload로도 그대로 저장된다) */
+        ProfilePatch: {
+            /** Format: int64 */
+            auto_retry_max?: number | null;
+            /** Format: int64 */
+            connection_sn?: number | null;
+            /** Format: int64 */
+            context_warn_percent?: number | null;
+            effort?: string | null;
+            github_mode?: string | null;
+            /** Format: int64 */
+            model_sn?: number | null;
+            network_mode?: string | null;
+            repo_rule_mode?: string | null;
+            /** Format: int64 */
+            run_time_limit_min?: number | null;
+            /** Format: int64 */
+            run_token_limit?: number | null;
+            /** Format: int64 */
+            runtime_sn?: number | null;
+            session_mode?: string | null;
+            /**
+             * Format: int64
+             * @description 1 ~ 4
+             */
+            trust_level?: number | null;
+            workdir?: string | null;
         };
         /** @description 프로젝트 (API 응답 형태) */
         Project: {
@@ -472,6 +798,13 @@ export interface components {
             /** @description starting | active | stopped | failed */
             status: string;
         };
+        /** @description 프로필의 스킬 연결 */
+        SkillLink: {
+            /** Format: int64 */
+            is_enabled: number;
+            /** Format: int64 */
+            skill_sn: number;
+        };
         /** @description 태스크 (API 응답 형태) */
         Task: {
             assign_by?: string | null;
@@ -536,6 +869,84 @@ export interface components {
             /** Format: int64 */
             queue_sort?: number | null;
             title?: string | null;
+        };
+        /** @description 팀 (API 응답 형태) */
+        Team: {
+            /** Format: int64 */
+            context_warn_percent: number;
+            create_at: string;
+            /** Format: int64 */
+            daily_token_budget?: number | null;
+            /** Format: int64 */
+            is_review_required: number;
+            /** @description orch | project */
+            kind: string;
+            /** Format: int64 */
+            max_concurrent_run: number;
+            name: string;
+            /** @description read | branch | push */
+            repo_permission: string;
+            repo_scope?: string | null;
+            /** @description before_merge | before_done */
+            review_stage: string;
+            /** Format: int64 */
+            sn: number;
+            /** Format: int64 */
+            sort: number;
+            update_at: string;
+        };
+        /** @description 팀 생성 요청 본문. 나머지 설정은 DB 기본값으로 시작한다 */
+        TeamNew: {
+            /** @description orch | project, 생략하면 project */
+            kind?: string | null;
+            name: string;
+        };
+        /** @description 팀 수정 요청 본문. 보낸 필드만 바꾼다 */
+        TeamPatch: {
+            /** Format: int64 */
+            context_warn_percent?: number | null;
+            /** Format: int64 */
+            daily_token_budget?: number | null;
+            /** Format: int64 */
+            is_review_required?: number | null;
+            /** Format: int64 */
+            max_concurrent_run?: number | null;
+            name?: string | null;
+            repo_permission?: string | null;
+            repo_scope?: string | null;
+            review_stage?: string | null;
+            /** Format: int64 */
+            sort?: number | null;
+        };
+        /** @description 역할 템플릿 (API 응답 형태) */
+        Template: {
+            /** @description dev | verify | design_pm | orch */
+            category: string;
+            color?: string | null;
+            create_at: string;
+            description?: string | null;
+            icon?: string | null;
+            /** Format: int64 */
+            is_orch: number;
+            name: string;
+            role_name?: string | null;
+            /** Format: int64 */
+            sn: number;
+            /** Format: int64 */
+            sort: number;
+            /** @description draft | active | archived */
+            status: string;
+            /** @description 태그 JSON 배열 문자열 */
+            tag_json?: string | null;
+            update_at: string;
+        };
+        /** @description 프로필의 도구 정책 */
+        ToolRule: {
+            /** @description allow | allowlist | approval | block */
+            policy: string;
+            scope_text?: string | null;
+            /** @description read | edit | shell | git_push | web_fetch | git_destructive */
+            tool_code: string;
         };
     };
     responses: never;
@@ -718,6 +1129,283 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    member: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 멤버 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Member"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 멤버 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 삭제됨 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    edit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 멤버 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Member"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: {
+                /** @description 이 종류만 */
+                kind?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileNew"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로필 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로필 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 삭제됨 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로필 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfilePatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    caps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로필 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Caps"];
                 };
             };
             default: {
@@ -1285,6 +1973,70 @@ export interface operations {
             };
         };
     };
+    assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 태스크 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    unassign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 태스크 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     mv: {
         parameters: {
             query?: never;
@@ -1367,6 +2119,278 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Team"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamNew"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Team"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 팀 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Team"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 팀 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 삭제됨 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 팀 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Team"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    members: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 팀 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Member"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 팀 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberNew"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Member"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Template"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    template: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 템플릿 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Template"];
                 };
             };
             default: {

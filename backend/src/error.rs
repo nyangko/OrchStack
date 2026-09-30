@@ -66,6 +66,15 @@ impl From<DbErr> for Error {
     }
 }
 
+/// 삭제 시 외래키 위반 = 다른 행이 참조 중(RESTRICT) → 409. 나머지는 일반 DB 오류
+pub fn in_use(e: DbErr) -> Error {
+    // SQLite는 RESTRICT 위반을 FK 코드(787)가 아닌 1811로 보내 sql_err()가 못 잡는다 → 메시지로 판별
+    if e.to_string().contains("FOREIGN KEY constraint failed") {
+        return Error::conflict("in use by other rows".into());
+    }
+    e.into()
+}
+
 /// 본문 JSON 파싱 실패 변환 (상태 코드는 axum이 정한 400/415/422 그대로)
 impl From<JsonRejection> for Error {
     fn from(e: JsonRejection) -> Self {

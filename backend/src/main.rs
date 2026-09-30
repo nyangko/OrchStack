@@ -1,5 +1,6 @@
 // OrchStack 백엔드 진입점: DB 준비 → 라우터 구성 → HTTP 서버 실행
 
+mod agent; // /profiles CRUD · /templates 조회
 #[allow(unused_imports, dead_code)] // sea-orm-cli 생성 코드
 mod entity; // 테이블별 SeaORM entity (sea-orm-cli 생성물 · 직접 수정하지 않는다)
 mod error; // 공통 에러 응답
@@ -7,7 +8,8 @@ mod event; // 명령 실행 틀 (상태 변경 + 이벤트 append + 발행)
 mod issue; // /issues CRUD
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
-mod task; // /tasks CRUD + MoveTask
+mod task; // /tasks CRUD + MoveTask + 배정
+mod team; // /teams · /members CRUD
 
 use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
 use utoipa::OpenApi;
@@ -49,7 +51,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -337,12 +339,114 @@ mod tests {
         assert_eq!(events(&db, "session", 1).await.len(), 2);
     }
 
+    /// 프로필 CRUD · 하위 매핑 조회 · 템플릿 조회 → 멤버 생성 시 live 버전 프로필 복사 · 팀/멤버 CRUD · 삭제 제한
+    #[tokio::test]
+    async fn agent_team() {
+        let db = mem().await;
+        let app = app(db.clone());
+
+        // 프로필: 생성(DB 기본값) · 수정 · Trust 범위 · 종류 검사 · 목록 필터 · 삭제
+        let (st, p) = call(&app, "POST", "/profiles", Some(json!({}))).await;
+        assert_eq!((st, p["kind"].as_str(), p["trust_level"].as_i64()), (StatusCode::CREATED, Some("workspace"), Some(3)));
+        let ps = p["sn"].as_i64().unwrap();
+        let (_, p) = call(&app, "PATCH", &format!("/profiles/{ps}"), Some(json!({"effort": "high", "trust_level": 2}))).await;
+        assert_eq!((p["effort"].as_str(), p["trust_level"].as_i64()), (Some("high"), Some(2)));
+        assert_eq!(call(&app, "PATCH", &format!("/profiles/{ps}"), Some(json!({"trust_level": 5}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", "/profiles", Some(json!({"kind": "x"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "GET", "/profiles?kind=member", None).await.1.as_array().unwrap().len(), 0);
+        assert_eq!(call(&app, "DELETE", &format!("/profiles/{ps}"), None).await.0, StatusCode::NO_CONTENT);
+
+        // 템플릿(live v2 · 도구 정책 1개)과 draft 템플릿은 SQL로 넣는다 (템플릿 편집은 이 Task 범위 밖)
+        db.execute_unprepared(
+            "INSERT INTO tbl_agent_profile (sn, wid, kind, effort) VALUES (10, 1, 'template', 'high'); \
+             INSERT INTO tbl_profile_tool (profile_sn, tool_code, policy) VALUES (10, 'shell', 'approval'); \
+             INSERT INTO tbl_template (sn, wid, name, role_name, icon, color) VALUES (1, 1, 'Frontend', 'Frontend Developer', 'monitor', 'role-frontend'); \
+             INSERT INTO tbl_template_revision (template_sn, profile_sn, version, status) VALUES (1, 10, 2, 'live'); \
+             INSERT INTO tbl_template (sn, wid, name, status) VALUES (2, 1, 'Draft', 'draft');",
+        ).await.unwrap();
+        assert_eq!(call(&app, "GET", "/templates", None).await.1.as_array().unwrap().len(), 2);
+        assert_eq!(call(&app, "GET", "/templates/1", None).await.1["role_name"], "Frontend Developer");
+
+        // 팀
+        let (st, t) = call(&app, "POST", "/teams", Some(json!({"name": "Core"}))).await;
+        assert_eq!((st, t["kind"].as_str()), (StatusCode::CREATED, Some("project")));
+        let ts = t["sn"].as_i64().unwrap();
+        assert_eq!(call(&app, "PATCH", &format!("/teams/{ts}"), Some(json!({"max_concurrent_run": 5}))).await.1["max_concurrent_run"], 5);
+        assert_eq!(call(&app, "POST", "/teams", Some(json!({"name": "x", "kind": "y"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "GET", "/teams", None).await.1.as_array().unwrap().len(), 1);
+
+        // 템플릿 멤버: 새 프로필(kind member)에 설정 · 도구 정책이 복사되고 표시값은 템플릿에서
+        let members = format!("/teams/{ts}/members");
+        let (st, m) = call(&app, "POST", &members, Some(json!({"name": "진", "template_sn": 1}))).await;
+        assert_eq!((st, m["role_name"].as_str(), m["icon"].as_str(), m["template_version"].as_i64()), (StatusCode::CREATED, Some("Frontend Developer"), Some("monitor"), Some(2)));
+        let (ms, mp) = (m["sn"].as_i64().unwrap(), m["profile_sn"].as_i64().unwrap());
+        assert_ne!(mp, 10);
+        let p = call(&app, "GET", &format!("/profiles/{mp}"), None).await.1;
+        assert_eq!((p["kind"].as_str(), p["effort"].as_str()), (Some("member"), Some("high")));
+        let caps = call(&app, "GET", &format!("/profiles/{mp}/caps"), None).await.1;
+        assert_eq!((caps["tools"][0]["tool_code"].as_str(), caps["tools"][0]["policy"].as_str()), (Some("shell"), Some("approval")));
+
+        // draft 템플릿 409 · 없는 템플릿 422 · 템플릿도 역할도 없으면 422 · 빈 캐릭터는 역할만으로
+        assert_eq!(call(&app, "POST", &members, Some(json!({"name": "a", "template_sn": 2}))).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", &members, Some(json!({"name": "a", "template_sn": 9}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", &members, Some(json!({"name": "a"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        let (st, m2) = call(&app, "POST", &members, Some(json!({"name": "하린", "role_name": "QA"}))).await;
+        assert_eq!((st, m2["template_sn"].as_i64()), (StatusCode::CREATED, None));
+        assert_eq!(call(&app, "GET", &members, None).await.1.as_array().unwrap().len(), 2);
+
+        // 멤버 수정 · 상태 검사 · 쓰는 중인 프로필 삭제 409 · 멤버 삭제 시 프로필도 삭제
+        assert_eq!(call(&app, "PATCH", &format!("/members/{ms}"), Some(json!({"status": "paused"}))).await.1["status"], "paused");
+        assert_eq!(call(&app, "PATCH", &format!("/members/{ms}"), Some(json!({"status": "x"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "DELETE", &format!("/profiles/{mp}"), None).await.0, StatusCode::CONFLICT);
+        let m2s = m2["sn"].as_i64().unwrap();
+        assert_eq!(call(&app, "DELETE", &format!("/members/{m2s}"), None).await.0, StatusCode::NO_CONTENT);
+        assert_eq!(call(&app, "GET", &format!("/profiles/{}", m2["profile_sn"]), None).await.0, StatusCode::NOT_FOUND);
+
+        // Run 기록이 있는 멤버는 삭제 · 팀 삭제 모두 409. 기록이 없으면 팀 삭제 시 멤버 · 프로필도 지워진다
+        let t = task_of(&app, &db, false).await;
+        call(&app, "POST", &format!("/tasks/{t}/assign"), Some(json!({"member_sn": ms}))).await;
+        call(&app, "POST", &format!("/tasks/{t}/runs"), None).await;
+        assert_eq!(call(&app, "DELETE", &format!("/members/{ms}"), None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "DELETE", &format!("/teams/{ts}"), None).await.0, StatusCode::CONFLICT);
+        db.execute_unprepared("DELETE FROM tbl_run").await.unwrap();
+        assert_eq!(call(&app, "DELETE", &format!("/teams/{ts}"), None).await.0, StatusCode::NO_CONTENT);
+        assert_eq!(call(&app, "GET", &format!("/members/{ms}"), None).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(call(&app, "GET", &format!("/profiles/{mp}"), None).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(call(&app, "GET", "/profiles/10", None).await.0, StatusCode::OK); // 템플릿 프로필은 그대로
+    }
+
+    /// assign: 태스크 member_sn · assign_by 반영 + 이벤트 1행. 해제는 NULL. 없는 멤버 422 · 보관 멤버 409 · 없는 태스크 404
+    #[tokio::test]
+    async fn assign() {
+        let db = mem().await;
+        let app = app(db.clone());
+        let ts = task_of(&app, &db, false).await;
+        let (_, t) = call(&app, "POST", "/teams", Some(json!({"name": "T"}))).await;
+        let (_, m) = call(&app, "POST", &format!("/teams/{}/members", t["sn"]), Some(json!({"name": "진", "role_name": "Dev"}))).await;
+        let (ms, uri) = (m["sn"].as_i64().unwrap(), format!("/tasks/{ts}/assign"));
+
+        let (st, v) = call(&app, "POST", &uri, Some(json!({"member_sn": ms}))).await;
+        assert_eq!((st, v["member_sn"].as_i64(), v["assign_by"].as_str()), (StatusCode::OK, Some(ms), Some("user")));
+        assert_eq!(call(&app, "GET", &format!("/tasks/{ts}"), None).await.1["member_sn"].as_i64(), Some(ms));
+        assert_eq!(events(&db, "task", ts).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["TaskCreated", "AgentAssigned"]);
+
+        let (st, v) = call(&app, "DELETE", &uri, None).await;
+        assert_eq!((st, v["member_sn"].as_i64(), v["assign_by"].as_str()), (StatusCode::OK, None, None));
+        assert_eq!(events(&db, "task", ts).await.last().unwrap().0, "AgentUnassigned");
+
+        assert_eq!(call(&app, "POST", &uri, Some(json!({"member_sn": 99}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        call(&app, "PATCH", &format!("/members/{ms}"), Some(json!({"status": "archived"}))).await;
+        assert_eq!(call(&app, "POST", &uri, Some(json!({"member_sn": ms}))).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", "/tasks/99/assign", Some(json!({"member_sn": ms}))).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(events(&db, "task", ts).await.len(), 3); // 실패한 요청은 이벤트를 남기지 않는다
+    }
+
     /// 문서에 모든 경로와 공통 에러 스키마가 있다
     #[tokio::test]
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

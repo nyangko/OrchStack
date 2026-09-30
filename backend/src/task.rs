@@ -1,4 +1,4 @@
-//! tbl_task CRUD + MoveTask. 쓰기는 event::run 경유 (TaskCreated · TaskUpdated · TaskMoved · TaskDeleted)
+//! tbl_task CRUD + MoveTask + 배정. 쓰기는 event::run 경유 (TaskCreated · TaskUpdated · TaskMoved · TaskDeleted · AgentAssigned · AgentUnassigned)
 use crate::{entity::tbl_task::{self as t, Entity as Tbl}, error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::next_num};
 use axum::{Json, extract::{Query, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
@@ -26,6 +26,7 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
         .routes(routes!(list, create))
         .routes(routes!(read, update, remove))
         .routes(routes!(mv))
+        .routes(routes!(assign, unassign))
 }
 
 /// 태스크 (API 응답 형태)
@@ -99,6 +100,13 @@ struct TaskPatch {
 struct MoveBody {
     /// 옮겨갈 상태
     status: String,
+}
+
+/// AssignAgent 요청 본문
+#[derive(Deserialize, ToSchema)]
+struct AssignBody {
+    /// 배정할 멤버 (Agent profile 아님)
+    member_sn: i64,
 }
 
 /// 우선순위 범위 검사 (0~3)
@@ -204,4 +212,40 @@ async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusC
         Ok(((), vec![Ev::new(Some(m.project_sn), "task", sn, "TaskDeleted", &json!({ "num": m.num }))]))
     }).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// 담당 멤버 설정 (없으면 해제)과 배정 이벤트를 남긴다. 태스크가 없으면 404
+async fn set_member(db: &DatabaseConnection, sn: i64, member: Option<i64>) -> Res<Task> {
+    event::run(db, async |tx| {
+        get(tx, sn).await?;
+        if let Some(ms) = member {
+            let m = crate::entity::tbl_member::Entity::find_by_id(ms).one(tx).await?.ok_or_else(|| Error::invalid("member not found".into()))?;
+            if m.status == "archived" {
+                return Err(Error::conflict("member is archived".into()));
+            }
+        }
+        // 해제는 member_sn · assign_by 모두 NULL
+        let (to, by) = member.map_or((Expr::cust("NULL"), Expr::cust("NULL")), |v| (Expr::value(v), Expr::value("user")));
+        let q = Tbl::update_many().filter(t::Column::Sn.eq(sn)).col_expr(t::Column::MemberSn, to).col_expr(t::Column::AssignBy, by)
+            .col_expr(t::Column::UpdateAt, Expr::cust("datetime('now')"));
+        q.exec(tx).await?;
+        let out = get(tx, sn).await?;
+        let ev = match member {
+            Some(ms) => Ev::new(Some(out.project_sn), "task", sn, "AgentAssigned", &json!({ "member_sn": ms, "assign_by": "user" })),
+            None => Ev::new(Some(out.project_sn), "task", sn, "AgentUnassigned", &json!({})),
+        };
+        Ok((out, vec![ev]))
+    }).await
+}
+
+/// 멤버 배정 (AssignAgent → AgentAssigned · assign_by = user). 없는 멤버 422, 보관된 멤버 409. Run은 만들지 않는다
+#[utoipa::path(post, path = "/tasks/{sn}/assign", params(("sn" = i64, Path, description = "태스크 번호")), request_body = AssignBody, responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
+async fn assign(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<AssignBody>) -> Res<Json<Task>> {
+    set_member(&db, sn, Some(b.member_sn)).await.map(Json)
+}
+
+/// 배정 해제 (AgentUnassigned · member_sn = NULL)
+#[utoipa::path(delete, path = "/tasks/{sn}/assign", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
+async fn unassign(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Task>> {
+    set_member(&db, sn, None).await.map(Json)
 }
