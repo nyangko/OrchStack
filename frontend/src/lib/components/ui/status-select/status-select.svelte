@@ -9,11 +9,14 @@
 	let {
 		value = $bindable(),
 		disabled = false,
+		compact = false,
 		class: className,
 		onValueChange,
 	}: {
 		value: TaskStatus;
 		disabled?: boolean;
+		/** 아이콘만 있는 트리거 (.pen Issue Board 행 상태 아이콘). 라벨은 aria-label · title로. */
+		compact?: boolean;
 		class?: string;
 		onValueChange?: (value: TaskStatus) => void;
 	} = $props();
@@ -28,17 +31,22 @@
 	{disabled}
 >
 	<Select.Trigger
-		aria-label="Status"
+		aria-label={compact ? `Status: ${current.label}` : "Status"}
+		title={compact ? `${current.label} · 클릭하여 변경` : undefined}
 		class={cn(
-			"data-[size=default]:h-auto gap-1 rounded-md border-0 py-0.5 pr-1.5 pl-2 font-medium shadow-none [&_svg:last-child]:hidden",
-			current.soft,
+			"data-[size=default]:h-auto gap-1 rounded-md border-0 font-medium shadow-none [&_svg:last-child]:hidden",
+			compact ? "size-6 justify-center bg-transparent p-0 hover:bg-muted" : ["py-0.5 pr-1.5 pl-2", current.soft],
 			current.text,
 			className
 		)}
 	>
-		<current.icon class="size-3" />
-		{current.label}
-		<ChevronDown class="size-3" />
+		{#if compact}
+			<current.icon class="size-3.5" />
+		{:else}
+			<current.icon class="size-3" />
+			{current.label}
+			<ChevronDown class="size-3" />
+		{/if}
 	</Select.Trigger>
 	<Select.Content class="w-47 p-1">
 		{#each statusOrder as s (s)}

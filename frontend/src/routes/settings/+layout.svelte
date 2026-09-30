@@ -1,0 +1,55 @@
+<script lang="ts">
+	/// Settings 셸 — 좌측 워크스페이스 설정 메뉴 (.pen SettingsNav). 메뉴마다 /settings/<메뉴> 라우트.
+	import { page } from '$app/state';
+	import Settings from '@lucide/svelte/icons/settings';
+	import PlugZap from '@lucide/svelte/icons/plug-zap';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import Terminal from '@lucide/svelte/icons/terminal';
+	import FileStack from '@lucide/svelte/icons/file-stack';
+	import FileText from '@lucide/svelte/icons/file-text';
+	import Bell from '@lucide/svelte/icons/bell';
+	import Shield from '@lucide/svelte/icons/shield';
+	import { cn } from '$lib/utils';
+
+	let { children } = $props();
+
+	// ready: 화면이 만들어진 메뉴만 링크 (나머지는 #76 하위 Task에서 채운다).
+	const menus = [
+		{ href: '/settings/general', label: '일반', icon: Settings, ready: true },
+		{ href: '/settings/connections', label: '모델 연결', icon: PlugZap, ready: true },
+		{ href: '/settings/skill-sources', label: '스킬 소스', icon: Sparkles, ready: true },
+		{ href: '/settings/runtimes', label: '실행기 (CLI)', icon: Terminal, ready: true },
+		{ href: '/settings/presets', label: 'Instruction presets', icon: FileStack },
+		{ href: '/settings/report-forms', label: '보고서 양식', icon: FileText },
+		{ href: '/settings/notifications', label: '알림', icon: Bell, ready: true },
+		{ href: '/settings/security', label: '권한 · 보안', icon: Shield, ready: true }
+	];
+</script>
+
+<div class="flex h-full">
+	<nav class="flex w-60 shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-sidebar px-3 py-5" aria-label="워크스페이스 설정">
+		<h2 class="px-2.5 pb-1.5 text-caption font-semibold text-muted-foreground">워크스페이스 설정</h2>
+		{#each menus as m (m.href)}
+			{@const on = page.url.pathname.startsWith(m.href)}
+			{#if m.ready}
+				<a
+					href={m.href}
+					aria-current={on ? 'page' : undefined}
+					class={cn(
+						'flex h-8.5 items-center gap-2.5 rounded-md px-2.5 text-body text-muted-foreground outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50',
+						on && 'bg-accent font-semibold text-foreground'
+					)}
+				>
+					<m.icon class="size-3.75" />{m.label}
+				</a>
+			{:else}
+				<span class="flex h-8.5 items-center gap-2.5 px-2.5 text-body text-muted-foreground opacity-50" aria-disabled="true" title="준비 중">
+					<m.icon class="size-3.75" />{m.label}
+				</span>
+			{/if}
+		{/each}
+	</nav>
+	<div class="min-w-0 flex-1 overflow-y-auto">
+		{@render children()}
+	</div>
+</div>

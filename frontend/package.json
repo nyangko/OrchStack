@@ -43,6 +43,7 @@
 	"dependencies": {
 		"@dnd-kit-svelte/svelte": "0.1.6",
 		"@dnd-kit/abstract": "0.2.4",
+		"@dnd-kit/dom": "0.2.4",
 		"@dnd-kit/helpers": "0.2.4",
 		"@lucide/svelte": "^1.48.0",
 		"@xyflow/svelte": "^1.7.0",

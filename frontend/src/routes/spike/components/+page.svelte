@@ -135,10 +135,7 @@
 		</div>
 		<div class="flex flex-wrap items-center gap-1.5">
 			{#each filters as f (f.label)}
-				<Toggle variant="chip" pressed={filter === f.label} onPressedChange={() => (filter = f.label)}>
-					{f.label}
-					<span class="font-mono text-subtle-foreground group-aria-pressed/toggle:text-background">{f.count}</span>
-				</Toggle>
+				<Toggle variant="chip" count={f.count} pressed={filter === f.label} onPressedChange={() => (filter = f.label)}>{f.label}</Toggle>
 			{/each}
 		</div>
 	</section>

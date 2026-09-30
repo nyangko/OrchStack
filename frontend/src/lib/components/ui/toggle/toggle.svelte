@@ -38,10 +38,14 @@
 		class: className,
 		size = "default",
 		variant = "default",
+		count,
+		children,
 		...restProps
 	}: TogglePrimitive.RootProps & {
 		variant?: ToggleVariant;
 		size?: ToggleSize;
+		/** 라벨 뒤 개수 (.pen FilterChip). 눌림 상태에서 색이 반전된다. */
+		count?: number;
 	} = $props();
 </script>
 
@@ -51,4 +55,9 @@
 	data-slot="toggle"
 	class={cn(toggleVariants({ variant, size }), className)}
 	{...restProps}
-/>
+>
+	{@render children?.({ pressed })}
+	{#if count !== undefined}
+		<span data-slot="toggle-count" class="font-mono tabular-nums text-subtle-foreground group-aria-pressed/toggle:text-background">{count}</span>
+	{/if}
+</TogglePrimitive.Root>

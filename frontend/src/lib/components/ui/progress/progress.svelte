@@ -7,8 +7,12 @@
 		class: className,
 		max = 100,
 		value,
+		indicator,
 		...restProps
-	}: WithoutChildrenOrChild<ProgressPrimitive.RootProps> = $props();
+	}: WithoutChildrenOrChild<ProgressPrimitive.RootProps> & {
+		/** 막대 색 (bg-* 클래스). 잔량 · 경고처럼 값에 따라 색이 바뀔 때 쓴다. */
+		indicator?: string;
+	} = $props();
 </script>
 
 <ProgressPrimitive.Root
@@ -21,7 +25,7 @@
 >
 	<div
 		data-slot="progress-indicator"
-		class="bg-primary size-full flex-1 transition-all"
+		class={cn("bg-primary size-full flex-1 transition-all", indicator)}
 		style="transform: translateX(-{100 - (100 * (value ?? 0)) / (max ?? 1)}%)"
 	></div>
 </ProgressPrimitive.Root>

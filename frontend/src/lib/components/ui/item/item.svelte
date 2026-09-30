@@ -9,7 +9,7 @@
 				outline: "border-border",
 				muted: "bg-muted/50 border-transparent",
 				// .pen 목록 행: 둥근 상자 대신 아래 구분선, 좌우 여백 없음
-				row: "rounded-none border-0 border-b px-0! **:data-[slot=item-title]:text-body **:data-[slot=item-description]:text-xs",
+				row: "rounded-none border-0 border-b **:data-[slot=item-title]:text-body **:data-[slot=item-description]:text-xs",
 			},
 			size: {
 				default: "gap-3.5 px-4 py-3.5",
@@ -17,6 +17,8 @@
 				xs: "gap-2 px-2.5 py-2 in-data-[slot=dropdown-menu-content]:p-0",
 			},
 		},
+		// row는 크기별 좌우 여백을 없앤다 (호출부 class로 다시 줄 수 있게 ! 대신 compound).
+		compoundVariants: [{ variant: "row", class: "px-0" }],
 		defaultVariants: {
 			variant: "default",
 			size: "default",

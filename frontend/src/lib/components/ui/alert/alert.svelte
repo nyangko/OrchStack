@@ -6,10 +6,11 @@
 		variants: {
 			variant: {
 				default: "bg-card text-card-foreground",
-				warning: "bg-warning-soft border-warning px-3 text-warning *:data-[slot=alert-title]:text-body *:data-[slot=alert-title]:font-semibold *:data-[slot=alert-description]:text-xs *:data-[slot=alert-description]:text-foreground",
+				warning: "bg-warning-soft border-warning px-3 text-warning **:data-[slot=alert-title]:text-body **:data-[slot=alert-title]:font-semibold **:data-[slot=alert-description]:text-xs **:data-[slot=alert-description]:text-foreground",
 				// .pen InfoStrip: 회색 띠 · 12px
-				info: "bg-muted border-border px-3.5 py-2 *:data-[slot=alert-title]:text-xs *:data-[slot=alert-title]:font-semibold *:data-[slot=alert-description]:text-xs *:[svg]:size-3.5",
-				destructive: "text-destructive bg-card *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
+				info: "bg-muted border-border px-3.5 py-2 **:data-[slot=alert-title]:text-xs **:data-[slot=alert-title]:font-semibold **:data-[slot=alert-description]:text-xs *:[svg]:size-3.5",
+				// .pen Quota Alert: 붉은 띠 · 제목은 본문색
+				destructive: "bg-destructive-soft border-destructive px-3.5 py-2.5 text-destructive **:data-[slot=alert-title]:text-body **:data-[slot=alert-title]:font-semibold **:data-[slot=alert-title]:text-foreground **:data-[slot=alert-description]:text-xs **:data-[slot=alert-description]:text-muted-foreground *:data-[slot=button]:text-foreground",
 			},
 		},
 		defaultVariants: {
