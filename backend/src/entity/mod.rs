@@ -37,6 +37,7 @@ pub mod tbl_map_runtime_connection;
 pub mod tbl_map_task_contract;
 pub mod tbl_map_task_dependency;
 pub mod tbl_map_task_label;
+pub mod tbl_map_issue_label;
 pub mod tbl_mcp;
 pub mod tbl_member;
 pub mod tbl_message;

@@ -17,9 +17,10 @@ pub struct Model {
     pub token_cache_read: i64,
     pub token_cache_write: i64,
     pub token_output: i64,
-    pub context_token: i64,
-    #[sea_orm(column_type = "Double")]
-    pub cost_usd: f64,
+    pub context_token: Option<i64>,
+    pub cost_usd_micro: i64,
+    #[sea_orm(column_type = "Text")]
+    pub usage_source: String,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
 }

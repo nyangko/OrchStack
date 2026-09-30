@@ -27,6 +27,7 @@ pub struct Model {
     pub streak_count: i64,
     #[sea_orm(column_type = "Text", nullable)]
     pub deadline_at: Option<String>,
+    pub event_sn: Option<i64>,
     pub uid: Option<i64>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,

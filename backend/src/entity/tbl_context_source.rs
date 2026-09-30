@@ -13,6 +13,9 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub ref_label: String,
     pub ref_sn: Option<i64>,
+    pub ref_version: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub content_hash: Option<String>,
     pub token_count: i64,
     pub is_repeat: i64,
     pub sort: i64,

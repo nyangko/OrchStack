@@ -20,8 +20,13 @@ pub struct Model {
     pub spawn_mode: Option<String>,
     pub tier: Option<String>,
     pub brief: Option<String>,
+    pub kind: Option<String>,
+    pub child_seq: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub paths: Option<String>,
+    pub wait_run_sn: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub wait_glob: Option<String>,
     pub runtime_sn: Option<i64>,
     pub connection_sn: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
@@ -39,14 +44,13 @@ pub struct Model {
     pub branch: Option<String>,
     pub workdir: Option<String>,
     pub workdir_clean_at: Option<String>,
-    pub token_input: i64,
-    pub token_cache_read: i64,
-    pub token_cache_write: i64,
-    pub token_output: i64,
-    pub context_token: i64,
+    pub token_input: Option<i64>,
+    pub token_cache_read: Option<i64>,
+    pub token_cache_write: Option<i64>,
+    pub token_output: Option<i64>,
+    pub context_token: Option<i64>,
     pub context_limit: Option<i64>,
-    #[sea_orm(column_type = "Double")]
-    pub cost_usd: f64,
+    pub cost_usd_micro: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub start_at: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]

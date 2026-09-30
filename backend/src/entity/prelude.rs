@@ -35,6 +35,7 @@ pub use super::tbl_map_runtime_connection::Entity as TblMapRuntimeConnection;
 pub use super::tbl_map_task_contract::Entity as TblMapTaskContract;
 pub use super::tbl_map_task_dependency::Entity as TblMapTaskDependency;
 pub use super::tbl_map_task_label::Entity as TblMapTaskLabel;
+pub use super::tbl_map_issue_label::Entity as TblMapIssueLabel;
 pub use super::tbl_mcp::Entity as TblMcp;
 pub use super::tbl_member::Entity as TblMember;
 pub use super::tbl_message::Entity as TblMessage;

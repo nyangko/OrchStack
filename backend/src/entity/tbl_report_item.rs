@@ -13,6 +13,7 @@ pub struct Model {
     pub kind: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub ref_key: Option<String>,
+    pub criterion_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
     pub code: String,
     #[sea_orm(column_type = "Text", nullable)]

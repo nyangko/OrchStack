@@ -23,6 +23,7 @@ pub struct Model {
     pub ref_sn: Option<i64>,
     pub is_action: i64,
     pub is_read: i64,
+    pub event_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
     #[sea_orm(column_type = "Text", nullable)]

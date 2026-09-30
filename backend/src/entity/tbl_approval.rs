@@ -20,6 +20,8 @@ pub struct Model {
     pub detail: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub status: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub deadline_at: Option<String>,
     pub uid: Option<i64>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,

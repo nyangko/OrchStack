@@ -34,8 +34,7 @@ pub struct Model {
     pub status: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub status_message: Option<String>,
-    #[sea_orm(column_type = "Double", nullable)]
-    pub monthly_budget_usd: Option<f64>,
+    pub monthly_budget_usd_micro: Option<i64>,
     pub budget_warn_percent: i64,
     pub is_budget_exclude: i64,
     #[sea_orm(column_type = "Text")]

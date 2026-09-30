@@ -131,6 +131,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/{sn}/fallbacks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 폴백 체인 조회 (sort 순). 프로필이 없으면 404 */
+        get: operations["fallbacks"];
+        /** 폴백 체인 전체 교체 (ProfileUpdated). 배열 순서 = sort. 모르는 tier · 없는 실행기 · 연결 · 모델은 422, 프로필이 없으면 404 */
+        put: operations["chain"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects": {
         parameters: {
             query?: never;
@@ -386,7 +404,7 @@ export interface paths {
         /** 태스크의 Run 목록 (번호순) */
         get: operations["list"];
         put?: never;
-        /** Run 시작 (StartRun → RunStarted). Run은 queued로 만들고 태스크는 in_progress. 담당 멤버가 없거나 진행 중 Run이 있으면 409 */
+        /** Run 시작 (StartRun → RunStarted). Run은 queued로 만들고 태스크는 in_progress. 담당 멤버가 없거나 진행 중 Run(하위 Run 제외 · #67)이 있으면 409 */
         post: operations["start"];
         delete?: never;
         options?: never;
@@ -427,7 +445,7 @@ export interface paths {
         delete: operations["remove"];
         options?: never;
         head?: never;
-        /** 팀 부분 수정 (TeamUpdated). 없으면 404 */
+        /** 팀 부분 수정 (TeamUpdated). 없으면 404, 모르는 하위 작업 방식 · 허용 밖 기본 방식은 422 */
         patch: operations["update"];
         trace?: never;
     };
@@ -507,6 +525,24 @@ export interface components {
             error: string;
             /** @description 사람이 읽는 설명 */
             message: string;
+        };
+        /** @description 폴백 체인 1단계. sort 순으로 시도하고, tier가 있으면 그 등급의 하위 작업만 쓴다 (NULL = 모든 등급) */
+        Fallback: {
+            /** Format: int64 */
+            connection_sn: number;
+            /** Format: int64 */
+            max_level?: number | null;
+            /**
+             * Format: int64
+             * @description NULL = 연결 기본 모델
+             */
+            model_sn?: number | null;
+            /** Format: int64 */
+            runtime_sn: number;
+            /** @description 다음 단계로 넘어가는 조건 (예: 429) */
+            switch_rule?: string | null;
+            /** @description S | M | L | NULL */
+            tier?: string | null;
         };
         /** @description health 응답 */
         Health: {
@@ -881,6 +917,11 @@ export interface components {
             is_review_required: number;
             /** @description orch | project */
             kind: string;
+            /**
+             * Format: int64
+             * @description 리드 Run 1개당 동시 하위 작업 수
+             */
+            max_child_run: number;
             /** Format: int64 */
             max_concurrent_run: number;
             name: string;
@@ -893,6 +934,10 @@ export interface components {
             sn: number;
             /** Format: int64 */
             sort: number;
+            /** @description 허용 방식 (쉼표 구분) */
+            spawn_allow: string;
+            /** @description 하위 작업 기본 방식: sub | fork | runner */
+            spawn_mode: string;
             update_at: string;
         };
         /** @description 팀 생성 요청 본문. 나머지 설정은 DB 기본값으로 시작한다 */
@@ -910,6 +955,8 @@ export interface components {
             /** Format: int64 */
             is_review_required?: number | null;
             /** Format: int64 */
+            max_child_run?: number | null;
+            /** Format: int64 */
             max_concurrent_run?: number | null;
             name?: string | null;
             repo_permission?: string | null;
@@ -917,6 +964,10 @@ export interface components {
             review_stage?: string | null;
             /** Format: int64 */
             sort?: number | null;
+            /** @description 쉼표 구분 (예: "sub,runner") */
+            spawn_allow?: string | null;
+            /** @description sub | fork | runner */
+            spawn_mode?: string | null;
         };
         /** @description 역할 템플릿 (API 응답 형태) */
         Template: {
@@ -1406,6 +1457,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Caps"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    fallbacks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로필 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fallback"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로필 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Fallback"][];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fallback"][];
                 };
             };
             default: {

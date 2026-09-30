@@ -21,6 +21,7 @@ pub struct Model {
     pub uid: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub note: Option<String>,
+    pub event_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
     #[sea_orm(column_type = "Text", nullable)]
