@@ -20,6 +20,8 @@ pub struct Model {
     pub spawn_mode: Option<String>,
     pub tier: Option<String>,
     pub brief: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub paths: Option<String>,
     pub runtime_sn: Option<i64>,
     pub connection_sn: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]

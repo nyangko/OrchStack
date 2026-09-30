@@ -19,6 +19,8 @@ pub struct Model {
     pub status: String,
     pub priority: i64,
     #[sea_orm(column_type = "Text", nullable)]
+    pub spawn_mode: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
     pub assign_by: Option<String>,
     pub queue_sort: Option<i64>,
     pub estimate_min: Option<i64>,

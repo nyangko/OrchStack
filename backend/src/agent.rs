@@ -1,5 +1,5 @@
 //! tbl_agent_profile CRUD + 하위 매핑 조회 + tbl_template 조회. 쓰기는 event::run 경유 (ProfileCreated · ProfileUpdated · ProfileDeleted)
-use crate::{entity::{tbl_agent_profile::{self as p, Entity as Tbl}, tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_profile_tool as pt, tbl_template as tp},
+use crate::{entity::{tbl_agent_profile::{self as p, Entity as Tbl}, tbl_map_fallback as fb, tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_profile_tool as pt, tbl_template as tp},
     error::{Body, Error, ErrorBody, Res, Sn, in_use}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::{NotSet, Set}, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, EntityTrait,
@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
+
+/// 허용되는 하위 작업 모델 등급 (#67)
+const TIERS: [&str; 3] = ["S", "M", "L"];
 
 /// 허용되는 프로필 소유 종류
 const KINDS: [&str; 3] = ["workspace", "template", "member"];
@@ -24,6 +27,7 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
         .routes(routes!(list, create))
         .routes(routes!(read, update, remove))
         .routes(routes!(caps))
+        .routes(routes!(fallbacks, chain))
         .routes(routes!(templates))
         .routes(routes!(template))
 }
@@ -289,6 +293,49 @@ async fn caps(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Caps
     let tools = pt::Entity::find().filter(pt::Column::ProfileSn.eq(sn)).order_by_asc(pt::Column::Sort).all(&db).await?
         .into_iter().map(|m| ToolRule { tool_code: m.tool_code, scope_text: m.scope_text, policy: m.policy }).collect();
     Ok(Json(Caps { skills, mcps, tools }))
+}
+
+/// 폴백 체인 1단계. sort 순으로 시도하고, tier가 있으면 그 등급의 하위 작업만 쓴다 (NULL = 모든 등급)
+#[derive(Serialize, Deserialize, ToSchema)]
+struct Fallback {
+    runtime_sn: i64,
+    connection_sn: i64,
+    /// NULL = 연결 기본 모델
+    model_sn: Option<i64>,
+    /// 다음 단계로 넘어가는 조건 (예: 429)
+    switch_rule: Option<String>,
+    max_level: Option<i64>,
+    /// S | M | L | NULL
+    tier: Option<String>,
+}
+
+/// 폴백 체인 조회 (sort 순). 프로필이 없으면 404
+#[utoipa::path(get, path = "/profiles/{sn}/fallbacks", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Vec<Fallback>), (status = "default", body = ErrorBody)))]
+async fn fallbacks(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Fallback>>> {
+    get(&db, sn).await?;
+    Ok(Json(fb::Entity::find().filter(fb::Column::ProfileSn.eq(sn)).order_by_asc(fb::Column::Sort).all(&db).await?.into_iter()
+        .map(|m| Fallback { runtime_sn: m.runtime_sn, connection_sn: m.connection_sn, model_sn: m.model_sn, switch_rule: m.switch_rule, max_level: m.max_level, tier: m.tier })
+        .collect()))
+}
+
+/// 폴백 체인 전체 교체 (ProfileUpdated). 배열 순서 = sort. 모르는 tier · 없는 실행기 · 연결 · 모델은 422, 프로필이 없으면 404
+#[utoipa::path(put, path = "/profiles/{sn}/fallbacks", params(("sn" = i64, Path, description = "프로필 번호")), request_body = Vec<Fallback>, responses((status = 200, body = Vec<Fallback>), (status = "default", body = ErrorBody)))]
+async fn chain(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Vec<Fallback>>) -> Res<Json<Vec<Fallback>>> {
+    if b.iter().any(|f| f.tier.as_deref().is_some_and(|t| !TIERS.contains(&t))) {
+        return Err(Error::invalid(format!("tier must be one of {TIERS:?} or null")));
+    }
+    event::run(&db, async |tx| {
+        get(tx, sn).await?;
+        fb::Entity::delete_many().filter(fb::Column::ProfileSn.eq(sn)).exec(tx).await?;
+        for (i, f) in b.iter().enumerate() {
+            fb::ActiveModel {
+                profile_sn: Set(sn), runtime_sn: Set(f.runtime_sn), connection_sn: Set(f.connection_sn), model_sn: Set(f.model_sn),
+                sort: Set(i as i64 + 1), switch_rule: Set(f.switch_rule.clone()), max_level: Set(f.max_level), tier: Set(f.tier.clone()), ..Default::default()
+            }.insert(tx).await?;
+        }
+        Ok(((), vec![Ev::new(None, "profile", sn, "ProfileUpdated", &json!({ "fallbacks": &b }))]))
+    }).await?;
+    Ok(Json(b))
 }
 
 /// 템플릿 목록 (보관 제외 · sort → 번호순)

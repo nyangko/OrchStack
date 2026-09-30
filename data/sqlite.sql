@@ -383,8 +383,7 @@ CREATE TABLE tbl_map_fallback (
     switch_rule      TEXT,                                          -- 다음으로 넘어가는 조건 (예: 주간 잔량 20% 미만, 429)
     max_level        INTEGER,                                       -- 이 단계가 맡을 수 있는 최대 작업 레벨 (예: 0 = L0만)
     tier             TEXT,                                          -- 하위 작업 모델 등급: S | M | L · NULL = 모든 등급 (#67)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (profile_sn, runtime_sn, connection_sn)
+    create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 생성 시각 · 순서 겹침 금지는 ux_fallback_sort (같은 연결도 등급별 모델로 여러 번 올 수 있다 · #67)
 );
 
 -- 템플릿. 역할별 에이전트 기본값 · Agents 탭
@@ -592,6 +591,7 @@ CREATE TABLE tbl_task (
     description       TEXT,                                         -- 설명 (Markdown)
     status            TEXT NOT NULL DEFAULT 'todo',              -- 상태 (#9): backlog(백로그 · 계획 전) | todo(할 일 · 대기열) | in_progress(진행 중 · Run 실행) | blocked(막힘 · 사람 조치 필요) | review(리뷰 대기 · 리뷰 중) | done(완료) | failed(실패 · 재시도 한도 초과) | cancelled(취소) · waiting(의존 대기)은 저장하지 않고 의존 관계로 계산
     priority          INTEGER NOT NULL DEFAULT 2,                   -- 우선순위: 0(P0) ~ 3(P3)
+    spawn_mode        TEXT,                                         -- 하위 작업 방식: sub | fork | runner · NULL = 팀 기본값(tbl_team.spawn_mode) (#67)
     assign_by         TEXT,                                         -- 배정한 쪽: orch_auto(Orch 자동 배정) | orch_move(Orch 재배치) | user(사용자 수동)
     queue_sort        INTEGER,                                      -- 담당 멤버의 실행 대기열 순서
     estimate_min      INTEGER,                                      -- 예상 소요(분)
@@ -726,6 +726,7 @@ CREATE TABLE tbl_run (
     spawn_mode         TEXT,                                        -- 하위 작업 방식: NULL(일반 Run) | sub(실행기 내장 서브에이전트) | fork(부모 컨텍스트 상속) | runner(OrchStack 임시 하위 Run)
     tier               TEXT,                                        -- 모델 등급 (runner): S(소형) | M(중형) | L(대형) · 규칙 엔진이 kind로 판정
     brief              TEXT,                                        -- 받은 @TASK 원문 (하위 작업)
+    paths              TEXT,                                        -- 하위 작업 허용 경로 JSON 배열 · @ASK 추가 반영 · 규칙 엔진 겹침 검사 · 종료 후 범위 위반 검사 (#67)
     runtime_sn         INTEGER REFERENCES tbl_runtime(sn) ON DELETE SET NULL,          -- 사용한 실행기
     connection_sn      INTEGER REFERENCES tbl_connection(sn) ON DELETE SET NULL,       -- 사용한 연결
     model_code         TEXT,                                        -- 사용한 모델 ID (기록용 사본)
@@ -736,7 +737,7 @@ CREATE TABLE tbl_run (
     fail_detail        TEXT,                                        -- 실패 상세
     branch             TEXT,                                        -- 작업 브랜치
     workdir            TEXT,                                        -- 이 Run이 만든 worktree 경로 (repo 모드면 NULL)
-    workdir_clean_at   TEXT,                                        -- worktree · 임시 브랜치 정리 시각 (NULL + 종료된 Run = 정리 대상)
+    workdir_clean_at   TEXT,                                        -- worktree · 임시 브랜치 정리 시각 (workdir 있음 + NULL + 종료된 Run = 정리 대상)
     token_input        INTEGER NOT NULL DEFAULT 0,                  -- 새 입력 토큰 합계
     token_cache_read   INTEGER NOT NULL DEFAULT 0,                  -- 캐시 읽기 토큰 합계
     token_cache_write  INTEGER NOT NULL DEFAULT 0,                  -- 캐시 쓰기 토큰 합계

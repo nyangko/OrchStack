@@ -354,6 +354,19 @@ mod tests {
         assert_eq!(call(&app, "PATCH", &format!("/profiles/{ps}"), Some(json!({"trust_level": 5}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(call(&app, "POST", "/profiles", Some(json!({"kind": "x"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(call(&app, "GET", "/profiles?kind=member", None).await.1.as_array().unwrap().len(), 0);
+        // 폴백 체인: 같은 연결을 등급별 모델로 두 번 · 배열 순서 = sort · 모르는 tier · 없는 연결은 422
+        db.execute_unprepared(
+            "INSERT INTO tbl_runtime (sn, wid, code, name) VALUES (1, 1, 'claude_code', 'Claude Code'); \
+             INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'max');",
+        ).await.unwrap();
+        let fbs = format!("/profiles/{ps}/fallbacks");
+        let chain = json!([{"runtime_sn": 1, "connection_sn": 1, "tier": "S"}, {"runtime_sn": 1, "connection_sn": 1, "tier": null}]);
+        assert_eq!(call(&app, "PUT", &fbs, Some(chain)).await.0, StatusCode::OK);
+        let v = call(&app, "GET", &fbs, None).await.1;
+        assert_eq!((v[0]["tier"].as_str(), v[1]["tier"].is_null()), (Some("S"), true));
+        assert_eq!(call(&app, "PUT", &fbs, Some(json!([{"runtime_sn": 1, "connection_sn": 1, "tier": "X"}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "PUT", &fbs, Some(json!([{"runtime_sn": 1, "connection_sn": 9}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "GET", &fbs, None).await.1.as_array().unwrap().len(), 2); // 실패한 교체는 기존 체인을 지우지 않는다
         assert_eq!(call(&app, "DELETE", &format!("/profiles/{ps}"), None).await.0, StatusCode::NO_CONTENT);
 
         // 템플릿(live v2 · 도구 정책 1개)과 draft 템플릿은 SQL로 넣는다 (템플릿 편집은 이 Task 범위 밖)
@@ -373,6 +386,14 @@ mod tests {
         let ts = t["sn"].as_i64().unwrap();
         assert_eq!(call(&app, "PATCH", &format!("/teams/{ts}"), Some(json!({"max_concurrent_run": 5}))).await.1["max_concurrent_run"], 5);
         assert_eq!(call(&app, "POST", "/teams", Some(json!({"name": "x", "kind": "y"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        // 하위 작업 정책: 기본값 runner, 허용 밖 기본 방식 · 모르는 방식 · 0 상한은 422
+        let tp = format!("/teams/{ts}");
+        assert_eq!(t["spawn_mode"], "runner");
+        let v = call(&app, "PATCH", &tp, Some(json!({"spawn_allow": "sub,fork,runner", "spawn_mode": "fork", "max_child_run": 2}))).await.1;
+        assert_eq!((v["spawn_mode"].as_str(), v["max_child_run"].as_i64()), (Some("fork"), Some(2)));
+        for bad in [json!({"spawn_allow": "sub,runner"}), json!({"spawn_mode": "x"}), json!({"spawn_allow": "fork,y"}), json!({"max_child_run": 0})] {
+            assert_eq!(call(&app, "PATCH", &tp, Some(bad.clone())).await.0, StatusCode::UNPROCESSABLE_ENTITY, "{bad}");
+        }
         assert_eq!(call(&app, "GET", "/teams", None).await.1.as_array().unwrap().len(), 1);
 
         // 템플릿 멤버: 새 프로필(kind member)에 설정 · 도구 정책이 복사되고 표시값은 템플릿에서
@@ -446,7 +467,7 @@ mod tests {
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

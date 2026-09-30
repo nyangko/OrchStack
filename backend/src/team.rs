@@ -12,6 +12,8 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 const KINDS: [&str; 2] = ["orch", "project"];
 /// 허용되는 멤버 상태
 const STATUS: [&str; 5] = ["running", "waiting", "idle", "paused", "archived"];
+/// 허용되는 하위 작업 방식 (#67)
+const SPAWN: [&str; 3] = ["sub", "fork", "runner"];
 
 /// team · member 관련 경로 묶음
 pub fn routes() -> OpenApiRouter<DatabaseConnection> {
@@ -32,6 +34,12 @@ pub struct Team {
     daily_token_budget: Option<i64>,
     context_warn_percent: i64,
     max_concurrent_run: i64,
+    /// 하위 작업 기본 방식: sub | fork | runner
+    spawn_mode: String,
+    /// 허용 방식 (쉼표 구분)
+    spawn_allow: String,
+    /// 리드 Run 1개당 동시 하위 작업 수
+    max_child_run: i64,
     is_review_required: i64,
     /// before_merge | before_done
     review_stage: String,
@@ -47,7 +55,8 @@ impl From<tm::Model> for Team {
     fn from(m: tm::Model) -> Self {
         Self {
             sn: m.sn, name: m.name, kind: m.kind, daily_token_budget: m.daily_token_budget, context_warn_percent: m.context_warn_percent,
-            max_concurrent_run: m.max_concurrent_run, is_review_required: m.is_review_required, review_stage: m.review_stage,
+            max_concurrent_run: m.max_concurrent_run, spawn_mode: m.spawn_mode, spawn_allow: m.spawn_allow, max_child_run: m.max_child_run,
+            is_review_required: m.is_review_required, review_stage: m.review_stage,
             repo_scope: m.repo_scope, repo_permission: m.repo_permission, sort: m.sort, create_at: m.create_at, update_at: m.update_at,
         }
     }
@@ -104,6 +113,14 @@ struct TeamPatch {
     context_warn_percent: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_concurrent_run: Option<i64>,
+    /// sub | fork | runner
+    #[serde(skip_serializing_if = "Option::is_none")]
+    spawn_mode: Option<String>,
+    /// 쉼표 구분 (예: "sub,runner")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    spawn_allow: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_child_run: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     is_review_required: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -186,16 +203,30 @@ async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Team
     get(&db, sn).await.map(Json)
 }
 
-/// 팀 부분 수정 (TeamUpdated). 없으면 404
+/// 팀 부분 수정 (TeamUpdated). 없으면 404, 모르는 하위 작업 방식 · 허용 밖 기본 방식은 422
 #[utoipa::path(patch, path = "/teams/{sn}", params(("sn" = i64, Path, description = "팀 번호")), request_body = TeamPatch, responses((status = 200, body = Team), (status = "default", body = ErrorBody)))]
 async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<TeamPatch>) -> Res<Json<Team>> {
+    if b.spawn_mode.as_deref().is_some_and(|m| !SPAWN.contains(&m))
+        || b.spawn_allow.as_deref().is_some_and(|a| a.split(',').any(|m| !SPAWN.contains(&m)))
+        || b.max_child_run.is_some_and(|n| n < 1) {
+        return Err(Error::invalid(format!("spawn_mode · spawn_allow must be in {SPAWN:?}, max_child_run >= 1")));
+    }
     let out = event::run(&db, async |tx| {
+        let t = get(tx, sn).await?;
+        // 기본 방식은 허용 방식 안에 있어야 한다
+        let (mode, allow) = (b.spawn_mode.as_deref().unwrap_or(&t.spawn_mode), b.spawn_allow.as_deref().unwrap_or(&t.spawn_allow));
+        if !allow.split(',').any(|m| m == mode) {
+            return Err(Error::invalid(format!("spawn_mode {mode} is not in spawn_allow {allow}")));
+        }
         use tm::Column as C;
         let mut q = Tbl::update_many().filter(C::Sn.eq(sn)).col_expr(C::UpdateAt, Expr::cust("datetime('now')"));
         if let Some(v) = &b.name { q = q.col_expr(C::Name, v.clone().into()); }
         if let Some(v) = b.daily_token_budget { q = q.col_expr(C::DailyTokenBudget, v.into()); }
         if let Some(v) = b.context_warn_percent { q = q.col_expr(C::ContextWarnPercent, v.into()); }
         if let Some(v) = b.max_concurrent_run { q = q.col_expr(C::MaxConcurrentRun, v.into()); }
+        if let Some(v) = &b.spawn_mode { q = q.col_expr(C::SpawnMode, v.clone().into()); }
+        if let Some(v) = &b.spawn_allow { q = q.col_expr(C::SpawnAllow, v.clone().into()); }
+        if let Some(v) = b.max_child_run { q = q.col_expr(C::MaxChildRun, v.into()); }
         if let Some(v) = b.is_review_required { q = q.col_expr(C::IsReviewRequired, v.into()); }
         if let Some(v) = &b.review_stage { q = q.col_expr(C::ReviewStage, v.clone().into()); }
         if let Some(v) = &b.repo_scope { q = q.col_expr(C::RepoScope, v.clone().into()); }
