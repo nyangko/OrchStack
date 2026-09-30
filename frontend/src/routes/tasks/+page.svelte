@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	/// Tasks — 모든 프로젝트의 태스크 (.pen Tasks · 전체 태스크). 좌측 보기 · KPI · 필터 · 프로젝트별 표. 배정은 각 프로젝트 Orch가 한다.
 	import { goto } from '$app/navigation';
 	import Inbox from '@lucide/svelte/icons/inbox';
@@ -67,7 +68,8 @@
 	]);
 	let view = $state('all');
 	let f = $state<Filter>({ priorities: [] });
-	let query = $state('');
+	// 검색(⌘K)의 "Tasks에서 필터로 보기"는 ?q=로 검색어를 넘긴다.
+	let query = $state(page.url.searchParams.get('q') ?? '');
 	let sort = $state<'updated' | 'priority' | 'num'>('updated');
 	let folded = $state<number[]>([]);
 

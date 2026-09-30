@@ -301,6 +301,11 @@
 
 	// PM Dock — Orch 대화 (.pen ProjectPMChatDock). 서버 대화 API(#59) 전까지 화면 안에서만 유지한다.
 	let draft = $state('');
+	// 검색(⌘K) 명령에서 ?ask=로 오면 PM Dock 입력창에 채워 둔다 (보내기는 사용자가).
+	$effect(() => {
+		const ask = page.url.searchParams.get('ask');
+		if (ask) untrack(() => (draft = ask));
+	});
 	let chat = $state<Chat[]>(structuredClone(thread));
 	const now = () => new Date().toTimeString().slice(0, 5);
 	let threadEl = $state<HTMLElement>();
