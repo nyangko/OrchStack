@@ -25,6 +25,7 @@ pub struct ErrorBody {
 }
 
 /// HTTP 상태 + 에러 코드 + 설명
+#[derive(Debug)]
 pub struct Error(StatusCode, &'static str, String);
 
 impl Error {

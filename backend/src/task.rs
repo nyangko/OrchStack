@@ -1,7 +1,7 @@
 //! tbl_task CRUD + MoveTask. 쓰기는 event::run 경유 (TaskCreated · TaskUpdated · TaskMoved · TaskDeleted)
 use crate::{entity::tbl_task::{self as t, Entity as Tbl}, error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::next_num};
 use axum::{Json, extract::{Query, State}, http::StatusCode};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
@@ -169,22 +169,27 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
     Ok(Json(out))
 }
 
+/// 상태를 옮긴다 (표에 없는 전이는 409). MoveTask와 Run 명령이 함께 쓴다. (바뀐 태스크, 이전 상태)를 돌려준다
+pub async fn shift(tx: &DatabaseTransaction, sn: i64, to: &str) -> Res<(Task, String)> {
+    let cur = get(tx, sn).await?;
+    if !MOVES.contains(&(cur.status.as_str(), to)) {
+        return Err(Error::conflict(format!("cannot move {} -> {to}", cur.status)));
+    }
+    let mut q = Tbl::update_many().filter(t::Column::Sn.eq(sn))
+        .col_expr(t::Column::Status, to.to_owned().into()).col_expr(t::Column::UpdateAt, Expr::cust("datetime('now')"));
+    // 처음 시작한 시각 · 완료한 시각을 남긴다
+    if to == "in_progress" && cur.start_at.is_none() { q = q.col_expr(t::Column::StartAt, Expr::cust("datetime('now')")); }
+    if to == "done" { q = q.col_expr(t::Column::DoneAt, Expr::cust("datetime('now')")); }
+    q.exec(tx).await?;
+    Ok((get(tx, sn).await?, cur.status))
+}
+
 /// 상태 이동 (MoveTask → TaskMoved). 표에 없는 전이는 409, 없는 태스크는 404
 #[utoipa::path(post, path = "/tasks/{sn}/move", params(("sn" = i64, Path, description = "태스크 번호")), request_body = MoveBody, responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
 async fn mv(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<MoveBody>) -> Res<Json<Task>> {
     let out = event::run(&db, async |tx| {
-        let cur = get(tx, sn).await?;
-        if !MOVES.contains(&(cur.status.as_str(), b.status.as_str())) {
-            return Err(Error::conflict(format!("cannot move {} -> {}", cur.status, b.status)));
-        }
-        let mut q = Tbl::update_many().filter(t::Column::Sn.eq(sn))
-            .col_expr(t::Column::Status, b.status.clone().into()).col_expr(t::Column::UpdateAt, Expr::cust("datetime('now')"));
-        // 처음 시작한 시각 · 완료한 시각을 남긴다
-        if b.status == "in_progress" && cur.start_at.is_none() { q = q.col_expr(t::Column::StartAt, Expr::cust("datetime('now')")); }
-        if b.status == "done" { q = q.col_expr(t::Column::DoneAt, Expr::cust("datetime('now')")); }
-        q.exec(tx).await?;
-        let out = get(tx, sn).await?;
-        let ev = Ev::new(Some(out.project_sn), "task", sn, "TaskMoved", &json!({ "from": cur.status, "to": b.status }));
+        let (out, from) = shift(tx, sn, &b.status).await?;
+        let ev = Ev::new(Some(out.project_sn), "task", sn, "TaskMoved", &json!({ "from": from, "to": b.status }));
         Ok((out, vec![ev]))
     }).await?;
     Ok(Json(out))

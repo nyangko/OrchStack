@@ -130,6 +130,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{sn}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 1건 조회. 없으면 404 */
+        get: operations["read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{sn}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 승인 (ApproveRun → RunApproved). Run은 completed, 태스크는 done */
+        post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{sn}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 반려 (RejectRun → RunRejected). Run은 failed(rejected), 태스크는 in_progress로 돌아가고 tbl_review에 반려가 쌓인다 (round = 반려 횟수). 재실행은 retry */
+        post: operations["reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{sn}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 재시도 (RetryRun → RunStarted). failed · cancelled Run에서만, 기존 Run은 그대로 두고 새 Run을 만든다 */
+        post: operations["retry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{sn}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 리뷰 요청 (RequestReview → ReviewRequested). running Run과 in_progress 태스크가 함께 review로 간다 */
+        post: operations["review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{sn}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run의 Session 목록 (번호순) */
+        get: operations["sessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{sn}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run 중지 (StopRun → RunCancelled). 끝난 Run이면 409. 태스크 상태는 그대로 둔다 */
+        post: operations["stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{sn}": {
         parameters: {
             query?: never;
@@ -160,6 +279,24 @@ export interface paths {
         put?: never;
         /** 상태 이동 (MoveTask → TaskMoved). 표에 없는 전이는 409, 없는 태스크는 404 */
         post: operations["mv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{sn}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 태스크의 Run 목록 (번호순) */
+        get: operations["list"];
+        put?: never;
+        /** Run 시작 (StartRun → RunStarted). Run은 queued로 만들고 태스크는 in_progress. 담당 멤버가 없거나 진행 중 Run이 있으면 409 */
+        post: operations["start"];
         delete?: never;
         options?: never;
         head?: never;
@@ -270,6 +407,70 @@ export interface components {
             /** Format: int64 */
             sort?: number | null;
             status?: string | null;
+        };
+        /** @description 반려 요청 본문 */
+        RejectBody: {
+            /**
+             * Format: int64
+             * @description 리뷰한 멤버 (tbl_review.member_sn이 필수라 받는다)
+             */
+            member_sn: number;
+            /** @description 반려 사유 */
+            reason?: string | null;
+        };
+        /** @description Run (API 응답 형태) */
+        Run: {
+            branch?: string | null;
+            create_at: string;
+            end_at?: string | null;
+            fail_code?: string | null;
+            fail_detail?: string | null;
+            /** Format: int64 */
+            member_sn: number;
+            /**
+             * Format: int64
+             * @description 화면 표시 번호 (프로젝트 안에서 1부터)
+             */
+            num: number;
+            /** Format: int64 */
+            project_sn: number;
+            result_summary?: string | null;
+            /**
+             * Format: int64
+             * @description 재시도 대상인 이전 Run
+             */
+            retry_run_sn?: number | null;
+            /** Format: int64 */
+            sn: number;
+            start_at?: string | null;
+            /** @description orch | user | retry */
+            start_by: string;
+            /** @description queued | starting | running | waiting | review | completed | failed | cancelled */
+            status: string;
+            /** Format: int64 */
+            task_sn: number;
+        };
+        /** @description Session (API 응답 형태) */
+        Session: {
+            end_at?: string | null;
+            /** Format: int64 */
+            is_resumed: number;
+            /** Format: int64 */
+            member_sn: number;
+            /**
+             * Format: int64
+             * @description 멤버별 표시 번호
+             */
+            num: number;
+            provider_session_id?: string | null;
+            rotate_reason?: string | null;
+            /** Format: int64 */
+            run_sn: number;
+            /** Format: int64 */
+            sn: number;
+            start_at: string;
+            /** @description starting | active | stopped | failed */
+            status: string;
         };
         /** @description 태스크 (API 응답 형태) */
         Task: {
@@ -782,6 +983,220 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Run 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Run 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Run 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    retry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 재시도할 Run 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Run 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    sessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Run 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Run 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
                 /** @description 태스크 번호 */
                 sn: number;
             };
@@ -892,6 +1307,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 태스크 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 태스크 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
                 };
             };
             default: {
