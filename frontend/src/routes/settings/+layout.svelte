@@ -13,16 +13,15 @@
 
 	let { children } = $props();
 
-	// ready: 화면이 만들어진 메뉴만 링크 (나머지는 #76 하위 Task에서 채운다).
 	const menus = [
-		{ href: '/settings/general', label: '일반', icon: Settings, ready: true },
-		{ href: '/settings/connections', label: '모델 연결', icon: PlugZap, ready: true },
-		{ href: '/settings/skill-sources', label: '스킬 소스', icon: Sparkles, ready: true },
-		{ href: '/settings/runtimes', label: '실행기 (CLI)', icon: Terminal, ready: true },
+		{ href: '/settings/general', label: '일반', icon: Settings },
+		{ href: '/settings/connections', label: '모델 연결', icon: PlugZap },
+		{ href: '/settings/skill-sources', label: '스킬 소스', icon: Sparkles },
+		{ href: '/settings/runtimes', label: '실행기 (CLI)', icon: Terminal },
 		{ href: '/settings/presets', label: 'Instruction presets', icon: FileStack },
 		{ href: '/settings/report-forms', label: '보고서 양식', icon: FileText },
-		{ href: '/settings/notifications', label: '알림', icon: Bell, ready: true },
-		{ href: '/settings/security', label: '권한 · 보안', icon: Shield, ready: true }
+		{ href: '/settings/notifications', label: '알림', icon: Bell },
+		{ href: '/settings/security', label: '권한 · 보안', icon: Shield }
 	];
 </script>
 
@@ -31,22 +30,16 @@
 		<h2 class="px-2.5 pb-1.5 text-caption font-semibold text-muted-foreground">워크스페이스 설정</h2>
 		{#each menus as m (m.href)}
 			{@const on = page.url.pathname.startsWith(m.href)}
-			{#if m.ready}
-				<a
-					href={m.href}
-					aria-current={on ? 'page' : undefined}
-					class={cn(
-						'flex h-8.5 items-center gap-2.5 rounded-md px-2.5 text-body text-muted-foreground outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50',
-						on && 'bg-accent font-semibold text-foreground'
-					)}
-				>
-					<m.icon class="size-3.75" />{m.label}
-				</a>
-			{:else}
-				<span class="flex h-8.5 items-center gap-2.5 px-2.5 text-body text-muted-foreground opacity-50" aria-disabled="true" title="준비 중">
-					<m.icon class="size-3.75" />{m.label}
-				</span>
-			{/if}
+			<a
+				href={m.href}
+				aria-current={on ? 'page' : undefined}
+				class={cn(
+					'flex h-8.5 items-center gap-2.5 rounded-md px-2.5 text-body text-muted-foreground outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50',
+					on && 'bg-accent font-semibold text-foreground'
+				)}
+			>
+				<m.icon class="size-3.75" />{m.label}
+			</a>
 		{/each}
 	</nav>
 	<div class="min-w-0 flex-1 overflow-y-auto">

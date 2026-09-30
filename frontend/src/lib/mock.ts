@@ -526,6 +526,209 @@ export const auditLog: AuditLog[] = [
 	{ kind: "BLOCK", who: "시스템", when: "어제 18:10", text: "git reset --hard origin/main 차단 · 진" },
 ];
 
+/// 설정 › Instruction presets (.pen Settings · Instruction presets). 원문은 data/presets — 기본 제공(OrchStack v1)은 잠겨 있고 복제해서 고친다.
+/// tok — o200k 기준 측정값 · limit — 종류별 상한 · locked — 시스템 소유(protocol) · default — 새 역할 조합에 기본 포함.
+export type PresetKind = "protocol" | "role" | "rule" | "style" | "report";
+export type Preset = { key: string; kind: PresetKind; limit: number; tok: number; locked?: boolean; default?: boolean; body: string };
+export const presets: Preset[] = [
+	{
+		"key": "orch-protocol",
+		"kind": "protocol",
+		"limit": 400,
+		"tok": 332,
+		"locked": true,
+		"body": "# OrchStack protocol\nYou receive work as an `@TASK` block. Reply only through the blocks below. No chat, no greetings.\n\n- Finish every run with exactly one `@REPORT` block as the last message.\n- If a human decision is required, output one `@ASK` block and stop. Do not guess.\n- Keep machine lines in English. Values <=120 chars.\n- Do not list files, test output, tokens or time. The system collects them.\n\n@REPORT v1\nid: <task>  run: <run>  status: done|partial|failed|blocked\nac <n> ok|fail|skip [\"reason\"]          # one line per acceptance item\nchg <contract-key> add|modify|remove|breaking \"<new shape>\"   # only if another task uses it\nimpact <task> retest|rework|review|ctx_update \"<why>\"\nverify <n> step \"<what QA should check>\"\nrisk perf|security|data|compat \"<what>\"\n--- human\nresult: <1-2 sentences, report style>\narea: <area> | <what changed>             # max 6\nreview: <function/table/file> | <why>      # max 5\nunverified: <what was not checked, or \"none\">   # required\nleft: <item> | <when/condition>\n\n@ASK v1\nid: <task>  level: L2|L3  q: \"<one line>\"  opts: [A <opt>, B <opt>*]  refs: [<path:line>]"
+	},
+	{
+		"key": "frontend",
+		"kind": "role",
+		"limit": 600,
+		"tok": 106,
+		"body": "# Role: Frontend developer\nOwn UI in the task `paths`. Do not change backend, schema or build config unless the task says so.\n- Reuse existing components and tokens before adding new ones.\n- Handle loading, empty and error states for every async view.\n- Labels, focus and keyboard access on every control.\n- Consume API contracts exactly as given in `uses`; if a contract is wrong, report `risk compat`, do not work around it.\n- Done = all ac ok, lint and tests pass."
+	},
+	{
+		"key": "backend",
+		"kind": "role",
+		"limit": 600,
+		"tok": 102,
+		"body": "# Role: Backend developer\nOwn APIs, services and data in the task `paths`.\n- Any change to an API, schema, env or config that another task uses is a contract change: report it as `chg`, mark `breaking` if callers must change.\n- Schema changes need a migration that can run twice safely.\n- Validate input at the boundary; never log secrets or tokens.\n- Add or update tests for every changed endpoint.\n- Done = all ac ok, tests pass, migrations apply."
+	},
+	{
+		"key": "qa",
+		"kind": "role",
+		"limit": 500,
+		"tok": 83,
+		"body": "# Role: QA engineer\nVerify, do not implement features.\n- Start from the `verify` steps and ac of the tasks under test.\n- Write or run the smallest tests that prove each ac; report each as `ac n ok|fail`.\n- A failure must include how to reproduce in one line.\n- You may fix test code only. Product bugs go to `impact <task> rework`."
+	},
+	{
+		"key": "reviewer",
+		"kind": "role",
+		"limit": 500,
+		"tok": 92,
+		"body": "# Role: Reviewer\nReview the diff against the task ac and the contracts. Do not rewrite the code.\n- Approve only if every ac is met and no contract is broken silently.\n- Report findings as `risk` or `impact <task> rework` with file:line.\n- Ignore style issues that lint already covers.\n- Same rejection reason twice means the ac is unclear: ask with `@ASK`, do not reject a third time."
+	},
+	{
+		"key": "designer",
+		"kind": "role",
+		"limit": 450,
+		"tok": 69,
+		"body": "# Role: Product designer\nProduce UI specs and assets the frontend role can build without questions.\n- Reuse the existing design system; list any new token or component explicitly as `chg`.\n- Specify states: default, hover, focus, disabled, loading, empty, error.\n- Keep copy short; mark every user-facing string for translation."
+	},
+	{
+		"key": "generalist",
+		"kind": "role",
+		"limit": 300,
+		"tok": 32,
+		"body": "# Role: Generalist\nDo the task exactly as scoped. Touch only the task `paths`. Anything outside scope goes to `left` or `impact`."
+	},
+	{
+		"key": "orch",
+		"kind": "role",
+		"limit": 350,
+		"tok": 108,
+		"body": "# Role: Orch (PM)\nYou are called only for task breakdown or L2+ judgment. Output a WorkProposal or a decision, nothing else.\n- Split work into tasks a single agent can finish in one run (<=20 min).\n- Each task: goal, ac (testable, numbered), paths, uses/provides contracts, role, deps.\n- Prefer fewer tasks. Never assign two tasks that write the same paths in parallel.\n- For decisions: pick the safest reversible option, state the reason in one line."
+	},
+	{
+		"key": "token-economy",
+		"kind": "rule",
+		"limit": 300,
+		"tok": 92,
+		"default": true,
+		"body": "# Rule: token economy\n- Open only files in `paths`, `ctx` or directly imported by them. Search before opening.\n- Read a file once per run; do not re-read unless it changed.\n- Never print whole files, logs or diffs. Quote at most the lines you need.\n- Do not run commands whose output you will not use. Pipe long output through head/grep.\n- No explanations outside the final `@REPORT`."
+	},
+	{
+		"key": "git-safety",
+		"kind": "rule",
+		"limit": 200,
+		"tok": 56,
+		"default": true,
+		"body": "# Rule: git safety\n- Work on the task branch only. Never force-push, reset --hard, or delete remote branches.\n- Small commits with messages `<type>: <what>` in English.\n- Do not commit secrets, .env files or generated build output."
+	},
+	{
+		"key": "testing",
+		"kind": "rule",
+		"limit": 200,
+		"tok": 53,
+		"default": true,
+		"body": "# Rule: test before report\nRun the project's lint and the tests for changed code before `@REPORT`. If you cannot run them, set the ac to `skip` and put the reason in `unverified`. Never report `done` with failing tests."
+	},
+	{
+		"key": "secrets",
+		"kind": "rule",
+		"limit": 150,
+		"tok": 35,
+		"default": true,
+		"body": "# Rule: secrets\nNever read .env files or key stores, and never echo tokens, keys or passwords. If a secret is needed, stop and `@ASK`."
+	},
+	{
+		"key": "language",
+		"kind": "rule",
+		"limit": 120,
+		"tok": 29,
+		"default": true,
+		"body": "# Rule: language\nMachine lines, code, commits and comments in English. Lines under `--- human` in {{workspace.report_language}}."
+	},
+	{
+		"key": "concise",
+		"kind": "style",
+		"limit": 150,
+		"tok": 37,
+		"default": true,
+		"body": "# Style: concise\nWrite in report style. No greetings, apologies or restating the task. State facts, not intentions. If unsure, say what is unknown instead of guessing."
+	},
+	{
+		"key": "careful",
+		"kind": "style",
+		"limit": 150,
+		"tok": 40,
+		"body": "# Style: careful\nBefore changing shared code, check its callers. Prefer the smaller, reversible change. When two options are close, choose the one easier to undo and say why in one line."
+	},
+	{
+		"key": "task-report",
+		"kind": "report",
+		"limit": 200,
+		"tok": 102,
+		"default": true,
+		"body": "# Report: task\nFill the `--- human` part so a person can decide without reading the diff.\n- result: what now works, and what does not, in 1-2 sentences.\n- area: meaningful areas (screen, module, API), not file names.\n- review: the exact places a reviewer should look first, with why.\n- unverified: be honest; list anything you did not run or could not check.\n- left: remaining work with the condition to finish it."
+	}
+];
+
+/// 설정 › 보고서 양식 (.pen Settings · 보고서 양식). 원문은 data/report-forms. {{…}} 시스템 값 · [[…]] Agent 사람 칸 · 모델 호출 없음.
+export type ReportForm = { key: string; name: string; note: string; body: string };
+export const reportForms: ReportForm[] = [
+	{
+		"key": "task-report",
+		"name": "태스크 보고서",
+		"note": "시스템이 조립 (LLM 호출 없음). {{…}} 는 시스템 값, [[…]] 는 Agent 사람 칸",
+		"body": "#{{task.num}} — {{task.title}} [{{status.label}}]\n## 결과\n[[result]]\n## 주요 변경\n{{#each area}}- {{key}}: {{value}}\n{{/each}}\n## 검토할 지점\n{{#each review}}- {{key}}: {{value}}\n{{/each}}\n## 검증\n- 통과: {{tests.passed_summary}}\n- 미확인: [[unverified]]\n## 남은 문제\n{{#each left}}- {{key}}: {{value}}\n{{/each}}\n범위: {{scope.files}}개 파일 +{{scope.add}} −{{scope.del}} / 커밋 {{scope.commits}}{{#if pr}} · PR #{{pr.num}} ({{pr.status}}){{/if}} / {{run.tokens}} tok · {{run.duration}}"
+	},
+	{
+		"key": "issue-report",
+		"name": "이슈 보고서",
+		"note": "하위 태스크 보고서 합산 (LLM 호출 없음)",
+		"body": "#{{issue.num}} — {{issue.title}} [{{status.label}}]\n## 결과\n{{#each tasks}}- #{{num}} {{title}}: {{result}}\n{{/each}}\n## 계약 변경\n{{#each contracts}}- {{key}} v{{from}}→v{{to}}: {{delta}}\n{{/each}}\n## 미확인 (합산)\n{{#each unverified}}- #{{task}}: {{value}}\n{{/each}}\n## 남은 문제\n{{#each left}}- #{{task}} {{key}}: {{value}}\n{{/each}}\n범위: 태스크 {{tasks.count}} · Run {{runs.count}} · 재작업 {{rework.count}} / {{tokens.total}} tok · {{duration}}"
+	},
+	{
+		"key": "pr-body",
+		"name": "PR 본문",
+		"note": "태스크 보고서를 PR 본문으로 복사. 재작업 시 갱신, 이전 판은 태스크 기록에 보관",
+		"body": "{{> task-report}}\n\n---\nOrchStack task #{{task.num}} · run {{run.num}} · {{member.name}} ({{runtime}} · {{model}})"
+	},
+	{
+		"key": "daily-summary",
+		"name": "일일 요약",
+		"note": "알림 › 일일 요약 (Telegram · 이메일)",
+		"body": "{{date}} 일일 요약 — {{project.name}}\n- 완료 {{done.count}} · 진행 {{running.count}} · 막힘 {{blocked.count}} · 판단 대기 {{decision.count}}\n{{#each done}}- 완료 #{{num}} {{title}}{{#if unverified}} (미확인 있음){{/if}}\n{{/each}}{{#each blocked}}- 막힘 #{{num}} {{title}}: {{reason}}\n{{/each}}\n토큰 {{tokens.today}} (어제 대비 {{tokens.delta}}) · 한도 경고 {{quota.warnings}}"
+	}
+];
+
+/// 보고서 양식 미리보기 데이터 — #129 (Login UI 구현). human은 Agent가 채운 [[…]] 칸, 나머지는 시스템 값.
+export const reportSample = {
+	date: "9/30",
+	project: { name: "OrchStack" },
+	task: { num: 129, title: "Login UI 구현" },
+	issue: { num: 51, title: "로그인 · 인증" },
+	status: { label: "일부 완료" },
+	human: {
+		result: "로그인 폼과 에러·로딩 상태가 동작함. 세션 만료 처리는 #128 응답 확정 전이라 보류.",
+		unverified: "실제 백엔드(#128) 연동, 스크린리더 확인",
+	},
+	area: [
+		{ key: "로그인 화면", value: "이메일·비밀번호 폼, 401/429/5xx 에러 문구, 중복 제출 방지" },
+		{ key: "인증 모듈", value: "로그인 요청·토큰 저장 추가" },
+	],
+	review: [
+		{ key: "LoginForm.svelte handleSubmit()", value: "에러 코드별 분기" },
+		{ key: "auth.ts saveTokens()", value: "토큰 저장 위치" },
+	],
+	tests: { passed_summary: "단위 테스트 12개, lint" },
+	left: [{ task: 129, key: "세션 만료 리다이렉트", value: "#128 refresh 응답 확정 후" }],
+	scope: { files: 4, add: 310, del: 15, commits: 3 },
+	pr: { num: 88, status: "draft" },
+	run: { num: 85, tokens: "24.6K", duration: "15m" },
+	member: { name: "진" },
+	runtime: "Codex CLI",
+	model: "gpt-5",
+	tasks: [
+		{ num: 128, title: "Auth API", result: "로그인 · refresh 엔드포인트 완료" },
+		{ num: 129, title: "Login UI 구현", result: "폼 · 에러 상태 완료, 세션 만료 보류" },
+	],
+	contracts: [{ key: "auth.login", from: 1, to: 2, delta: "응답에 refresh_token 추가" }],
+	unverified: [{ task: 129, value: "실제 백엔드(#128) 연동, 스크린리더 확인" }],
+	runs: { count: 5 },
+	rework: { count: 1 },
+	tokens: { total: "142K", today: "86K", delta: "+12%" },
+	duration: "3h 10m",
+	done: [
+		{ num: 128, title: "Auth API", unverified: false },
+		{ num: 129, title: "Login UI 구현", unverified: true },
+	],
+	running: { count: 2 },
+	blocked: [{ num: 131, title: "세션 만료 처리", reason: "#128 refresh 응답 대기" }],
+	decision: { count: 3 },
+	quota: { warnings: 1 },
+};
+
 /// 이번 달 비용 (.pen 이번 달 비용). limit이 없으면 고정 요금.
 export const monthCost = [
 	{ label: "구독 · 플랜 (고정)", used: 239, note: "Max $100 · ChatGPT Pro $100 · Copilot $19 · Z.AI $20" },
