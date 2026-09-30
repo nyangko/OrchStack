@@ -6,7 +6,11 @@ mod error; // 공통 에러 응답
 mod project; // /projects CRUD
 
 use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
+use utoipa::OpenApi;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DbBackend, DbErr, Statement, TransactionTrait};
+use serde::Serialize;
+#[cfg(test)]
 use serde_json::{Value, json};
 
 // 스키마 원본. 빌드할 때 파일 내용을 바이너리에 포함한다
@@ -34,22 +38,48 @@ async fn connect(opt: ConnectOptions) -> Result<DatabaseConnection, DbErr> {
     Ok(db)
 }
 
-/// 전체 라우터. 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
+/// API 문서 머리말
+#[derive(OpenApi)]
+#[openapi(info(title = "OrchStack API", version = "0.1.0"))]
+struct Doc;
+
+/// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
+fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).split_for_parts()
+}
+
+/// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
 fn app(db: DatabaseConnection) -> Router {
-    Router::new().route("/health", get(health)).merge(project::routes()).with_state(db)
+    let (router, doc) = api();
+    router.route("/openapi.json", get(move || async move { Json(doc) })).with_state(db)
+}
+
+/// health 응답
+#[derive(Serialize, utoipa::ToSchema)]
+struct Health {
+    /// ok | error
+    status: &'static str,
+    /// ok | down
+    db: &'static str,
 }
 
 /// 서버와 DB가 살아 있는지 확인한다 (DB 연결이 끊기면 503)
-async fn health(State(db): State<DatabaseConnection>) -> (StatusCode, Json<Value>) {
+#[utoipa::path(get, path = "/health", responses((status = 200, body = Health), (status = 503, body = Health)))]
+async fn health(State(db): State<DatabaseConnection>) -> (StatusCode, Json<Health>) {
     match db.ping().await {
-        Ok(()) => (StatusCode::OK, Json(json!({ "status": "ok", "db": "ok" }))),
-        Err(_) => (StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "status": "error", "db": "down" }))),
+        Ok(()) => (StatusCode::OK, Json(Health { status: "ok", db: "ok" })),
+        Err(_) => (StatusCode::SERVICE_UNAVAILABLE, Json(Health { status: "error", db: "down" })),
     }
 }
 
 /// 환경변수로 설정을 읽고 서버를 시작한다
 #[tokio::main]
 async fn main() {
+    // `orchstack-backend openapi` : 서버를 띄우지 않고 OpenAPI JSON만 출력한다 (프론트 타입 생성용)
+    if std::env::args().nth(1).as_deref() == Some("openapi") {
+        println!("{}", api().1.to_pretty_json().unwrap());
+        return;
+    }
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://orchstack.db?mode=rwc".into());
     let addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".into());
     let db = connect(ConnectOptions::new(url)).await.expect("db connect failed");
@@ -103,6 +133,17 @@ mod tests {
         assert_eq!(call(&app, "GET", &format!("/projects/{sn}"), None).await.1["name"], "Renamed");
         assert_eq!(call(&app, "DELETE", &format!("/projects/{sn}"), None).await.0, StatusCode::NO_CONTENT);
         assert_eq!(call(&app, "GET", &format!("/projects/{sn}"), None).await.0, StatusCode::NOT_FOUND);
+    }
+
+    /// 문서에 모든 경로와 공통 에러 스키마가 있다
+    #[tokio::test]
+    async fn openapi() {
+        let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
+        assert_eq!(st, StatusCode::OK);
+        for path in ["/health", "/projects", "/projects/{sn}"] {
+            assert!(v["paths"][path].is_object(), "{path}");
+        }
+        assert!(v["components"]["schemas"]["ErrorBody"].is_object());
     }
 
     /// 실패는 전부 { error, message } JSON이어야 한다

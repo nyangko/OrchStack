@@ -9,10 +9,20 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use sea_orm::{DbErr, SqlErr};
-use serde_json::json;
+use serde::Serialize;
+use utoipa::ToSchema;
 
 /// 핸들러 반환 형태
 pub type Res<T> = Result<T, Error>;
+
+/// 에러 응답 본문 (OpenAPI 공통 에러 스키마)
+#[derive(Serialize, ToSchema)]
+pub struct ErrorBody {
+    /// 에러 코드 (예: not_found, invalid_ref)
+    error: &'static str,
+    /// 사람이 읽는 설명
+    message: String,
+}
 
 /// HTTP 상태 + 에러 코드 + 설명
 pub struct Error(StatusCode, &'static str, String);
@@ -26,7 +36,7 @@ impl Error {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        (self.0, Json(json!({ "error": self.1, "message": self.2 }))).into_response()
+        (self.0, Json(ErrorBody { error: self.1, message: self.2 })).into_response()
     }
 }
 
