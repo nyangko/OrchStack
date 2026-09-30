@@ -16,6 +16,8 @@
 		status?: TaskStatus;
 		badge?: string;
 		meta?: string;
+		/** 리드 토큰 (K) — 자기 사용량 + 하위 runner 합계 (.pen TokenMeter lead). */
+		tokens?: { self: number; runner: number };
 		/** 머리 줄 … 메뉴 항목 (.pen Node Menu). */
 		menu?: { label: string; onSelect: () => void }[];
 	};
@@ -39,6 +41,7 @@
 	import { StatusBadge } from "$lib/components/ui/status-badge";
 	import { RoleAvatar } from "$lib/components/ui/role-avatar";
 	import { RuntimeLogo } from "$lib/components/ui/runtime-logo";
+	import TokenMeter from "./token-meter.svelte";
 	import { cn } from "$lib/utils";
 
 	let { data, selected }: NodeProps<Node<DiagramNodeData>> = $props();
@@ -88,6 +91,7 @@
 		{/if}
 	</div>
 	<p class="text-sm leading-tight font-semibold">{data.title}</p>
+	{#if data.tokens}<TokenMeter self={data.tokens.self} runner={data.tokens.runner} />{/if}
 	{#if data.who}
 		<div class="flex items-center gap-1.5 text-xs">
 			<RoleAvatar role={data.who.role} size="sm" />

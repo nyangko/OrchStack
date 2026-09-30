@@ -760,6 +760,68 @@ export const notices: Notice[] = [
 	{ id: 6, kind: "pr", who: "Orch", title: "PR #86 병합 · #121 Signup UI", desc: "tests 12/12 · 하린에게 QA 배정", when: "9/26", group: "이번 주", task: 121 },
 ];
 
+/// 하위 작업 (#67 · .pen Diagram · 하위 작업). 리드 Run 안에서 나눈 작업 — runner는 별도 Run, sub · fork는 리드 Run 안.
+/// tier는 규칙 엔진이 kind로 정한다 (리드가 고르지 않음). paths from — orig: 처음 받음 · ask: @ASK로 추가 · bad: 범위 밖 변경.
+/// runs — runner의 Run들 (재시도 전 Run 포함), 토큰 K. 토큰은 Run별로 저장하고 화면에서만 합친다.
+export type SubRunTier = "S" | "M" | "L";
+export type SubRun = {
+	id: string;
+	task: number;
+	/** 리드 멤버 sn · 리드 Run 번호. */
+	lead: number;
+	leadRun: number;
+	mode: "sub" | "fork" | "runner";
+	kind: "explore" | "search" | "format" | "test" | "implement" | "fix" | "design" | "review" | "debug";
+	tier?: SubRunTier;
+	goal: string;
+	status: "running" | "done" | "failed" | "queued";
+	model?: string;
+	minutes?: number;
+	runs: { num: number; tokens: number; tier?: SubRunTier }[];
+	/** 재시도로 등급이 오른 경우. */
+	retry?: { from: SubRunTier; to: SubRunTier };
+	paths: { path: string; from: "orig" | "ask" | "bad"; at?: string }[];
+	ac: { text: string; ok: boolean }[];
+	report?: string;
+	/** paths가 겹쳐 순서를 기다리는 하위 작업과 겹친 경로. */
+	waits?: { id: string; glob: string };
+	workdir: { mode: "repo" | "worktree"; path?: string; branch: string };
+};
+/// 리드 Run의 자기 사용량 (K) — 하위 runner 합계는 subRuns에서 더한다.
+export const leadRuns: Record<number, { run: number; self: number }> = { 129: { run: 81, self: 10 } };
+export const subRuns: SubRun[] = [
+	{ id: "T129.1", task: 129, lead: 1, leadRun: 81, mode: "runner", kind: "implement", tier: "M", goal: "LoginForm 컴포넌트 구현", status: "running", model: "gpt-5 · Effort Auto", minutes: 6,
+		runs: [{ num: 82, tokens: 18.4 }],
+		paths: [{ path: "login/LoginForm.svelte", from: "orig" }, { path: "lib/ui/Input.svelte", from: "orig" }, { path: "src/api/auth.ts", from: "ask", at: "14:02" }],
+		ac: [{ text: "이메일 · 비밀번호 입력에 label 연결", ok: true }, { text: "제출 중 버튼 비활성 + 스피너", ok: false }, { text: "pnpm lint · check 통과", ok: false }],
+		report: "@REPORT T129.1 · 진행 중 · 폼 마크업 완료, 제출 상태 작업 중", workdir: { mode: "repo", branch: "feat/129-login-form" } },
+	{ id: "T129.2", task: 129, lead: 1, leadRun: 81, mode: "runner", kind: "search", tier: "S", goal: "에러 코드별 문구 정리", status: "done", model: "gpt-5-mini", minutes: 4,
+		runs: [{ num: 83, tokens: 9.1 }],
+		paths: [{ path: "lib/auth/errors.ts", from: "orig" }],
+		ac: [{ text: "401 · 429 · 5xx 문구", ok: true }, { text: "i18n 키로 분리", ok: true }],
+		report: "@REPORT T129.2 · 완료 · 문구 5개 · 키 lib/auth/errors.ts", workdir: { mode: "repo", branch: "feat/129-login-form" } },
+	{ id: "T129.4", task: 129, lead: 1, leadRun: 81, mode: "runner", kind: "implement", tier: "M", goal: "Input 에러 상태 추가", status: "queued", model: "gpt-5",
+		runs: [],
+		paths: [{ path: "lib/ui/Input.svelte", from: "orig" }, { path: "src/api/errors.ts", from: "orig" }],
+		ac: [{ text: "aria-invalid · 설명 연결", ok: false }, { text: "에러 색 토큰 사용", ok: false }],
+		waits: { id: "T129.1", glob: "src/api/*" }, workdir: { mode: "repo", branch: "feat/129-login-form" } },
+	{ id: "T129.3", task: 129, lead: 1, leadRun: 81, mode: "sub", kind: "search", goal: "기존 Input 사용처 조사", status: "done", minutes: 2,
+		runs: [],
+		paths: [],
+		ac: [{ text: "사용처 목록", ok: true }, { text: "props 차이 정리", ok: true }],
+		report: "@REPORT T129.3 · 완료 · 사용처 7곳", workdir: { mode: "repo", branch: "feat/129-login-form" } },
+	{ id: "T129.6", task: 129, lead: 1, leadRun: 81, mode: "runner", kind: "test", tier: "M", goal: "E2E 로그인 시나리오", status: "failed", model: "gpt-5 · Effort Auto", minutes: 11,
+		runs: [{ num: 84, tokens: 6.0, tier: "S" }, { num: 85, tokens: 22.0, tier: "M" }], retry: { from: "S", to: "M" },
+		paths: [{ path: "e2e/login.spec.ts", from: "orig" }, { path: "e2e/fixtures/user.ts", from: "orig" }, { path: "src/x.ts", from: "bad" }],
+		ac: [{ text: "로그인 성공 시나리오 통과", ok: true }, { text: "잘못된 비밀번호 안내 문구 확인", ok: false }, { text: "pnpm test:e2e 통과", ok: false }],
+		report: "@REPORT T129.6 · 실패 · paths 밖 파일(src/x.ts)을 고쳐 규칙 엔진이 중단", workdir: { mode: "worktree", path: ".orch/wt/T129.6", branch: "feat/129-e2e-login" } },
+	{ id: "T129.5", task: 129, lead: 1, leadRun: 81, mode: "fork", kind: "design", goal: "에러 문구 톤 가이드 초안", status: "running", minutes: 5,
+		runs: [],
+		paths: [{ path: "docs/tone.md", from: "orig" }, { path: "lib/auth/errors.ts", from: "orig" }],
+		ac: [{ text: "톤 규칙 5줄", ok: false }],
+		workdir: { mode: "repo", branch: "feat/129-login-form" } },
+];
+
 /// 이번 달 비용 (.pen 이번 달 비용). limit이 없으면 고정 요금.
 export const monthCost = [
 	{ label: "구독 · 플랜 (고정)", used: 239, note: "Max $100 · ChatGPT Pro $100 · Copilot $19 · Z.AI $20" },

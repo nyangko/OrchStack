@@ -37,6 +37,7 @@
 	import * as Alert from '$lib/components/ui/alert';
 	import Link2 from '@lucide/svelte/icons/link-2';
 	import X from '@lucide/svelte/icons/x';
+	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import Square from '@lucide/svelte/icons/square';
 	import MessageCircleQuestion from '@lucide/svelte/icons/message-circle-question';
 	import Check from '@lucide/svelte/icons/check';
@@ -49,6 +50,17 @@
 	import { SvelteFlow, Background, BackgroundVariant, Controls, Panel, MarkerType, type Node, type Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import DiagramNode, { type DiagramNodeData } from '$lib/components/orch/diagram/diagram-node.svelte';
+	import SubRunNode, { subRunStatus, subRunMode, tierTone } from '$lib/components/orch/diagram/sub-run-node.svelte';
+	import TokenMeter from '$lib/components/orch/diagram/token-meter.svelte';
+	import FolderTree from '@lucide/svelte/icons/folder-tree';
+	import FileCode from '@lucide/svelte/icons/file-code';
+	import FilePlus from '@lucide/svelte/icons/file-plus';
+	import FileX from '@lucide/svelte/icons/file-x';
+	import Split from '@lucide/svelte/icons/split';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
+	import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { DragDropProvider } from '@dnd-kit-svelte/svelte';
 	import { move } from '@dnd-kit/helpers';
 	import KanbanCard from '$lib/components/orch/kanban/kanban-card.svelte';
@@ -67,7 +79,7 @@
 	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
 	import { statuses, statusOrder, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
-	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, type Issue, type Chat } from '$lib/mock';
+	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, type Issue, type Chat, type SubRun } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
 	import { cn } from '$lib/utils';
 
@@ -108,6 +120,7 @@
 		selected = num;
 		detail = true;
 		inspect = undefined;
+		subSel = undefined;
 		issueSel = undefined;
 	}
 	const count = (s: TaskStatus) => list.filter((t) => t.status === s).length;
@@ -174,8 +187,20 @@
 
 	// Diagram (.pen #26 Workbench / Diagram) — 3열: Project → Orch → Issue / Task / Agent. 사용자 배치 저장은 #59.
 	// 1열은 관계 순서대로 둔다 (프로젝트의 PM이 이슈를 위임). .pen은 Project · Issue · Orch 순이라 흐름이 거꾸로 읽혔다.
-	const col = [0, 260, 520];
-	const nodeTypes = { diagram: DiagramNode };
+	// 4 · 5열은 리드의 하위 작업 (#67)
+	const col = [0, 260, 520, 780, 1020];
+	const nodeTypes = { diagram: DiagramNode, subrun: SubRunNode };
+	// 하위 작업 (.pen Diagram · 하위 작업) — 리드 토큰은 자기 사용량 + runner Run 합계 (재시도 전 Run 포함).
+	const runnerTotal = (task: number) => subRuns.filter((s) => s.task === task && s.mode === 'runner').reduce((n, s) => n + s.runs.reduce((m, r) => m + r.tokens, 0), 0);
+	let subSel = $state<string>();
+	const subCur = $derived(subRuns.find((s) => s.id === subSel));
+	/// 하위 작업 카드 열기 — 다른 카드 · 상세는 닫는다.
+	function openSub(id: string) {
+		detail = false;
+		issueSel = undefined;
+		inspect = undefined;
+		subSel = id;
+	}
 	/// 태스크 노드 데이터. 상태가 바뀌면 다시 계산한다.
 	function taskData(num: number): DiagramNodeData {
 		const t = task(num);
@@ -202,39 +227,45 @@
 	/// 에이전트 노드 데이터.
 	function agentData(sn: number, ctx: string): DiagramNodeData {
 		const a = agentOf(sn)!;
+		const lead = subRuns.filter((s) => s.lead === sn);
+		const leadTask = lead[0]?.task;
 		return {
+			...(leadTask && { tokens: { self: leadRuns[leadTask].self, runner: runnerTotal(leadTask) } }),
 			kind: 'agent',
 			ref: roles[a.role].label.toUpperCase(),
 			title: a.name,
 			who: { role: a.role, name: a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI', runtime: a.runtime },
 			badge: a.activity.split(' · ')[0],
-			meta: `ctx ${ctx}`
+			meta: lead.length ? `sub-run ${lead.length} · ctx ${ctx}` : `ctx ${ctx}`
 		};
 	}
 	const diagramTasks = [128, 129, 130, 131];
 	// #131은 소라보다 조금 위 — 완료 보고 선(소라 아래 → Orch)의 라벨이 카드에 가리지 않게
 	const taskY = [0, 228, 457, 630];
-	let nodes = $state.raw<Node<DiagramNodeData>[]>([
+	let nodes = $state.raw<(Node<DiagramNodeData> | Node<SubRun>)[]>([
 		{ id: 'project', type: 'diagram', position: { x: col[0], y: 0 }, data: { kind: 'project', ref: 'PROJECT', title: 'OrchStack', badge: 'Active', meta: 'Core Team' } },
 		{ id: 'issue-51', type: 'diagram', position: { x: col[0], y: 360 }, data: { kind: 'issue', ref: 'ISSUE #51', title: 'Authentication Flow 개선', progress: { value: 29, text: '86K / 300K tok' }, badge: 'In Progress' } },
 		{ id: 'orch', type: 'diagram', position: { x: col[0], y: 140 }, data: { kind: 'orch', ref: 'ORCH · PM', title: 'Orch', who: { role: 'orch', name: 'Project Manager', runtime: 'claude', model: 'claude-opus-5.5' }, alert: { text: '판단 대기 3 · 제안 4초 후 진행', tone: 'warning' }, badge: 'Auto · 5초', meta: '자동 3/10' } },
 		...diagramTasks.map((n, i) => ({ id: `task-${n}`, type: 'diagram', position: { x: col[1], y: taskY[i] }, data: taskData(n) })),
 		...[[2, '92%', 0], [1, '32%', 228], [3, '12%', 457], [4, '6%', 660], [5, '20%', 862]].map(([sn, ctx, y]) => ({
 			id: `agent-${sn}`, type: 'diagram', position: { x: col[2], y: y as number }, data: agentData(sn as number, ctx as string)
-		}))
+		})),
+		// 진(#129)의 하위 작업 — 2열 · 행마다 리드 옆부터
+		...subRuns.map((s, i) => ({ id: `sub-${s.id}`, type: 'subrun', position: { x: col[3 + (i % 2)], y: 228 + Math.floor(i / 2) * 190 }, data: s }))
 	]);
 	// 연결선 종류별 색 (.pen Workbench/EdgeLegend). 라벨은 .pen EdgeLabel 칩 모양.
-	const stroke = { contains: 'var(--input)', delegate: 'var(--primary)', assigned: 'var(--node-agent)', idle: 'var(--status-review)', live: 'var(--primary)' };
+	const stroke = { contains: 'var(--input)', delegate: 'var(--primary)', assigned: 'var(--node-agent)', idle: 'var(--status-review)', live: 'var(--primary)', spawn: 'var(--node-agent)', waits: 'var(--subtle-foreground)' };
 	const chip = (live = false) =>
 		`font: 600 10px var(--font-mono); padding: 2px 6px; border-radius: 4px; border: 1px solid ${live ? 'var(--primary)' : 'var(--border)'}; background: ${live ? 'var(--primary)' : 'var(--card)'}; color: ${live ? 'var(--primary-foreground)' : 'var(--status-review)'};`;
 	/// 연결선 하나.
-	function link(id: string, source: string, target: string, kind: keyof typeof stroke, label?: string, handles = ['r', 'l']): Edge {
+	function link(id: string, source: string, target: string, kind: keyof typeof stroke, label?: string, handles = ['r', 'l'], dashed = false): Edge {
 		return {
 			id, source, target, sourceHandle: handles[0], targetHandle: handles[1], type: 'smoothstep', label,
 			animated: kind === 'live',
 			// 방향: 누가 누구에게 (위임 · 배정 · 요청 · 보고)
 			markerEnd: { type: MarkerType.ArrowClosed, color: stroke[kind], width: 16, height: 16 },
-			style: `stroke: ${stroke[kind]}; stroke-width: ${kind === 'live' ? 3 : 1.5};`,
+			// spawn(sub · fork) · waits는 점선
+			style: `stroke: ${stroke[kind]}; stroke-width: ${kind === 'live' ? 3 : 1.5};${dashed ? ' stroke-dasharray: 5 4;' : ''}`,
 			labelStyle: label ? chip(kind === 'live') : undefined
 		};
 	}
@@ -248,7 +279,9 @@
 		link('e-131', 'task-131', 'agent-4', 'assigned'),
 		link('e-verify', 'agent-1', 'agent-3', 'live', '검증 요청 · 진행 중', ['b', 't']),
 		link('e-review', 'agent-3', 'agent-4', 'idle', '리뷰 요청', ['b', 't']),
-		link('e-report', 'agent-4', 'orch', 'idle', '완료 보고', ['b', 'l'])
+		link('e-report', 'agent-4', 'orch', 'idle', '완료 보고', ['b', 'l']),
+		...subRuns.map((s, i) => link(`e-spawn-${s.id}`, `agent-${s.lead}`, `sub-${s.id}`, 'spawn', i ? undefined : 'spawn', ['r', 'l'], s.mode !== 'runner')),
+		...subRuns.filter((s) => s.waits).map((s) => link(`e-waits-${s.id}`, `sub-${s.id}`, `sub-${s.waits!.id}`, 'waits', `queued · waits ${s.waits!.id} · ${s.waits!.glob}`, ['t', 'b'], true))
 	]);
 	// 태스크 상태 · 선택이 바뀌면 노드에 반영한다 (위치는 유지).
 	$effect(() => {
@@ -291,6 +324,7 @@
 	function openAgent(sn: number) {
 		detail = false;
 		issueSel = undefined;
+		subSel = undefined;
 		inspect = sn;
 	}
 	/// 실행 중 지시 보내기 (.pen RuntimeInstructionComposer). 서버 전송은 #59, 지금은 활동 기록에만 남긴다.
@@ -673,6 +707,7 @@
 							if (node.id.startsWith('task-')) open(Number(node.id.slice(5)));
 							else if (node.id.startsWith('issue-')) openIssue(Number(node.id.slice(6)));
 							else if (node.id.startsWith('agent-')) openAgent(Number(node.id.slice(6)));
+							else if (node.id.startsWith('sub-')) openSub(node.id.slice(4));
 						}}
 						class="bg-canvas"
 					>
@@ -681,7 +716,7 @@
 						<Controls position="bottom-right" showLock={false} />
 						<Panel position="bottom-left">
 							<div class="flex items-center gap-3 rounded-md border bg-card px-2.5 py-1.5 text-xs text-muted-foreground" aria-label="연결선 범례">
-								{#each [['contains', 'bg-input', 'h-0.5'], ['delegate', 'bg-primary', 'h-0.5'], ['assigned', 'bg-node-agent', 'h-0.5'], ['interaction (idle)', 'bg-status-review', 'h-0.5'], ['live event', 'bg-primary', 'h-0.75']] as [l, bg, h] (l)}
+								{#each [['contains', 'bg-input', 'h-0.5'], ['delegate', 'bg-primary', 'h-0.5'], ['assigned', 'bg-node-agent', 'h-0.5'], ['interaction (idle)', 'bg-status-review', 'h-0.5'], ['live event', 'bg-primary', 'h-0.75'], ['spawn', 'bg-node-agent', 'h-0.5'], ['queued · waits', 'bg-subtle-foreground', 'h-0.5']] as [l, bg, h] (l)}
 									<span class="flex items-center gap-1.5"><span class={cn('w-3.5 rounded-full', bg, h)}></span>{l}</span>
 								{/each}
 							</div>
@@ -942,6 +977,109 @@
 								</section>
 							</aside>
 						</div>
+					</div>
+				</div>
+			{/if}
+			{#if subCur}
+				{@const s = subCur}
+				{@const st = subRunStatus[s.status]}
+				{@const md = subRunMode[s.mode]}
+				{@const lt = list.find((t) => t.num === s.task)}
+				{@const bad = s.paths.filter((p) => p.from === 'bad')}
+				{@const cur = s.runs.at(-1)}
+				<!-- Inspector 한 줄 (.pen Inspector/ValueRow) -->
+				{#snippet row(Icon: typeof Cpu, l: string, v: string)}
+					<div class="flex h-7 items-center gap-2"><Icon class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">{l}</span><span class="font-medium">{v}</span></div>
+				{/snippet}
+				<!-- 하위 작업 카드: 뷰 오른쪽 (.pen SubRun Inspector Card, 340px) -->
+				<div role="dialog" aria-modal="false" aria-label="하위 작업 {s.id}" class="absolute top-4 right-4 bottom-4 z-10 flex w-85 flex-col overflow-hidden rounded-xl border bg-card shadow-lg">
+					<header class="flex flex-col gap-2.5 border-b p-4">
+						<div class="flex items-center gap-2.5">
+							<span class={cn('flex size-7 shrink-0 items-center justify-center rounded-sm text-on-solid', md.tile)}><md.icon class="size-4" /></span>
+							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
+								<span class="flex items-center gap-1.5 font-mono text-caption font-semibold text-muted-foreground">
+									{s.mode.toUpperCase()} · {s.id}
+									{#if s.tier}<span class={cn('flex items-center gap-0.5 rounded-xs px-1.5 font-mono text-2xs font-bold', tierTone[s.tier])}><Cpu class="size-2.5" />{s.tier}</span>{/if}
+								</span>
+								<span class="text-sm font-semibold">{s.goal}</span>
+							</div>
+							<Button variant="ghost" size="icon-sm" aria-label="하위 작업 카드 닫기" onclick={() => (subSel = undefined)}><X /></Button>
+						</div>
+						<div class="flex items-center gap-2 text-caption text-muted-foreground">
+							<span class={cn('flex items-center gap-1 rounded-full px-2 py-0.5 font-medium', st.tone)}><st.icon class={cn('size-3', s.status === 'running' && 'animate-spin motion-reduce:animate-none')} />{st.label}</span>
+							<span class="flex-1 truncate">{agentName(s.lead)}이 spawn · #{s.task} {lt?.title}</span>
+							<Button variant="ghost" size="icon-sm" class="bg-destructive-soft text-destructive" aria-label="하위 작업 중지" disabled={s.status !== 'running'}><Square /></Button>
+						</div>
+					</header>
+					<div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+						<section class="flex flex-col gap-0.5 border-b px-4 py-3 text-xs">
+							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">SUB-RUN</h3>
+							{@render row(Split, 'mode', { runner: 'runner · 별도 Run', sub: 'sub · 리드 Run 안', fork: 'fork · 부모 컨텍스트 상속' }[s.mode])}
+							{@render row(Play, '시작', `리드 Run #${s.leadRun}`)}
+							{#if s.retry}
+								<div class="flex h-7 items-center gap-2">
+									<RotateCcw class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">재시도</span>
+									<span class="flex items-center gap-1 font-medium">Run #{s.runs[0].num}<ArrowRight class="size-3" /><span class="text-muted-foreground">등급</span>
+										<span class={cn('rounded-xs px-1.5 font-mono text-2xs font-bold', tierTone[s.retry.from])}>{s.retry.from}</span><ArrowRight class="size-3" /><span class={cn('rounded-xs px-1.5 font-mono text-2xs font-bold', tierTone[s.retry.to])}>{s.retry.to}</span>
+									</span>
+								</div>
+							{/if}
+							{#if s.tier}{@render row(Gauge, 'tier', `${s.tier} · ${s.retry ? `재시도로 ${s.retry.from}에서 올림` : `kind ${s.kind} → 규칙 엔진`}`)}{/if}
+							{#if s.model}{@render row(Cpu, 'model', s.model)}{/if}
+							{@render row(Timer, '소요', s.status === 'queued' ? '대기 중' : `${s.minutes}m`)}
+						</section>
+						<section class="flex flex-col gap-1 border-b px-4 py-3 text-xs">
+							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">
+								PATHS · {s.paths.length - bad.length}{#if bad.length} · 범위 위반{:else if s.paths.some((p) => p.from === 'ask')} · 처음 {s.paths.filter((p) => p.from === 'orig').length} + @ASK {s.paths.filter((p) => p.from === 'ask').length}{/if}
+							</h3>
+							{#if bad.length}
+								<Alert.Root variant="destructive" class="mb-1">
+									<OctagonX />
+									<Alert.Title>paths 밖 변경 · {bad.map((p) => p.path).join(', ')}</Alert.Title>
+									<Alert.Description>허용된 paths 밖 파일을 고쳐 실패로 처리됐어요. 변경은 적용되지 않았어요.</Alert.Description>
+								</Alert.Root>
+							{/if}
+							{#each s.paths as p (p.path)}
+								{@const Icon = p.from === 'ask' ? FilePlus : p.from === 'bad' ? FileX : FileCode}
+								<div class="flex h-7 items-center gap-2">
+									<span class={cn('flex size-5 shrink-0 items-center justify-center rounded-xs text-on-solid', p.from === 'ask' ? 'bg-primary' : p.from === 'bad' ? 'bg-destructive' : 'bg-muted-foreground')}><Icon class="size-3" /></span>
+									<span class={cn('flex-1 truncate font-mono', p.from === 'bad' && 'text-destructive')}>{p.path}</span>
+									<span class={cn('text-caption', p.from === 'ask' ? 'text-primary' : p.from === 'bad' ? 'text-destructive' : 'text-muted-foreground')}>{p.from === 'ask' ? `@ASK · ${p.at}` : p.from === 'bad' ? 'paths 밖' : '처음'}</span>
+								</div>
+							{:else}
+								<p class="text-muted-foreground">파일을 고치지 않는 작업이에요 (조사 · 탐색).</p>
+							{/each}
+							<p class="pt-1 text-caption text-muted-foreground">
+								{#if s.waits}paths가 겹쳐 {s.waits.id}가 끝날 때까지 대기해요 ({s.waits.glob}).
+								{:else if bad.length}재시도하면 등급이 한 단계 올라가요. 경로가 더 필요하면 @ASK로 요청해요.
+								{:else}paths 밖 파일을 고치면 실패로 처리돼요. 겹치는 경로의 하위 작업은 순서대로 실행돼요.{/if}
+							</p>
+						</section>
+						<section class="flex flex-col gap-1 border-b px-4 py-3 text-xs">
+							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">@REPORT · ac {s.ac.filter((a) => a.ok).length}/{s.ac.length}</h3>
+							{#each s.ac as a (a.text)}
+								<span class="flex items-center gap-2 py-0.5"><Checkbox checked={a.ok} disabled aria-label={a.text} />{a.text}</span>
+							{/each}
+							{#if s.report}<p class="mt-1 rounded-md bg-muted px-2.5 py-2 text-caption text-muted-foreground">{s.report}</p>{/if}
+						</section>
+						<section class="flex flex-col gap-0.5 border-b px-4 py-3 text-xs">
+							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">TOKENS</h3>
+							<div class="flex h-7 items-center gap-2">
+								<Coins class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">이 Run</span>
+								{#if s.mode !== 'runner'}<TokenMeter included />{:else if cur}<TokenMeter self={cur.tokens} class="text-foreground" />{:else}<span class="text-muted-foreground">시작 전</span>{/if}
+							</div>
+							{#if s.runs.length > 1}
+								<div class="flex h-7 items-center gap-2"><RotateCcw class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">재시도 전 Run #{s.runs[0].num}</span><TokenMeter self={s.runs[0].tokens} /></div>
+							{/if}
+							<p class="pt-1 text-caption text-muted-foreground">{s.mode === 'runner' ? '리드와 따로 쌓이고 리드 합계에만 더해져요.' : '리드 Run 안에서 돌아 리드 사용량에 이미 들어 있어요.'}</p>
+						</section>
+						<section class="flex flex-col gap-0.5 px-4 py-3 text-xs">
+							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">WORKTREE · {s.workdir.mode === 'repo' ? 'repo 모드' : 'worktree'}</h3>
+							{@render row(GitBranch, '모드', s.workdir.mode === 'repo' ? 'repo 모드 · worktree 없음' : 'worktree')}
+							{@render row(FolderGit2, '경로', s.workdir.path ?? '저장소 그대로 · orchstack/app')}
+							{@render row(GitBranch, '브랜치', s.workdir.branch)}
+							{#if s.workdir.mode === 'worktree'}{@render row(Trash2, '정리', s.status === 'failed' ? '실패 · 24시간 보관 후 삭제' : '완료 후 병합 · 삭제')}{/if}
+						</section>
 					</div>
 				</div>
 			{/if}
