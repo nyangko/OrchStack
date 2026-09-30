@@ -8,6 +8,8 @@
 				default: "border-transparent",
 				outline: "border-border",
 				muted: "bg-muted/50 border-transparent",
+				// .pen 목록 행: 둥근 상자 대신 아래 구분선, 좌우 여백 없음
+				row: "rounded-none border-0 border-b px-0! **:data-[slot=item-title]:text-body **:data-[slot=item-description]:text-xs",
 			},
 			size: {
 				default: "gap-3.5 px-4 py-3.5",

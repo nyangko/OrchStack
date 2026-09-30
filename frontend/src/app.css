@@ -1,8 +1,57 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn-svelte/tailwind.css";
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/jetbrains-mono";
+/* 본문: Pretendard (Inter 기반 + 한글), 쓰인 글자 조각만 로드 */
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+
+
+/*
+ * 고정폭: Casquare Mono Std (Cascadia Code + 나눔스퀘어 네오, OFL — lib/assets/fonts/OFL-casquare.txt)
+ * 한글이 영문 2칸 폭이라 로그·경로 정렬 유지. 400/600/700만 포함 (500은 400으로 표시).
+ * 영문/한글 파일을 unicode-range로 분리 → 한글이 화면에 나올 때만 한글 파일을 받는다.
+ */
+@font-face {
+	font-family: 'Casquare Mono';
+	font-weight: 400;
+	font-display: swap;
+	src: url('./lib/assets/fonts/casquare-mono-regular-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2190-21FF, U+2212, U+2500-25FF;
+}
+@font-face {
+	font-family: 'Casquare Mono';
+	font-weight: 400;
+	font-display: swap;
+	src: url('./lib/assets/fonts/casquare-mono-regular-ko.woff2') format('woff2');
+	unicode-range: U+3131-318E, U+AC00-D7A3;
+}
+@font-face {
+	font-family: 'Casquare Mono';
+	font-weight: 600;
+	font-display: swap;
+	src: url('./lib/assets/fonts/casquare-mono-semibold-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2190-21FF, U+2212, U+2500-25FF;
+}
+@font-face {
+	font-family: 'Casquare Mono';
+	font-weight: 600;
+	font-display: swap;
+	src: url('./lib/assets/fonts/casquare-mono-semibold-ko.woff2') format('woff2');
+	unicode-range: U+3131-318E, U+AC00-D7A3;
+}
+@font-face {
+	font-family: 'Casquare Mono';
+	font-weight: 700;
+	font-display: swap;
+	src: url('./lib/assets/fonts/casquare-mono-bold-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2190-21FF, U+2212, U+2500-25FF;
+}
+@font-face {
+	font-family: 'Casquare Mono';
+	font-weight: 700;
+	font-display: swap;
+	src: url('./lib/assets/fonts/casquare-mono-bold-ko.woff2') format('woff2');
+	unicode-range: U+3131-318E, U+AC00-D7A3;
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -83,6 +132,9 @@
 	--code-fg: #E2E8F0;
 	--code-muted: #94A3B8;
 	--scrim: #0F172A59;
+	--brand-codex: #0B0B0B;
+	--brand-claude: #D97757;
+	--brand-gemini: #1A73E8;
 }
 
 .dark {
@@ -163,8 +215,14 @@
 }
 
 @theme inline {
-	--font-sans: 'Inter Variable', sans-serif;
-	--font-mono: 'JetBrains Mono Variable', monospace;
+	--font-sans: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif;
+	--font-mono: 'Casquare Mono', ui-monospace, monospace;
+	--text-2xs: 0.625rem;
+	--text-2xs--line-height: 0.875rem;
+	--text-caption: 0.6875rem;
+	--text-caption--line-height: 1rem;
+	--text-body: 0.8125rem;
+	--text-body--line-height: 1.45;
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
@@ -239,6 +297,9 @@
 	--color-code-fg: var(--code-fg);
 	--color-code-muted: var(--code-muted);
 	--color-scrim: var(--scrim);
+	--color-brand-codex: var(--brand-codex);
+	--color-brand-claude: var(--brand-claude);
+	--color-brand-gemini: var(--brand-gemini);
 	--radius-xs: calc(var(--radius) * 0.4);
 	--radius-sm: calc(var(--radius) * 0.6);
 	--radius-md: calc(var(--radius) * 0.8);
@@ -247,6 +308,11 @@
 	--radius-2xl: calc(var(--radius) * 1.8);
 	--radius-3xl: calc(var(--radius) * 2.2);
 	--radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* 목록 그룹 제목 (.pen ListGroupLabel) */
+@utility list-label {
+	@apply px-2 pt-3 pb-1.5 text-caption font-semibold text-muted-foreground;
 }
 
 @layer base {

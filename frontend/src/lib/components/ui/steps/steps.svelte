@@ -16,17 +16,17 @@
 		<li class="flex items-center gap-1.5" aria-current={active ? "step" : undefined}>
 			<span
 				class={cn(
-					"flex size-[22px] items-center justify-center rounded-full text-[11px] font-bold",
-					done && "bg-success text-on-solid",
+					"flex size-[22px] items-center justify-center rounded-full text-caption font-bold",
+					done && "bg-status-done text-on-solid",
 					active && "bg-primary text-primary-foreground",
-					!done && !active && "bg-secondary text-muted-foreground"
+					!done && !active && "bg-muted text-muted-foreground"
 				)}
 			>
 				{#if done}<Check class="size-3" strokeWidth={3} />{:else}{i + 1}{/if}
 			</span>
 			<span
 				class={cn(
-					"text-[13px]",
+					"text-body",
 					active ? "text-foreground font-semibold" : done ? "text-foreground" : "text-muted-foreground"
 				)}>{label}</span
 			>

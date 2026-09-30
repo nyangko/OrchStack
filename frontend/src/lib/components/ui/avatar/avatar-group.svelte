@@ -14,7 +14,7 @@
 	bind:this={ref}
 	data-slot="avatar-group"
 	class={cn(
-		"group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background",
+		"group/avatar-group flex -space-x-1.5 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-card",
 		className
 	)}
 	{...restProps}

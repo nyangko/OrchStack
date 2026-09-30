@@ -18,7 +18,7 @@
 	bind:this={ref}
 	data-slot="pill"
 	class={cn(
-		"bg-secondary text-muted-foreground [&_svg:not([class*='size-'])]:size-3 inline-flex w-fit items-center gap-[5px] rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
+		"bg-muted text-muted-foreground [&_svg:not([class*='size-'])]:size-3 inline-flex w-fit items-center gap-[5px] rounded-full px-2 py-0.5 text-caption font-medium whitespace-nowrap",
 		className
 	)}
 	{...restProps}

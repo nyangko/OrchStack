@@ -6,7 +6,9 @@
 		variants: {
 			variant: {
 				default: "bg-card text-card-foreground",
-				warning: "bg-warning-soft border-warning px-3 text-warning *:data-[slot=alert-title]:text-[13px] *:data-[slot=alert-title]:font-semibold *:data-[slot=alert-description]:text-xs *:data-[slot=alert-description]:text-foreground",
+				warning: "bg-warning-soft border-warning px-3 text-warning *:data-[slot=alert-title]:text-body *:data-[slot=alert-title]:font-semibold *:data-[slot=alert-description]:text-xs *:data-[slot=alert-description]:text-foreground",
+				// .pen InfoStrip: 회색 띠 · 12px
+				info: "bg-muted border-border px-3.5 py-2 *:data-[slot=alert-title]:text-xs *:data-[slot=alert-title]:font-semibold *:data-[slot=alert-description]:text-xs *:[svg]:size-3.5",
 				destructive: "text-destructive bg-card *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
 			},
 		},

@@ -11,6 +11,8 @@
 				outline: "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
 				ghost: "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
 				link: "text-primary underline-offset-4 hover:underline",
+				// .pen FileChip · ModelChip: 경로·모델명 등 고정폭 값
+				mono: "bg-muted text-foreground rounded-xs px-2 font-mono text-caption [&>svg]:text-muted-foreground",
 			},
 		},
 		defaultVariants: {

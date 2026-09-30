@@ -7,6 +7,8 @@
 			variant: {
 				default: "bg-transparent",
 				outline: "border-input hover:bg-muted border bg-transparent shadow-xs",
+				// .pen FilterChip: 목록 필터용 둥근 칩. 눌림 = 반전색
+				chip: "rounded-full bg-muted text-caption text-muted-foreground hover:bg-muted-strong aria-pressed:bg-foreground aria-pressed:text-background [&_svg:not([class*='size-'])]:size-3",
 			},
 			size: {
 				default: "h-9 min-w-9 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
@@ -14,6 +16,7 @@
 				lg: "h-10 min-w-10 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
 			},
 		},
+		compoundVariants: [{ variant: "chip", class: "h-6 min-w-0 px-2" }],
 		defaultVariants: {
 			variant: "default",
 			size: "default",

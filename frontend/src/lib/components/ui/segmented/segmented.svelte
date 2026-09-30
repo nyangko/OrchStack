@@ -17,7 +17,7 @@
 <div
 	role="radiogroup"
 	data-slot="segmented"
-	class={cn("bg-secondary flex w-full gap-0.5 rounded-sm p-[3px]", className)}
+	class={cn("bg-muted flex w-full gap-0.5 rounded-sm p-[3px]", className)}
 >
 	{#each options as opt (opt.value)}
 		{@const active = value === opt.value}
@@ -29,7 +29,7 @@
 			class={cn(
 				"flex flex-1 items-center justify-center gap-1 rounded-xs px-2.5 py-[5px] text-xs transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
 				active
-					? "bg-background text-foreground font-semibold shadow-xs"
+					? "bg-card text-foreground font-semibold shadow-xs"
 					: "text-muted-foreground hover:text-foreground"
 			)}
 		>
