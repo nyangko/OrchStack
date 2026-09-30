@@ -20,7 +20,9 @@
 --       (sqlite_master.sql 에 원문 그대로 보존됨)
 --
 -- 사용 방법 (#11)
---   이 파일은 SeaORM migration을 만들 때 쓰는 참고 자료다. 직접 실행하지 않는다.
+--   이 파일이 스키마 원본이다. 서버(backend)가 첫 실행 시 이 파일로 테이블을 만들고
+--   기본 사용자(uid=1) · 워크스페이스(sn=1)를 넣는다. SeaORM migration은 쓰지 않는다.
+--   Rust entity는 `sea-orm-cli generate entity`로 이 스키마에서 생성한다 (backend/src/entity).
 --   DB 전용 문법은 피한다 (SQLite · MySQL · PostgreSQL 공통 문법 · COALESCE 사용).
 --   상태 값 · 이벤트 구조는 #9 Core Domain Model · #10 Command → Event → Projection 기준.
 --   화면 전용 값(진행률 %, 저장된 보기 등)은 domain이 아니라 조회 전용으로 다룬다.

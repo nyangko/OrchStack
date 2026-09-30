@@ -62,6 +62,17 @@ The Alpha does **not** depend on model-native compact as its primary strategy. S
 - SeaORM
 - SQLite
 
+#### Run the backend
+
+```bash
+cd backend && cargo run          # http://127.0.0.1:8080/health
+```
+
+| Env | Default | |
+| --- | --- | --- |
+| `DATABASE_URL` | `sqlite://orchstack.db?mode=rwc` | SQLite file, created on first run from `data/sqlite.sql` |
+| `BIND_ADDR` | `127.0.0.1:8080` | HTTP listen address |
+
 ### Frontend
 
 - Node.js
