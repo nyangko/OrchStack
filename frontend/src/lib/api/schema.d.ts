@@ -21,6 +21,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/issues/{sn}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 1건 조회. 없으면 404 */
+        get: operations["read"];
+        put?: never;
+        post?: never;
+        /** 삭제 (IssueDeleted). 성공 204, 없으면 404. 속한 태스크는 남고 issue_sn만 비워진다 */
+        delete: operations["remove"];
+        options?: never;
+        head?: never;
+        /** 부분 수정 (UpdateIssue → IssueUpdated). 없으면 404, 모르는 status면 422 */
+        patch: operations["update"];
+        trace?: never;
+    };
+    "/issues/{sn}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 이슈의 태스크 목록 (번호순) */
+        get: operations["list"];
+        put?: never;
+        /** 태스크 생성 (CreateTask → TaskCreated). 이슈가 없으면 404 */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects": {
         parameters: {
             query?: never;
@@ -58,6 +95,77 @@ export interface paths {
         patch: operations["update"];
         trace?: never;
     };
+    "/projects/{sn}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 프로젝트의 이슈 목록 (번호순) */
+        get: operations["list"];
+        put?: never;
+        /** 이슈 생성 (CreateIssue → IssueCreated). 프로젝트가 없으면 404 */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{sn}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 프로젝트 태스크 목록 (Kanban용). `status`로 거르고 queue_sort → 번호순 */
+        get: operations["board"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{sn}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 1건 조회. 없으면 404 */
+        get: operations["read"];
+        put?: never;
+        post?: never;
+        /** 삭제 (TaskDeleted). 성공 204, 없으면 404 */
+        delete: operations["remove"];
+        options?: never;
+        head?: never;
+        /** 부분 수정 (TaskUpdated). 상태는 못 바꾼다. 없으면 404 */
+        patch: operations["update"];
+        trace?: never;
+    };
+    "/tasks/{sn}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 상태 이동 (MoveTask → TaskMoved). 표에 없는 전이는 409, 없는 태스크는 404 */
+        post: operations["mv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -74,6 +182,50 @@ export interface components {
             /** @description ok | down */
             db: string;
             /** @description ok | error */
+            status: string;
+        };
+        /** @description 이슈 (API 응답 형태) */
+        Issue: {
+            body?: string | null;
+            close_at?: string | null;
+            create_at: string;
+            /** Format: int64 */
+            github_number?: number | null;
+            github_url?: string | null;
+            /**
+             * Format: int64
+             * @description 화면 표시 번호 (태스크와 공용)
+             */
+            num: number;
+            /** Format: int64 */
+            parent_sn?: number | null;
+            /** Format: int64 */
+            project_sn: number;
+            /** Format: int64 */
+            sn: number;
+            source: string;
+            /** @description open | in_progress | done | closed */
+            status: string;
+            title: string;
+            update_at: string;
+        };
+        /** @description 생성 요청 본문 */
+        IssueNew: {
+            body?: string | null;
+            /** Format: int64 */
+            parent_sn?: number | null;
+            title: string;
+        };
+        /** @description 수정 요청 본문. 보낸 필드만 바꾼다 (이벤트 payload로도 그대로 저장된다) */
+        IssuePatch: {
+            body?: string | null;
+            /** @description open | in_progress | done | closed */
+            status?: string | null;
+            title?: string | null;
+        };
+        /** @description MoveTask 요청 본문 */
+        MoveBody: {
+            /** @description 옮겨갈 상태 */
             status: string;
         };
         /** @description 프로젝트 (API 응답 형태) */
@@ -119,6 +271,71 @@ export interface components {
             sort?: number | null;
             status?: string | null;
         };
+        /** @description 태스크 (API 응답 형태) */
+        Task: {
+            assign_by?: string | null;
+            block_reason?: string | null;
+            branch?: string | null;
+            /** Format: int64 */
+            commit_count: number;
+            create_at: string;
+            create_by: string;
+            description?: string | null;
+            done_at?: string | null;
+            /** Format: int64 */
+            estimate_min?: number | null;
+            eta_at?: string | null;
+            /** Format: int64 */
+            issue_sn?: number | null;
+            /** Format: int64 */
+            member_sn?: number | null;
+            /**
+             * Format: int64
+             * @description 화면 표시 번호 (이슈와 공용)
+             */
+            num: number;
+            /** Format: int64 */
+            pr_number?: number | null;
+            pr_status?: string | null;
+            /**
+             * Format: int64
+             * @description 0(P0) ~ 3(P3)
+             */
+            priority: number;
+            /** Format: int64 */
+            project_sn: number;
+            /** Format: int64 */
+            queue_sort?: number | null;
+            /** Format: int64 */
+            sn: number;
+            start_at?: string | null;
+            /** @description backlog | todo | in_progress | blocked | review | done | failed | cancelled */
+            status: string;
+            title: string;
+            update_at: string;
+        };
+        /** @description 생성 요청 본문. 상태는 항상 todo로 시작한다 */
+        TaskNew: {
+            description?: string | null;
+            /**
+             * Format: int64
+             * @description 0(P0) ~ 3(P3), 생략하면 2
+             */
+            priority?: number | null;
+            title: string;
+        };
+        /** @description 수정 요청 본문. 보낸 필드만 바꾼다 (이벤트 payload로도 그대로 저장된다). 상태는 `/tasks/{sn}/move`로만 바꾼다 */
+        TaskPatch: {
+            description?: string | null;
+            /**
+             * Format: int64
+             * @description 0(P0) ~ 3(P3)
+             */
+            priority?: number | null;
+            /** Format: int64 */
+            queue_sort?: number | null;
+            title?: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -151,6 +368,163 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 이슈 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 이슈 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 삭제됨 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 이슈 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssuePatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 이슈 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 이슈 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskNew"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
         };
@@ -294,6 +668,230 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로젝트 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로젝트 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueNew"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    board: {
+        parameters: {
+            query?: {
+                /** @description 이 상태만 */
+                status?: string;
+            };
+            header?: never;
+            path: {
+                /** @description 프로젝트 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 태스크 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 태스크 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 삭제됨 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 태스크 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    mv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 태스크 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
                 };
             };
             default: {

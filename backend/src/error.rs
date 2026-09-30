@@ -32,6 +32,16 @@ impl Error {
     pub fn not_found() -> Self {
         Self(StatusCode::NOT_FOUND, "not_found", "not found".into())
     }
+
+    /// 값이 허용 범위를 벗어났을 때 (422)
+    pub fn invalid(msg: String) -> Self {
+        Self(StatusCode::UNPROCESSABLE_ENTITY, "invalid", msg)
+    }
+
+    /// 현재 상태에서 할 수 없는 조작일 때 (409)
+    pub fn conflict(msg: String) -> Self {
+        Self(StatusCode::CONFLICT, "conflict", msg)
+    }
 }
 
 impl IntoResponse for Error {
