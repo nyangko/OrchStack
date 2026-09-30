@@ -24,11 +24,17 @@
 	import type { Component } from 'svelte';
 	import { goto } from '$app/navigation';
 	import * as Command from '$lib/components/ui/command';
+	import * as Popover from '$lib/components/ui/popover';
+	import CircleX from '@lucide/svelte/icons/circle-x';
+	import Gauge from '@lucide/svelte/icons/gauge';
+	import ShieldCheck from '@lucide/svelte/icons/shield-check';
+	import GitMerge from '@lucide/svelte/icons/git-merge';
+	import Settings2 from '@lucide/svelte/icons/settings-2';
 	import { Button } from '$lib/components/ui/button';
 	import { Kbd } from '$lib/components/ui/kbd';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { RoleAvatar } from '$lib/components/ui/role-avatar';
-	import { tasks, projectTasks, issues, agents, connections } from '$lib/mock';
+	import { tasks, projectTasks, issues, agents, connections, notices, type Notice } from '$lib/mock';
 	import { statuses } from '$lib/status';
 	import { roles } from '$lib/roles';
 	import { store, glyphOf } from '$lib/teams.svelte';
@@ -108,6 +114,36 @@
 		if (newTab) window.open(href, '_blank');
 		else goto(href);
 	}
+	// 알림 (상단 벨) — 확인 필요(결정 · 승인)는 여기서 바로 처리한다 (.pen Workbench · 알림 목록). 목데이터.
+	type Tab = '전체' | '확인 필요' | 'Run' | '한도';
+	let list = $state(notices.map((n) => ({ ...n, done: '' })));
+	let tab = $state<Tab>('전체');
+	let bellOpen = $state(false);
+	const inTab: Record<Tab, (n: Notice) => boolean> = {
+		전체: () => true,
+		'확인 필요': (n) => n.group === '확인 필요',
+		Run: (n) => n.kind === 'fail' || n.kind === 'guard',
+		한도: (n) => n.kind === 'quota'
+	};
+	const noticeMeta: Record<Notice['kind'], { tag: string; icon: Component; tile: string }> = {
+		decision: { tag: '결정', icon: Sparkles, tile: 'bg-primary text-on-solid' },
+		approval: { tag: '승인', icon: Sparkles, tile: 'bg-primary text-on-solid' },
+		fail: { tag: '실패', icon: CircleX, tile: 'bg-destructive text-on-solid' },
+		quota: { tag: '한도', icon: Gauge, tile: 'bg-warning text-on-solid' },
+		guard: { tag: '루프 가드', icon: ShieldCheck, tile: 'bg-status-review text-on-solid' },
+		pr: { tag: 'PR', icon: GitMerge, tile: 'bg-success text-on-solid' }
+	};
+	const unread = $derived(list.filter((n) => n.unread).length);
+	const noticeGroups = $derived(
+		(['확인 필요', '오늘', '어제', '이번 주'] as const).map((g) => ({ g, items: list.filter((n) => n.group === g && inTab[tab](n)) })).filter((x) => x.items.length)
+	);
+	const memberOf = (sn?: number) => store.crew.flatMap((t) => t.members).find((m) => m.sn === sn);
+	/// 확인 필요 처리 — 결과를 남기고 읽음으로.
+	function settle(n: (typeof list)[number], result: string) {
+		n.done = result;
+		n.unread = false;
+	}
+
 	function onkey(e: KeyboardEvent) {
 		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
 			e.preventDefault();
@@ -159,7 +195,64 @@
 		<button type="button" onclick={openSearch} class="flex h-8 w-75 items-center gap-2 rounded-md border bg-card px-2.5 text-xs text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
 			<Search class="size-4" /><span class="flex-1 text-left">Search tasks, agents, issues</span><Kbd>⌘K</Kbd>
 		</button>
-		<Button variant="ghost" size="icon" aria-label="알림"><Bell /></Button>
+		<Popover.Root bind:open={bellOpen}>
+			<Popover.Trigger>
+				{#snippet child({ props })}
+					<Button variant="ghost" size="icon" class="relative" aria-label={unread ? `알림 · 안 읽음 ${unread}` : '알림'} {...props}>
+						<Bell />
+						{#if unread}<span class="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive ring-2 ring-card"></span>{/if}
+					</Button>
+				{/snippet}
+			</Popover.Trigger>
+			<Popover.Content align="end" class="w-115 gap-0 p-0">
+				<div class="flex items-center gap-2 px-4 pt-3.5 pb-2.5">
+					<h2 class="flex-1 text-sm font-semibold">알림</h2>
+					<button type="button" class="text-xs font-medium text-primary hover:underline disabled:opacity-50" disabled={!unread} onclick={() => list.forEach((n) => (n.unread = false))}>모두 읽음</button>
+					<Button variant="ghost" size="icon-sm" href="/settings/notifications" onclick={() => (bellOpen = false)} aria-label="알림 설정"><Settings2 /></Button>
+				</div>
+				<div class="flex gap-1.5 border-b px-4 pb-3" role="group" aria-label="알림 종류">
+					{#each ['전체', '확인 필요', 'Run', '한도'] as const as t (t)}
+						<Toggle variant="chip" count={list.filter(inTab[t]).length} bind:pressed={() => tab === t, (v) => { if (v) tab = t; }}>{t}</Toggle>
+					{/each}
+				</div>
+				<div class="max-h-130 overflow-y-auto pb-1">
+					{#each noticeGroups as { g, items } (g)}
+						<h3 class="px-4 pt-3 pb-1.5 text-caption font-semibold text-muted-foreground">{g}</h3>
+						{#each items as n (n.id)}
+							{@const m = noticeMeta[n.kind]}
+							{@const mem = memberOf(n.member)}
+							<div class={cn('flex flex-col gap-2 border-t px-4 py-3', n.unread && 'bg-primary-soft/60')}>
+								<div class="flex gap-3">
+									{#if mem}<RoleAvatar role={mem.role} icon={glyphOf(mem)} />{:else}<span class={cn('flex size-7 shrink-0 items-center justify-center rounded-md', m.tile)}><m.icon class="size-3.5" /></span>{/if}
+									<div class="flex min-w-0 flex-1 flex-col gap-1 text-xs">
+										<span class="flex items-center gap-1.5">
+											<span class="font-semibold">{n.who}</span>
+											<span class="rounded-sm bg-muted px-1.5 py-px text-caption text-muted-foreground">{m.tag}</span>
+											{#if n.task}<a href="/p/1?task={n.task}" onclick={() => (bellOpen = false)} class="truncate hover:underline">{n.title}</a>{:else}<span class="truncate">{n.title}</span>{/if}
+											<span class="ml-auto shrink-0 text-caption text-subtle-foreground">{n.when}</span>
+										</span>
+										<span class="text-muted-foreground">{n.done || n.desc}</span>
+									</div>
+								</div>
+								{#if n.group === '확인 필요' && !n.done}
+									<div class="flex gap-2 pl-10">
+										{#if n.kind === 'decision'}
+											<Button size="sm" href="/p/1?decide={n.task}" onclick={() => ((n.unread = false), (bellOpen = false))}>답하기</Button>
+											<Button size="sm" variant="ghost" onclick={() => settle(n, 'Orch에게 맡김 · 추천안으로 진행')}>Orch에게 맡기기</Button>
+										{:else}
+											<Button size="sm" onclick={() => settle(n, '승인함 · Run 연장')}>승인</Button>
+											<Button size="sm" variant="outline" onclick={() => settle(n, '거부함 · 현재 단계에서 멈춤')}>거부</Button>
+										{/if}
+									</div>
+								{/if}
+							</div>
+						{/each}
+					{/each}
+				</div>
+				<!-- 모든 활동 화면은 .pen에 아직 없음 -->
+				<div class="border-t py-2.5 text-center text-xs font-medium text-primary">모든 활동 보기 →</div>
+			</Popover.Content>
+		</Popover.Root>
 		<span class="flex size-7 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary" aria-label="사용자">S</span>
 	</header>
 	{/if}

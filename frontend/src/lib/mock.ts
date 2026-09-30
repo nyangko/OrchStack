@@ -737,6 +737,29 @@ export const reportSample = {
 	quota: { warnings: 1 },
 };
 
+/// 상단 벨 알림 (.pen Workbench · 알림 목록). kind — decision: 결정 요청 · approval: 승인 요청 · fail: Run 실패 · quota: 한도 · guard: 루프 가드 · pr: PR.
+/// need — 사람이 확인해야 하는 알림 (확인 필요 묶음). who가 멤버면 member sn.
+export type Notice = {
+	id: number;
+	kind: "decision" | "approval" | "fail" | "quota" | "guard" | "pr";
+	who: string;
+	member?: number;
+	title: string;
+	desc: string;
+	when: string;
+	group: "확인 필요" | "오늘" | "어제" | "이번 주";
+	task?: number;
+	unread?: boolean;
+};
+export const notices: Notice[] = [
+	{ id: 1, kind: "decision", who: "Orch", title: "#130 E2E 브라우저 선택 (L2)", desc: "Chromium만 vs Chromium + WebKit · 10분 뒤 Orch가 결정", when: "2분 전", group: "확인 필요", task: 130, unread: true },
+	{ id: 2, kind: "approval", who: "진", member: 1, title: "Run 연장 요청 · #129 Run #81", desc: "20분 초과 예상 · 남은 단계 2/5", when: "3분 전", group: "확인 필요", task: 129, unread: true },
+	{ id: 3, kind: "fail", who: "진", title: "Run #77 실패 · lint 3건", desc: "Orch가 lint 수정 지시와 함께 Run #81로 재시도", when: "13:56", group: "오늘", task: 129, unread: true },
+	{ id: 4, kind: "quota", who: "시스템", title: "Codex 계정 주간 잔량 18%", desc: "현재 속도면 목요일 오후 소진 · 폴백: Anthropic Max", when: "13:40", group: "오늘", unread: true },
+	{ id: 5, kind: "guard", who: "소라", title: "#121 리뷰 3회 반려 → 정지", desc: "완료 조건에 접근성 기준 추가 후 통과", when: "17:40", group: "어제", task: 121 },
+	{ id: 6, kind: "pr", who: "Orch", title: "PR #86 병합 · #121 Signup UI", desc: "tests 12/12 · 하린에게 QA 배정", when: "9/26", group: "이번 주", task: 121 },
+];
+
 /// 이번 달 비용 (.pen 이번 달 비용). limit이 없으면 고정 요금.
 export const monthCost = [
 	{ label: "구독 · 플랜 (고정)", used: 239, note: "Max $100 · ChatGPT Pro $100 · Copilot $19 · Z.AI $20" },
