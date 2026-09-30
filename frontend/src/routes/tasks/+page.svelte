@@ -34,7 +34,7 @@
 	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
 	import { statuses, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
-	import { projects, tasks, projectTasks, decisions, type Task } from '$lib/mock';
+	import { tasks, projectTasks, decisions, type Task } from '$lib/mock';
 	import { store, glyphOf } from '$lib/teams.svelte';
 	import { cn } from '$lib/utils';
 
@@ -101,7 +101,7 @@
 	function saveView() {
 		const parts = [
 			f.inbox && '내 확인 필요',
-			f.project && projects.find((p) => p.sn === f.project)?.name,
+			f.project && store.projects.find((p) => p.sn === f.project)?.name,
 			f.status && chips.find((c) => c.v === f.status)?.l,
 			f.agent !== undefined && memberOf(f.agent)?.name,
 			f.priorities.join('·'),
@@ -120,9 +120,9 @@
 			.filter((t) => match(t, f, query))
 			.sort((a, b) => (sort === 'updated' ? minutes(a.updated) - minutes(b.updated) : sort === 'priority' ? rank[a.priority] - rank[b.priority] : b.num - a.num))
 	);
-	const groups = $derived(projects.map((p) => ({ p, team: teamOf(p.name), list: shown.filter((t) => t.project === p.sn) })).filter((g) => g.list.length));
+	const groups = $derived(store.projects.map((p) => ({ p, team: teamOf(p.name), list: shown.filter((t) => t.project === p.sn) })).filter((g) => g.list.length));
 	const heading = $derived(
-		f.project ? projects.find((p) => p.sn === f.project)!.name : `${[...views, ...saved].find((v) => v.key === view)?.label ?? '전체'}${view === 'all' ? ' 태스크' : ''}`
+		f.project ? store.projects.find((p) => p.sn === f.project)!.name : `${[...views, ...saved].find((v) => v.key === view)?.label ?? '전체'}${view === 'all' ? ' 태스크' : ''}`
 	);
 	const assignees = [...new Set(all.map((t) => t.agent).filter((sn) => sn !== undefined))].map((sn) => memberOf(sn)!).filter(Boolean);
 
@@ -163,7 +163,7 @@
 		<span class="list-label px-2 pt-3 pb-1.5">보기</span>
 		{#each views as v (v.key)}{@render navItem(v.key, v.label, v.icon, v.f)}{/each}
 		<span class="list-label px-2 pt-3 pb-1.5">프로젝트</span>
-		{#each projects as p (p.sn)}{@render navItem(`p${p.sn}`, p.name, Folder, { project: p.sn, priorities: [] })}{/each}
+		{#each store.projects as p (p.sn)}{@render navItem(`p${p.sn}`, p.name, Folder, { project: p.sn, priorities: [] })}{/each}
 		<span class="list-label px-2 pt-3 pb-1.5">저장된 보기</span>
 		{#each saved as v (v.key)}
 			<div class="group relative">
@@ -207,12 +207,12 @@
 			<span class="flex-1"></span>
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
-					{#snippet child({ props })}<Button variant="outline" size="sm" {...props}><Folder />프로젝트: {f.project ? projects.find((p) => p.sn === f.project)?.name : '전체'}</Button>{/snippet}
+					{#snippet child({ props })}<Button variant="outline" size="sm" {...props}><Folder />프로젝트: {f.project ? store.projects.find((p) => p.sn === f.project)?.name : '전체'}</Button>{/snippet}
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="end">
 					<DropdownMenu.RadioGroup bind:value={() => String(f.project ?? ''), (v) => (f.project = v ? Number(v) : undefined)}>
 						<DropdownMenu.RadioItem value="">전체</DropdownMenu.RadioItem>
-						{#each projects as p (p.sn)}<DropdownMenu.RadioItem value={String(p.sn)}>{p.name}</DropdownMenu.RadioItem>{/each}
+						{#each store.projects as p (p.sn)}<DropdownMenu.RadioItem value={String(p.sn)}>{p.name}</DropdownMenu.RadioItem>{/each}
 					</DropdownMenu.RadioGroup>
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>

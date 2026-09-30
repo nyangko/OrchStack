@@ -1,20 +1,36 @@
 <script lang="ts">
-	/// Workbench 셸 (.pen Project Tabs). 열린 프로젝트 탭 · All Projects · 새 프로젝트.
+	/// Workbench 셸 (.pen Project Tabs). 열린 프로젝트 탭 · All Projects · 새 프로젝트 (.pen 새 프로젝트 만들기 다이얼로그).
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import X from '@lucide/svelte/icons/x';
 	import Plus from '@lucide/svelte/icons/plus';
+	import FolderPlus from '@lucide/svelte/icons/folder-plus';
+	import Folder from '@lucide/svelte/icons/folder';
+	import GitFork from '@lucide/svelte/icons/git-fork';
+	import Users from '@lucide/svelte/icons/users';
+	import Hand from '@lucide/svelte/icons/hand';
+	import Timer from '@lucide/svelte/icons/timer';
+	import Zap from '@lucide/svelte/icons/zap';
+	import Info from '@lucide/svelte/icons/info';
+	import Check from '@lucide/svelte/icons/check';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Select from '$lib/components/ui/select';
+	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import { projects } from '$lib/mock';
+	import { Segmented } from '$lib/components/ui/segmented';
+	import { Switch } from '$lib/components/ui/switch';
+	import { repos, type OrchPolicy } from '$lib/mock';
+	import { roles } from '$lib/roles';
+	import { store } from '$lib/teams.svelte';
 	import { cn } from '$lib/utils';
 
 	let { children } = $props();
 
 	// 열린 탭은 화면 상태(서버에 저장하지 않음). 닫아도 프로젝트는 그대로다.
-	let open = $state(projects.map((p) => p.sn));
-	const tabs = $derived(projects.filter((p) => open.includes(p.sn)));
+	let open = $state(store.projects.map((p) => p.sn));
+	const tabs = $derived(store.projects.filter((p) => open.includes(p.sn)));
 	const current = $derived(Number(page.params.project));
 
 	/// 탭을 닫고, 보고 있던 탭이면 옆 탭(없으면 All Projects)으로 이동한다.
@@ -22,6 +38,53 @@
 		const i = open.indexOf(sn);
 		open = open.filter((s) => s !== sn);
 		if (sn === current) goto(open.length ? `/p/${open[Math.min(i, open.length - 1)]}` : '/p');
+	}
+
+	// 새 프로젝트 — 프로젝트 탭 + 또는 All Projects(?new)에서 연다.
+	const squads = $derived(store.crew.filter((t) => !t.orch));
+	let creating = $state(false);
+	let name = $state('');
+	let repo = $state(repos[0].name);
+	let teamSn = $state(0);
+	let mode = $state<OrchPolicy['mode']>('manual');
+	let importIssues = $state(true);
+	let firstPlan = $state(true);
+	const repoInfo = $derived(repos.find((r) => r.name === repo)!);
+	const team = $derived(squads.find((t) => t.sn === teamSn));
+	const nameTaken = $derived(store.projects.some((p) => p.name === name.trim()));
+
+	/// 팀 구성 요약 — 멤버 수 · 역할별 수 (예: 멤버 3 · Frontend 2 · Backend 1).
+	function teamMeta(t: (typeof squads)[number]) {
+		const count = new Map<keyof typeof roles, number>();
+		for (const m of t.members) count.set(m.role, (count.get(m.role) ?? 0) + 1);
+		const byRole = [...count].map(([r, n]) => `${roles[r].label} ${n}`);
+		return [`멤버 ${t.members.length}`, ...byRole].join(' · ');
+	}
+	function openNew() {
+		name = '';
+		repo = repos[0].name;
+		teamSn = squads[0]?.sn ?? 0;
+		// 팀 정책의 진행 방식이 기본값
+		mode = store.policies[teamSn]?.mode ?? 'manual';
+		importIssues = true;
+		firstPlan = true;
+		creating = true;
+	}
+	$effect(() => {
+		if (!page.url.searchParams.has('new')) return;
+		openNew();
+		goto(page.url.pathname, { replaceState: true });
+	});
+
+	/// 만들면 탭을 열고 그 Workbench로 간다 (목데이터 · 서버 연결은 #59).
+	function create(e: SubmitEvent) {
+		e.preventDefault();
+		if (!name.trim() || nameTaken) return;
+		const sn = Math.max(0, ...store.projects.map((p) => p.sn)) + 1;
+		store.projects.push({ sn, name: name.trim(), status: 'active', dot: firstPlan ? 'bg-status-waiting' : 'bg-subtle-foreground' });
+		open.push(sn);
+		creating = false;
+		goto(`/p/${sn}`);
 	}
 </script>
 
@@ -37,7 +100,7 @@
 		>
 			<LayoutGrid class="size-3.5" />
 			All Projects
-			<Badge variant="secondary" class="px-1.5">{projects.length}</Badge>
+			<Badge variant="secondary" class="px-1.5">{store.projects.length}</Badge>
 		</a>
 		{#each tabs as p (p.sn)}
 			{@const on = p.sn === current}
@@ -61,9 +124,94 @@
 				</button>
 			</div>
 		{/each}
-		<Button variant="ghost" size="icon-sm" class="mb-0.5 shrink-0 text-muted-foreground" aria-label="새 프로젝트"><Plus /></Button>
+		<Button variant="ghost" size="icon-sm" class="mb-0.5 shrink-0 text-muted-foreground" aria-label="새 프로젝트" onclick={openNew}><Plus /></Button>
 	</div>
 	<div class="min-h-0 flex-1">
 		{@render children()}
 	</div>
 </div>
+
+<!-- 폼 한 줄 제목 (.pen FormRow) -->
+{#snippet field(label: string, hint: string)}
+	<span class="flex items-baseline gap-2"><span class="text-xs font-semibold">{label}</span><span class="text-caption text-muted-foreground">{hint}</span></span>
+{/snippet}
+
+<Dialog.Root bind:open={creating}>
+	<Dialog.Content showCloseButton={false} class="gap-0 p-0 sm:max-w-200">
+		<!-- contents — 머리 · 바닥 여백은 Dialog 쪽 규칙을 그대로 쓴다 -->
+		<form onsubmit={create} class="contents">
+			<Dialog.Header class="flex-row items-center gap-3 pr-6">
+				<FolderPlus class="size-5 shrink-0" />
+				<div class="flex flex-1 flex-col gap-0.5">
+					<Dialog.Title>새 프로젝트</Dialog.Title>
+					<Dialog.Description>저장소를 연결하고 팀 · Orch 진행 방식을 정해요</Dialog.Description>
+				</div>
+				<Dialog.Close>
+					{#snippet child({ props })}<Button variant="ghost" size="icon-sm" aria-label="닫기" {...props}><X /></Button>{/snippet}
+				</Dialog.Close>
+			</Dialog.Header>
+
+			<div class="flex flex-col px-6 pt-1">
+				<label class="flex flex-col gap-2.5 border-b py-4">
+					{@render field('이름', '프로젝트 탭 · 브레드크럼에 보여요')}
+					<InputGroup.Root>
+						<InputGroup.Addon><Folder /></InputGroup.Addon>
+						<InputGroup.Input bind:value={name} placeholder="예: Checkout Revamp" aria-invalid={nameTaken || undefined} class="text-xs font-medium" />
+					</InputGroup.Root>
+					{#if nameTaken}<span class="text-caption text-destructive">같은 이름의 프로젝트가 있어요</span>{/if}
+				</label>
+				<div class="flex flex-col gap-2.5 border-b py-4">
+					{@render field('저장소', 'GitHub App이 설치된 저장소만 보여요')}
+					<Select.Root type="single" bind:value={repo}>
+						<Select.Trigger class="w-full" aria-label="저장소">
+							<span class="flex min-w-0 flex-1 items-center gap-2">
+								<GitFork class="size-4 text-muted-foreground" />{repo}
+								<span class="truncate text-caption font-normal text-muted-foreground">{repoInfo.meta} · 이슈 {repoInfo.issues}개</span>
+							</span>
+						</Select.Trigger>
+						<Select.Content>{#each repos as r (r.name)}<Select.Item value={r.name} label={r.name} />{/each}</Select.Content>
+					</Select.Root>
+				</div>
+				<div class="flex flex-col gap-2.5 border-b py-4">
+					{@render field('팀', '이 프로젝트를 맡을 팀 · 나중에 바꿀 수 있어요')}
+					<Select.Root type="single" bind:value={() => String(teamSn), (v) => ((teamSn = Number(v)), (mode = store.policies[teamSn]?.mode ?? mode))}>
+						<Select.Trigger class="w-full" aria-label="팀">
+							<span class="flex min-w-0 flex-1 items-center gap-2">
+								<Users class="size-4 text-muted-foreground" />{team?.name}
+								{#if team}<span class="truncate text-caption font-normal text-muted-foreground">{teamMeta(team)}</span>{/if}
+							</span>
+						</Select.Trigger>
+						<Select.Content>{#each squads as t (t.sn)}<Select.Item value={String(t.sn)} label={t.name} />{/each}</Select.Content>
+					</Select.Root>
+				</div>
+				<div class="flex flex-col gap-2.5 border-b py-4">
+					{@render field('Orch 진행 방식', '팀 정책을 따르거나 이 프로젝트만 바꿔요')}
+					<Segmented
+						aria-label="Orch 진행 방식"
+						options={[
+							{ value: 'manual', label: 'Manual', icon: Hand },
+							{ value: 'timer', label: `Auto · ${store.policies[teamSn]?.timer ?? 5}초`, icon: Timer },
+							{ value: 'full', label: 'Full auto', icon: Zap }
+						]}
+						bind:value={() => mode, (v) => (mode = v as OrchPolicy['mode'])}
+					/>
+				</div>
+				<label class="flex items-center gap-3 border-b py-3">
+					<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">GitHub 이슈 가져오기</span><span class="text-caption text-muted-foreground">열린 이슈 {repoInfo.issues}개 → Backlog · 라벨 bug · feature만</span></span>
+					<Switch bind:checked={importIssues} aria-label="GitHub 이슈 가져오기" />
+				</label>
+				<label class="flex items-center gap-3 border-b py-3">
+					<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">Orch가 첫 계획 세우기</span><span class="text-caption text-muted-foreground">가져온 이슈를 태스크로 나누고 배정안을 제안해요 (승인 후 실행)</span></span>
+					<!-- 가져온 이슈가 있어야 계획을 세운다 -->
+					<Switch bind:checked={() => importIssues && firstPlan, (v) => (firstPlan = v)} disabled={!importIssues} aria-label="Orch가 첫 계획 세우기" />
+				</label>
+			</div>
+
+			<Dialog.Footer class="mt-2">
+				<span class="flex flex-1 items-center gap-1.5 text-caption text-muted-foreground"><Info class="size-3.5" />만든 뒤 Workbench에서 이슈 · 태스크를 바로 볼 수 있어요</span>
+				<Dialog.Close>{#snippet child({ props })}<Button type="button" variant="ghost" {...props}>취소</Button>{/snippet}</Dialog.Close>
+				<Button type="submit" disabled={!name.trim() || nameTaken || !team}><Check />프로젝트 만들기</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>

@@ -12,6 +12,14 @@ export const projects: ProjectTab[] = [
 	{ sn: 3, name: "Mobile App", status: "active", dot: "bg-subtle-foreground" },
 ];
 
+/// 새 프로젝트에 연결할 수 있는 저장소 (GitHub App이 설치된 곳). issues = 열린 이슈 수.
+export const repos = [
+	{ name: "orchstack/checkout", meta: "main · 비공개", issues: 12 },
+	{ name: "orchstack/app", meta: "main · 비공개", issues: 12 },
+	{ name: "orchstack/web", meta: "main · 공개", issues: 4 },
+	{ name: "orchstack/mobile", meta: "develop · 비공개", issues: 7 },
+];
+
 import type { TaskStatus } from "$lib/status";
 import type { Role } from "$lib/roles";
 import type { Runtime } from "$lib/components/ui/runtime-logo";

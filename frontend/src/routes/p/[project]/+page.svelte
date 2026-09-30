@@ -67,10 +67,11 @@
 	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
 	import { statuses, statusOrder, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
-	import { projects, tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, type Issue, type Chat } from '$lib/mock';
+	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, type Issue, type Chat } from '$lib/mock';
+	import { store } from '$lib/teams.svelte';
 	import { cn } from '$lib/utils';
 
-	const project = $derived(projects.find((p) => p.sn === Number(page.params.project)));
+	const project = $derived(store.projects.find((p) => p.sn === Number(page.params.project)));
 
 	// 태스크 목록은 페이지가 소유한다 (Kanban 이동 · Quick Panel이 같은 목록을 본다). 서버 연결은 #59.
 	let list = $state(tasks.map((t) => ({ ...t })));
