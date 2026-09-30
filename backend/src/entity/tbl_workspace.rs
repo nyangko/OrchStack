@@ -39,6 +39,7 @@ pub struct Model {
     pub workdir_mode: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub workdir_root: Option<String>,
+    pub worktree_keep_hour: i64,
     #[sea_orm(column_type = "Text", nullable)]
     pub detect_path: Option<String>,
     pub is_network_sandbox: i64,

@@ -15,6 +15,9 @@ pub struct Model {
     pub daily_token_budget: Option<i64>,
     pub context_warn_percent: i64,
     pub max_concurrent_run: i64,
+    pub spawn_mode: String,
+    pub spawn_allow: String,
+    pub max_child_run: i64,
     pub is_review_required: i64,
     #[sea_orm(column_type = "Text")]
     pub review_stage: String,

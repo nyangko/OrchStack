@@ -16,6 +16,10 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub start_by: String,
     pub retry_run_sn: Option<i64>,
+    pub parent_run_sn: Option<i64>,
+    pub spawn_mode: Option<String>,
+    pub tier: Option<String>,
+    pub brief: Option<String>,
     pub runtime_sn: Option<i64>,
     pub connection_sn: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
@@ -31,6 +35,8 @@ pub struct Model {
     pub fail_detail: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub branch: Option<String>,
+    pub workdir: Option<String>,
+    pub workdir_clean_at: Option<String>,
     pub token_input: i64,
     pub token_cache_read: i64,
     pub token_cache_write: i64,

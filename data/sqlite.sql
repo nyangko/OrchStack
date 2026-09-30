@@ -69,8 +69,9 @@ CREATE TABLE tbl_workspace (
     github_repo_scope        TEXT,                                  -- 접근 가능한 저장소 범위 (예: orchstack/*)
     max_concurrent_run       INTEGER NOT NULL DEFAULT 3,            -- 기기 전체 동시 실행 Run 수
     run_timeout_min          INTEGER NOT NULL DEFAULT 20,           -- Run 제한 시간(분) · 넘으면 연장 승인 요청
-    workdir_mode             TEXT NOT NULL DEFAULT 'worktree',      -- 작업 공간 방식: worktree(Run마다 git worktree로 격리) | repo(저장소 폴더에서 직접 작업)
+    workdir_mode             TEXT NOT NULL DEFAULT 'repo',          -- 작업 공간 방식: worktree(Run마다 git worktree로 격리) | repo(저장소 폴더에서 직접 작업)
     workdir_root             TEXT,                                  -- 작업 공간 폴더 (예: ~/.orch/worktrees)
+    worktree_keep_hour       INTEGER NOT NULL DEFAULT 24,           -- 실패 · 취소 Run의 worktree 보관 시간(조사용) · 지나면 정리. 성공 Run은 병합 직후 정리
     detect_path              TEXT,                                  -- 실행기를 찾을 경로 목록 (콜론 구분)
     is_network_sandbox       INTEGER NOT NULL DEFAULT 1,            -- 허용 도메인만 접근
     is_runtime_auto_update   INTEGER NOT NULL DEFAULT 1,            -- 실행기 패치 버전 자동 업데이트
@@ -381,6 +382,7 @@ CREATE TABLE tbl_map_fallback (
     sort             INTEGER NOT NULL,                              -- 순서 (1 = 기본)
     switch_rule      TEXT,                                          -- 다음으로 넘어가는 조건 (예: 주간 잔량 20% 미만, 429)
     max_level        INTEGER,                                       -- 이 단계가 맡을 수 있는 최대 작업 레벨 (예: 0 = L0만)
+    tier             TEXT,                                          -- 하위 작업 모델 등급: S | M | L · NULL = 모든 등급 (#67)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     UNIQUE (profile_sn, runtime_sn, connection_sn)
 );
@@ -428,6 +430,9 @@ CREATE TABLE tbl_team (
     daily_token_budget    INTEGER,                                  -- 하루 토큰 예산 (예: 200000)
     context_warn_percent  INTEGER NOT NULL DEFAULT 80,              -- 컨텍스트 경고 기준(%)
     max_concurrent_run    INTEGER NOT NULL DEFAULT 3,               -- 팀 동시 실행 Run 수
+    spawn_mode            TEXT NOT NULL DEFAULT 'runner',           -- 하위 작업 기본 방식: sub | fork | runner (#67)
+    spawn_allow           TEXT NOT NULL DEFAULT 'sub,runner',       -- 허용 방식 (쉼표 구분) · fork는 기본 제외
+    max_child_run         INTEGER NOT NULL DEFAULT 3,               -- 리드 Run 1개당 동시 하위 작업 수
     is_review_required    INTEGER NOT NULL DEFAULT 1,               -- 리뷰 필수 여부
     review_stage          TEXT NOT NULL DEFAULT 'before_merge',     -- 리뷰 시점: before_merge(PR 병합 전) | before_done(태스크 완료 처리 전)
     repo_scope            TEXT,                                     -- 저장소 권한 범위 (예: orchstack/*)
@@ -715,8 +720,12 @@ CREATE TABLE tbl_run (
     member_sn          INTEGER NOT NULL REFERENCES tbl_member(sn) ON DELETE RESTRICT,  -- 실행한 멤버
     num                INTEGER NOT NULL,                            -- 화면 표시 번호 (Run #81)
     status             TEXT NOT NULL DEFAULT 'queued',              -- 상태 (#9): queued(대기열) | starting(세션 시작 중) | running(실행 중) | waiting(판단 · 승인 대기로 멈춤) | review(결과 검토 중) | completed(성공) | failed(실패) | cancelled(사용자 · Orch가 중지)
-    start_by           TEXT NOT NULL DEFAULT 'orch',                -- 시작한 쪽: orch(Orch 배정) | user(사용자 시작) | retry(실패 후 자동 재시도)
+    start_by           TEXT NOT NULL DEFAULT 'orch',                -- 시작한 쪽: orch(Orch 배정) | user(사용자 시작) | retry(실패 후 자동 재시도) | lead(리드가 하위 작업으로 요청 · #67)
     retry_run_sn       INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,              -- 재시도 대상인 이전 Run
+    parent_run_sn      INTEGER REFERENCES tbl_run(sn) ON DELETE CASCADE,               -- 상위(리드) Run · 하위 작업일 때 (#67)
+    spawn_mode         TEXT,                                        -- 하위 작업 방식: NULL(일반 Run) | sub(실행기 내장 서브에이전트) | fork(부모 컨텍스트 상속) | runner(OrchStack 임시 하위 Run)
+    tier               TEXT,                                        -- 모델 등급 (runner): S(소형) | M(중형) | L(대형) · 규칙 엔진이 kind로 판정
+    brief              TEXT,                                        -- 받은 @TASK 원문 (하위 작업)
     runtime_sn         INTEGER REFERENCES tbl_runtime(sn) ON DELETE SET NULL,          -- 사용한 실행기
     connection_sn      INTEGER REFERENCES tbl_connection(sn) ON DELETE SET NULL,       -- 사용한 연결
     model_code         TEXT,                                        -- 사용한 모델 ID (기록용 사본)
@@ -726,6 +735,8 @@ CREATE TABLE tbl_run (
     fail_code          TEXT,                                        -- 실패 분류 (예: lint, test, timeout)
     fail_detail        TEXT,                                        -- 실패 상세
     branch             TEXT,                                        -- 작업 브랜치
+    workdir            TEXT,                                        -- 이 Run이 만든 worktree 경로 (repo 모드면 NULL)
+    workdir_clean_at   TEXT,                                        -- worktree · 임시 브랜치 정리 시각 (NULL + 종료된 Run = 정리 대상)
     token_input        INTEGER NOT NULL DEFAULT 0,                  -- 새 입력 토큰 합계
     token_cache_read   INTEGER NOT NULL DEFAULT 0,                  -- 캐시 읽기 토큰 합계
     token_cache_write  INTEGER NOT NULL DEFAULT 0,                  -- 캐시 쓰기 토큰 합계
@@ -1200,6 +1211,7 @@ CREATE INDEX idx_task_member            ON tbl_task (member_sn, status);
 CREATE INDEX idx_task_issue             ON tbl_task (issue_sn);
 CREATE INDEX idx_run_task               ON tbl_run (task_sn);
 CREATE INDEX idx_run_member             ON tbl_run (member_sn, create_at);
+CREATE INDEX idx_run_parent             ON tbl_run (parent_run_sn);
 CREATE INDEX idx_session_run            ON tbl_session (run_sn);
 CREATE INDEX idx_decision_status        ON tbl_decision (project_sn, status);
 CREATE INDEX idx_approval_status        ON tbl_approval (project_sn, status);

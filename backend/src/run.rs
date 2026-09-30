@@ -130,11 +130,11 @@ async fn in_review(tx: &DatabaseTransaction, sn: i64) -> Res<()> {
     }
 }
 
-/// 새 Run(queued)을 만들고 태스크를 in_progress로 올린다. StartRun · RetryRun 공용. 담당 멤버가 없거나 진행 중 Run이 있으면 409
+/// 새 Run(queued)을 만들고 태스크를 in_progress로 올린다. StartRun · RetryRun 공용. 담당 멤버가 없거나 진행 중 Run(하위 Run 제외 · #67)이 있으면 409
 async fn begin(tx: &DatabaseTransaction, task_sn: i64, retry: Option<i64>) -> Res<(Run, Ev)> {
     let t = tbl_task::Entity::find_by_id(task_sn).one(tx).await?.ok_or_else(Error::not_found)?;
     let member = t.member_sn.ok_or_else(|| Error::conflict("task has no member".into()))?;
-    if r::Entity::find().filter(r::Column::TaskSn.eq(task_sn)).filter(r::Column::Status.is_in(ACTIVE)).one(tx).await?.is_some() {
+    if r::Entity::find().filter(r::Column::TaskSn.eq(task_sn)).filter(r::Column::ParentRunSn.is_null()).filter(r::Column::Status.is_in(ACTIVE)).one(tx).await?.is_some() {
         return Err(Error::conflict("task already has an active run".into()));
     }
     if t.status != "in_progress" {
@@ -159,7 +159,7 @@ async fn list(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<
     Ok(Json(r::Entity::find().filter(r::Column::TaskSn.eq(sn)).order_by_asc(r::Column::Num).all(&db).await?.into_iter().map(Run::from).collect()))
 }
 
-/// Run 시작 (StartRun → RunStarted). Run은 queued로 만들고 태스크는 in_progress. 담당 멤버가 없거나 진행 중 Run이 있으면 409
+/// Run 시작 (StartRun → RunStarted). Run은 queued로 만들고 태스크는 in_progress. 담당 멤버가 없거나 진행 중 Run(하위 Run 제외 · #67)이 있으면 409
 #[utoipa::path(post, path = "/tasks/{sn}/runs", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 201, body = Run), (status = "default", body = ErrorBody)))]
 async fn start(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<(StatusCode, Json<Run>)> {
     let out = event::run(&db, async |tx| begin(tx, sn, None).await.map(|(out, ev)| (out, vec![ev]))).await?;
