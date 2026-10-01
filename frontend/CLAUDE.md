@@ -1,5 +1,7 @@
 # SvelteKit UI Implementation Rules
 
+> 컴포넌트 층 · 폴더 · 한 줄 판 · 꺼내는 기준은 [`docs/ui-components.md`](docs/ui-components.md)를 따른다 (2026-10-01 사용자 지시). 이 문서와 겹치면 그쪽이 우선한다.
+
 ## Scope
 
 These rules apply to pages and UI components built with SvelteKit, Svelte 5, shadcn-svelte, Bits UI, and Tailwind CSS.
