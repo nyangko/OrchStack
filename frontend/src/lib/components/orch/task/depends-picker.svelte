@@ -1,0 +1,80 @@
+<script lang="ts">
+	/// 의존 선택 창 (.pen C · Depends Picker): depends on / blocks 전환 · 태스크 검색 · 순환 의존 경고.
+	/// 고르면 그 관계를 넣거나 뺀다(토글). 트리거는 호출부가 그린다.
+	import type { Snippet } from 'svelte';
+	import * as Popover from '$lib/components/ui/popover';
+	import * as Command from '$lib/components/ui/command';
+	import { Segmented } from '$lib/components/ui/segmented';
+	import { statuses } from '$lib/status';
+	import type { Task, TaskDetail } from '$lib/mock';
+	import { cn } from '$lib/utils';
+
+	type Dep = TaskDetail['deps'][number];
+
+	let {
+		value = $bindable(),
+		current,
+		tasks,
+		depsOf,
+		trigger
+	}: {
+		/** 이 태스크의 의존 관계. */
+		value: Dep[];
+		/** 이 태스크 번호. 새 태스크면 undefined (순환 검사 없음). */
+		current?: number;
+		tasks: Task[];
+		/** 다른 태스크의 의존 관계 (순환 검사). */
+		depsOf: (num: number) => Dep[];
+		trigger: Snippet<[Record<string, unknown>]>;
+	} = $props();
+
+	let open = $state(false);
+	let kind = $state<Dep['kind']>('depends');
+
+	const has = (num: number) => value.some((d) => d.kind === kind && d.num === num);
+	/// 순환: X에 의존하려는데 X가 이미 이 태스크에 의존(또는 이 태스크가 X를 막음)하는 경우, blocks는 그 반대.
+	function cycle(num: number) {
+		if (current === undefined) return false;
+		const other = depsOf(num);
+		return kind === 'depends'
+			? other.some((d) => d.kind === 'depends' && d.num === current) || value.some((d) => d.kind === 'blocks' && d.num === num)
+			: other.some((d) => d.kind === 'blocks' && d.num === current) || value.some((d) => d.kind === 'depends' && d.num === num);
+	}
+	function toggle(num: number) {
+		value = has(num) ? value.filter((d) => !(d.kind === kind && d.num === num)) : [...value, { kind, num }];
+	}
+</script>
+
+<Popover.Root bind:open>
+	<Popover.Trigger>
+		{#snippet child({ props })}{@render trigger(props)}{/snippet}
+	</Popover.Trigger>
+	<Popover.Content align="start" class="w-75 gap-0 p-1">
+		<Segmented
+			class="w-full"
+			aria-label="관계"
+			options={[
+				{ value: 'depends', label: 'depends on' },
+				{ value: 'blocks', label: 'blocks' }
+			]}
+			bind:value={() => kind, (v) => (kind = v as Dep['kind'])}
+		/>
+		<Command.Root>
+			<Command.Input placeholder="#번호 · 제목 검색" />
+			<Command.List>
+				<Command.Empty>찾는 태스크가 없어요</Command.Empty>
+				{#each tasks.filter((t) => t.num !== current) as t (t.num)}
+					{@const m = statuses[t.status]}
+					{@const loop = cycle(t.num)}
+					<Command.Item value="#{t.num} {t.title}" data-checked={has(t.num)} disabled={loop && !has(t.num)} onSelect={() => toggle(t.num)} class="gap-2 py-1.5">
+						<m.icon class={cn('size-3.5', m.text)} />
+						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+							<span class="flex min-w-0 items-center gap-1.5"><span class="font-medium">#{t.num}</span><span class="truncate text-xs text-muted-foreground">{t.title}</span></span>
+							{#if loop}<span class="text-xs text-status-blocked">⚠ 순환 의존 — #{t.num}이 이미 #{current}{kind === 'depends' ? '에 의존' : '을 막음'}</span>{/if}
+						</span>
+					</Command.Item>
+				{/each}
+			</Command.List>
+		</Command.Root>
+	</Popover.Content>
+</Popover.Root>

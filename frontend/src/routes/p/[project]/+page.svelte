@@ -45,7 +45,7 @@
 	import * as Bubble from '$lib/components/ui/bubble';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { untrack, onDestroy } from 'svelte';
+	import { untrack, onDestroy, type Component } from 'svelte';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { toast } from 'svelte-sonner';
 	import { useMock } from '$lib/api/env';
@@ -93,6 +93,39 @@
 	import Users from '@lucide/svelte/icons/users';
 	import GitFork from '@lucide/svelte/icons/git-fork';
 	import { cn } from '$lib/utils';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import Maximize2 from '@lucide/svelte/icons/maximize-2';
+	import Minimize2 from '@lucide/svelte/icons/minimize-2';
+	import CircleDotIcon from '@lucide/svelte/icons/circle-dot';
+	import GitBranchIcon from '@lucide/svelte/icons/git-branch';
+	import Bold from '@lucide/svelte/icons/bold';
+	import Italic from '@lucide/svelte/icons/italic';
+	import List from '@lucide/svelte/icons/list';
+	import ListChecks from '@lucide/svelte/icons/list-checks';
+	import Code from '@lucide/svelte/icons/code';
+	import LinkIcon from '@lucide/svelte/icons/link';
+	import AtSign from '@lucide/svelte/icons/at-sign';
+	import FileText from '@lucide/svelte/icons/file-text';
+	import Link2Icon from '@lucide/svelte/icons/link-2';
+	import TimerIcon from '@lucide/svelte/icons/timer';
+	import Tag from '@lucide/svelte/icons/tag';
+	import Flag from '@lucide/svelte/icons/flag';
+	import WandSparkles from '@lucide/svelte/icons/wand-sparkles';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import X from '@lucide/svelte/icons/x';
+	import Radio from '@lucide/svelte/icons/radio';
+	import UserRoundX from '@lucide/svelte/icons/user-round-x';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { Kbd } from '$lib/components/ui/kbd';
+	import { Switch } from '$lib/components/ui/switch';
+	import { applyMd, type MdFormat } from '$lib/components/ui/md-editor';
+	import AssigneePicker from '$lib/components/orch/task/assignee-picker.svelte';
+	import DependsPicker from '$lib/components/orch/task/depends-picker.svelte';
+	import PriorityPicker from '$lib/components/orch/task/priority-picker.svelte';
+	import CriteriaList from '$lib/components/orch/task/criteria-list.svelte';
+	import { priorities, type Priority } from '$lib/priority';
+	import type { Role } from '$lib/roles';
+	import type { TaskDetail } from '$lib/mock';
 
 	const project = $derived(store.projects.find((p) => p.sn === Number(page.params.project)));
 
@@ -387,6 +420,160 @@
 
 	// Task Detail View (.pen TaskDetailView) — 가운데 뷰 위에 겹쳐 연다. 상세 데이터가 없는 태스크는 빈 상태로.
 	let details = $state(structuredClone(taskDetails));
+
+	// ── Task Editor (.pen XBNVi A · 새 태스크 / A' · 편집) · QuickAdd (.pen biSss) ─────────────────────
+	// 목데이터 단계: 만들고 고친 값은 페이지 목록(local) · 상세(details)에 바로 넣는다. 서버 저장은 API 단계(#92).
+	type Draft = {
+		num?: number;
+		title: string;
+		body: string;
+		issue: number;
+		status: TaskStatus;
+		agent?: number;
+		priority: Priority;
+		criteria: TaskDetail['criteria'];
+		deps: TaskDetail['deps'];
+		eta: string;
+		labels: string[];
+		files: { name: string; size: number; url?: string }[];
+	};
+	let editor = $state<Draft>();
+	let editorWide = $state(false);
+	let more = $state(false);
+	let bodyArea = $state<HTMLTextAreaElement>();
+	let fileInput = $state<HTMLInputElement>();
+	/// 새 태스크 기본 이슈: 열린 상세의 이슈 → 첫 진행 중 이슈 → 첫 이슈.
+	const defaultIssue = () => (cur ? cur.issue : (issueList.find((i) => i.status === 'in_progress') ?? issueList[0])?.num ?? 0);
+	const blank = (over: Partial<Draft> = {}): Draft => ({ title: '', body: '', issue: defaultIssue(), status: 'backlog', priority: 'P2', criteria: [], deps: [], eta: '', labels: [], files: [], ...over });
+
+	/// 새 태스크 편집기 (QuickAdd ⤢ · N).
+	function newTask(over: Partial<Draft> = {}) {
+		quick = undefined;
+		editorWide = false;
+		editor = blank(over);
+	}
+	/// 편집 모드 (Task 상세 ✎ · E).
+	function editTask(num: number) {
+		const t = task(num);
+		const d = details[num];
+		editorWide = false;
+		editor = {
+			num, title: t.title, body: d?.description ?? t.description ?? '', issue: t.issue, status: t.status, agent: t.agent, priority: t.priority,
+			criteria: structuredClone($state.snapshot(d?.criteria ?? [])), deps: [...(d?.deps ?? [])], eta: d?.eta ?? '', labels: [...(d?.labels ?? [])], files: []
+		};
+	}
+	/// 진행 중 Run (편집 경고 줄 · Runtime Instruction 전달).
+	const liveRunOf = (num?: number) => (num === undefined ? undefined : details[num]?.runs.find((r) => r.live));
+
+	/// 태스크 1개를 목록 · 상세에 넣는다. 번호는 프로젝트 안에서 다음 번호.
+	function createTask(d: Draft): number {
+		const num = Math.max(0, ...list.map((t) => t.num)) + 1;
+		local.push({ num, project: project?.sn, title: d.title.trim(), status: d.status, priority: d.priority, agent: d.agent, issue: d.issue, steps: [d.criteria.filter((c) => c.done).length, d.criteria.length], messages: 0, updated: 'just now' });
+		details[num] = { description: d.body, criteria: d.criteria, deps: d.deps, runs: [], activity: [{ type: 'CREATE', who: '나', time: now(), text: `Task #${num} 생성` }], eta: d.eta, labels: d.labels };
+		return num;
+	}
+	/// 편집기 제출 (⌘↵). 새 태스크면 만들고(계속 만들기면 비운 편집기 유지), 편집이면 덮어쓴다.
+	function saveTask(e?: Event) {
+		e?.preventDefault();
+		const d = editor;
+		if (!d || !d.title.trim()) return;
+		if (!useMock) {
+			toast.info('서버 저장은 API 단계에서 붙여요');
+			return;
+		}
+		if (d.num === undefined) {
+			const num = createTask(d);
+			toast.success(`Task #${num}을 만들었어요`);
+			if (more) {
+				editor = blank({ issue: d.issue, status: d.status, agent: d.agent, priority: d.priority });
+				return;
+			}
+			editor = undefined;
+			open(num);
+			return;
+		}
+		const t = task(d.num);
+		Object.assign(t, { title: d.title.trim(), status: d.status, priority: d.priority, agent: d.agent, issue: d.issue, steps: [d.criteria.filter((c) => c.done).length, d.criteria.length], updated: 'just now' });
+		const prev = details[d.num];
+		details[d.num] = { ...(prev ?? { runs: [], activity: [] }), description: d.body, criteria: d.criteria, deps: d.deps, eta: d.eta, labels: d.labels };
+		const run = liveRunOf(d.num);
+		if (run) {
+			details[d.num].activity.push({ type: 'RUNTIME_INSTRUCTION', who: `나 → ${agentName(t.agent) ?? '담당'}`, time: now(), text: `Task #${d.num} 변경 사항 전달 · Run #${run.num}` });
+			toast.success('저장했어요', { description: `Run #${run.num}에 Runtime Instruction으로 전달했어요` });
+		} else toast.success('저장했어요');
+		editor = undefined;
+	}
+
+	/// 설명 툴바 서식 (MdEditor와 같은 규칙). @는 언급.
+	async function format(kind: MdFormat) {
+		if (!bodyArea || !editor) return;
+		const { next, cursor } = applyMd(bodyArea.value, bodyArea.selectionStart, bodyArea.selectionEnd, kind);
+		editor.body = next;
+		await Promise.resolve();
+		bodyArea.focus();
+		bodyArea.setSelectionRange(cursor, cursor);
+	}
+	const bodyTools: { k: MdFormat; icon: typeof Bold; label: string }[] = [
+		{ k: 'b', icon: Bold, label: '굵게' },
+		{ k: 'i', icon: Italic, label: '기울임' },
+		{ k: 'ul', icon: List, label: '목록' },
+		{ k: 'task', icon: ListChecks, label: '체크리스트' },
+		{ k: 'code', icon: Code, label: '코드' },
+		{ k: 'link', icon: LinkIcon, label: '링크' },
+		{ k: 'mention', icon: AtSign, label: '언급' }
+	];
+	/// 첨부 — 이미지는 썸네일, 그 밖은 파일 상자. 목데이터라 브라우저 안에서만 보여 준다.
+	function attach(files: FileList | null) {
+		if (!editor || !files) return;
+		for (const f of files) editor.files.push({ name: f.name, size: f.size, url: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined });
+	}
+	const fileMeta = (f: { name: string; size: number }) => `${f.name.split('.').pop()?.toUpperCase() ?? 'FILE'} · ${f.size < 1024 ? `${f.size}B` : `${Math.round(f.size / 1024)}KB`}`;
+
+	/// 추천 담당 — 제목 · 라벨에 역할 낱말이 있으면 그 역할 (.pen 추천 · 역할 일치).
+	const roleWords: Partial<Record<Role, string[]>> = {
+		frontend: ['ui', 'front', '화면', 'login', '폼'],
+		backend: ['api', 'db', 'server', 'token', 'backend', '스키마'],
+		qa: ['qa', 'test', '검증', 'e2e'],
+		designer: ['design', '디자인', '시안', 'ui'],
+		reviewer: ['review', '리뷰']
+	};
+	function recommendFor(title: string, labels: string[]) {
+		const words = `${title} ${labels.join(' ')}`.toLowerCase();
+		return agentList.filter((a) => roleWords[a.role]?.some((w) => words.includes(w))).map((a) => a.sn);
+	}
+	const openCount = (sn: number) => list.filter((t) => t.agent === sn && !['done', 'cancelled'].includes(t.status)).length;
+	/// Orch에게 배정 맡기기 — 추천 중(없으면 전체) 열린 태스크가 가장 적은 에이전트. 실제 판단은 서버 Orch(#87).
+	function orchPick(title: string, labels: string[]) {
+		const pool = recommendFor(title, labels);
+		const best = (pool.length ? agentList.filter((a) => pool.includes(a.sn)) : agentList).toSorted((a, b) => openCount(a.sn) - openCount(b.sn))[0];
+		if (best) toast(`Orch가 ${best.name}에게 배정했어요`, { description: '역할 · 부하 기준' });
+		return best?.sn;
+	}
+	/// 제목만 적으면 Orch가 설명 · 완료 조건 · 담당 · 의존을 제안 (.pen Orch Draft). 목데이터: 정해진 틀로 채운다.
+	function orchDraft() {
+		const d = editor;
+		if (!d?.title.trim()) return toast.warning('제목을 먼저 적어 주세요');
+		if (!d.body.trim()) d.body = `${d.title.trim()} — 범위 · 완료 기준을 정리했어요. 필요하면 고쳐 주세요.`;
+		if (!d.criteria.length) d.criteria = [{ text: '동작 구현', done: false }, { text: '오류 · 빈 상태 처리', done: false }, { text: '테스트 통과', done: false }];
+		d.agent ??= orchPick(d.title, d.labels);
+		toast.success('Orch 초안을 채웠어요');
+	}
+
+	// QuickAdd — Quick Panel 헤더 +. Enter로 바로 만들고, ⤢로 편집기에 이어서.
+	let quick = $state<{ title: string; status: TaskStatus; agent?: number; priority: Priority }>();
+	function openQuick(status: TaskStatus = 'todo') {
+		leftOpen = true;
+		panelTab = 'tasks';
+		quick = { title: '', status, priority: 'P2' };
+	}
+	function quickSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		if (!quick?.title.trim()) return;
+		if (!useMock) return toast.info('서버 저장은 API 단계에서 붙여요');
+		const num = createTask(blank({ ...quick }));
+		toast.success(`Task #${num}을 만들었어요`);
+		quick = { ...quick, title: '' };
+	}
 	const cur = $derived(detail && selected !== undefined ? list.find((t) => t.num === selected) : undefined);
 	const info = $derived(cur ? details[cur.num] : undefined);
 	// Run 목록 — 목데이터는 상세에 있고, 서버는 상세를 열 때 GET /tasks/{sn}/runs. 토큰은 #88 뒤에.
@@ -505,12 +692,40 @@
 <svelte:head><title>{project?.name ?? '프로젝트'} · OrchStack</title></svelte:head>
 <svelte:window
 	onkeydown={(e) => {
-		if (e.key !== 'Escape') return;
-		detail = false;
-		inspect = undefined;
-		issueSel = undefined;
+		// 편집기 · 다이얼로그가 열려 있으면 그쪽이 키를 처리한다
+		if (editor || panel) return;
+		const typing = e.target instanceof HTMLElement && (e.target.closest('input, textarea, [contenteditable]') !== null);
+		if (e.key === 'Escape') {
+			if (quick) return void (quick = undefined);
+			detail = false;
+			inspect = undefined;
+			issueSel = undefined;
+			return;
+		}
+		if (typing || e.altKey) return;
+		// N · ⌘N 새 태스크 (브라우저가 ⌘N을 가로채면 N만), E 편집 (.pen A · A')
+		if (e.key.toLowerCase() === 'n' && !e.shiftKey) {
+			e.preventDefault();
+			newTask();
+		} else if (e.key.toLowerCase() === 'e' && !e.metaKey && !e.ctrlKey && cur) {
+			e.preventDefault();
+			editTask(cur.num);
+		}
 	}}
 />
+
+<!-- Task Editor 속성 칩 (.pen TaskEditor · Properties) -->
+{#snippet propChip(props: Record<string, unknown>, Icon: Component, label: string, tone = 'text-muted-foreground')}
+	<button type="button" {...props} class="flex h-6 items-center gap-1.5 rounded-sm border px-2 text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+		<Icon class={cn('size-3.25', tone)} />{label}
+	</button>
+{/snippet}
+<!-- QuickAdd 칩 (.pen QuickAdd · Options) -->
+{#snippet quickChip(props: Record<string, unknown>, Icon: Component, label: string, tone = 'text-muted-foreground')}
+	<button type="button" {...props} class="flex h-6 items-center gap-1 rounded-md border border-input bg-background px-1.5 text-xs font-medium text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+		<Icon class={cn('size-3', tone)} />{label}
+	</button>
+{/snippet}
 
 <!-- Issue Board 행: 이슈와 하위 이슈가 같은 모양이라 재귀로 그린다 -->
 {#snippet issueRow(i: Issue, depth: number)}
@@ -614,7 +829,7 @@
 								<Tabs.Trigger value="agents">Agents</Tabs.Trigger>
 							</Tabs.List>
 							<span class="flex-1"></span>
-							<Button variant="ghost" size="icon-sm" aria-label="새 태스크"><Plus /></Button>
+							<Button variant="ghost" size="icon-sm" aria-label="새 태스크" aria-expanded={quick !== undefined} onclick={() => (quick ? (quick = undefined) : openQuick())}><Plus /></Button>
 							<Button variant="ghost" size="icon-sm" aria-label="Quick panel 접기" onclick={() => (leftOpen = false)}><PanelLeftClose /></Button>
 						</div>
 						{#if panelTab === 'tasks'}
@@ -630,6 +845,35 @@
 							</div>
 						{/if}
 					</div>
+
+					{#if quick && panelTab === 'tasks'}
+						{@const q = quick}
+						{@const qa = agentOf(q.agent)}
+						<!-- QuickAdd (.pen QuickAdd · open) — Enter 만들기 · Esc 닫기 · ⤢ 편집기 -->
+						<form onsubmit={quickSubmit} class="flex flex-col gap-2 border-b p-3" aria-label="빠른 태스크 추가">
+							<InputGroup.Root class="h-8 border-ring">
+								<InputGroup.Addon><Plus /></InputGroup.Addon>
+								<!-- svelte-ignore a11y_autofocus -->
+								<InputGroup.Input autofocus bind:value={q.title} placeholder="태스크 제목" aria-label="태스크 제목" onkeydown={(e) => e.key === 'Escape' && (quick = undefined)} />
+								<InputGroup.Addon align="inline-end">
+									<InputGroup.Button size="icon-xs" aria-label="편집기로 열기" title="편집기로 열기" onclick={() => newTask({ title: q.title, status: q.status, agent: q.agent, priority: q.priority })}><Maximize2 /></InputGroup.Button>
+								</InputGroup.Addon>
+							</InputGroup.Root>
+							<div class="flex items-center gap-1">
+								<StatusSelect bind:value={q.status}>
+									{#snippet trigger(props)}{@const m = statuses[q.status]}{@render quickChip(props, m.icon, m.label)}{/snippet}
+								</StatusSelect>
+								<AssigneePicker bind:value={q.agent} agents={agentList} tasks={list} recommend={recommendFor(q.title, [])}>
+									{#snippet trigger(props)}{@render quickChip(props, Bot, qa?.name ?? 'Assignee')}{/snippet}
+								</AssigneePicker>
+								<PriorityPicker bind:value={q.priority}>
+									{#snippet trigger(props)}{@render quickChip(props, Flag, q.priority)}{/snippet}
+								</PriorityPicker>
+								<span class="flex-1"></span>
+								<Kbd>↵</Kbd>
+							</div>
+						</form>
+					{/if}
 
 					<Tabs.Content value="tasks" class="min-h-0 flex-1 overflow-y-auto">
 						{#each shown as t (t.num)}
@@ -862,6 +1106,7 @@
 									<p class="truncate text-xs text-muted-foreground">{project.name} / Issue #{cur.issue} {iss?.title} / <span class="font-mono">TASK #{cur.num}</span></p>
 									<h2 class="text-lg font-semibold">{cur.title}</h2>
 								</div>
+								<Button variant="ghost" size="icon-sm" aria-label="편집 (E)" title="편집 (E)" onclick={() => editTask(cur.num)}><Pencil /></Button>
 								<Button variant="ghost" size="sm" onclick={() => navigator.clipboard?.writeText(`${page.url.origin}${page.url.pathname}?task=${cur.num}`)}><Link2 />Copy link</Button>
 							{#snippet sub()}
 							<div class="flex flex-wrap items-center gap-2 pl-11">
@@ -1524,6 +1769,160 @@
 					</section>
 				{/if}
 			</Dialog.Body>
+		</Dialog.Content>
+	</Dialog.Root>
+
+	<!-- Task Editor (.pen XBNVi A · 새 태스크 / A' · 편집) -->
+	<Dialog.Root bind:open={() => editor !== undefined, (v) => !v && (editor = undefined)}>
+		<!-- ⌘↵ 제출 -->
+		<Dialog.Content size={editorWide ? 'xl' : 'md'} onkeydown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && saveTask(e)}>
+			{#if editor}
+				{@const d = editor}
+				{@const top = issueOf(topIssue(d.issue))}
+				{@const subs = top ? subIssues(top.num) : []}
+				{@const leaf = issueOf(d.issue)}
+				{@const who = agentOf(d.agent)}
+				{@const st = statuses[d.status]}
+				{@const pr = priorities[d.priority]}
+				{@const run = liveRunOf(d.num)}
+				<form onsubmit={saveTask} class="contents">
+					<Dialog.Header>
+						{#snippet lead()}<span class="flex size-5 shrink-0 items-center justify-center rounded-xs bg-node-task text-on-solid"><SquareCheck class="size-3" /></span>{/snippet}
+						<Dialog.Title class="sr-only">{d.num === undefined ? '새 태스크' : `Task #${d.num} 편집`}</Dialog.Title>
+						<!-- 경로: 프로젝트 / 이슈 / 하위 이슈 -->
+						<div class="flex min-w-0 items-center gap-2 text-xs">
+							<span class="text-muted-foreground">{project.name}</span>
+							<span class="text-subtle-foreground">/</span>
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<button type="button" {...props} class="flex items-center gap-1 rounded-sm border px-1.5 py-0.75 font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+											<CircleDotIcon class="size-3 text-node-issue" />{top ? `#${top.num} ${top.title}` : '이슈 선택'}<ChevronDown class="size-2.75 text-muted-foreground" />
+										</button>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="start" class="w-64">
+									{#each issueList.filter((i) => !i.parent) as i (i.num)}
+										<DropdownMenu.Item onSelect={() => (d.issue = i.num)}><CircleDotIcon class="text-node-issue" />#{i.num} {i.title}{#if top?.num === i.num}<Check class="ml-auto" />{/if}</DropdownMenu.Item>
+									{/each}
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
+							{#if subs.length}
+								<span class="text-subtle-foreground">/</span>
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger>
+										{#snippet child({ props })}
+											<button type="button" {...props} class="flex items-center gap-1 rounded-sm border px-1.5 py-0.75 font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+												<GitBranchIcon class="size-3 text-node-issue" />{leaf?.parent ? `#${leaf.num} ${leaf.title}` : '하위 이슈'}<ChevronDown class="size-2.75 text-muted-foreground" />
+											</button>
+										{/snippet}
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Content align="start" class="w-60">
+										<DropdownMenu.Item onSelect={() => top && (d.issue = top.num)}>하위 이슈 없음{#if !leaf?.parent}<Check class="ml-auto" />{/if}</DropdownMenu.Item>
+										{#each subs as i (i.num)}
+											<DropdownMenu.Item onSelect={() => (d.issue = i.num)}><GitBranchIcon class="text-node-issue" />#{i.num} {i.title}{#if d.issue === i.num}<Check class="ml-auto" />{/if}</DropdownMenu.Item>
+										{/each}
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
+							{/if}
+						</div>
+						{#snippet actions()}
+							<Button variant="ghost" size="icon-sm" aria-label={editorWide ? '작게' : '크게'} onclick={() => (editorWide = !editorWide)}>{#if editorWide}<Minimize2 />{:else}<Maximize2 />{/if}</Button>
+						{/snippet}
+					</Dialog.Header>
+
+					<Dialog.Body class="gap-3.5">
+						<!-- svelte-ignore a11y_autofocus -->
+						<input autofocus bind:value={d.title} placeholder="태스크 제목" aria-label="제목" class="w-full border-b pt-1 pb-1.5 text-2xl font-semibold outline-none placeholder:text-subtle-foreground" />
+
+						<!-- 설명 (.pen Description Editor) -->
+						<div class="flex flex-col overflow-hidden rounded-md border focus-within:border-ring">
+							<div class="flex items-center gap-0.5 bg-muted px-2 py-1.5">
+								{#each bodyTools as t (t.k)}
+									<button type="button" aria-label={t.label} title={t.label} onclick={() => format(t.k)} class="flex size-6.5 items-center justify-center rounded-xs text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"><t.icon class="size-3.5" /></button>
+								{/each}
+								<button type="button" aria-label="첨부" title="첨부" onclick={() => fileInput?.click()} class="flex size-6.5 items-center justify-center rounded-xs text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"><Paperclip class="size-3.5" /></button>
+								<input bind:this={fileInput} type="file" multiple class="hidden" onchange={(e) => (attach(e.currentTarget.files), (e.currentTarget.value = ''))} />
+								<span class="flex-1"></span>
+								<span class="text-caption text-subtle-foreground">Markdown · @ 언급</span>
+							</div>
+							<textarea bind:this={bodyArea} bind:value={d.body} placeholder="무엇을 · 왜 · 참고할 것" aria-label="설명" class="field-sizing-content min-h-16 resize-none bg-transparent px-3 py-2.5 text-body outline-none placeholder:text-subtle-foreground"></textarea>
+							{#if d.files.length}
+								<div class="flex flex-wrap gap-2.5 px-3 pb-3">
+									{#each d.files as f, i (i)}
+										<div class="relative">
+											{#if f.url}
+												<img src={f.url} alt={f.name} class="size-15 rounded-md border object-cover" />
+											{:else}
+												<div class="flex h-15 w-52 items-center gap-2.5 rounded-md border bg-card pr-3 pl-2.5">
+													<span class="flex size-9 shrink-0 items-center justify-center rounded-sm bg-primary text-on-solid"><FileText class="size-4.5" /></span>
+													<span class="flex min-w-0 flex-col gap-0.5"><span class="truncate text-xs font-medium">{f.name}</span><span class="text-caption text-muted-foreground">{fileMeta(f)}</span></span>
+												</div>
+											{/if}
+											<button type="button" aria-label="{f.name} 빼기" onclick={() => d.files.splice(i, 1)} class="absolute -top-1.5 -right-1.5 flex size-4.5 items-center justify-center rounded-full border-2 border-card bg-foreground text-background"><X class="size-2.5" /></button>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</div>
+
+						<!-- 완료 조건 -->
+						<section class="flex flex-col gap-0.5 rounded-md border p-3" aria-label="완료 조건">
+							<h3 class="pb-1 text-xs font-semibold text-muted-foreground">완료 조건</h3>
+							<CriteriaList bind:items={d.criteria} />
+						</section>
+
+						<!-- 속성 칩 (.pen Properties) — 선택 창은 C -->
+						<div class="flex flex-wrap items-center gap-1.5">
+							<StatusSelect bind:value={d.status}>
+								{#snippet trigger(props)}{@render propChip(props, st.icon, st.label, st.text)}{/snippet}
+							</StatusSelect>
+							<AssigneePicker bind:value={d.agent} agents={agentList} tasks={list} recommend={recommendFor(d.title, d.labels)} onorch={() => (d.agent = orchPick(d.title, d.labels))}>
+								{#snippet trigger(props)}
+									<button type="button" {...props} class="flex h-6 items-center gap-1.5 rounded-sm border px-2 text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+										{#if who}<RoleAvatar role={who.role} size="sm" class="size-4" />{who.name} · {roles[who.role].label}{:else}<UserRoundX class="size-3.25 text-muted-foreground" />Unassigned{/if}
+									</button>
+								{/snippet}
+							</AssigneePicker>
+							<PriorityPicker bind:value={d.priority}>
+								{#snippet trigger(props)}{@render propChip(props, pr.icon, d.priority, pr.text)}{/snippet}
+							</PriorityPicker>
+							<DependsPicker bind:value={d.deps} current={d.num} tasks={list} depsOf={(n) => details[n]?.deps ?? []}>
+								{#snippet trigger(props)}
+									{@const dep = d.deps.filter((x) => x.kind === 'depends')}
+									{@render propChip(props, Link2Icon, dep.length ? `depends on ${dep.map((x) => `#${x.num}`).join(', ')}` : d.deps.length ? `blocks ${d.deps.map((x) => `#${x.num}`).join(', ')}` : 'Depends')}
+								{/snippet}
+							</DependsPicker>
+							<!-- ETA · 라벨 선택 창은 .pen에 없어 표시만 (#60) -->
+							<span class="flex h-6 items-center gap-1.5 rounded-sm border px-2 text-xs text-muted-foreground"><TimerIcon class="size-3.25" />{d.eta || 'ETA'}</span>
+							<span class="flex h-6 items-center gap-1.5 rounded-sm border px-2 text-xs text-muted-foreground"><Tag class="size-3.25" />{d.labels.length ? d.labels.join(' · ') : 'Labels'}</span>
+						</div>
+
+						{#if d.num === undefined}
+							<div class="flex items-center gap-2.5 rounded-md bg-primary-soft px-3 py-2.5 text-xs">
+								<Sparkles class="size-3.75 shrink-0 text-primary" />
+								<span class="flex-1">제목만 적으면 Orch가 설명 · 완료 조건 · 담당자 · 의존 관계를 제안해요</span>
+								<Button variant="outline" size="sm" onclick={orchDraft}><WandSparkles />초안 요청</Button>
+							</div>
+						{:else if run}
+							<div class="flex items-center gap-2.5 rounded-md bg-warning-soft px-3 py-2.5 text-xs">
+								<Radio class="size-3.75 shrink-0 text-status-waiting" />
+								<span>{who?.name ?? '담당'}이 Run #{run.num} 실행 중 — 저장하면 변경 사항이 Runtime Instruction으로 전달돼요</span>
+							</div>
+						{/if}
+					</Dialog.Body>
+
+					<Dialog.Footer>
+						{#snippet lead()}
+							{#if d.num === undefined}
+								<label class="flex items-center gap-1.5 text-xs text-muted-foreground"><Switch size="sm" bind:checked={more} aria-label="계속 만들기" />계속 만들기</label>
+							{/if}
+						{/snippet}
+						<Dialog.Close>{#snippet child({ props })}<Button type="button" variant="ghost" {...props}>취소</Button>{/snippet}</Dialog.Close>
+						<Button type="submit" disabled={!d.title.trim()}>{d.num === undefined ? '태스크 생성' : '저장'}<Kbd class="bg-primary-foreground/15 text-primary-foreground">⌘↵</Kbd></Button>
+					</Dialog.Footer>
+				</form>
+			{/if}
 		</Dialog.Content>
 	</Dialog.Root>
 {:else}

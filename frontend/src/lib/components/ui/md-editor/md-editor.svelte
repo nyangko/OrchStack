@@ -44,6 +44,25 @@
 		}
 		return rows;
 	}
+
+	export type MdFormat = "h" | "b" | "i" | "ul" | "task" | "code" | "link" | "quote" | "var" | "include" | "mention";
+
+	/// 선택 영역(s~e)을 감싸거나(굵게 등) 줄 앞에 붙인다(제목 · 목록 등). 바뀐 글과 커서 위치를 돌려준다.
+	/// MdEditor 툴바와 Task Editor 설명 툴바가 같이 쓴다.
+	export function applyMd(value: string, s: number, e: number, kind: MdFormat): { next: string; cursor: number } {
+		const sel = value.slice(s, e);
+		const wrap: Partial<Record<MdFormat, [string, string]>> = { b: ["**", "**"], i: ["*", "*"], code: ["`", "`"], link: ["[", "](url)"], var: ["{{", "}}"], mention: ["@", ""] };
+		const prefix: Partial<Record<MdFormat, string>> = { h: "## ", ul: "- ", task: "- [ ] ", quote: "> ", include: "@include " };
+		const w = wrap[kind];
+		if (w) {
+			const [l, r] = w;
+			const inner = sel || (kind === "var" ? "team.name" : "");
+			return { next: value.slice(0, s) + l + inner + r + value.slice(e), cursor: s + l.length + inner.length };
+		}
+		const lineStart = value.lastIndexOf("\n", s - 1) + 1;
+		const pre = prefix[kind] ?? "";
+		return { next: value.slice(0, lineStart) + pre + value.slice(lineStart), cursor: e + pre.length };
+	}
 </script>
 
 <script lang="ts">
@@ -124,24 +143,10 @@
 		caret = { ln: before.length, col: before[before.length - 1].length + 1 };
 	}
 
-	/// 선택 영역을 감싸거나(굵게 등) 줄 앞에 붙인다(제목 · 목록 등).
-	async function format(kind: "h" | "b" | "i" | "ul" | "task" | "code" | "link" | "quote" | "var" | "include") {
+	/// 툴바 서식 적용 (applyMd).
+	async function format(kind: MdFormat) {
 		if (!area || !file) return;
-		const { selectionStart: s, selectionEnd: e, value } = area;
-		const sel = value.slice(s, e);
-		const wrap: Record<string, [string, string]> = { b: ["**", "**"], i: ["*", "*"], code: ["`", "`"], link: ["[", "](url)"], var: ["{{", "}}"] };
-		const prefix: Record<string, string> = { h: "## ", ul: "- ", task: "- [ ] ", quote: "> ", include: "@include " };
-		let next: string;
-		let cursor: number;
-		if (wrap[kind]) {
-			const [l, r] = wrap[kind];
-			next = value.slice(0, s) + l + (sel || (kind === "var" ? "team.name" : "")) + r + value.slice(e);
-			cursor = s + l.length + (sel || (kind === "var" ? "team.name" : "")).length;
-		} else {
-			const lineStart = value.lastIndexOf("\n", s - 1) + 1;
-			next = value.slice(0, lineStart) + prefix[kind] + value.slice(lineStart);
-			cursor = e + prefix[kind].length;
-		}
+		const { next, cursor } = applyMd(area.value, area.selectionStart, area.selectionEnd, kind);
 		file.body = next;
 		await tick();
 		area.focus();

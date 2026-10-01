@@ -1,10 +1,12 @@
 <script lang="ts">
 	/// Task 상태 선택 (.pen StatusSelect + StatusMenu). 트리거는 현재 상태 색, 메뉴는 전체 상태 목록.
 	import * as Select from "$lib/components/ui/select/index.js";
+	import { Select as SelectPrimitive } from "bits-ui";
 	import ChevronDown from "@lucide/svelte/icons/chevron-down";
 	import Check from "@lucide/svelte/icons/check";
 	import { statuses, statusOrder, type TaskStatus } from "$lib/status.js";
 	import { cn } from "$lib/utils.js";
+	import type { Snippet } from "svelte";
 
 	let {
 		value = $bindable(),
@@ -12,6 +14,7 @@
 		compact = false,
 		class: className,
 		onValueChange,
+		trigger,
 	}: {
 		value: TaskStatus;
 		disabled?: boolean;
@@ -19,6 +22,8 @@
 		compact?: boolean;
 		class?: string;
 		onValueChange?: (value: TaskStatus) => void;
+		/** 트리거를 호출부가 그릴 때 (예: Task Editor 속성 칩). 받은 props를 그 요소에 펼친다. */
+		trigger?: Snippet<[Record<string, unknown>]>;
 	} = $props();
 
 	const current = $derived(statuses[value]);
@@ -30,6 +35,10 @@
 	onValueChange={(v) => onValueChange?.(v as TaskStatus)}
 	{disabled}
 >
+	{#if trigger}
+		<!-- ui/select Trigger는 child를 넘기지 않아 bits-ui 원본을 쓴다 -->
+		<SelectPrimitive.Trigger>{#snippet child({ props })}{@render trigger(props)}{/snippet}</SelectPrimitive.Trigger>
+	{:else}
 	<Select.Trigger
 		aria-label={compact ? `Status: ${current.label}` : "Status"}
 		title={compact ? `${current.label} · 클릭하여 변경` : undefined}
@@ -48,6 +57,7 @@
 			<ChevronDown class="size-3" />
 		{/if}
 	</Select.Trigger>
+	{/if}
 	<Select.Content class="w-47 p-1">
 		{#each statusOrder as s (s)}
 			{@const m = statuses[s]}
