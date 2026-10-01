@@ -1,333 +1,307 @@
-# UI 컴포넌트 지침
+# SvelteKit UI and Component Rules
 
-SvelteKit · Svelte 5 · shadcn-svelte(Bits UI) · Tailwind CSS 프로젝트의 화면과 컴포넌트에 적용한다.
-`.svelte` 를 새로 만들거나 고치기 전에 이 문서를 기준으로 삼는다.
+Applies to SvelteKit, Svelte 5, shadcn-svelte, Bits UI, and Tailwind CSS projects.
 
-> 이 프로젝트에서 서비스 이름은 `orch` 다. 아래의 `cms/<종류>/` 는 `src/lib/components/orch/<종류>/` 로 읽는다.
+**Primary rule:** A developer should be able to read a page from top to bottom, understand its screen and user actions, and change it without tracing unnecessary files.
+
+Follow the repository's existing instructions, installed versions, design system, and issue contract. Apply these rules within the requested task. Do not start an unrelated migration.
+
+## This project (OrchStack)
+
+- `{project}` = `orch` → `src/lib/components/orch/`.
+- `ui/` holds **shadcn-svelte components only** (사용자 지시 2026-10-01). Product-independent components that shadcn does not have (Kanban, Combobox, Checklist, …) also live under `orch/`, built as generic as possible.
+- Callers use **named tags only** — `<KanbanBoard><KanbanColumn><KanbanColumnHeader>`, `<DropdownMenu><DropdownMenuTrigger>` — not `import * as X` / `<X.Root>`. Each `index.ts` exports every part as `<Component><Part>`.
+- Canonical stylesheet: `src/app.css` (raw values in `:root` / `.dark`, mappings in `@theme inline`). Role styles: `src/lib/styles/roles.css`. Styles owned by one screen with real repeated use: `src/lib/styles/screens.css`.
 
 ---
 
-## 0. 원칙 한 줄
+## 1. Inspect before creating
 
-**화면은 페이지에서 위에서 아래로 한 번 읽고 고칠 수 있어야 한다.**
-파일 수를 줄이고 한 화면의 가독성을 지키는 것이 컴포넌트를 잘게 나누는 것보다 우선한다.
+Before writing or modifying UI:
 
----
+- Inspect the page and comparable screens.
+- Find existing UI and project components with the same purpose.
+- Find the canonical tokens, component styles, utilities, variants, and class-merging conventions.
+- Check installed versions before using framework or Tailwind syntax.
+- Identify who owns the data, editing draft, and submission.
+- Reuse or extend a suitable component before creating another.
 
-## 1. 층과 책임
+## 2. Component boundaries
 
-| 층 | 위치 | 책임 |
+| Layer | Typical location | Responsibility |
 |---|---|---|
-| Page | `src/routes/**` | 화면 구성과 배치. 데이터를 사용자 동작에 잇는다 |
-| Primitive | `src/lib/components/ui/` | 범용 부품. 업무 데이터를 모른다 |
-| Layout | `src/lib/components/layout/` | 화면 틀(헤더 · 사이드바) |
-| Feature | `src/lib/components/cms/<종류>/` | 이 서비스 전용 부품. 완결된 사용자 작업 하나를 맡는다 |
-| Logic | `src/lib/logic/` | 계산 · 필터링 · 변환 · 상태 판정. TypeScript 순수 함수 |
-| State | `src/lib/state/` | 여러 화면이 나눠 쓰는 상태(`*.svelte.ts`) |
-| API | `src/lib/api/` | 서버 호출 |
-| Config | `src/lib/config/` | 라벨 · 상태 이름 · 고정 목록 |
+| Foundation | The project's canonical stylesheet | Theme values, tokens, and shared styles |
+| UI primitives | `src/lib/components/ui/` | Product-independent controls |
+| Project components | `src/lib/components/{project}/` | This product's concepts, workflows, and complex UI |
+| Layout | SvelteKit layouts or existing layout components | Shared application shell |
+| Page | `src/routes/**` | Screen order, composition, data, and user actions |
+| Shared logic and API | Existing project locations | Reused rules, contracts, and server communication |
 
-- `cms` 는 이 프로젝트의 이름이다. 프로젝트마다 서비스 이름으로 바꿔도 된다(예: `erp/`, `app/`). 규칙은 같다.
-- 층을 새로 만들지 않는다. `sections/` · `widgets/` · `containers/` · `blocks/` 같은 정리용 폴더를 두지 않는다.
+Use the actual project name in place of `{project}`. Keep existing repository paths when they already express these boundaries.
 
-```
-src/lib/components/
-├─ ui/                 범용 부품 (shadcn 조각 + 한 줄 판)
-├─ layout/             AppHeader · Sidebar …
-└─ cms/
-   ├─ dialog/          XxxDialog.svelte
-   ├─ menu/            XxxActions.svelte
-   ├─ viewer/          XxxViewer.svelte
-   ├─ form/            (필요해질 때)
-   └─ table/           (필요해질 때)
-```
+A component belongs in `ui/` only when its public API and behavior are independent of this product's concepts. Reuse within one product does not make it a universal UI primitive.
+
+For example, a board designed for OrchStack tasks, statuses, and agent workflows belongs under `components/orch/`, even if several OrchStack pages use it. Its independent Button or Popover controls remain in `ui/`.
+
+**Reason:** Directory placement communicates whether a component carries product assumptions.
+
+## 3. Use libraries and wrappers deliberately
+
+- Prefer an installed shadcn-svelte component for a standard control.
+- Use Bits UI when an existing project component does not provide the required interaction.
+- Do not rebuild the same Bits UI composition in multiple pages.
+- Do not wrap a component merely to rename its import.
+- Create a wrapper when it establishes a shared API, behavior, or design rule used by real call sites.
+- Provide a ready-to-use API when callers repeatedly assemble the same structure. Keep lower-level composition available for exceptional cases. Do not require a "single" wrapper for every shadcn-svelte component.
+
+## 4. Extract components only with a concrete reason
+
+Create a separate component when at least one condition applies:
+
+1. It has at least two actual call sites.
+2. It owns a complete user task with meaningful state and behavior.
+3. It is an independent complex UI, such as a viewer, editor, chart, or advanced input.
+
+A visual card, heading, section, or table is not automatically a component. File length and possible future reuse are not sufficient reasons.
+
+Before extracting, confirm that its responsibility fits in one sentence, its name and props explain its use, and the page becomes easier to read.
+
+An extracted project dialog should normally own its frame, form state, and submission flow. Do not leave the frame in the page while hiding only its inner fields in another component.
+
+Do not create `sections/`, `widgets/`, or `containers/` merely to organize unnecessary components. Group project components further only when the existing files warrant it.
+
+## 5. Make pages readable in display order
+
+A `+page.svelte` file should show the screen in approximately the order users encounter it: heading, primary actions, filters, content, supporting information, and dialogs.
+
+- Keep simple, single-use markup at its display location.
+- Use data and `{#each}` for repeated structures.
+- Remove duplication and misplaced logic before splitting a long page.
+- Extract a complete task or independent complex UI when it improves readability.
+- Do not replace the screen with an opaque list of tiny components.
+
+There is no automatic line-count threshold for extraction.
+
+## 6. Use snippets for composition
+
+Use snippets for required library composition, child content, or short markup genuinely reused within a file.
+
+Do not move a single-use section away from its display position, represent most of a page as snippet functions, or replace ordinary data-driven rendering with snippets.
+
+Bits UI and shadcn-svelte `child` snippets remain valid when their APIs require them.
+
+## 7. Keep local state and behavior together
+
+Put component-specific state, event handlers, short validation, and display calculations in that component's `<script lang="ts">`.
+
+Extract logic when it is reused, independently maintained, too complex for the component to remain readable, or belongs to an API or server boundary. Do not create a `.ts` file merely to separate "logic" from markup.
+
+Give each value one owner. A child may own an editing draft, but parent and child must not keep independent authoritative copies of the same value.
+
+A project component may coordinate its own pending state, submission, and notification when these complete its user task. Keep API transport and shared business rules in their established locations.
+
+Do not store per-user or per-request data in server module globals. Clean up subscriptions, timers, observers, and similar resources when they are no longer needed.
+
+## 8. Design APIs for callers
+
+- Expose only props needed by current call sites.
+- Keep related controls consistent in value, size, disabled state, labels, descriptions, and errors.
+- Use variants for a small number of meaningful choices.
+- Avoid overlapping `mode`, `kind`, `type`, `variant`, and configuration props.
+- Preserve internal interaction when accepting caller event handlers.
+- Preserve library attributes, keyboard behavior, and focus handling.
+- Do not make callers pass the same long class list repeatedly.
+- Use compound components such as Root, Column, and Item when flexible composition is genuinely needed. Do not force every component into that structure.
 
 ---
 
-## 2. `ui/` — 범용 부품
+## Foundation, Classes, and Tokens
 
-### 2-1. 무엇이 들어가나
+## 9. Use one canonical source for each design role
 
-- shadcn-svelte 로 설치한 부품과 그 조각 파일(`dialog-content.svelte` …).
-- shadcn 에 없지만 **업무 데이터를 모르는** 범용 부품. 예: combobox(쳐서 찾는 한 값 고르기), pick-menu(목록을 좁히는 거르개 · 정렬 단추), page-title, icon, confirm.
-- 업무 이름이 붙은 것은 `ui/` 에 두지 않는다. `ProjectCombobox` 는 `ui/` 가 아니다. 옵션은 부르는 쪽이 만든다.
+Locate the project's canonical stylesheet before adding tokens. Its path may differ across projects; do not assume it is always `src/routes/layout.css`.
 
-### 2-2. 「한 줄 판」(`*-single.svelte`)
+One design role has one source value. For example, the card surface has one `--card` value. Do not add `--surface` or another independently maintained value for the same role.
 
-자주 쓰는 shadcn 부품에는 조각을 다 짜 둔 **한 줄 판**을 하나 둔다.
+For Tailwind CSS v4, organize the foundation as:
 
-- 반복되는 틀(머리 · 제목 · 설명 · 아이콘 · 단추 · 오류)은 **props** 로 받는다.
-- 내용(몸)만 **`children`** 으로 받는다.
-- 부르는 쪽은 조각(`Root` · `Content` · `Header` …)을 다시 짜지 않는다.
+- **Raw values:** Theme-dependent values in `:root` and the project's dark-theme selector.
+- **Tailwind mappings:** `@theme` names that expose raw values to utilities where individual utility access is useful.
+- **Role styles:** Classes such as `card` that apply a complete, coherent default appearance.
+
+A Tailwind mapping may require a differently named CSS variable to connect a raw value to a utility. That mapping is a technical alias, not a second independent design decision.
+
+Use syntax supported by the installed Tailwind version. Do not apply v4 directives to a project using another version.
+
+### Example: card foundation in Tailwind CSS v4
+
+```css
+:root {
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --card-border: rgb(20 23 28 / 0.07);
+  --card-shadow:
+    0 1px 2px -1px rgb(20 23 28 / 0.06),
+    0 2px 6px rgb(20 23 28 / 0.05);
+}
+
+.dark {
+  --card: #171a1f;
+  --card-foreground: #e8eaee;
+  --card-border: rgb(255 255 255 / 0.1);
+  --card-shadow: none;
+}
+
+@theme inline {
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-card-border: var(--card-border);
+  --shadow-card: var(--card-shadow);
+  --radius-card: 12px;
+}
+
+/* A card surface for elements that do not need the Card component API. */
+@utility card {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+}
+```
+
+Check for an existing `card` class before registering this utility. If that name is already owned by another style, reconcile the existing definition rather than defining a competing `.card`.
+
+The project's `<Card>` component and the `card` class must use the same foundation values. Prefer reusing the same class where it fits. Do not maintain a second set of card colors, radius, border, or shadow in the component.
+
+### Card usage
 
 ```svelte
-<!-- 부르는 쪽 -->
-<Dialog bind:open title="자격 추가" description="…" icon={Award}
-        actions={[{ label: '취소', variant: 'ghost', onclick: close },
-                  { label: '추가', icon: Check, type: 'submit', form: 'license-form', busy }]}>
-  <form id="license-form">…</form>
-</Dialog>
-
-<Field label="이름" for="name" required error={errors.name}>
-  <Input id="name" bind:value={name} />
-</Field>
+<div class="card p-4">Default card surface</div>
+<div class="card bg-black text-white p-4">Intentionally black card</div>
 ```
 
-- 한 줄 판을 두는 부품의 예: dialog · card · field · select · table · tabs · sheet · toggle-group · empty · tooltip.
-- 한 줄 판으로 안 되는 특수한 경우에만 조각을 직접 조합한다.
+`card` supplies the default appearance. An explicit utility may replace an individual property when the design calls for it. Verify the generated result and class-merging behavior in the installed Tailwind setup.
 
-### 2-3. `index.ts` 내보내기
+`bg-black` means fixed black in both themes. If the override must change between light and dark themes, use an existing semantic color or define a new role; do not assume `bg-black` will switch automatically.
 
-조각과 한 줄 판을 함께 내보낸다. **한 줄 판은 부품 이름 그대로** 내보낸다.
+Do not write `bg-card rounded-card border-card-border shadow-card` at every card call site merely to recreate the card role.
 
-```ts
-import Root from './dialog.svelte';
-import Content from './dialog-content.svelte';
-// …
-import Single from './dialog-single.svelte';
+**Reason:** A role class supplies a complete default. A caller only states what differs.
 
-export {
-  Root, Content, /* … 조각 */
-  /** 한 줄로 쓰는 창 — `<Dialog bind:open title=… actions={…}>몸</Dialog>` */
-  Single as Dialog,
-  Content as DialogContent, /* … */
-};
-export type { DialogAction } from './dialog-single.svelte';
-```
+## 10. Choose styles in this order
 
-부르는 쪽은 `import { Dialog } from '$lib/components/ui/dialog'` 하나만 쓴다.
+1. Existing component and its variant.
+2. Existing role class such as `card`.
+3. Standard Tailwind utilities and existing semantic tokens.
+4. A new token for a repeated design value.
+5. A named shared style or custom utility for a repeated property pattern.
+6. An arbitrary value only when the preceding choices do not represent the requirement.
 
-### 2-3-1. 부르는 쪽은 이름 붙은 태그만 쓴다 (2026-10-01 사용자 권장)
+Do not convert `w-[347px]` into `.width-347`. Name shared values by purpose, such as sidebar width or dialog maximum height.
 
-- 페이지 · `orch/` 에서는 `<Kanban.Root>` · `<Dialog.Header>` 같은 점 표기를 쓰지 않는다. `<KanbanBoard>` · `<KanbanHeader>` · `<DialogHeader>` 처럼 **태그 이름만으로** 읽히게 한다.
-- 그래서 `import * as X from …` 를 쓰지 않고, 쓰는 조각을 이름으로 가져온다: `import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from '$lib/components/ui/dropdown-menu'`.
-- `index.ts` 는 모든 조각을 `<부품><조각>` 이름으로 내보낸다(`DropdownMenuItem` · `ContextMenuEntries`).
-- 부품 이름 그대로(`Dialog`)는 한 줄 판이 있으면 한 줄 판, 없으면 Root 다. 한 줄 판이 생기면 Root 는 `<부품>Root` 로 내보낸다.
+Do not use the number of classes as an extraction threshold. Create a named style when its combined appearance has a stable meaning and real use.
 
-### 2-4. 생김새와 색
+## 11. Define utilities and variants by purpose
 
-- 생김새 차이는 `tailwind-variants` 의 `tv()` variant 로 낸다. 클래스 문자열을 부르는 쪽에서 반복해 넘기지 않는다.
-- 색 · 간격 · 둥글기는 **토큰에서만** 가져온다. `layout.css` 의 CSS 변수와 shadcn semantic 토큰(`bg-card` · `text-muted-foreground` · `border-border`)을 쓴다.
-- 상태 색(통과 · 보류 · 실패 · 대기 · 안내)은 `tone-*` 같은 유틸리티 하나로 정의하고, 부품은 그 이름만 쓴다.
-- 새 hex, 임의 px(`w-[137px]`)는 예외다. 써야 하면 이유를 주석으로 남긴다. 그 전에 다음 순서로 찾는다: 기존 부품 → 토큰 → 유틸리티 → 그래도 없으면 임의값.
+- Use a custom utility for a small reusable behavior or a coherent role style. Use a component variant for a supported appearance of that component.
+- Check for collisions with Tailwind utilities, shadcn-svelte styles, and existing project classes.
+- Do not define two classes with the same role and different values.
+- Keep product statuses out of generic UI variant names.
+- Map a product status to its label and visual tone at the project boundary.
+- Use foundation values inside variants, not raw hex or palette colors.
+- Use the project's established variant mechanism. If it already uses tailwind-variants, follow its `tv()` conventions; do not introduce the package solely for this rule.
+- A custom utility's intent should be clear from its name. Add a short comment when the reason or cascade behavior is not obvious.
+- Scope overrides for an external renderer, map, drawing engine, or viewer under one owning class. Map supported library CSS variables to foundation values where possible. Explain unusual layer overrides or `!important`.
 
-### 2-5. 새 `ui/` 부품을 들일 때
+## 12. Limit arbitrary values and inline styles
 
-- shadcn 에 있으면 shadcn 으로 설치한다. 직접 만들지 않는다.
-- 기존 shadcn 부품을 **이름만 바꾸려고 감싸지 않는다.** 공통 API · 동작 · 디자인 규칙을 실제로 세울 때만 wrapper 를 만든다.
-- 같은 Bits UI 조합이 두 곳 이상에서 반복되면 그때 `ui/` 로 올린다. 「나중에 쓸 것 같다」는 근거가 아니다.
+Do not use `[...]` arbitrary values as the default styling method in newly authored pages and project components.
 
----
+Exceptions include a genuinely one-off layout value, an external integration requirement, or a precise value that cannot be represented by the existing foundation.
 
-## 3. `layout/` — 화면 틀
+Use a `style` property or CSS variable for values computed at runtime, such as positions or proportions. Do not generate Tailwind class names from runtime values.
 
-- 앱 헤더 · 사이드바처럼 여러 화면을 감싸는 틀만 둔다.
-- 한 구역(예: 관리자 화면 묶음)에서만 쓰는 틀은 컴포넌트가 아니라 그 구역의 `+layout.svelte` 에 바로 적는다.
+Explain a non-obvious arbitrary-value exception near its use or in the change report. Do not bulk-edit shadcn-svelte selectors such as `data-[state=open]:` merely to eliminate brackets.
 
----
+## 13. Compose complete class names
 
-## 4. `cms/<종류>/` — 서비스 전용 부품
-
-### 4-1. 폴더는 업무가 아니라 「부품 종류」로 나눈다
-
-- 맞음: `cms/dialog/ProjectDialog.svelte`, `cms/menu/ProjectActions.svelte`, `cms/viewer/PdfViewer.svelte`
-- 틀림: `cms/project/ProjectDialog.svelte`, `cms/common/…`, `cms/upload/…`
-- 파일 이름은 `<대상><종류>` 로 짓는다: `XxxDialog` · `XxxActions` · `XxxViewer` · `XxxForm` · `XxxTable`.
-
-### 4-2. 꺼내는 기준
-
-다음 중 **하나 이상**일 때만 `cms/` 로 꺼낸다.
-
-1. 실제로 **두 곳 이상**에서 쓰인다.
-2. 스스로 상태와 동작을 가진 **완결된 사용자 작업**이다. 예: 업로드 · 일괄 가져오기 · 주소 고르기 · 등록 창.
-3. 차트 · 에디터 · 뷰어 · 복합 입력처럼 **독립 UI 로서 충분히 복잡**하다.
-
-다음은 꺼내는 이유가 아니다.
-
-- 코드가 길다
-- 데이터 계산이 복잡하다(→ `logic/` 으로)
-- 화면에서 카드 · 섹션 · 머리처럼 덩어리로 보인다
-- 나중에 다시 쓸 것 같다
-
-꺼내기 전에 확인한다.
-
-- 책임을 한 문장으로 말할 수 있다.
-- 부르는 자리에서 이름과 props 만 보고 쓰임을 알 수 있다.
-- 꺼낸 뒤 페이지가 실제로 더 읽기 쉬워진다.
-
-### 4-3. 창(Dialog) 컴포넌트는 창 전체를 갖는다
-
-- `open` 을 `$bindable` 로 받는다.
-- `ui/` 의 Dialog 한 줄 판으로 틀 · 머리 · 몸 · 발을 **전부** 그린다.
-- 페이지는 한 줄만 적는다: `<ProjectDialog bind:open />`
-- 「틀(Dialog.Root · Content)은 페이지에, 안쪽만 컴포넌트에」로 나누지 않는다.
-- 열 때마다 새로 시작해야 하는 값(입력 초기화 등)은 컴포넌트 안에서 처리한다. `$effect.pre` 로 `open` 을 감시하고, 이 코드는 스크립트 맨 끝에 둔다.
+Do not build Tailwind class names through string interpolation.
 
 ```svelte
-<!-- 페이지 -->
-<script lang="ts">
-  import ProjectDialog from '$lib/components/cms/dialog/ProjectDialog.svelte';
-  let creating = $state(false);
-</script>
+<!-- Avoid -->
+<span class="bg-{tone}-soft text-{size}">
 
-<Button onclick={() => (creating = true)}>새 프로젝트</Button>
-<ProjectDialog bind:open={creating} />
+<!-- Use complete classes -->
+<span class={remaining < 0 ? 'text-destructive' : 'text-primary'}>
 ```
 
-### 4-4. 업무 동작은 컴포넌트 안에서 끝낸다
+For several choices, select from complete class strings or a defined variant.
 
-- 서버 호출(`lib/api`), 알림(toast), 확인 창, 화면 이동은 그 컴포넌트가 직접 한다.
-- 부르는 쪽은 **데이터 하나**만 넘긴다. 예: `<ProjectActions {project} />`
-- 두 번 눌러 요청이 두 번 가지 않게, 요청 중 상태(`busy`)를 컴포넌트가 가진다.
+Use the project's `cn()` helper where merging is part of a component's API, commonly in `ui/`. Do not use it throughout pages to compensate for conflicting class bundles. A project component may use it when it intentionally supports caller class overrides.
 
-### 4-5. 정리
+A component's `class` prop is primarily for placement, width, and local layout. If callers repeatedly replace its colors, type scale, or internal appearance, improve its default role style or add a meaningful variant.
 
-- 옮기거나 바꾼 뒤에는 **사용처가 0인 컴포넌트를 찾아 지운다.**
-- shadcn 부품 안의 쓰지 않는 조각(예: `Dialog.Trigger`)을 지울지는 따로 정한다.
+Do not create a Svelte component solely to hide classes.
 
----
+## 14. Keep theme behavior in the foundation
 
-## 5. 페이지 작성
+When a semantic role has light and dark values, redefine its raw value under the project's dark-theme selector. Do not scatter color-only `dark:` classes across pages and feature components for that role.
 
-### 5-1. 한 번 쓰는 것은 그 자리에 펼친다
+A fixed-color illustration or intentionally fixed `bg-black` override is different: it remains fixed unless the design explicitly defines another theme behavior.
 
-화면의 카드 · 섹션 · 머리를 이유로 새 컴포넌트를 만들지 않는다.
-
-```svelte
-<!-- 이렇게 한다 -->
-<Card title="보유 자격" meta={licenses.length}>…</Card>
-<Card title="서류" meta={docs.length}>…</Card>
-
-<!-- 이렇게 하지 않는다 -->
-<LicenseSectionCard />
-<DocumentListHeader />
-<ActionRequiredCard />
-```
-
-필드가 10개면 10개를 그 자리에 적는다.
-
-### 5-2. 판단 질문
-
-새 `.svelte` 를 만들기 전에 묻는다.
-
-> **이 파일을 없애고 부모 페이지에 넣었을 때 실제로 이해하기 어려워지는가?**
-
-아니면 만들지 않는다.
-
-### 5-3. 스니펫과 작은 함수
-
-- `{#snippet}` 은 두 경우에만 쓴다.
-  1. 라이브러리가 요구하는 `child` · `children`
-  2. **한 파일 안에서** 실제로 여러 번 되풀이되는 틀
-- 스니펫을 함수나 다른 스니펫의 인자로 넘기지 않는다. 사람이 따라 읽을 수 없게 된다.
-- 반복은 스니펫이 아니라 **데이터 + `{#each}`** 로 돌린다.
-- 한 번만 쓰는 작은 함수를 만들지 않는다. 계산 · 변환이 필요하면 `lib/logic/` 에 순수 함수로 둔다.
-
-### 5-4. 화면 순서대로 읽힌다
-
-- 마크업 순서가 사용자가 보는 순서와 같아야 한다.
-- 열어 봐야만 화면을 알 수 있는 불투명한 컴포넌트 목록으로 페이지를 만들지 않는다.
+Do not introduce raw hex or RGB colors into newly authored `.svelte` UI. Do not use palette colors for product statuses when semantic status roles exist. Do not add page-level `<style>` blocks merely to hold design values.
 
 ---
 
-## 6. 컴포넌트 API
+## Interaction and Delivery
 
-- props 는 **지금 부르는 곳이 실제로 쓰는 것만** 받는다.
-- 받는 것은 props 와 `children` 이다. 스니펫 여러 개를 받아 조립하는 구조를 만들지 않는다.
-- `mode` · `kind` · `type` · `variant` 와 설정 객체의 조합으로 동작이 갈리는 범용 부품을 만들지 않는다. 한 줄 판에 켜고 끄는 값(`interactive` · `selected` …)이 쌓이면 두 부품으로 나눌지 먼저 따진다.
-- 관련된 입력 부품은 이름과 동작을 맞춘다: `value` · `size` · `disabled` · `label` · `description` · `error`.
-- 비슷한 일을 하는 부품끼리는 생김새 · 목록 규칙을 맞춘다. 예: 폼 안의 Select 와 Combobox.
-- 부르는 자리에서 사용자 작업이 드러나는 API 를 고른다.
-- 클래스 문자열을 숨기려고 컴포넌트를 만들지 않는다. 토큰 · 유틸리티 · variant 중 맞는 것을 쓴다.
+## 15. Preserve input and async behavior
 
-### 비슷한 부품을 가르는 기준
+- Show relevant pending, success, error, and empty states.
+- Prevent duplicate submissions while an operation is pending.
+- Preserve entered values after failure and show an actionable error.
+- Distinguish persisted data from an editing draft.
+- Prevent an older response from overwriting a newer selection or edit.
+- Protect unfinished work when changing a date, account, tab, route, or dialog would discard it.
 
-| 부품 | 쓰는 곳 |
-|---|---|
-| `Select` | 폼에서 짧은 목록 중 하나를 고르는 입력 |
-| `Combobox` | 폼에서 긴 목록을 쳐서 찾는 입력 |
-| `PickMenu` | 목록을 좁히는 단추(거르개 · 정렬 · 쪽당 개수) |
-| `Tabs` | 같은 대상의 다른 면을 바꿔 보기 |
-| `ToggleGroup` | 목록 거르개 · 보기 방식 전환 |
-| `Dialog` | 하던 일을 멈추고 끝내야 하는 작업 |
-| `Sheet` | 목록을 보면서 옆에서 하는 작업 |
+Use the project's existing API and submission architecture. This document does not mandate SvelteKit form actions or a new API layer.
 
----
+## 16. Preserve accessibility and responsive behavior
 
-## 7. 코드 쓰는 법
+- Use semantic controls with accessible names and visible focus.
+- Associate labels, descriptions, and errors with inputs.
+- Preserve keyboard and focus behavior when composing Bits UI or shadcn-svelte components.
+- Do not suppress Svelte accessibility warnings without a specific reason.
+- Check changed screens at supported narrow and wide viewport sizes.
+- Inspect tables, long content, menus, dialogs, and empty states for clipping.
+- Check relevant states in both light and dark themes when both are supported.
 
-### 7-1. 파일 머리 주석
+## 17. Verify proportionally and stay in scope
 
-- 첫 줄은 **굵게, 한 줄로** 「무엇을 하는 부품인지」 적는다.
-- 비슷한 부품과 어떻게 다른지, 왜 이렇게 만들었는지를 이어서 적는다.
-- props 마다 한 줄 주석을 단다. 값이 비었을 때 어떻게 되는지도 적는다.
+Run relevant type, lint, build, and focused tests already available in the repository. Inspect the actual screen in a browser when layout or interaction changes.
 
-```svelte
-<script lang="ts">
-  /**
-   * **한 값 고르기.** 거르개 · 정렬 · 쪽당 개수가 전부 같은 일이라 같은 컴포넌트다.
-   * 폼의 입력 칸은 이것이 아니라 `Select` · `Combobox` 다 — 저쪽은 「적어 넣는 값」, 이쪽은 「목록을 좁히는 단추」.
-   */
-  let {
-    label,
-    /** 「전체」로 되돌릴 수 있나 — 거르개는 풀 수 있어야 하고, 쪽당 개수는 아니다 */
-    clearable = true,
-  }: { label: string; clearable?: boolean } = $props();
-</script>
-```
+For a visual refactor intended to preserve appearance, compare representative before and after states at consistent viewport and data settings. Do not require a full screenshot suite for every routine UI task.
 
-### 7-2. 타입
+Do not start an unrelated component migration, folder reorganization, design-system expansion, or issue hierarchy. Check the staged diff before committing, particularly when another session may share the worktree.
 
-- 밖에서 쓰는 타입(`DialogAction` · `ComboboxOption`)은 `<script lang="ts" module>` 에서 export 하고, `index.ts` 에서 다시 내보낸다.
-- `any` 를 쓰지 않는다.
+Before completing, confirm:
 
-### 7-3. Svelte 5
+- The page reads in display order.
+- Each new component meets an extraction criterion and is in the correct layer.
+- A project-specific workflow has not been placed in `ui/`.
+- One design role has one source value.
+- Role classes provide complete defaults; callers specify only differences.
+- Explicit override utilities actually win in the project's generated CSS.
+- Arbitrary values have a concrete reason.
+- Class names are complete rather than dynamically assembled.
+- State has one owner and unfinished input is protected.
+- Relevant accessibility, viewport, and theme states have been checked.
 
-- `$props()` · `$state()` · `$derived()` · `$bindable()` 를 쓴다.
-- `$effect` 안에서 같은 상태를 읽고 쓰지 않는다. 무한 루프가 난다. 필요하면 `untrack` 으로 끊는다.
-- `$state` 배열은 프록시다. push 한 원본 객체로 `indexOf` 하면 찾지 못한다.
+Report concisely:
 
-### 7-4. 따옴표 · 서식
-
-- 프로젝트 전체에서 하나로 정한다. shadcn 이 설치하는 파일도 같은 규칙으로 맞춘다.
-- 포매터(Prettier)에 맡기고 손으로 맞추지 않는다.
-
----
-
-## 8. 입력 · 비동기
-
-- 사용자가 적은 값은 오류가 나도 지우지 않는다.
-- 요청 중에는 단추를 막고 도는 표시를 보인다. 두 번 요청하지 않는다.
-- 오류는 그 칸 아래에 보인다. 오류가 있으면 설명 대신 오류가 같은 자리에 선다.
-- 지우기는 먼저 상태 바꾸기(종료 · 해지)를 제안한다. 정말 지울 때는 확인을 받고, 「되돌리기」를 준다.
-
----
-
-## 9. 접근성 · 반응형
-
-- 입력에는 라벨을 잇는다(`for` / `id`). 아이콘만 있는 단추에는 `aria-label` 을 단다.
-- 꾸밈 아이콘에는 `aria-hidden="true"` 를 단다.
-- 키보드로 열고 닫고 고를 수 있어야 한다. Bits UI 부품의 기본 동작을 깨지 않는다.
-- 좁은 화면에서 넘치거나 겹치지 않는지 브라우저에서 본다. `svelte-check` 와 `build` 가 통과해도 화면은 깨질 수 있다.
-
----
-
-## 10. 새 파일을 만들기 전 점검
-
-1. `ui/` 에 그 자리가 이미 있는가? 있으면 조합한다.
-2. `cms/` 에 같은 일을 하는 부품이 있는가? 있으면 쓴다.
-3. 꺼내는 기준(4-2) 중 하나를 만족하는가? 아니면 페이지에 펼친다.
-4. 계산 · 변환이면 컴포넌트가 아니라 `logic/` 인가?
-5. 폴더는 종류(dialog · menu · viewer · form · table) 기준인가?
-6. 이름 · props 만 보고 부르는 자리에서 쓰임이 드러나는가?
-
----
-
-## 11. 완료 보고에 적을 것
-
-- 바꾼 화면 · 파일
-- **새로 만든 컴포넌트와 꺼낸 이유**(4-2 의 어느 조건인지)
-- 지운 컴포넌트(사용처 0)
-- 쓴 임의값과 그 이유
-- 브라우저에서 확인한 것
-- 요청 범위 밖이라 손대지 않은 것
+- Changed screens and behavior.
+- New components and their extraction reasons.
+- New tokens, role styles, utilities, variants, or arbitrary-value exceptions.
+- Relevant browser and code checks with results.
+- A concrete blocker or unresolved decision, if one remains.
