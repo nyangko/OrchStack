@@ -186,6 +186,23 @@ export interface paths {
         patch: operations["project_update"];
         trace?: never;
     };
+    "/projects/{sn}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 놓친 이벤트 재수신. after 다음부터 순서대로 최대 500건 — 500건이면 마지막 sn으로 다시 부른다 */
+        get: operations["stream_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{sn}/issues": {
         parameters: {
             query?: never;
@@ -198,6 +215,43 @@ export interface paths {
         put?: never;
         /** 이슈 생성 (CreateIssue → IssueCreated). 프로젝트가 없으면 404 */
         post: operations["issue_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{sn}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 현재 상태 묶음. 프로젝트가 없으면 404 */
+        get: operations["stream_snapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{sn}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SSE 스트림. 구독을 먼저 걸고, 브라우저가 `Last-Event-ID`를 보내면 그 다음 이벤트를 DB에서 먼저 보낸 뒤 실시간으로 잇는다.
+         *     따라서 재연결해도 이벤트를 새로 만들지 않고 빠짐도 없다. 15초마다 heartbeat 주석. 수신이 밀려 버린 이벤트(lagged)는 건너뛴다 — 클라이언트가 events?after=로 메운다
+         */
+        get: operations["stream_stream"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -526,6 +580,29 @@ export interface components {
             /** @description 사람이 읽는 설명 */
             message: string;
         };
+        /** @description 이벤트 1건 (API 응답 · SSE data). payload는 JSON 그대로 */
+        EventOut: {
+            /** Format: int64 */
+            aggregate_sn: number;
+            /** @description 대상 종류 (project · issue · task · run · member …) */
+            aggregate_type: string;
+            create_at: string;
+            /** @description 예: TaskMoved. 모르는 종류는 클라이언트가 무시한다 */
+            event_type: string;
+            payload: unknown;
+            /** Format: int64 */
+            project_sn?: number | null;
+            /**
+             * Format: int64
+             * @description 대상 안에서의 순번
+             */
+            seq: number;
+            /**
+             * Format: int64
+             * @description 전체 순번 — SSE `id` · `events?after=`의 기준
+             */
+            sn: number;
+        };
         /** @description 폴백 체인 1단계. sort 순으로 시도하고, tier가 있으면 그 등급의 하위 작업만 쓴다 (NULL = 모든 등급) */
         Fallback: {
             /** Format: int64 */
@@ -840,6 +917,18 @@ export interface components {
             is_enabled: number;
             /** Format: int64 */
             skill_sn: number;
+        };
+        /** @description 프로젝트 현재 상태 묶음. 이걸 받은 뒤 `last_event_sn` 이후를 stream · events로 받으면 빠짐이 없다 */
+        Snapshot: {
+            issues: components["schemas"]["Issue"][];
+            /**
+             * Format: int64
+             * @description 이 snapshot이 반영한 마지막 이벤트 sn (워크스페이스 전체 기준). 0이면 이벤트 없음
+             */
+            last_event_sn: number;
+            /** @description 프로젝트 팀의 멤버 (팀이 없으면 빈 목록) */
+            members: components["schemas"]["Member"][];
+            tasks: components["schemas"]["Task"][];
         };
         /** @description 태스크 (API 응답 형태) */
         Task: {
@@ -1684,6 +1773,38 @@ export interface operations {
             };
         };
     };
+    stream_events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로젝트 번호 */
+                sn: number;
+                /** @description 이 sn 다음부터 (snapshot의 last_event_sn 또는 마지막으로 받은 SSE id) */
+                after: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     issue_list: {
         parameters: {
             query?: never;
@@ -1736,6 +1857,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Issue"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    stream_snapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로젝트 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Snapshot"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    stream_stream: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 재연결 시 마지막으로 받은 이벤트 sn */
+                "Last-Event-ID"?: number | null;
+            };
+            path: {
+                /** @description 프로젝트 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description text/event-stream · id=이벤트 sn · event=event_type · data=EventOut */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
                 };
             };
             default: {

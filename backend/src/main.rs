@@ -10,6 +10,7 @@ mod issue; // /issues CRUD
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
 mod rule; // 하위 작업 규칙 엔진 (#67 · LLM 0)
+mod stream; // /projects/{sn}/snapshot · events · stream (SSE)
 mod task; // /tasks CRUD + MoveTask + 배정
 mod team; // /teams · /members CRUD
 
@@ -53,7 +54,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(stream::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -492,5 +493,84 @@ mod tests {
             assert_eq!((st, v["error"].as_str()), (status, Some(code)), "{method} {uri}");
             assert!(v["message"].is_string(), "{method} {uri}");
         }
+    }
+
+    /// 스트림에서 `marker`가 들어 있는 청크가 나올 때까지 읽고, 그때까지 받은 청크 전부를 돌려준다.
+    /// 발행 버스는 프로세스 전역이라 병렬 테스트의 이벤트도 섞여 오므로 id가 아니라 내용으로 찾는다
+    async fn until(body: &mut Body, marker: &str) -> Vec<String> {
+        let mut got = Vec::new();
+        loop {
+            let f = body.frame().await.expect("stream ended").unwrap();
+            let s = String::from_utf8(f.into_data().unwrap().to_vec()).unwrap();
+            let hit = s.contains(marker);
+            got.push(s);
+            if hit {
+                return got;
+            }
+        }
+    }
+
+    /// 스트림 요청을 보내고 응답 본문(스트림)을 돌려준다
+    async fn open_stream(app: &Router, sn: i64, last: Option<i64>) -> Body {
+        let mut req = Request::builder().method("GET").uri(format!("/projects/{sn}/stream"));
+        if let Some(l) = last {
+            req = req.header("last-event-id", l.to_string());
+        }
+        let res = app.clone().oneshot(req.body(Body::empty()).unwrap()).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert!(res.headers()["content-type"].to_str().unwrap().starts_with("text/event-stream"));
+        res.into_body()
+    }
+
+    /// B-5: snapshot → 변경 → 연결된 SSE 클라이언트가 그 이벤트(id = 이벤트 sn · event = 종류)를 받는다. 다른 프로젝트 이벤트는 오지 않는다
+    #[tokio::test]
+    async fn stream_live() {
+        let db = mem().await;
+        let app = app(db.clone());
+        let ts = task_of(&app, &db, false).await;
+        let (_, other) = call(&app, "POST", "/projects", Some(json!({"name": "other"}))).await;
+        let (st, snap) = call(&app, "GET", "/projects/1/snapshot", None).await;
+        assert_eq!((st, snap["tasks"].as_array().unwrap().len(), snap["issues"].as_array().unwrap().len()), (StatusCode::OK, 1, 1));
+        let last = snap["last_event_sn"].as_i64().unwrap();
+        assert!(last > 0);
+        assert_eq!(call(&app, "GET", "/projects/99/snapshot", None).await.0, StatusCode::NOT_FOUND);
+
+        let mut body = open_stream(&app, 1, None).await;
+        call(&app, "POST", &format!("/projects/{}/issues", other["sn"]), Some(json!({"title": "zz-other-project"}))).await;
+        let (_, m) = call(&app, "POST", "/projects/1/issues", Some(json!({"title": "zz-live-marker"}))).await;
+        let got = until(&mut body, "zz-live-marker").await;
+        let s = got.last().unwrap();
+        assert!(s.starts_with(&format!("id: {}\nevent: IssueCreated\n", last + 2)) && s.contains(&format!(r#""aggregate_sn":{}"#, m["sn"])), "{s}");
+        assert!(!got.iter().any(|c| c.contains("zz-other-project")), "{got:?}");
+    }
+
+    /// B-5: 스트림이 끊긴 사이 이벤트 2개 → events?after= 로 2개 모두 순서대로, Last-Event-ID 재연결도 같은 2개를 먼저 보낸 뒤 실시간으로 잇는다. 재연결은 이벤트를 만들지 않는다
+    #[tokio::test]
+    async fn stream_catchup() {
+        use crate::entity::tbl_log_event as ev;
+        use sea_orm::{EntityTrait, PaginatorTrait};
+        let db = mem().await;
+        let app = app(db.clone());
+        // 다른 테스트와 겹치지 않게 TaskMoved 대신 IssueCreated(고유 제목)로 센다 (move_task 테스트가 버스의 TaskMoved 수를 센다)
+        task_of(&app, &db, false).await;
+        let last = call(&app, "GET", "/projects/1/snapshot", None).await.1["last_event_sn"].as_i64().unwrap();
+        for t in ["zz-c1", "zz-c2"] {
+            call(&app, "POST", "/projects/1/issues", Some(json!({"title": t}))).await;
+        }
+        let (st, list) = call(&app, "GET", &format!("/projects/1/events?after={last}"), None).await;
+        let kinds: Vec<_> = list.as_array().unwrap().iter().map(|e| (e["sn"].as_i64().unwrap(), e["payload"]["title"].as_str().unwrap().to_string())).collect();
+        assert_eq!((st, &kinds), (StatusCode::OK, &vec![(last + 1, "zz-c1".into()), (last + 2, "zz-c2".into())]));
+        assert_eq!(call(&app, "GET", &format!("/projects/1/events?after={}", last + 2), None).await.1.as_array().unwrap().len(), 0);
+
+        let before = ev::Entity::find().count(&db).await.unwrap();
+        let mut body = open_stream(&app, 1, Some(last)).await;
+        let a = until(&mut body, "zz-c1").await;
+        let b = until(&mut body, "zz-c2").await;
+        assert!(a.len() == 1 && a[0].starts_with(&format!("id: {}\n", last + 1)), "{a:?}");
+        assert!(b.len() == 1 && b[0].starts_with(&format!("id: {}\n", last + 2)), "{b:?}");
+        // 보충 뒤 실시간으로 이어진다
+        call(&app, "POST", "/projects/1/issues", Some(json!({"title": "zz-catchup-marker"}))).await;
+        assert!(until(&mut body, "zz-catchup-marker").await.last().unwrap().starts_with(&format!("id: {}\n", last + 3)));
+        assert_eq!(ev::Entity::find().count(&db).await.unwrap(), before + 1);
     }
 }
