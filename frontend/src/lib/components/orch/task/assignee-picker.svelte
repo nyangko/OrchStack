@@ -4,8 +4,7 @@
 	import type { Snippet } from 'svelte';
 	import UserRoundX from '@lucide/svelte/icons/user-round-x';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
-	import * as Popover from '$lib/components/ui/popover';
-	import * as Command from '$lib/components/ui/command';
+	import * as Combobox from '$lib/components/ui/combobox';
 	import { RoleAvatar } from '$lib/components/ui/role-avatar';
 	import { Progress } from '$lib/components/ui/progress';
 	import { roles } from '$lib/roles';
@@ -48,54 +47,48 @@
 		{ heading: recommend.length ? '다른 에이전트' : '에이전트', list: agents.filter((a) => !recommend.includes(a.sn)) }
 	].filter((g) => g.list.length));
 
-	function pick(sn?: number) {
-		value = sn;
-		open = false;
-	}
 </script>
 
-<Popover.Root bind:open>
-	<Popover.Trigger>
+<Combobox.Root bind:open>
+	<Combobox.Trigger>
 		{#snippet child({ props })}{@render trigger(props)}{/snippet}
-	</Popover.Trigger>
-	<Popover.Content align="start" class="w-70 gap-0 p-0">
-		<Command.Root>
-			<Command.Input placeholder="에이전트 검색…" />
-			<Command.List>
-				<Command.Empty>찾는 에이전트가 없어요</Command.Empty>
-				{#each groups as g (g.heading)}
-					<Command.Group heading={g.heading}>
-						{#each g.list as a (a.sn)}
-							{@const l = load(a.sn)}
-							<Command.Item value="{a.name} {roles[a.role].label}" data-checked={value === a.sn} onSelect={() => pick(a.sn)} class="gap-2 py-1.5">
-								<RoleAvatar role={a.role} size="sm" />
-								<span class="row-text">
-									<span class="flex items-center gap-1.5"><span class="font-medium">{a.name}</span><span class="text-xs text-muted-foreground">{roles[a.role].label}</span></span>
-									<span class="flex items-center gap-1.5 text-xs">
-										<Progress value={l.pct} class="h-1 w-10" aria-label="{a.name} 부하" />
-										<span class={l.tone}>{l.note}</span>
-									</span>
+	</Combobox.Trigger>
+	<Combobox.Content class="w-70">
+		<Combobox.Search placeholder="에이전트 검색…" />
+		<Combobox.List>
+			<Combobox.Empty>찾는 에이전트가 없어요</Combobox.Empty>
+			{#each groups as g (g.heading)}
+				<Combobox.Group heading={g.heading}>
+					{#each g.list as a (a.sn)}
+						{@const l = load(a.sn)}
+						<Combobox.Item value="{a.name} {roles[a.role].label}" selected={value === a.sn} onSelect={() => (value = a.sn)} class="gap-2 py-1.5">
+							<RoleAvatar role={a.role} size="sm" />
+							<span class="row-text">
+								<span class="flex items-center gap-1.5"><span class="font-medium">{a.name}</span><span class="text-xs text-muted-foreground">{roles[a.role].label}</span></span>
+								<span class="flex items-center gap-1.5 text-xs">
+									<Progress value={l.pct} class="h-1 w-10" aria-label="{a.name} 부하" />
+									<span class={l.tone}>{l.note}</span>
 								</span>
-							</Command.Item>
-						{/each}
-					</Command.Group>
-				{/each}
-				<Command.Group>
-					<Command.Item value="Unassigned 미배정" data-checked={value === undefined} onSelect={() => pick(undefined)} class="gap-2">
-						<span class="center-box size-5 rounded-xs bg-muted"><UserRoundX class="size-3 text-muted-foreground" /></span>
-						<span class="font-medium">Unassigned</span>
-					</Command.Item>
-				</Command.Group>
-				{#if onorch}
-					<Command.Separator />
-					<Command.Group>
-						<Command.Item value="Orch에게 배정 맡기기" onSelect={() => ((open = false), onorch())} class="gap-2">
-							<span class="flex size-5 items-center justify-center"><Sparkles class="size-3.5 text-primary" /></span>
-							<span class="flex flex-col gap-0.5"><span class="font-medium">Orch에게 배정 맡기기</span><span class="text-xs text-muted-foreground">역할 · 부하 · 컨텍스트 기준</span></span>
-						</Command.Item>
-					</Command.Group>
-				{/if}
-			</Command.List>
-		</Command.Root>
-	</Popover.Content>
-</Popover.Root>
+							</span>
+						</Combobox.Item>
+					{/each}
+				</Combobox.Group>
+			{/each}
+			<Combobox.Group>
+				<Combobox.Item value="Unassigned 미배정" selected={value === undefined} onSelect={() => (value = undefined)} class="gap-2">
+					<span class="center-box size-5 rounded-xs bg-muted"><UserRoundX class="size-3 text-muted-foreground" /></span>
+					<span class="font-medium">Unassigned</span>
+				</Combobox.Item>
+			</Combobox.Group>
+			{#if onorch}
+				<Combobox.Separator />
+				<Combobox.Group>
+					<Combobox.Item value="Orch에게 배정 맡기기" onSelect={() => onorch()} class="gap-2">
+						<span class="flex size-5 items-center justify-center"><Sparkles class="size-3.5 text-primary" /></span>
+						<span class="flex flex-col gap-0.5"><span class="font-medium">Orch에게 배정 맡기기</span><span class="text-xs text-muted-foreground">역할 · 부하 · 컨텍스트 기준</span></span>
+					</Combobox.Item>
+				</Combobox.Group>
+			{/if}
+		</Combobox.List>
+	</Combobox.Content>
+</Combobox.Root>
