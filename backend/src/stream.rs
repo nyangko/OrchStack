@@ -85,9 +85,17 @@ async fn snapshot(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<
 
 /// `events?after=` 쿼리
 #[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 struct After {
     /// 이 sn 다음부터 (snapshot의 last_event_sn 또는 마지막으로 받은 SSE id)
     after: i64,
+}
+
+/// `stream?after=` 쿼리 — 브라우저가 Last-Event-ID를 못 보내는 경우(클라이언트가 직접 다시 연 연결)를 위한 대안. 둘 다 있으면 헤더가 우선
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+struct StreamQuery {
+    after: Option<i64>,
 }
 
 /// 놓친 이벤트 재수신. after 다음부터 순서대로 최대 500건 — 500건이면 마지막 sn으로 다시 부른다
@@ -102,12 +110,13 @@ fn sse(m: e::Model) -> Event {
     Event::default().id(out.sn.to_string()).event(out.event_type.clone()).data(serde_json::to_string(&out).unwrap_or_default())
 }
 
-/// SSE 스트림. 구독을 먼저 걸고, 브라우저가 `Last-Event-ID`를 보내면 그 다음 이벤트를 DB에서 먼저 보낸 뒤 실시간으로 잇는다.
-/// 따라서 재연결해도 이벤트를 새로 만들지 않고 빠짐도 없다. 15초마다 heartbeat 주석. 수신이 밀려 버린 이벤트(lagged)는 건너뛴다 — 클라이언트가 events?after=로 메운다
-#[utoipa::path(operation_id = "stream_stream", get, path = "/projects/{sn}/stream", params(("sn" = i64, Path, description = "프로젝트 번호"), ("Last-Event-ID" = Option<i64>, Header, description = "재연결 시 마지막으로 받은 이벤트 sn")), responses((status = 200, description = "text/event-stream · id=이벤트 sn · event=event_type · data=EventOut", content_type = "text/event-stream"), (status = "default", body = ErrorBody)))]
-async fn stream(State(db): State<DatabaseConnection>, Sn(sn): Sn, headers: HeaderMap) -> Res<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+/// SSE 스트림. 구독을 먼저 걸고, `Last-Event-ID`(또는 `?after=`)가 있으면 그 다음 이벤트를 DB에서 먼저 보낸 뒤 실시간으로 잇는다.
+/// 따라서 재연결해도 이벤트를 새로 만들지 않고 빠짐도 없다. 15초마다 `ping` 이벤트(주석이 아니라 이벤트 — 클라이언트가 끊김을 감지하는 데 쓴다).
+/// 수신이 밀려 버린 이벤트(lagged)는 건너뛴다 — 클라이언트가 events?after=로 메운다
+#[utoipa::path(operation_id = "stream_stream", get, path = "/projects/{sn}/stream", params(("sn" = i64, Path, description = "프로젝트 번호"), ("Last-Event-ID" = Option<i64>, Header, description = "재연결 시 마지막으로 받은 이벤트 sn"), StreamQuery), responses((status = 200, description = "text/event-stream · id=이벤트 sn · event=event_type(+ ping) · data=EventOut", content_type = "text/event-stream"), (status = "default", body = ErrorBody)))]
+async fn stream(State(db): State<DatabaseConnection>, Sn(sn): Sn, headers: HeaderMap, Query(q): Query<StreamQuery>) -> Res<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
     let rx = event::subscribe();
-    let last = headers.get("last-event-id").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse::<i64>().ok());
+    let last = headers.get("last-event-id").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse::<i64>().ok()).or(q.after);
     let missed = match last {
         Some(id) => after(&db, sn, id).await?,
         None => Vec::new(),
@@ -115,6 +124,8 @@ async fn stream(State(db): State<DatabaseConnection>, Sn(sn): Sn, headers: Heade
     // 보충분과 실시간이 겹칠 수 있어 마지막 보충 sn 이하는 실시간에서 버린다
     let floor = missed.last().map_or(last.unwrap_or(0), |m| m.sn);
     let live = BroadcastStream::new(rx).filter_map(move |r| r.ok().filter(|m| belongs(m, sn) && m.sn > floor));
-    let all = tokio_stream::iter(missed).chain(live).map(|m| Ok(sse(m)));
-    Ok(Sse::new(all).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb")))
+    // 첫 바이트를 바로 보내야 프록시 · 브라우저가 응답 머리를 넘기고 onopen이 뜬다 (heartbeat 15초를 기다리지 않게)
+    let hello = tokio_stream::once(Event::default().comment("ok"));
+    let all = hello.chain(tokio_stream::iter(missed).chain(live).map(sse)).map(Ok);
+    Ok(Sse::new(all).keep_alive(KeepAlive::new().interval(HEARTBEAT).event(Event::default().event("ping"))))
 }

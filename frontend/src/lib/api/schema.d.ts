@@ -246,8 +246,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * SSE 스트림. 구독을 먼저 걸고, 브라우저가 `Last-Event-ID`를 보내면 그 다음 이벤트를 DB에서 먼저 보낸 뒤 실시간으로 잇는다.
-         *     따라서 재연결해도 이벤트를 새로 만들지 않고 빠짐도 없다. 15초마다 heartbeat 주석. 수신이 밀려 버린 이벤트(lagged)는 건너뛴다 — 클라이언트가 events?after=로 메운다
+         * SSE 스트림. 구독을 먼저 걸고, `Last-Event-ID`(또는 `?after=`)가 있으면 그 다음 이벤트를 DB에서 먼저 보낸 뒤 실시간으로 잇는다.
+         *     따라서 재연결해도 이벤트를 새로 만들지 않고 빠짐도 없다. 15초마다 `ping` 이벤트(주석이 아니라 이벤트 — 클라이언트가 끊김을 감지하는 데 쓴다).
+         *     수신이 밀려 버린 이벤트(lagged)는 건너뛴다 — 클라이언트가 events?after=로 메운다
          */
         get: operations["stream_stream"];
         put?: never;
@@ -1775,13 +1776,14 @@ export interface operations {
     };
     stream_events: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description 이 sn 다음부터 (snapshot의 last_event_sn 또는 마지막으로 받은 SSE id) */
+                after: number;
+            };
             header?: never;
             path: {
                 /** @description 프로젝트 번호 */
                 sn: number;
-                /** @description 이 sn 다음부터 (snapshot의 last_event_sn 또는 마지막으로 받은 SSE id) */
-                after: number;
             };
             cookie?: never;
         };
@@ -1901,7 +1903,9 @@ export interface operations {
     };
     stream_stream: {
         parameters: {
-            query?: never;
+            query?: {
+                after?: number;
+            };
             header?: {
                 /** @description 재연결 시 마지막으로 받은 이벤트 sn */
                 "Last-Event-ID"?: number | null;
@@ -1914,7 +1918,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description text/event-stream · id=이벤트 sn · event=event_type · data=EventOut */
+            /** @description text/event-stream · id=이벤트 sn · event=event_type(+ ping) · data=EventOut */
             200: {
                 headers: {
                     [name: string]: unknown;

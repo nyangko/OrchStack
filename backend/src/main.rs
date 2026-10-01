@@ -10,7 +10,6 @@ mod issue; // /issues CRUD
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
 mod rule; // 하위 작업 규칙 엔진 (#67 · LLM 0)
-mod runner; // runner 하위 Run 실행 · @REPORT 회수 (#67)
 mod stream; // /projects/{sn}/snapshot · events · stream (SSE)
 mod task; // /tasks CRUD + MoveTask + 배정
 mod team; // /teams · /members CRUD
@@ -503,6 +502,9 @@ mod tests {
         loop {
             let f = body.frame().await.expect("stream ended").unwrap();
             let s = String::from_utf8(f.into_data().unwrap().to_vec()).unwrap();
+            if s.starts_with(':') {
+                continue; // 연결 직후 주석(: ok)
+            }
             let hit = s.contains(marker);
             got.push(s);
             if hit {
