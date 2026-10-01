@@ -94,6 +94,7 @@
 	import GitFork from '@lucide/svelte/icons/git-fork';
 	import { cn } from '$lib/utils';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import Maximize2 from '@lucide/svelte/icons/maximize-2';
 	import Minimize2 from '@lucide/svelte/icons/minimize-2';
 	import CircleDotIcon from '@lucide/svelte/icons/circle-dot';
@@ -462,6 +463,21 @@
 			criteria: structuredClone($state.snapshot(d?.criteria ?? [])), deps: [...(d?.deps ?? [])], eta: d?.eta ?? '', labels: [...(d?.labels ?? [])], files: []
 		};
 	}
+	/// 상세 기록이 없는 태스크는 빈 상세를 만들어 둔다 (인라인 편집 · 의존 추가).
+	function detailOf(num: number): TaskDetail {
+		return (details[num] ??= { description: task(num).description ?? '', criteria: [], deps: [], runs: [], activity: [], eta: '', labels: [] });
+	}
+	// 완료 조건을 바꾸면 카드 · 목록의 진행(steps)도 맞춘다 (.pen B · 인라인 체크).
+	$effect(() => {
+		const n = cur?.num;
+		const c = n === undefined ? undefined : details[n]?.criteria;
+		if (n === undefined || !c) return;
+		const steps: [number, number] = [c.filter((x) => x.done).length, c.length];
+		untrack(() => {
+			const t = list.find((x) => x.num === n);
+			if (t && (t.steps[0] !== steps[0] || t.steps[1] !== steps[1])) t.steps = steps;
+		});
+	});
 	/// 진행 중 Run (편집 경고 줄 · Runtime Instruction 전달).
 	const liveRunOf = (num?: number) => (num === undefined ? undefined : details[num]?.runs.find((r) => r.live));
 
@@ -695,7 +711,10 @@
 		// 편집기 · 다이얼로그가 열려 있으면 그쪽이 키를 처리한다
 		if (editor || panel) return;
 		const typing = e.target instanceof HTMLElement && (e.target.closest('input, textarea, [contenteditable]') !== null);
+		// 선택 창 · 메뉴 안에서 누른 Esc는 그 창만 닫는다
+		const layer = e.target instanceof HTMLElement && e.target.closest('[data-slot$="-content"], [role="menu"], [role="listbox"], [cmdk-root]') !== null;
 		if (e.key === 'Escape') {
+			if (layer || e.defaultPrevented) return;
 			if (quick) return void (quick = undefined);
 			detail = false;
 			inspect = undefined;
@@ -719,6 +738,19 @@
 	<button type="button" {...props} class="flex h-6 items-center gap-1.5 rounded-sm border px-2 text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
 		<Icon class={cn('size-3.25', tone)} />{label}
 	</button>
+{/snippet}
+<!-- Task 상세 속성 한 줄 (.pen B3 · Properties). props가 있으면 선택 창 트리거(버튼), 없으면 표시만 -->
+{#snippet propRow(props: Record<string, unknown> | undefined, label: string, Icon: Component, value: string, tone = 'text-muted-foreground')}
+	{#if props}
+		<button type="button" {...props} class="group flex h-8 items-center gap-2 rounded-sm px-2 text-left text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+			<span class="w-27 shrink-0 text-muted-foreground">{label}</span><Icon class={cn('size-3.25 shrink-0', tone)} /><span class="min-w-0 flex-1 truncate">{value}</span>
+			<ChevronsUpDown class="size-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+		</button>
+	{:else}
+		<div class="flex h-8 items-center gap-2 px-2 text-xs">
+			<span class="w-27 shrink-0 text-muted-foreground">{label}</span><Icon class={cn('size-3.25 shrink-0', tone)} /><span class="min-w-0 flex-1 truncate">{value}</span>
+		</div>
+	{/if}
 {/snippet}
 <!-- QuickAdd 칩 (.pen QuickAdd · Options) -->
 {#snippet quickChip(props: Record<string, unknown>, Icon: Component, label: string, tone = 'text-muted-foreground')}
@@ -1096,6 +1128,8 @@
 			</div>
 			{#if cur}
 				{@const a = agentOf(cur.agent)}
+				{@const pm = priorities[cur.priority]}
+				{@const deps = info?.deps ?? []}
 				{@const iss = issueOf(cur.issue)}
 				<!-- 태스크 상세: 뷰 위 scrim + 패널. Esc · 닫기 버튼으로 닫는다 -->
 				<div class="absolute inset-0 z-10 bg-foreground/5 p-5">
@@ -1148,14 +1182,8 @@
 								</section>
 								<section class="flex flex-col gap-1">
 									<h3 class="text-body font-semibold">Acceptance criteria</h3>
-									{#each info?.criteria ?? [] as c, i (i)}
-										<label class="flex items-center gap-2 rounded-md px-1 py-1.5 text-body hover:bg-muted">
-											<Checkbox bind:checked={c.done} />
-											<span class={cn(c.done && 'text-muted-foreground line-through')}>{c.text}</span>
-										</label>
-									{:else}
-										<p class="text-xs text-muted-foreground">완료 조건이 없어요.</p>
-									{/each}
+									<!-- .pen B · 인라인: 체크 · 끌기 · hover 편집/삭제 · 조건 추가 -->
+									<CriteriaList bind:items={() => info?.criteria ?? [], (v) => (detailOf(cur.num).criteria = v)} />
 								</section>
 								{#if info?.deps.length}
 									<section class="flex flex-col gap-2">
@@ -1235,12 +1263,28 @@
 							<aside class="flex w-85 shrink-0 flex-col gap-5 overflow-y-auto border-l bg-background px-5 py-4" aria-label="속성">
 								<section class="flex flex-col">
 									<h3 class="mb-1 text-body font-semibold">Properties</h3>
-									{#each [['Issue', `#${cur.issue} ${iss?.title ?? ''}`], ['Assignee', a ? `${a.name} · ${roles[a.role].label}` : 'Unassigned'], ['Priority', cur.priority], ['ETA', info?.eta ?? '—'], ['Labels', info?.labels.join(' · ') || '—']] as [k, v] (k)}
-										<Item.Root variant="row" size="xs">
-											<Item.Content><Item.Description>{k}</Item.Description></Item.Content>
-											<Item.Actions class="min-w-0 truncate text-xs font-medium">{v}</Item.Actions>
-										</Item.Root>
-									{/each}
+									<!-- .pen B · Properties hover / click: 담당 · 우선순위 · 의존은 선택 창(C), 나머지는 표시 -->
+									{@render propRow(undefined, 'Issue', CircleDotIcon, `#${cur.issue} ${iss?.title ?? ''}`, 'text-node-issue')}
+									<AssigneePicker bind:value={() => cur.agent, (v) => (task(cur.num).agent = v)} agents={agentList} tasks={list} recommend={recommendFor(cur.title, info?.labels ?? [])} onorch={() => (task(cur.num).agent = orchPick(cur.title, info?.labels ?? []))}>
+										{#snippet trigger(props)}
+											<button type="button" {...props} class="group flex h-8 items-center gap-2 rounded-sm px-2 text-left text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+												<span class="w-27 shrink-0 text-muted-foreground">Assignee</span>
+												{#if a}<RoleAvatar role={a.role} size="sm" class="size-4.5" /><span class="min-w-0 flex-1 truncate">{a.name} · {roles[a.role].label}</span>{:else}<UserRoundX class="size-3.25 text-muted-foreground" /><span class="flex-1">Unassigned</span>{/if}
+												<ChevronsUpDown class="size-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+											</button>
+										{/snippet}
+									</AssigneePicker>
+									<PriorityPicker bind:value={() => cur.priority, (v) => (task(cur.num).priority = v)}>
+										{#snippet trigger(props)}{@render propRow(props, 'Priority', pm.icon, cur.priority, pm.text)}{/snippet}
+									</PriorityPicker>
+									<DependsPicker bind:value={() => deps, (v) => (detailOf(cur.num).deps = v)} current={cur.num} tasks={list} depsOf={(n) => details[n]?.deps ?? []}>
+										{#snippet trigger(props)}
+											{@const on = deps.filter((x) => x.kind === 'depends')}
+											{@render propRow(props, 'Depends on', Link2Icon, on.length ? on.map((x) => `#${x.num} ${task(x.num)?.title ?? ''}`).join(', ') : '—')}
+										{/snippet}
+									</DependsPicker>
+									{@render propRow(undefined, 'ETA', TimerIcon, info?.eta || '—')}
+									{@render propRow(undefined, 'Labels', Tag, info?.labels.join(' · ') || '—')}
 								</section>
 								<section class="flex flex-col gap-2">
 									<div class="flex items-center gap-2">
