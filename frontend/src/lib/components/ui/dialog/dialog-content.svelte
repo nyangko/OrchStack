@@ -1,10 +1,22 @@
+<script lang="ts" module>
+	/** 다이얼로그 너비 (.pen): sm 448 · md 672 · lg 800 · xl 1024 · full 1120 */
+	export type DialogSize = "sm" | "md" | "lg" | "xl" | "full";
+	export const dialogSizes: Record<DialogSize, string> = {
+		sm: "sm:max-w-md",
+		md: "sm:max-w-2xl",
+		lg: "sm:max-w-200",
+		xl: "sm:max-w-5xl",
+		full: "sm:max-w-280",
+	};
+</script>
+
 <script lang="ts">
+	/// 다이얼로그 본체 — Header · Body · Footer를 세로로 쌓는다. 닫기 버튼은 Header가 그린다.
+	/// tall: 화면 높이 4/5로 고정하고 Body만 스크롤한다 (목록 · 다단계 화면).
 	import { Dialog as DialogPrimitive } from "bits-ui";
-	import XIcon from '@lucide/svelte/icons/x';
-	import { Button } from "$lib/components/ui/button/index.js";
 	import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
-	import * as Dialog from "./index.js";
 	import DialogPortal from "./dialog-portal.svelte";
+	import DialogOverlay from "./dialog-overlay.svelte";
 	import type { Snippet } from "svelte";
 	import type { ComponentProps } from "svelte";
 
@@ -13,38 +25,30 @@
 		class: className,
 		portalProps,
 		children,
-		showCloseButton = true,
+		size = "sm",
+		tall = false,
 		...restProps
 	}: WithoutChildrenOrChild<DialogPrimitive.ContentProps> & {
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DialogPortal>>;
 		children: Snippet;
-		showCloseButton?: boolean;
+		size?: DialogSize;
+		tall?: boolean;
 	} = $props();
 </script>
 
-<!-- .pen Dialog: 머리글·바닥글은 끝까지 닿는 구분선, 그 사이 직접 자식(본문)은 px-6 py-5 자동 여백. 본문은 div로 감싼다. -->
-
 <DialogPortal {...portalProps}>
-	<Dialog.Overlay />
+	<DialogOverlay />
 	<DialogPrimitive.Content
 		bind:ref
 		data-slot="dialog-content"
 		class={cn(
-			"bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%_-_2rem)] gap-0 rounded-xl p-0 text-sm [&>*:not([data-slot=dialog-header],[data-slot=dialog-footer],[data-slot=dialog-close])]:px-6 [&>*:not([data-slot=dialog-header],[data-slot=dialog-footer],[data-slot=dialog-close])]:py-5 ring-1 duration-100 sm:max-w-md fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
+			"bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 fixed top-1/2 left-1/2 z-50 flex w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl p-0 text-sm ring-1 duration-100 outline-none",
+			dialogSizes[size],
+			tall && "h-4/5",
 			className
 		)}
 		{...restProps}
 	>
 		{@render children?.()}
-		{#if showCloseButton}
-			<DialogPrimitive.Close data-slot="dialog-close">
-				{#snippet child({ props })}
-					<Button variant="ghost" class="absolute top-4 right-4" size="icon-sm" {...props}>
-						<XIcon  />
-						<span class="sr-only">Close</span>
-					</Button>
-				{/snippet}
-			</DialogPrimitive.Close>
-		{/if}
 	</DialogPrimitive.Content>
 </DialogPortal>

@@ -263,7 +263,7 @@
 
 <svelte:window onkeydown={onkey} />
 
-<Command.Dialog bind:open={searching} bind:value={selected} shouldFilter={false} title="검색" description="태스크 · 이슈 · 멤버 · 설정 · 명령" class="*:px-0! *:py-0! sm:max-w-180">
+<Command.Dialog bind:open={searching} bind:value={selected} shouldFilter={false} title="검색" description="태스크 · 이슈 · 멤버 · 설정 · 명령" class="sm:max-w-180">
 	<!-- ⌘↵ 새 탭 · ↵ 열기 · ↑↓ 이동은 Command가 처리 -->
 	<div class="contents" role="presentation" onkeydown={(e) => {
 		const h = hits.find((x) => idOf(x) === selected);

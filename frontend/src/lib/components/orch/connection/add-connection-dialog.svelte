@@ -283,14 +283,14 @@
 {/snippet}
 
 <Dialog.Root bind:open={() => open, (v) => (open = v)}>
-	<Dialog.Content class="flex max-h-11/12 flex-col sm:max-w-5xl">
-		<Dialog.Header>
-			<Dialog.Title class="flex items-center gap-2"><PlugZap class="size-4" />연결 추가</Dialog.Title>
+	<Dialog.Content size="xl" tall>
+		<Dialog.Header icon={PlugZap}>
+			<Dialog.Title>연결 추가</Dialog.Title>
 			<Dialog.Description>에이전트가 모델을 부를 경로 · 워크스페이스 전체에서 사용</Dialog.Description>
+			{#snippet sub()}<Steps steps={['제공자 선택', '인증', '사용 범위 · 확인']} current={step} />{/snippet}
 		</Dialog.Header>
-		<div class="border-b bg-muted/50 py-3!"><Steps steps={['제공자 선택', '인증', '사용 범위 · 확인']} current={step} /></div>
 
-		<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+		<Dialog.Body class="gap-4">
 			{#if step === 0}
 				<div class="flex items-center gap-3">
 					<InputGroup.Root class="h-9 flex-1">
@@ -507,13 +507,9 @@
 					</aside>
 				</div>
 			{/if}
-		</div>
+		</Dialog.Body>
 
-		<Dialog.Footer>
-			<span class="flex flex-1 items-center gap-1.5 text-caption text-muted-foreground">
-				<Info class="size-3.5 shrink-0" />
-				{step === 0 ? '이미 연결된 제공자도 계정 · 키를 하나 더 추가할 수 있어요 (예: 개인 / 팀 계정)' : step === 1 ? (isSub ? '구독 토큰은 실행기(CLI)가 보관해요 · OrchStack은 한도만 읽어요' : '키는 이 기기 키체인에만 저장돼요 · 팀원에게는 연결 이름만 공유') : '언어 · 알림 기본값은 설정 › 일반 · 알림에서 바꿀 수 있어요'}
-			</span>
+		<Dialog.Footer note={step === 0 ? '이미 연결된 제공자도 계정 · 키를 하나 더 추가할 수 있어요 (예: 개인 / 팀 계정)' : step === 1 ? (isSub ? '구독 토큰은 실행기(CLI)가 보관해요 · OrchStack은 한도만 읽어요' : '키는 이 기기 키체인에만 저장돼요 · 팀원에게는 연결 이름만 공유') : '언어 · 알림 기본값은 설정 › 일반 · 알림에서 바꿀 수 있어요'}>
 			{#if step === 0}
 				<Button variant="ghost" size="sm" onclick={() => (open = false)}>취소</Button>
 				<Button size="sm" disabled={!sel} onclick={() => (step = 1)}><ArrowRight />다음 · 인증</Button>

@@ -1375,12 +1375,12 @@
 	</div>
 	<!-- 판단 대기 패널 (.pen DecisionPanel) — 전체 / 이 태스크만 -->
 	<Dialog.Root bind:open={panel}>
-		<Dialog.Content class="flex h-4/5 flex-col sm:max-w-5xl">
+		<Dialog.Content size="xl" tall>
 			<Dialog.Header>
 				<Dialog.Title class="flex items-center gap-2">판단 대기 <Badge variant="secondary">{pending.length}</Badge></Dialog.Title>
 				<Dialog.Description>{scope === undefined ? `${project.name} · L2 모호한 판단` : `Task #${scope}만`}</Dialog.Description>
 			</Dialog.Header>
-			<div class="flex min-h-0 flex-1 p-0!">
+			<Dialog.Body padded={false} class="flex-row">
 				<nav class="flex w-72 shrink-0 flex-col overflow-y-auto border-r bg-background p-2" aria-label="판단 대기 목록">
 					{#each shownQueue as d (d.id)}
 						{@const who = agentOf(d.agent)}
@@ -1450,7 +1450,7 @@
 						{/if}
 					</section>
 				{/if}
-			</div>
+			</Dialog.Body>
 		</Dialog.Content>
 	</Dialog.Root>
 {:else}

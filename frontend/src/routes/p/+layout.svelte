@@ -3,8 +3,8 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-	import X from '@lucide/svelte/icons/x';
 	import Plus from '@lucide/svelte/icons/plus';
+	import X from '@lucide/svelte/icons/x';
 	import FolderPlus from '@lucide/svelte/icons/folder-plus';
 	import Folder from '@lucide/svelte/icons/folder';
 	import GitFork from '@lucide/svelte/icons/git-fork';
@@ -12,7 +12,6 @@
 	import Hand from '@lucide/svelte/icons/hand';
 	import Timer from '@lucide/svelte/icons/timer';
 	import Zap from '@lucide/svelte/icons/zap';
-	import Info from '@lucide/svelte/icons/info';
 	import Check from '@lucide/svelte/icons/check';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Select from '$lib/components/ui/select';
@@ -137,21 +136,15 @@
 {/snippet}
 
 <Dialog.Root bind:open={creating}>
-	<Dialog.Content showCloseButton={false} class="gap-0 p-0 sm:max-w-200">
-		<!-- contents — 머리 · 바닥 여백은 Dialog 쪽 규칙을 그대로 쓴다 -->
+	<Dialog.Content size="lg">
+		<!-- contents — Header · Body · Footer가 Content의 세로 배치에 그대로 놓이게 -->
 		<form onsubmit={create} class="contents">
-			<Dialog.Header class="flex-row items-center gap-3 pr-6">
-				<FolderPlus class="size-5 shrink-0" />
-				<div class="flex flex-1 flex-col gap-0.5">
-					<Dialog.Title>새 프로젝트</Dialog.Title>
-					<Dialog.Description>저장소를 연결하고 팀 · Orch 진행 방식을 정해요</Dialog.Description>
-				</div>
-				<Dialog.Close>
-					{#snippet child({ props })}<Button variant="ghost" size="icon-sm" aria-label="닫기" {...props}><X /></Button>{/snippet}
-				</Dialog.Close>
+			<Dialog.Header icon={FolderPlus}>
+				<Dialog.Title>새 프로젝트</Dialog.Title>
+				<Dialog.Description>저장소를 연결하고 팀 · Orch 진행 방식을 정해요</Dialog.Description>
 			</Dialog.Header>
 
-			<div class="flex flex-col px-6 pt-1">
+			<Dialog.Body class="py-1">
 				<label class="flex flex-col gap-2.5 border-b py-4">
 					{@render field('이름', '프로젝트 탭 · 브레드크럼에 보여요')}
 					<InputGroup.Root>
@@ -205,10 +198,9 @@
 					<!-- 가져온 이슈가 있어야 계획을 세운다 -->
 					<Switch bind:checked={() => importIssues && firstPlan, (v) => (firstPlan = v)} disabled={!importIssues} aria-label="Orch가 첫 계획 세우기" />
 				</label>
-			</div>
+			</Dialog.Body>
 
-			<Dialog.Footer class="mt-2">
-				<span class="flex flex-1 items-center gap-1.5 text-caption text-muted-foreground"><Info class="size-3.5" />만든 뒤 Workbench에서 이슈 · 태스크를 바로 볼 수 있어요</span>
+			<Dialog.Footer note="만든 뒤 Workbench에서 이슈 · 태스크를 바로 볼 수 있어요">
 				<Dialog.Close>{#snippet child({ props })}<Button type="button" variant="ghost" {...props}>취소</Button>{/snippet}</Dialog.Close>
 				<Button type="submit" disabled={!name.trim() || nameTaken || !team}><Check />프로젝트 만들기</Button>
 			</Dialog.Footer>

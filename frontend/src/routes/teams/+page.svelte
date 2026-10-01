@@ -29,7 +29,6 @@
 	import Info from '@lucide/svelte/icons/info';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
-	import X from '@lucide/svelte/icons/x';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Cpu from '@lucide/svelte/icons/cpu';
 	import Gauge from '@lucide/svelte/icons/gauge';
@@ -695,20 +694,13 @@
 {/snippet}
 
 <Sheet.Root bind:open={adding}>
-	<Sheet.Content side="right" showCloseButton={false} class="gap-0 bg-background p-0 data-[side=right]:w-260 data-[side=right]:sm:max-w-260">
-		<header class="flex flex-col gap-3.5 border-b px-7 pt-5 pb-4">
-			<div class="flex items-center gap-2.5">
-				<Sheet.Title class="flex-1 text-lg font-semibold">{team.name}에 멤버 추가</Sheet.Title>
-				<Sheet.Close>
-					{#snippet child({ props })}
-						<Button variant="ghost" size="icon-sm" aria-label="닫기" {...props}><X /></Button>
-					{/snippet}
-				</Sheet.Close>
-			</div>
-			<Steps steps={['템플릿 선택', '캐릭터', '런타임 · 도구']} current={step} />
-		</header>
+	<Sheet.Content side="right" size="xl">
+		<Sheet.Header>
+			<Sheet.Title>{team.name}에 멤버 추가</Sheet.Title>
+			{#snippet sub()}<Steps steps={['템플릿 선택', '캐릭터', '런타임 · 도구']} current={step} />{/snippet}
+		</Sheet.Header>
 
-		<div class="flex min-h-0 flex-1 gap-6 overflow-y-auto px-7 py-6">
+		<Sheet.Body class="flex-row gap-6">
 			<div class="flex min-w-0 flex-1 flex-col gap-4.5">
 				{#if step === 0}
 					<InputGroup.Root class="h-9">
@@ -983,19 +975,16 @@
 					</div>
 				{/if}
 			</aside>
-		</div>
+		</Sheet.Body>
 
-		<footer class="flex items-center gap-2.5 border-t bg-card px-7 py-3.5">
+		<Sheet.Footer
+			note={step === 0 ? '다음 단계에서 이름 · 성격 · 런타임을 다듬어요' : step === 1 ? '이름 · 성격을 정해요 · 이후 변경은 이 멤버에게만' : '추가 후 멤버 상세에서 계속 편집할 수 있어요'}
+			noteIcon={step === 0 ? Info : Copy}
+		>
 			{#if step === 0}
-				<Info class="size-3.5 text-muted-foreground" />
-				<span class="flex-1 text-xs text-muted-foreground">다음 단계에서 이름 · 성격 · 런타임을 다듬어요</span>
 				<Button variant="ghost" size="sm" onclick={() => (adding = false)}>취소</Button>
 				<Button size="sm" onclick={toCharacter}>다음 · 캐릭터<ArrowRight /></Button>
 			{:else}
-				<Copy class="size-3.5 text-muted-foreground" />
-				<span class="flex-1 text-xs text-muted-foreground">
-					{step === 1 ? '이름 · 성격을 정해요 · 이후 변경은 이 멤버에게만' : '추가 후 멤버 상세에서 계속 편집할 수 있어요'}
-				</span>
 				<Button variant="ghost" size="sm" onclick={() => step--}><ArrowLeft />이전</Button>
 				{#if step === 1}
 					<Button size="sm" disabled={!name.trim()} onclick={() => (step = 2)}>다음 · 런타임 · 도구<ArrowRight /></Button>
@@ -1003,7 +992,7 @@
 					<Button size="sm" disabled={!name.trim()} onclick={add}><UserPlus />팀에 추가</Button>
 				{/if}
 			{/if}
-		</footer>
+		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>
 
@@ -1056,14 +1045,13 @@
 {/snippet}
 
 <Sheet.Root bind:open={() => viewing !== undefined, (v) => !v && (viewing = undefined)}>
-	<Sheet.Content side="right" showCloseButton={false} class="gap-0 bg-background p-0 data-[side=right]:w-260 data-[side=right]:sm:max-w-260">
+	<Sheet.Content side="right" size="xl">
 		{#if viewed}
 			{@const m = viewed}
 			{@const st = states[m.status]}
 			{@const isPaused = paused.includes(m.sn)}
-			<header class="flex items-center gap-3.5 border-b px-7 py-5">
-				<RoleAvatar role={m.role} icon={glyphOf(m)} size="lg" />
-				<div class="flex min-w-0 flex-1 flex-col gap-1.25">
+			<Sheet.Header>
+				{#snippet lead()}<RoleAvatar role={m.role} icon={glyphOf(m)} size="lg" />{/snippet}
 					<div class="flex items-center gap-2.5">
 						<Sheet.Title class="text-xl font-bold">{m.name}</Sheet.Title>
 						{#if isPaused}
@@ -1083,18 +1071,14 @@
 							</span>
 						{/if}
 					</div>
-				</div>
-				<Button variant="outline" size="sm" onclick={() => togglePause(m.sn)}>
-					{#if isPaused}<Play />Resume{:else}<Pause />Pause{/if}
-				</Button>
-				<Sheet.Close>
-					{#snippet child({ props })}
-						<Button variant="ghost" size="icon-sm" aria-label="닫기" {...props}><X /></Button>
-					{/snippet}
-				</Sheet.Close>
-			</header>
+				{#snippet actions()}
+					<Button variant="outline" size="sm" onclick={() => togglePause(m.sn)}>
+						{#if isPaused}<Play />Resume{:else}<Pause />Pause{/if}
+					</Button>
+				{/snippet}
+			</Sheet.Header>
 
-			<div class="flex min-h-0 flex-1">
+			<Sheet.Body padded={false} class="flex-row">
 				<nav aria-label="멤버 메뉴" class="flex w-52.5 shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-sidebar px-2.5 py-3.5">
 					{#each nav as g, gi (g.group)}
 						<span class={cn('list-label px-2 pt-0.5 pb-1.5', gi > 0 && 'mt-1.5 border-t pt-3.5')}>{g.group}</span>
@@ -1530,26 +1514,25 @@
 						</Empty.Root>
 					{/if}
 				</div>
-			</div>
+			</Sheet.Body>
 		{/if}
 	</Sheet.Content>
 </Sheet.Root>
 
 <!-- Orch 진행 정책 편집 (.pen Team Settings · Orch 진행) -->
 <Dialog.Root bind:open={() => draft !== undefined, (v) => !v && (draft = undefined)}>
-	<Dialog.Content showCloseButton={false} class="flex h-4/5 flex-col sm:max-w-280">
+	<Dialog.Content size="full" tall>
 		{#if draft}
 			{@const d = draft}
-			<header class="flex items-center gap-3 border-b px-7! py-5!">
-				<div class="flex flex-1 flex-col gap-1">
-					<span class="flex items-center gap-1 text-caption text-muted-foreground">{team.name}<ChevronRight class="size-3" />팀 설정</span>
-					<Dialog.Title class="text-lg font-semibold">Orch 진행 정책</Dialog.Title>
-					<Dialog.Description class="text-xs">다음 작업 배정 · 분배 · 사용자 판단이 필요한 순간을 Orch가 어떻게 처리할지 정해요.</Dialog.Description>
-				</div>
-				<Button variant="ghost" size="sm" onclick={() => (draft = undefined)}>취소</Button>
-				<Button size="sm" disabled={!!spawnError || !!childError} onclick={savePolicy}>저장</Button>
-			</header>
-			<div class="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-7! pt-6! pb-7!">
+			<Dialog.Header crumb={[team.name, '팀 설정']} closable={false}>
+				<Dialog.Title>Orch 진행 정책</Dialog.Title>
+				<Dialog.Description>다음 작업 배정 · 분배 · 사용자 판단이 필요한 순간을 Orch가 어떻게 처리할지 정해요.</Dialog.Description>
+				{#snippet actions()}
+					<Button variant="ghost" size="sm" onclick={() => (draft = undefined)}>취소</Button>
+					<Button size="sm" disabled={!!spawnError || !!childError} onclick={savePolicy}>저장</Button>
+				{/snippet}
+			</Dialog.Header>
+			<Dialog.Body class="gap-7">
 				<section class="flex flex-col gap-3">
 					{@render heading('1 · 진행 모드', '태스크가 끝났을 때 Orch가 다음 행동을 제안하고 실행하는 방식')}
 					<div role="radiogroup" aria-label="진행 모드" class="grid grid-cols-3 gap-3">
@@ -1686,7 +1669,7 @@
 						</Alert.Root>
 					{/if}
 				</section>
-			</div>
+			</Dialog.Body>
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>

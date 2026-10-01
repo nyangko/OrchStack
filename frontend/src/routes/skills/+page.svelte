@@ -307,14 +307,14 @@
 
 <!-- 스킬 · MCP 추가 — skills.sh에서 워크스페이스 라이브러리로 -->
 <Dialog.Root bind:open={adding}>
-	<Dialog.Content class="flex h-4/5 flex-col sm:max-w-4xl">
+	<Dialog.Content size="xl" tall>
 		<Dialog.Header>
 			<Dialog.Title>스킬 · MCP 추가</Dialog.Title>
 			<Dialog.Description>워크스페이스 라이브러리에 추가해요. 에이전트별로 켜는 건 템플릿 · 멤버 Skills 탭에서 해요.</Dialog.Description>
 		</Dialog.Header>
-		<div class="min-h-0 flex-1 overflow-y-auto">
+		<Dialog.Body>
 			<SkillBrowser added={(n) => store.library.some((s) => s.name === n)} onadd={(h) => (installSkill(h), (sel = { kind: 'skill', name: h.name }))} target="워크스페이스" />
-		</div>
+		</Dialog.Body>
 	</Dialog.Content>
 </Dialog.Root>
 

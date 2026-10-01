@@ -1,3 +1,4 @@
+import Body from "./sheet-body.svelte";
 import Close from "./sheet-close.svelte";
 import Content from "./sheet-content.svelte";
 import Description from "./sheet-description.svelte";
@@ -11,6 +12,7 @@ import Root from "./sheet.svelte";
 
 export {
 	Root,
+	Body,
 	Close,
 	Trigger,
 	Portal,
@@ -22,6 +24,7 @@ export {
 	Description,
 	//
 	Root as Sheet,
+	Body as SheetBody,
 	Close as SheetClose,
 	Trigger as SheetTrigger,
 	Portal as SheetPortal,

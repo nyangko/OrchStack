@@ -86,24 +86,22 @@
 
 <!-- 스킬 상세 (.pen Skill Detail Dialog) -->
 <Dialog.Root bind:open={() => skillView !== undefined, (v) => !v && (skillView = undefined)}>
-	<Dialog.Content showCloseButton={false} class="flex h-4/5 flex-col sm:max-w-4xl">
+	<Dialog.Content size="xl" tall>
 		{#if skillView}
 			{@const h = skillView}
 			{@const isAdded = added(h.name)}
-			<header class="flex items-start gap-3 border-b px-6! py-5!">
-				<span class="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-lg font-semibold text-muted-foreground uppercase">{h.name[0]}</span>
-				<div class="flex min-w-0 flex-1 flex-col gap-1.5">
-					<Dialog.Title class="flex items-baseline gap-2 text-lg font-semibold">{h.name}<span class="font-mono text-xs font-normal text-muted-foreground">{h.repo}</span></Dialog.Title>
+			<Dialog.Header>
+				{#snippet lead()}<span class="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-lg font-semibold text-muted-foreground uppercase">{h.name[0]}</span>{/snippet}
+					<Dialog.Title class="flex items-baseline gap-2">{h.name}<span class="font-mono text-xs font-normal text-muted-foreground">{h.repo}</span></Dialog.Title>
 					<div class="flex flex-wrap items-center gap-3 text-caption text-muted-foreground">
 						<span class="flex items-center gap-1"><Download class="size-3" />{h.installs} installs</span>
 						<span class="flex items-center gap-1"><GitCommitHorizontal class="size-3" />{h.version}</span>
 						<span class="flex items-center gap-1"><Scale class="size-3" />{h.license}</span>
 						<Pill class={h.audit[0] < h.audit[1] ? 'bg-warning-soft text-status-waiting' : 'bg-success-soft text-status-done'}><ShieldCheck />보안 검사 {h.audit[0]}/{h.audit[1]}</Pill>
 					</div>
-				</div>
-				<Button variant="ghost" size="icon-sm" href="https://skills.sh" target="_blank" rel="noreferrer" aria-label="skills.sh에서 보기"><ExternalLink /></Button>
-			</header>
-			<div class="flex min-h-0 flex-1 p-0!">
+				{#snippet actions()}<Button variant="ghost" size="icon-sm" href="https://skills.sh" target="_blank" rel="noreferrer" aria-label="skills.sh에서 보기"><ExternalLink /></Button>{/snippet}
+			</Dialog.Header>
+			<Dialog.Body padded={false} class="flex-row">
 				<Tabs.Root value="overview" class="min-w-0 flex-1 gap-0 overflow-y-auto px-6 py-4">
 					<Tabs.List variant="line" class="mb-4">
 						<Tabs.Trigger value="overview">개요</Tabs.Trigger>
@@ -136,12 +134,11 @@
 					<div class="flex items-center gap-2"><RuntimeLogo runtime="claude" class="size-4 ring-0" />Claude Code</div>
 					<div class="flex items-center gap-2"><RuntimeLogo runtime="codex" class="size-4 ring-0" />Codex CLI<span class="text-muted-foreground">+{h.agents - 2}</span></div>
 				</aside>
-			</div>
-			<footer class="flex items-center gap-2 border-t px-6! py-3.5!">
-				<span class="flex-1 text-xs text-muted-foreground">{target}에 추가 · 다음 Run부터 적용</span>
+			</Dialog.Body>
+			<Dialog.Footer note="{target}에 추가 · 다음 Run부터 적용">
 				<Button variant="ghost" size="sm" onclick={() => (skillView = undefined)}>닫기</Button>
 				<Button size="sm" disabled={isAdded} onclick={() => (onadd(h), (skillView = undefined))}>{#if isAdded}<Check />추가됨{:else}<Plus />{h.audit[0] < h.audit[1] ? '검토했어요 · 추가' : '추가'}{/if}</Button>
-			</footer>
+			</Dialog.Footer>
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>

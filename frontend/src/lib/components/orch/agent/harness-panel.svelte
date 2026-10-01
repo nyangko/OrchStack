@@ -212,13 +212,13 @@
 
 <!-- 모델 선택 (.pen Model Picker Dialog) — 연결별 모델 · 한도 잔량 -->
 <Dialog.Root bind:open={picker}>
-	<Dialog.Content class="flex h-4/5 flex-col sm:max-w-4xl">
+	<Dialog.Content size="xl" tall>
 		{#if picker}
 			<Dialog.Header>
 				<Dialog.Title>모델 선택</Dialog.Title>
 				<Dialog.Description>연결별 모델 목록 · 한도 잔량을 보고 고르세요 · 소진된 제공자는 폴백으로만 쓰여요</Dialog.Description>
-			</Dialog.Header>
-			<div class="flex flex-wrap items-center gap-2 border-b pb-3!">
+				{#snippet sub()}
+			<div class="flex flex-wrap items-center gap-2">
 				<InputGroup.Root class="h-8 w-60">
 					<InputGroup.Addon><Search /></InputGroup.Addon>
 					<InputGroup.Input bind:value={pickQuery} placeholder="모델 검색…" aria-label="모델 검색" />
@@ -229,7 +229,9 @@
 				<span class="flex-1"></span>
 				<span class="text-caption text-muted-foreground">{pickModels.reduce((n, p) => n + p.models.length, 0)}개 · 가격 in/out per 1M</span>
 			</div>
-			<div class="flex min-h-0 flex-1 p-0!">
+				{/snippet}
+			</Dialog.Header>
+			<Dialog.Body padded={false} class="flex-row">
 				<nav aria-label="제공자" class="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-2 text-xs">
 					<span class="list-label px-2 pt-1 pb-1.5">제공자 · 연결됨 {modelCatalog.length}</span>
 					<button type="button" aria-pressed={pickProvider === 'all'} onclick={() => (pickProvider = 'all')} class={cn('flex items-center gap-2 rounded-sm px-2 py-1.5 text-left outline-none hover:bg-muted', pickProvider === 'all' && 'bg-accent font-medium')}><Layers class="size-3.5" /><span class="flex-1">전체</span></button>
@@ -283,7 +285,7 @@
 						<p class="py-10 text-center text-xs text-muted-foreground">조건에 맞는 모델이 없어요.</p>
 					{/each}
 				</div>
-			</div>
+			</Dialog.Body>
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>

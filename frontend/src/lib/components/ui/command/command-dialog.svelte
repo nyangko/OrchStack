@@ -11,7 +11,6 @@
 		value = $bindable(""),
 		title = "Command Palette",
 		description = "Search for a command to run...",
-		showCloseButton = false,
 		portalProps,
 		children,
 		class: className,
@@ -22,7 +21,6 @@
 			children: Snippet;
 			title?: string;
 			description?: string;
-			showCloseButton?: boolean;
 			class?: string;
 		} = $props();
 </script>
@@ -34,7 +32,6 @@
 	</Dialog.Header>
 	<Dialog.Content
 		class={cn("rounded-xl! top-1/3 translate-y-0 overflow-hidden p-0", className)}
-		{showCloseButton}
 		{portalProps}
 	>
 		<Command {...restProps} bind:value bind:ref {children} />

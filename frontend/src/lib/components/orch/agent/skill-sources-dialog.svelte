@@ -25,14 +25,14 @@
 
 <!-- 스킬 소스 연동 (.pen Skill Sources Dialog) — 워크스페이스 전체 설정 -->
 <Dialog.Root bind:open={() => open, (v) => (open = v)}>
-	<Dialog.Content class="sm:max-w-2xl">
+	<Dialog.Content size="md">
 		{#if sourcesDraft}
 			{@const d = sourcesDraft}
-			<Dialog.Header>
-				<Dialog.Title class="flex items-center gap-2"><Plug class="size-4" />스킬 소스 연동</Dialog.Title>
+			<Dialog.Header icon={Plug}>
+				<Dialog.Title>스킬 소스 연동</Dialog.Title>
 				<Dialog.Description>스킬을 찾고 설치할 곳 · 워크스페이스 전체에 적용</Dialog.Description>
 			</Dialog.Header>
-			<div class="flex flex-col gap-4">
+			<Dialog.Body class="gap-4">
 				<section class="flex flex-col gap-2">
 					<span class="list-label">소스</span>
 					{#each d.sources as src (src.name)}
@@ -62,9 +62,8 @@
 						</label>
 					{/each}
 				</section>
-			</div>
-			<Dialog.Footer>
-				<span class="flex-1 text-caption text-muted-foreground">API 한도 600회/분 · 캐시 15분</span>
+			</Dialog.Body>
+			<Dialog.Footer note="API 한도 600회/분 · 캐시 15분">
 				<Button variant="ghost" size="sm" onclick={() => (open = false)}>취소</Button>
 				<Button size="sm" onclick={() => ((store.sources = d), (open = false))}>저장</Button>
 			</Dialog.Footer>

@@ -255,14 +255,13 @@
 				<Dialog.Trigger>
 					{#snippet child({ props })}<Button variant="outline" {...props}>Open dialog</Button>{/snippet}
 				</Dialog.Trigger>
-				<Dialog.Content>
-					<Dialog.Header>
+				<Dialog.Content size="md">
+					<Dialog.Header icon={Plug} crumb={['Settings', '모델 연결']}>
 						<Dialog.Title>연결 추가</Dialog.Title>
 						<Dialog.Description>에이전트가 모델을 부를 경로 · 워크스페이스 전체에서 사용</Dialog.Description>
 					</Dialog.Header>
-					<div><Input placeholder="이름" aria-label="이름" /></div>
-					<Dialog.Footer>
-						<span class="mr-auto flex items-center gap-2 text-caption text-subtle-foreground"><Info class="size-3.5" />계정 · 키를 하나 더 추가할 수 있어요</span>
+					<Dialog.Body><Input placeholder="이름" aria-label="이름" /></Dialog.Body>
+					<Dialog.Footer note="계정 · 키를 하나 더 추가할 수 있어요">
 						<Dialog.Close>{#snippet child({ props })}<Button variant="ghost" {...props}>취소</Button>{/snippet}</Dialog.Close>
 						<Button>다음</Button>
 					</Dialog.Footer>
