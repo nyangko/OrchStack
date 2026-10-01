@@ -21,6 +21,7 @@ export const repos = [
 import type { TaskStatus } from "$lib/status";
 import type { Role } from "$lib/roles";
 import type { Runtime } from "$lib/components/orch/runtime-logo";
+import type { DecisionRecordData } from "$lib/components/orch/decision-record";
 
 /// 에이전트(멤버). 스키마 tbl_member · tbl_agent_profile 요약. OpenAPI(#45) 전 임시 타입.
 export type Agent = {
@@ -121,7 +122,8 @@ export type TaskDetail = {
 	criteria: { text: string; done: boolean }[];
 	deps: { kind: "depends" | "blocks"; num: number }[];
 	runs: { num: number; note: string; time: string; tokens: string; live?: boolean }[];
-	activity: { type: string; who: string; time: string; text: string }[];
+	/** record가 있으면 결정 기록(한 줄 → 펼침 카드)으로 그린다. */
+	activity: { type: string; who: string; time: string; text: string; record?: DecisionRecordData }[];
 	eta: string;
 	labels: string[];
 	/** 현재 Run 컨텍스트 사용 / 한도 (K 토큰). */
@@ -172,7 +174,7 @@ export const taskDetails: Record<number, TaskDetail> = {
 		activity: [
 			{ type: "TASK_INSTRUCTION", who: "Orch → 진", time: "13:58", text: "Task #129 생성 · WorkProposal 'Authentication 개선'에서 Proceed" },
 			{ type: "ASSIGN", who: "Orch → 진", time: "14:01", text: "#129 배정 · 유나의 Login 시안 v2 첨부" },
-			{ type: "DECISION", who: "나", time: "14:12", text: "Q 로그인 실패 5회 시 잠금? → 15분 잠금 + 안내" },
+			{ type: "DECISION", who: "나", time: "14:12", text: "Q 로그인 실패 5회 시 잠금? → 15분 잠금 + 안내", record: { by: "me", task: 129, time: "14:12", q: "로그인 실패 5회 시 잠금?", a: "15분 잠금 + 안내 문구", summary: "#129 실패 5회 → 15분 잠금", sent: "진에게 전달됨 · Run #81" } },
 			{ type: "TEST", who: "pnpm test auth", time: "14:16", text: "✓ 12 passed · 0 failed" },
 			{ type: "REQUEST_VERIFICATION", who: "진 → 하린 · live", time: "14:17", text: "Task #130 QA 대기 해제 요청" },
 		],
@@ -209,6 +211,9 @@ export type Decision = {
 	/** 남은 시간 (없으면 결정됨). 시간이 지나면 Orch가 추천안으로 결정. */
 	left?: string;
 	decided?: string;
+	/** 질문에 붙은 파일 · 코드 조각 수 (PM Dock 카드 B 메타) */
+	files?: number;
+	code?: number;
 	questions: {
 		q: string;
 		context?: string;
@@ -219,7 +224,7 @@ export type Decision = {
 
 export const decisions: Decision[] = [
 	{
-		id: 1, agent: 1, task: 129, title: "Login UI 구현", topic: "에러 문구 톤 · 재시도 제한 · 안내 문구", sub: "질문 3개 · Run #81 대기 중 · 그동안 #135 참고", left: "9:42",
+		id: 1, agent: 1, task: 129, title: "Login UI 구현", files: 2, code: 1, topic: "에러 문구 톤 · 재시도 제한 · 안내 문구", sub: "질문 3개 · Run #81 대기 중 · 그동안 #135 참고", left: "9:42",
 		questions: [
 			{ q: "로그인 실패 에러 문구 톤", answer: "친근하게 · 원인 + 다음 행동" },
 			{
@@ -253,7 +258,19 @@ export type Chat =
 	| { kind: "user"; text: string; time: string }
 	| { kind: "orch"; text: string; time: string }
 	| { kind: "proposal"; title: string; issue: string; tasks: { title: string; agent: number }[]; deps: string; status: "draft" | "proceeded" | "cancelled" }
-	| { kind: "result"; time: string; lines: string[] };
+	| { kind: "result"; time: string; lines: string[] }
+	| { kind: "card"; time: string; card: DockCard };
+
+/// PM Dock Orch 진행 카드 (.pen Kk8hB A · C–H, B는 판단 대기 큐에서 만든다). done이 있으면 처리됨 — 버튼 대신 결과 한 줄.
+export type DockCard = { done?: string } & (
+	| { type: "timer"; title: string; task: number; agent: number; proposal: { title: string; desc: string; task: number; agent: number }; seconds: number; streak: [number, number]; alternatives: string[] }
+	| { type: "guard"; title: string; tag: string; task: number; desc: string; rounds: string[]; cost: [string, string, string]; judgment: string }
+	| { type: "approval"; title: string; desc: string; branch: string; files: string; review: string; qa: string }
+	| { type: "blocked"; title: string; agent: number; desc: string; policy: string; alternative: string }
+	| { type: "limit"; title: string; desc: string; label: string; used: number; reset: string }
+	| { type: "failed"; title: string; task: number; desc: string; log: [string, string]; seconds: number; tries: [number, number] }
+	| { type: "report"; title: string; desc: string; stats: { tasks: string; tokens: string; time: string; rework: string } }
+);
 
 export const thread: Chat[] = [
 	{ kind: "user", text: "로그인 쪽 인증 흐름 전체 개선해줘. refresh token 도입하고 QA · 리뷰까지.", time: "13:52" },
@@ -263,6 +280,14 @@ export const thread: Chat[] = [
 		tasks: [{ title: "Auth API", agent: 2 }, { title: "Login UI", agent: 1 }, { title: "QA", agent: 3 }, { title: "Review", agent: 4 }],
 		deps: "QA ← Auth API + Login UI · Review ← QA", status: "draft",
 	},
+	// .pen Kk8hB — Orch 진행 카드 (목데이터: 시간 순서로 섞어 둔다)
+	{ kind: "card", time: "14:20", card: { type: "timer", title: "#129 Login UI 구현 완료 · 진", task: 129, agent: 1, proposal: { title: "Orch 제안 · #130 QA를 하린에게 배정", desc: "#128 · #129 모두 Done → QA 조건 충족", task: 130, agent: 3 }, seconds: 4, streak: [3, 10], alternatives: ["다른 멤버에게 · 소라 먼저 리뷰", "Todo로 보내고 대기", "Backlog로 · 이번 주 제외", "이슈 #51 완료 처리"] } },
+	{ kind: "card", time: "14:22", card: { type: "guard", title: "자동 진행 멈춤", tag: "루프 가드 · 반려 3회", task: 121, desc: "#121 Signup UI · 소라 리뷰 반려가 같은 이유로 반복되고 있어요.", rounds: ["1차 · a11y 라벨 누락", "2차 · 라벨 추가했지만 aria-describedby 누락", "3차 · 에러 메시지 포커스 이동 없음"], cost: ["재작업 3회", "24.6K 토큰", "38분"], judgment: "Orch 판단 · 완료 조건에 접근성 기준이 불명확해요. 기준을 정해주면 재개할게요." } },
+	{ kind: "card", time: "14:25", card: { type: "approval", title: "PR #86 병합 승인 · 진", desc: "#121 Signup UI가 리뷰와 QA를 통과했어요. main에 병합하면 스테이징에 자동 배포돼요.", branch: "feat/signup-ui → main", files: "6 files · +264 −31", review: "소라 리뷰 승인", qa: "QA 12/12 통과" } },
+	{ kind: "card", time: "14:27", card: { type: "blocked", title: "위험 작업 차단 · 민수", agent: 2, desc: "#128 작업 중 `git push --force origin main` 실행을 시도해 권한 정책에 따라 차단했어요.", policy: "Destructive git · 차단 정책", alternative: "대안 · 새 브랜치로 push 후 PR 생성" } },
+	{ kind: "card", time: "14:30", card: { type: "limit", title: "Codex 주간 잔량 18%", desc: "진 · 유나가 쓰는 Codex 계정이 목요일 오후에 소진될 예상이에요. 정책: 20% 미만 → 확인 요청.", label: "Codex 주간 사용", used: 82, reset: "화 09:00 리셋" } },
+	{ kind: "card", time: "14:31", card: { type: "failed", title: "Run #77 실패 · 진", task: 129, desc: "#129 Login UI · lint 에러 3건으로 실패했어요. Orch가 오류 내용을 붙여 자동 재시도할게요.", log: ["src/lib/LoginForm.svelte:42  a11y-label-has-associated-control", "+2 more · eslint exit 1"], seconds: 5, tries: [1, 1] } },
+	{ kind: "card", time: "14:40", card: { type: "report", title: "Issue #51 Authentication Flow 완료", desc: "하위 이슈 2 · 태스크 4를 모두 마쳤어요. PR #88, #91 병합 완료.", stats: { tasks: "태스크 4 / 4", tokens: "186K 토큰", time: "1일 3시간", rework: "재작업 2" } } },
 ];
 
 /// 팀 멤버 한 줄 (.pen Teams / MemberRow · WorkloadRow). 스키마 tbl_member · tbl_team_member · tbl_run 요약. OpenAPI(#45) 전 임시 타입.
@@ -1180,7 +1205,7 @@ export type MemberRun = {
 };
 
 export type MemberActivity =
-	| { type: "decision"; who: string; orch?: boolean; kind: string; text: string; time: string }
+	| { type: "decision"; who: string; orch?: boolean; kind: string; text: string; time: string; record: DecisionRecordData }
 	| { type: "event"; who: string; role: Role; kind: "지시" | "실패" | "메시지" | "배정" | "반려" | "리뷰" | "시스템"; title: string; time: string; note?: string };
 
 export type MemberDetail = {
@@ -1263,8 +1288,8 @@ export const memberDetails: Record<number, MemberDetail> = {
 			{
 				day: "오늘",
 				items: [
-					{ type: "decision", who: "나", kind: "결정", text: "#133 재전송 → 30초 쿨다운", time: "14:12" },
-					{ type: "decision", who: "Orch", orch: true, kind: "대신 결정", text: "#130 E2E 브라우저 → Chromium + WebKit", time: "13:58" },
+					{ type: "decision", who: "나", kind: "결정", text: "#133 재전송 → 30초 쿨다운", time: "14:12", record: { by: "me", task: 133, time: "14:12", q: "재전송 제한은 어떻게 할까요?", a: "30초 쿨다운 표시 · 버튼에 남은 시간 · 3회 연속 시 안내 문구", summary: "#133 재전송 → 30초 쿨다운", sent: "진에게 전달됨 · Run #84" } },
+					{ type: "decision", who: "Orch", orch: true, kind: "대신 결정", text: "#130 E2E 브라우저 → Chromium + WebKit", time: "13:58", record: { by: "orch", task: 130, time: "13:58", q: "E2E 테스트 브라우저 범위는?", a: "Chromium + WebKit (Firefox 제외)", summary: "#130 E2E 브라우저 → Chromium + WebKit", sent: "하린에게 전달됨", why: "10분 무응답 · 기존 CI 설정이 두 브라우저만 사용 · 사용자 트래픽 중 Firefox 3%" } },
 					{ type: "event", who: "Orch", role: "orch", kind: "지시", title: "#129 재시도 지시", time: "14:15", note: "“lint 규칙 준수 후 다시 진행. a11y 라벨 필수”" },
 					{ type: "event", who: "진", role: "frontend", kind: "실패", title: "Run #77 실패 · lint 3건", time: "13:56" },
 					{ type: "event", who: "진", role: "frontend", kind: "메시지", title: "민수에게 질문", time: "13:30", note: "“refresh 응답의 expires_in 단위가 초 맞나요?” → 민수: “네, 초 단위”" },

@@ -51,7 +51,6 @@
 	import Link2 from '@lucide/svelte/icons/link-2';
 	import Undo2 from '@lucide/svelte/icons/undo-2';
 	import Redo2 from '@lucide/svelte/icons/redo-2';
-	import BookMarked from '@lucide/svelte/icons/book-marked';
 	import GitCompare from '@lucide/svelte/icons/git-compare';
 	import ArrowDownWideNarrow from '@lucide/svelte/icons/arrow-down-wide-narrow';
 	import Shuffle from '@lucide/svelte/icons/shuffle';
@@ -74,6 +73,7 @@
 	import ListPlus from '@lucide/svelte/icons/list-plus';
 	import Moon from '@lucide/svelte/icons/moon';
 	import { untrack, type Component } from 'svelte';
+	import { DecisionRecord } from '$lib/components/orch/decision-record';
 	import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetBody, SheetFooter } from '$lib/components/ui/sheet';
 	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
 	import { Steps } from '$lib/components/orch/steps';
@@ -1349,13 +1349,9 @@
 									<span class="list-label pt-1">{d.day}</span>
 									{#each items as a, i (i)}
 										{#if a.type === 'decision'}
-											<div class="flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-xs">
-												<BookMarked class={['size-3.5', a.orch ? 'text-status-review' : 'text-primary']} />
-												<span class="font-semibold">{a.who}</span>
-												<span class="rounded-xs bg-muted px-1.5 py-px text-caption text-muted-foreground font-medium">{a.kind}</span>
-												<span class="flex-1">{a.text}</span>
-												<span class="font-mono text-caption text-subtle-foreground">{a.time}</span>
-											</div>
+											<!-- 결정 기록 (.pen Decision Record) — 한 줄, 누르면 카드. 재검토 · 답변 전문은 프로젝트 판단 패널로 -->
+											{@const r = a.record}
+											<DecisionRecord record={r} onreview={() => goto(`/p/${store.projects.find((p) => p.name === team.project)?.sn ?? 1}?decide=${r.task}`)} />
 										{:else}
 											{@const KindIcon = kindIcon[a.kind]}
 											<div class="row-divided gap-2.5 py-2">

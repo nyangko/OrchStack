@@ -15,6 +15,32 @@
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 	import MessageSquareShare from '@lucide/svelte/icons/message-square-share';
 	import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+	import Clock3 from '@lucide/svelte/icons/clock-3';
+	import CircleCheck from '@lucide/svelte/icons/circle-check';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import Eye from '@lucide/svelte/icons/eye';
+	import Inbox from '@lucide/svelte/icons/inbox';
+	import Archive from '@lucide/svelte/icons/archive';
+	import CircleCheckBig from '@lucide/svelte/icons/circle-check-big';
+	import CirclePause from '@lucide/svelte/icons/circle-pause';
+	import ShieldAlert from '@lucide/svelte/icons/shield-alert';
+	import Undo2 from '@lucide/svelte/icons/undo-2';
+	import Repeat from '@lucide/svelte/icons/repeat';
+	import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
+	import FileDiff from '@lucide/svelte/icons/file-diff';
+	import ShieldCheck from '@lucide/svelte/icons/shield-check';
+	import FlaskConical from '@lucide/svelte/icons/flask-conical';
+	import X from '@lucide/svelte/icons/x';
+	import Ban from '@lucide/svelte/icons/ban';
+	import ShieldX from '@lucide/svelte/icons/shield-x';
+	import Lightbulb from '@lucide/svelte/icons/lightbulb';
+	import Terminal from '@lucide/svelte/icons/terminal';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import Funnel from '@lucide/svelte/icons/funnel';
+	import CircleX from '@lucide/svelte/icons/circle-x';
+	import User from '@lucide/svelte/icons/user';
+	import ListChecks from '@lucide/svelte/icons/list-checks';
+	import FileText from '@lucide/svelte/icons/file-text';
 	import Pause from '@lucide/svelte/icons/pause';
 	import Play from '@lucide/svelte/icons/play';
 	import Download from '@lucide/svelte/icons/download';
@@ -86,12 +112,15 @@
 	import { AvatarGroup, AvatarBadge } from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
+	import { OrchCard, OrchCardHeader } from '$lib/components/orch/orch-card';
+	import { LevelBadge } from '$lib/components/orch/level-badge';
+	import { DecisionRecord } from '$lib/components/orch/decision-record';
 	import { StatusBadge } from '$lib/components/orch/status-badge';
 	import { RoleAvatar } from '$lib/components/orch/role-avatar';
 	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import { statuses, statusOrder, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
-	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, type Issue, type Chat, type SubRun, type SpawnMode } from '$lib/mock';
+	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, type Issue, type Chat, type DockCard, type SubRun, type SpawnMode } from '$lib/mock';
 	import { store, defaultTeam } from '$lib/teams.svelte';
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { Pill } from '$lib/components/orch/pill';
@@ -666,6 +695,33 @@
 		});
 	}
 
+	// ── PM Dock 진행 카드 (.pen Kk8hB A · C–H) — 목데이터: 버튼을 누르면 결과 한 줄 + 알림. 실제 명령은 Orch API(#87).
+	// A 타이머 · G 재시도는 초를 세다 0이면 스스로 진행한다. 카드를 보고 있으면(포인터가 위에) 멈추고, '멈춤'을 누르면 계속 멈춘다.
+	let cardHold = $state<Record<number, 'view' | 'stop'>>({});
+	let altOpen = $state<number>();
+	function settle(card: DockCard, result: string) {
+		card.done = result;
+		toast(result);
+	}
+	function assignNext(card: Extract<DockCard, { type: 'timer' }>, agent = card.proposal.agent, label?: string) {
+		task(card.proposal.task).agent = agent;
+		settle(card, label ?? `#${card.proposal.task}을 ${agentName(agent)}에게 배정했어요`);
+	}
+	$effect(() => {
+		const id = setInterval(() => {
+			chat.forEach((c, i) => {
+				if (c.kind !== 'card' || c.card.done || cardHold[i]) return;
+				const k = c.card;
+				if (k.type !== 'timer' && k.type !== 'failed') return;
+				if (k.seconds > 0) k.seconds -= 1;
+				if (k.seconds > 0) return;
+				if (k.type === 'timer') assignNext(k);
+				else settle(k, `Run 재시도 · #${k.task} (${k.tries[0]} / ${k.tries[1]}회)`);
+			});
+		}, 1000);
+		return () => clearInterval(id);
+	});
+
 	// DecisionPanel (.pen DecisionPanel) — 판단 대기는 하나의 다이얼로그. 범위: 전체 / 이 태스크만. 질문 위 · 답변 입력 아래.
 	let queue = $state(structuredClone(decisions));
 	let panel = $state(false);
@@ -688,6 +744,16 @@
 	/// 현재 질문에 답하고 다음 질문으로. 모두 답하면 결정됨 — 에이전트에게는 활동 기록(Runtime Instruction)으로 전달.
 	function reply(e: SubmitEvent) {
 		e.preventDefault();
+		submitAnswer();
+	}
+	/// PM Dock 카드 B에서 선택지를 바로 눌러 답한다.
+	function quickAnswer(id: number, key: string) {
+		active = id;
+		pick = key;
+		answer = '';
+		submitAnswer();
+	}
+	function submitAnswer() {
 		if (!dec || qi < 0) return;
 		const q = dec.questions[qi];
 		const opt = q.options?.find((o) => o.key === pick);
@@ -695,6 +761,8 @@
 		if (!text) return;
 		q.answer = text;
 		(activity[dec.agent] ??= []).push({ type: 'DECISION', who: `나 → ${agentOf(dec.agent)?.name}`, time: now(), text: `Q ${q.q} → ${text}` });
+		// 결정 기록 (.pen Decision Record) — Task 상세 Activity에 한 줄, 누르면 카드
+		detailOf(dec.task).activity.push({ type: 'DECISION', who: '나', time: now(), text: `Q ${q.q} → ${text}`, record: { by: 'me', task: dec.task, time: now(), q: q.q, a: text, summary: `#${dec.task} ${q.q} → ${opt?.title ?? text}`, sent: `${agentOf(dec.agent)?.name ?? '담당'}에게 전달됨` } });
 		if (dec.questions.every((x) => x.answer)) {
 			dec.left = undefined;
 			dec.decided = '방금';
@@ -1326,13 +1394,19 @@
 									<section class="flex flex-col">
 										<h3 class="mb-1 text-body font-semibold">Activity</h3>
 										{#each info.activity as ev, i (i)}
-											<Item variant="row" size="xs">
-												<ItemContent>
-													<ItemTitle><Badge variant="mono" class="text-2xs">{ev.type}</Badge><span class="text-xs font-normal text-muted-foreground">{ev.who}</span></ItemTitle>
-													<ItemDescription>{ev.text}</ItemDescription>
-												</ItemContent>
-												<ItemActions class="font-mono text-xs text-subtle-foreground">{ev.time}</ItemActions>
-											</Item>
+											{#if ev.record}
+												<!-- 결정 기록 (.pen Decision Record) — 한 줄, 누르면 카드 -->
+												{@const r = ev.record}
+												<div class="py-1"><DecisionRecord record={r} onreview={() => openDecisions(r.task)} /></div>
+											{:else}
+												<Item variant="row" size="xs">
+													<ItemContent>
+														<ItemTitle><Badge variant="mono" class="text-2xs">{ev.type}</Badge><span class="text-xs font-normal text-muted-foreground">{ev.who}</span></ItemTitle>
+														<ItemDescription>{ev.text}</ItemDescription>
+													</ItemContent>
+													<ItemActions class="font-mono text-xs text-subtle-foreground">{ev.time}</ItemActions>
+												</Item>
+											{/if}
 										{/each}
 									</section>
 								{/if}
@@ -1717,16 +1791,35 @@
 				<div bind:this={threadEl} class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3" aria-live="polite">
 					<div class="mt-auto flex flex-col gap-3">
 					{#if pending.length}
-						<!-- Orch 카드: 판단 대기 요약 (.pen OrchCard) -->
-						<div class="card rounded-lg flex flex-col gap-2 p-3 shadow-xs">
-							<div class="flex items-center gap-2">
-								<Hourglass class="size-4 text-status-waiting" />
-								<span class="flex-1 text-sm font-semibold">판단 대기 {pending.length}</span>
-								<Badge class="rounded-xs bg-primary font-mono text-2xs">L2</Badge>
+						{@const d = pending[0]}
+						{@const qn = d.questions.findIndex((x) => !x.answer)}
+						{@const q = d.questions[qn]}
+						{@const rec = q?.options?.find((o) => o.rec)}
+						<!-- B · 사용자 판단 대기 요약 (.pen Kk8hB B) — 가장 급한 판단. 선택지를 누르면 바로 답, 긴 답은 판단 패널 -->
+						<OrchCard tone="waiting">
+							<OrchCardHeader icon={MessageCircleQuestion} tone="text-status-waiting" title="{agentName(d.agent)}이 묻고 있어요 · #{d.task}"><LevelBadge level={2} /></OrchCardHeader>
+							<div class="flex flex-col gap-2.5">
+								<p class="line-clamp-2 text-body">{q?.q}{#if q?.context} — {q.context}{/if}</p>
+								<div class="meta-xs gap-3">
+									<span class="flex items-center gap-1"><List class="size-3" />질문 {qn + 1} / {d.questions.length}</span>
+									{#if d.files}<span class="flex items-center gap-1"><Paperclip class="size-3" />파일 {d.files}</span>{/if}
+									{#if d.code}<span class="flex items-center gap-1"><Code class="size-3" />코드 {d.code}</span>{/if}
+								</div>
+								{#if q?.options}
+									<div class="flex flex-wrap items-center gap-1.5">
+										{#each q.options as o (o.key)}
+											<Toggle variant="chip" pressed={o.rec} onPressedChange={() => quickAnswer(d.id, o.key)} aria-label="{o.title}로 답하기">{o.title}{o.rec ? ' · 추천' : ''}</Toggle>
+										{/each}
+									</div>
+								{/if}
+								<div class="flex items-center gap-2 border-t pt-2">
+									<Clock3 class="size-3.5 shrink-0 text-status-waiting" />
+									<span class="flex-1 text-xs font-medium text-status-waiting">{d.left} 후 Orch가 {rec ? `‘${rec.title}’으로` : '추천안으로'} 결정</span>
+									<Button size="sm" onclick={() => openDecisions()}><Maximize2 />답변하기</Button>
+								</div>
+								<p class="text-caption text-subtle-foreground">선택지를 바로 누르면 즉시 답변 · 긴 답은 ‘답변하기’로 결정 패널에서</p>
 							</div>
-							<p class="text-xs text-muted-foreground">가장 급한 것 {pending[0].left} 남음 · 시간이 지나면 Orch가 추천안으로 결정해요.</p>
-							<Button size="sm" variant="outline" class="self-start" onclick={() => openDecisions()}>판단 대기 열기</Button>
-						</div>
+						</OrchCard>
 					{/if}
 					{#each chat as c, i (i)}
 						{#if c.kind === 'user'}
@@ -1776,6 +1869,183 @@
 									</div>
 								{/if}
 							</div>
+						{:else if c.kind === 'card'}
+							{@const k = c.card}
+							{@const i = chat.indexOf(c)}
+							<!-- Orch 진행 카드 (.pen Kk8hB) -->
+							{#if k.type === 'timer'}
+								<OrchCard tone="primary" onpointerenter={() => cardHold[i] !== 'stop' && (cardHold[i] = 'view')} onpointerleave={() => cardHold[i] === 'view' && delete cardHold[i]}>
+									<OrchCardHeader icon={CircleCheck} tone="text-status-done" title={k.title}><LevelBadge level={1} /></OrchCardHeader>
+									<div class="flex flex-col gap-2.5">
+										<div class="flex items-center gap-2.5 rounded-md bg-primary-soft p-2.5">
+											<Sparkles class="size-4 shrink-0 text-primary" />
+											<div class="flex min-w-0 flex-1 flex-col gap-0.5">
+												<span class="text-xs font-semibold">{k.proposal.title}</span>
+												<span class="text-caption text-muted-foreground">{k.proposal.desc}</span>
+											</div>
+											{#if agentOf(k.proposal.agent)}<RoleAvatar role={agentOf(k.proposal.agent)!.role} size="sm" />{/if}
+										</div>
+										{#if k.done}
+											<p class="saved-note"><Check class="size-3" />{k.done}</p>
+										{:else}
+											<div class="flex flex-col gap-1.5">
+												<div class="flex items-center gap-2">
+													{#if cardHold[i]}
+														<Pill class="bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary"><Eye />{cardHold[i] === 'view' ? '보는 중 · 타이머 멈춤' : '타이머 멈춤'}</Pill>
+													{:else}
+														<Pill class="bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary"><Timer />{k.seconds}초 후 자동 진행 · 보면 멈춤</Pill>
+													{/if}
+													<span class="flex-1"></span>
+													<span class="font-mono text-caption text-subtle-foreground">연속 자동 {k.streak[0]} / {k.streak[1]}</span>
+												</div>
+												<Progress value={(k.seconds / 4) * 100} class="h-1 bg-primary-soft" aria-label="자동 진행까지" />
+											</div>
+											<div class="flex flex-wrap items-center gap-1.5">
+												<Button size="sm" onclick={() => assignNext(k)}><Play />지금 진행</Button>
+												<Button size="sm" variant="outline" onclick={() => (cardHold[i] = 'stop')}><Pause />멈춤</Button>
+												<Button size="sm" variant="ghost" aria-expanded={altOpen === i} onclick={() => ((cardHold[i] = 'stop'), (altOpen = altOpen === i ? undefined : i))}><ChevronDown />다른 선택</Button>
+											</div>
+											{#if altOpen === i}
+												<div class="flex flex-col gap-1 border-t pt-2">
+													<span class="text-caption font-semibold text-subtle-foreground">다른 선택</span>
+													{#each k.alternatives as alt, n (alt)}
+														{@const AltIcon = [UserRound, Inbox, Archive, CircleCheckBig][n] ?? Check}
+														<button type="button" class="flex items-center gap-2 py-0.75 text-left text-xs outline-none hover:underline focus-visible:underline" onclick={() => settle(k, alt)}><AltIcon class="size-3.5 text-muted-foreground" />{alt}</button>
+													{/each}
+												</div>
+											{/if}
+										{/if}
+									</div>
+								</OrchCard>
+							{:else if k.type === 'guard'}
+								<OrchCard tone="danger">
+									<OrchCardHeader icon={CirclePause} tone="text-destructive" title={k.title}><Pill class="bg-card text-status-blocked"><ShieldAlert />{k.tag}</Pill></OrchCardHeader>
+									<div class="flex flex-col gap-2.5 text-xs">
+										<p>{k.desc}</p>
+										<div class="flex flex-col gap-1 rounded-sm bg-card p-2.5">
+											{#each k.rounds as r (r)}<span class="flex items-center gap-1.5"><Undo2 class="size-3.5 text-destructive" />{r}</span>{/each}
+										</div>
+										<div class="meta-xs gap-3 text-caption">
+											{#each k.cost as v, n (v)}{@const CostIcon = [Repeat, Coins, Timer][n]}<span class="flex items-center gap-1"><CostIcon class="size-3" />{v}</span>{/each}
+										</div>
+										<p class="text-muted-foreground">{k.judgment}</p>
+										{#if k.done}
+											<p class="saved-note"><Check class="size-3" />{k.done}</p>
+										{:else}
+											<div class="flex flex-wrap items-center gap-1.5">
+												<Button size="sm" onclick={() => (editTask(k.task), settle(k, `#${k.task} 완료 조건에 기준 추가 후 재개`))}><ListPlus />기준 추가 후 재개</Button>
+												<Button size="sm" variant="outline" onclick={() => settle(k, `#${k.task} 반려 1회 더 허용`)}><RotateCcw />1회 더 허용</Button>
+												<Button size="sm" variant="ghost" onclick={() => settle(k, `#${k.task} Manual로 전환`)}>Manual로 전환</Button>
+											</div>
+										{/if}
+									</div>
+								</OrchCard>
+							{:else if k.type === 'approval'}
+								<OrchCard tone="review">
+									<OrchCardHeader icon={GitPullRequest} tone="text-status-review" title={k.title}><LevelBadge level={3} /></OrchCardHeader>
+									<div class="flex flex-col gap-2.5 text-xs">
+										<p>{k.desc}</p>
+										<div class="flex flex-col gap-1.5 rounded-md bg-muted p-2.5 text-caption">
+											<div class="flex flex-wrap gap-3 text-muted-foreground"><span class="flex items-center gap-1"><GitBranch class="size-3" />{k.branch}</span><span class="flex items-center gap-1"><FileDiff class="size-3" />{k.files}</span></div>
+											<div class="flex flex-wrap gap-3 text-status-done"><span class="flex items-center gap-1"><ShieldCheck class="size-3" />{k.review}</span><span class="flex items-center gap-1"><FlaskConical class="size-3" />{k.qa}</span></div>
+										</div>
+										{#if k.done}
+											<p class="saved-note"><Check class="size-3" />{k.done}</p>
+										{:else}
+											<div class="flex flex-wrap items-center gap-1.5">
+												<Button size="sm" onclick={() => settle(k, '승인 · 병합했어요 · 스테이징 배포 시작')}><Check />승인 · 병합</Button>
+												<Button size="sm" variant="outline" onclick={() => toast('변경 보기는 Git 연결(API 단계)에서 열려요')}><FileDiff />변경 보기</Button>
+												<span class="flex-1"></span>
+												<Button size="sm" variant="ghost" onclick={() => settle(k, '병합을 거절했어요')}><X />거절</Button>
+											</div>
+										{/if}
+									</div>
+								</OrchCard>
+							{:else if k.type === 'blocked'}
+								<OrchCard tone="danger">
+									<OrchCardHeader icon={Ban} tone="text-status-blocked" title={k.title}><LevelBadge level={4} /></OrchCardHeader>
+									<div class="flex flex-col gap-2.5 text-xs">
+										<p>{k.desc}</p>
+										<div class="flex flex-col gap-1.5 rounded-md bg-card p-2.5 text-caption">
+											<span class="flex items-center gap-1 text-status-blocked"><ShieldX class="size-3" />{k.policy}</span>
+											<span class="flex items-center gap-1 text-muted-foreground"><Lightbulb class="size-3" />{k.alternative}</span>
+										</div>
+										{#if k.done}
+											<p class="saved-note"><Check class="size-3" />{k.done}</p>
+										{:else}
+											<div class="flex flex-wrap items-center gap-1.5">
+												<Button size="sm" onclick={() => settle(k, '대안으로 진행 · 새 브랜치로 push 후 PR')}><GitBranch />대안으로 진행</Button>
+												<Button size="sm" variant="outline" onclick={() => ((opsOpen = true), (opsTab = 'logs'))}><Terminal />로그 보기</Button>
+												<span class="flex-1"></span>
+												<Button size="sm" variant="ghost" onclick={() => (pauseAgent(k.agent), settle(k, `${agentName(k.agent)} 멈춤`))}><Pause />{agentName(k.agent)} 멈춤</Button>
+											</div>
+										{/if}
+									</div>
+								</OrchCard>
+							{:else if k.type === 'limit'}
+								<OrchCard tone="waiting">
+									<OrchCardHeader icon={Gauge} tone="text-status-waiting" title={k.title}><Pill class="bg-warning-soft text-status-waiting"><TriangleAlert />한도</Pill></OrchCardHeader>
+									<div class="flex flex-col gap-2.5 text-xs">
+										<p>{k.desc}</p>
+										<div class="flex flex-col gap-1.5 py-1.5">
+											<div class="flex items-center gap-2"><Terminal class="size-3.5 text-muted-foreground" /><span class="flex-1 text-muted-foreground">{k.label}</span><span class="font-mono font-medium text-status-blocked">{k.used}%</span><span class="font-mono text-subtle-foreground">· {k.reset}</span></div>
+											<Progress value={k.used} class="h-1.5 bg-muted" indicator="bg-status-blocked" aria-label={k.label} />
+										</div>
+										{#if k.done}
+											<p class="saved-note"><Check class="size-3" />{k.done}</p>
+										{:else}
+											<div class="flex flex-wrap items-center gap-1.5">
+												<Button size="sm" onclick={() => settle(k, 'Claude로 전환했어요 · 다음 Run부터')}><Repeat />Claude로 전환</Button>
+												<Button size="sm" variant="outline" onclick={() => settle(k, '한도 동안 P0–P1만 실행')}><Funnel />P0–P1만 실행</Button>
+												<span class="flex-1"></span>
+												<Button size="sm" variant="ghost" onclick={() => settle(k, '나중에 다시 알려 드릴게요')}><Clock3 />나중에</Button>
+											</div>
+										{/if}
+									</div>
+								</OrchCard>
+							{:else if k.type === 'failed'}
+								<OrchCard onpointerenter={() => cardHold[i] !== 'stop' && (cardHold[i] = 'view')} onpointerleave={() => cardHold[i] === 'view' && delete cardHold[i]}>
+									<OrchCardHeader icon={CircleX} tone="text-status-blocked" title={k.title}><LevelBadge level={1} /></OrchCardHeader>
+									<div class="flex flex-col gap-2.5 text-xs">
+										<p>{k.desc}</p>
+										<div class="flex flex-col gap-1.5 rounded-md bg-code-bg p-2.5 font-mono"><span class="text-code-fg">{k.log[0]}</span><span class="text-code-muted">{k.log[1]}</span></div>
+										{#if k.done}
+											<p class="saved-note"><Check class="size-3" />{k.done}</p>
+										{:else}
+											<Pill class="bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{#if cardHold[i]}<Eye />보는 중 · 타이머 멈춤{:else}<Timer />{k.seconds}초 후 재시도 · {k.tries[0]} / {k.tries[1]}회{/if}</Pill>
+											<div class="flex flex-wrap items-center gap-1.5">
+												<Button size="sm" onclick={() => settle(k, `Run 재시도 · #${k.task}`)}><RotateCcw />지금 재시도</Button>
+												<Button size="sm" variant="outline" onclick={() => ((opsOpen = true), (opsTab = 'logs'))}><Terminal />로그 보기</Button>
+												<span class="flex-1"></span>
+												<Button size="sm" variant="ghost" onclick={() => ((cardHold[i] = 'stop'), open(k.task))}><User />직접 볼게요</Button>
+											</div>
+										{/if}
+									</div>
+								</OrchCard>
+							{:else}
+								<OrchCard tone="done">
+									<OrchCardHeader icon={Flag} tone="text-status-done" title={k.title}><Pill class="bg-success-soft text-status-done"><Check />완료</Pill></OrchCardHeader>
+									<div class="flex flex-col gap-2.5 text-xs">
+										<p>{k.desc}</p>
+										<div class="meta-xs flex-wrap gap-3 text-caption">
+											<span class="flex items-center gap-1 text-status-done"><ListChecks class="size-3" />{k.stats.tasks}</span>
+											<span class="flex items-center gap-1"><Coins class="size-3" />{k.stats.tokens}</span>
+											<span class="flex items-center gap-1"><Timer class="size-3" />{k.stats.time}</span>
+											<span class="flex items-center gap-1"><Repeat class="size-3" />{k.stats.rework}</span>
+										</div>
+										{#if k.done}
+											<p class="saved-note"><Check class="size-3" />{k.done}</p>
+										{:else}
+											<div class="flex flex-wrap items-center gap-1.5">
+												<Button size="sm" onclick={() => toast('보고서 양식은 Settings › 보고서 양식에서 정해요', { description: 'API 단계에서 실제 보고서가 열려요' })}><FileText />보고서 보기</Button>
+												<Button size="sm" variant="outline" onclick={() => settle(k, '이슈를 닫았어요')}><Archive />이슈 닫기</Button>
+												<span class="flex-1"></span>
+												<Button size="sm" variant="ghost" onclick={() => (draft = '다음 이슈 제안해줘 ')}><Sparkles />다음 이슈 제안</Button>
+											</div>
+										{/if}
+									</div>
+								</OrchCard>
+							{/if}
 						{:else}
 							<!-- 명령 결과 (.pen CommandResultCard) -->
 							<div class="card rounded-lg flex flex-col gap-2 p-3 shadow-xs">
