@@ -14,9 +14,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Progress } from '$lib/components/ui/progress';
 	import { StatusBadge } from '$lib/components/ui/status-badge';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import * as HoverCard from '$lib/components/ui/hover-card';
-	import type { MenuEntry } from '$lib/components/ui/dropdown-menu';
+	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, type MenuEntry } from '$lib/components/ui/dropdown-menu';
+	import { HoverCard, HoverCardContent } from '$lib/components/ui/hover-card';
 	import { statuses, statusOrder, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
 	import type { Agent, Issue, Task, TaskDetail } from '$lib/mock';
@@ -110,13 +109,13 @@
 					<div class="ml-auto flex items-center gap-2">
 						<Button variant="ghost" size="icon-xs" aria-label="{meta.label}에 태스크 추가" onclick={() => onadd(s)}><Plus /></Button>
 						<!-- 열 메뉴 — .pen에 항목이 없어 있는 동작만 (#60) -->
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger>{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-xs" aria-label="{meta.label} 열 메뉴"><Ellipsis /></Button>{/snippet}</DropdownMenu.Trigger>
-							<DropdownMenu.Content align="end" class="w-48">
-								<DropdownMenu.Item onSelect={() => onnew(s)}><SquarePen />{meta.label}로 새 태스크</DropdownMenu.Item>
-								<DropdownMenu.Item onSelect={() => onfilter(s)}><FilterIcon />Quick Panel에서 이 상태만</DropdownMenu.Item>
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
+						<DropdownMenu>
+							<DropdownMenuTrigger>{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-xs" aria-label="{meta.label} 열 메뉴"><Ellipsis /></Button>{/snippet}</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" class="w-48">
+								<DropdownMenuItem onSelect={() => onnew(s)}><SquarePen />{meta.label}로 새 태스크</DropdownMenuItem>
+								<DropdownMenuItem onSelect={() => onfilter(s)}><FilterIcon />Quick Panel에서 이 상태만</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
 				</div>
 				<div class="flex min-h-24 flex-col gap-2">
@@ -152,8 +151,8 @@
 	{@const ctx = d?.context}
 	{@const at = { x: hover.x, y: hover.y }}
 	<!-- .pen KanbanCard/HoverPreview — 커서 위치에 띄운다 (+18px, 화면 끝에선 floating-ui가 뒤집음) -->
-	<HoverCard.Root open onOpenChange={(o) => !o && hoverOff()}>
-		<HoverCard.Content
+	<HoverCard open onOpenChange={(o) => !o && hoverOff()}>
+		<HoverCardContent
 			customAnchor={{ getBoundingClientRect: () => new DOMRect(at.x + 18, at.y, 0, 0) }}
 			side="bottom"
 			align="start"
@@ -178,6 +177,6 @@
 				{/if}
 			</dl>
 			<p class="hover-preview-foot">클릭 → 상세 보기 · 우클릭 → 메뉴</p>
-		</HoverCard.Content>
-	</HoverCard.Root>
+		</HoverCardContent>
+	</HoverCard>
 {/if}

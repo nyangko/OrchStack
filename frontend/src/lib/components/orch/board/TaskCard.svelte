@@ -17,7 +17,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Progress } from '$lib/components/ui/progress';
 	import { RoleAvatar } from '$lib/components/ui/role-avatar';
-	import * as ContextMenu from '$lib/components/ui/context-menu';
+	import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuLabel, ContextMenuSeparator, ContextMenuEntries } from '$lib/components/ui/context-menu';
 	import type { MenuEntry } from '$lib/components/ui/dropdown-menu';
 	import type { TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
@@ -73,8 +73,8 @@
 </script>
 
 <!-- 우클릭: ContextMenu / Task (Diagram과 같은 목록) -->
-<ContextMenu.Root onOpenChange={(o) => o && onhoveroff()}>
-	<ContextMenu.Trigger>
+<ContextMenu onOpenChange={(o) => o && onhoveroff()}>
+	<ContextMenuTrigger>
 		{#snippet child({ props })}
 			<button
 				{...props}
@@ -130,10 +130,10 @@
 				</span>
 			</button>
 		{/snippet}
-	</ContextMenu.Trigger>
-	<ContextMenu.Content class="w-56">
-		<ContextMenu.Label class="truncate">Task #{t.num} · {t.title}</ContextMenu.Label>
-		<ContextMenu.Separator />
-		<ContextMenu.Entries entries={menu} />
-	</ContextMenu.Content>
-</ContextMenu.Root>
+	</ContextMenuTrigger>
+	<ContextMenuContent class="w-56">
+		<ContextMenuLabel class="truncate">Task #{t.num} · {t.title}</ContextMenuLabel>
+		<ContextMenuSeparator />
+		<ContextMenuEntries entries={menu} />
+	</ContextMenuContent>
+</ContextMenu>

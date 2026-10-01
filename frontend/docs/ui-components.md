@@ -97,6 +97,13 @@ export type { DialogAction } from './dialog-single.svelte';
 
 부르는 쪽은 `import { Dialog } from '$lib/components/ui/dialog'` 하나만 쓴다.
 
+### 2-3-1. 부르는 쪽은 이름 붙은 태그만 쓴다 (2026-10-01 사용자 권장)
+
+- 페이지 · `orch/` 에서는 `<Kanban.Root>` · `<Dialog.Header>` 같은 점 표기를 쓰지 않는다. `<KanbanBoard>` · `<KanbanHeader>` · `<DialogHeader>` 처럼 **태그 이름만으로** 읽히게 한다.
+- 그래서 `import * as X from …` 를 쓰지 않고, 쓰는 조각을 이름으로 가져온다: `import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from '$lib/components/ui/dropdown-menu'`.
+- `index.ts` 는 모든 조각을 `<부품><조각>` 이름으로 내보낸다(`DropdownMenuItem` · `ContextMenuEntries`).
+- 부품 이름 그대로(`Dialog`)는 한 줄 판이 있으면 한 줄 판, 없으면 Root 다. 한 줄 판이 생기면 Root 는 `<부품>Root` 로 내보낸다.
+
 ### 2-4. 생김새와 색
 
 - 생김새 차이는 `tailwind-variants` 의 `tv()` variant 로 낸다. 클래스 문자열을 부르는 쪽에서 반복해 넘기지 않는다.
