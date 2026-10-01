@@ -1,6 +1,7 @@
 <script lang="ts">
 	/// 에이전트 실행 방식 (.pen Harness 기본값 · 모델 선택). 실행기 · 모델은 템플릿/멤버 값을 받고 바꾸면 onchange로 돌려준다.
 	/// 나머지(Effort · 폴백 · 한도)는 config.harness를 바로 고친다.
+	import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '$lib/components/ui/collapsible';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import Cpu from '@lucide/svelte/icons/cpu';
 	import Gauge from '@lucide/svelte/icons/gauge';
@@ -123,11 +124,11 @@
 					</div>
 					<div class="flex flex-col gap-1.5">
 						<span class="text-caption font-semibold text-muted-foreground">모델</span>
-						<button type="button" onclick={() => ((picker = true), (pickQuery = ''), (pickFilter = 'all'), (pickProvider = 'all'))} class="field-box pressable h-9 text-left">
+						<Button variant="field" class="px-2.5" onclick={() => ((picker = true), (pickQuery = ''), (pickFilter = 'all'), (pickProvider = 'all'))}>
 							<Cpu class="size-3.5 text-muted-foreground" />{model}
 							<span class="flex-1 truncate font-normal text-muted-foreground">{modelCatalog.flatMap((p) => p.models).find((m) => m.name === model)?.ctx ?? ''}</span>
 							<ChevronsUpDown class="size-3.5 text-muted-foreground" />
-						</button>
+						</Button>
 					</div>
 					<div class="flex flex-col gap-1.5">
 						<span class="text-caption font-semibold text-muted-foreground">Effort</span>
@@ -164,12 +165,12 @@
 				{/each}
 			</CardContent>
 		</Card>
-		<div class="card flex flex-col rounded-md">
-			<button type="button" aria-expanded={showCmd} onclick={() => (showCmd = !showCmd)} class="flex items-center gap-2 px-4 py-3 text-left text-body font-medium outline-none focus-visible:underline">
+		<Collapsible bind:open={showCmd} class="card flex flex-col rounded-md">
+			<CollapsibleTrigger class="flex items-center gap-2 px-4 py-3 text-left text-body font-medium outline-none focus-visible:underline">
 				<Terminal class="size-3.5 text-muted-foreground" /><span class="flex-1">실행 명령 미리보기</span><ChevronDown class={['size-4 text-muted-foreground transition-transform', showCmd && 'rotate-180']} />
-			</button>
-			{#if showCmd}<pre class="mx-4 mb-4 overflow-x-auto rounded-sm bg-foreground p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-background">{command}</pre>{/if}
-		</div>
+			</CollapsibleTrigger>
+			<CollapsibleContent><pre class="mx-4 mb-4 overflow-x-auto rounded-sm bg-foreground p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-background">{command}</pre></CollapsibleContent>
+		</Collapsible>
 	</div>
 	<aside class="flex shrink-0 flex-col w-72 gap-4">
 		<Card size="sm">

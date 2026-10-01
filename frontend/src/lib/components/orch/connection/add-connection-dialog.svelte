@@ -63,6 +63,7 @@
 	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
 	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
+	import { Toggle } from '$lib/components/ui/toggle';
 	import { Steps } from '$lib/components/orch/steps';
 	import { Pill } from '$lib/components/orch/pill';
 	import { Progress } from '$lib/components/ui/progress';
@@ -274,17 +275,9 @@
 						<InputGroupAddon><Search /></InputGroupAddon>
 						<InputGroupInput bind:value={q} placeholder="제공자 검색 · OpenAI, Gemini, DeepSeek, OpenAI 호환…" aria-label="제공자 검색" />
 					</InputGroup>
-					<div class="flex items-center gap-1" role="radiogroup" aria-label="제공자 종류">
+					<div class="flex items-center gap-1" role="group" aria-label="제공자 종류">
 						{#each ['전체', ...kinds] as const as k (k)}
-							<button
-								type="button"
-								role="radio"
-								aria-checked={filter === k}
-								onclick={() => (filter = k)}
-								class={['flex items-center gap-1 rounded-full px-2.5 py-1 text-caption font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', filter === k ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground']}
-							>
-								{k}<span class="opacity-70">{k === '전체' ? providers.length : providers.filter((p) => p.kind === k).length}</span>
-							</button>
+							<Toggle variant="chip" count={k === '전체' ? providers.length : providers.filter((p) => p.kind === k).length} pressed={filter === k} onPressedChange={() => (filter = k)}>{k}</Toggle>
 						{/each}
 					</div>
 				</div>
@@ -321,10 +314,10 @@
 						{#if step === 1}
 						<div class="flex flex-col gap-2">
 							{@render field('제공자', isSub ? '구독 로그인' : sel.kind === 'API 키' ? '사용한 만큼 과금' : sel.kind === '게이트웨이' ? 'OpenAI 호환 게이트웨이' : '내 컴퓨터에서 실행')}
-							<button type="button" onclick={() => (step = 0)} class="flex h-10 items-center gap-2 rounded-md border bg-card px-3 text-left text-body outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
+							<Button variant="field" size="lg" class="gap-2 px-3 text-body font-normal" onclick={() => (step = 0)}>
 								{@render logoOf(sel.key, 'sm')}<span class="font-medium">{sel.name}</span><Pill class={kindMeta[sel.kind].pill}>{sel.kind}</Pill>
 								<span class="text-xs text-muted-foreground">변경</span><ChevronsUpDown class="ml-auto size-4 text-muted-foreground" />
-							</button>
+							</Button>
 						</div>
 						{/if}
 

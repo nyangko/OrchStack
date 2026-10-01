@@ -13,6 +13,8 @@
 				ghost: "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
 				destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
 				link: "text-primary underline-offset-4 hover:underline",
+				// 입력칸 모양으로 선택 창을 여는 버튼 (모델 · 제공자 고르기) — .pen PropertyField
+				field: "justify-start border-border bg-card text-left text-xs hover:bg-muted aria-expanded:bg-muted",
 			},
 			size: {
 				default: "h-9 gap-2 px-4 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
