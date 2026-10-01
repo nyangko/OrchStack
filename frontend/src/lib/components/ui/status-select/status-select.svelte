@@ -1,7 +1,6 @@
 <script lang="ts">
 	/// Task 상태 선택 (.pen StatusSelect + StatusMenu). 트리거는 현재 상태 색, 메뉴는 전체 상태 목록.
 	import * as Select from "$lib/components/ui/select/index.js";
-	import { Select as SelectPrimitive } from "bits-ui";
 	import ChevronDown from "@lucide/svelte/icons/chevron-down";
 	import Check from "@lucide/svelte/icons/check";
 	import { statuses, statusOrder, type TaskStatus } from "$lib/status.js";
@@ -36,8 +35,7 @@
 	{disabled}
 >
 	{#if trigger}
-		<!-- ui/select Trigger는 child를 넘기지 않아 bits-ui 원본을 쓴다 -->
-		<SelectPrimitive.Trigger>{#snippet child({ props })}{@render trigger(props)}{/snippet}</SelectPrimitive.Trigger>
+		<Select.Trigger>{#snippet child({ props })}{@render trigger(props)}{/snippet}</Select.Trigger>
 	{:else}
 	<Select.Trigger
 		aria-label={compact ? `Status: ${current.label}` : "Status"}

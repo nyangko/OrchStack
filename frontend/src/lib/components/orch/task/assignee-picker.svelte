@@ -7,9 +7,9 @@
 	import * as Popover from '$lib/components/ui/popover';
 	import * as Command from '$lib/components/ui/command';
 	import { RoleAvatar } from '$lib/components/ui/role-avatar';
+	import { Progress } from '$lib/components/ui/progress';
 	import { roles } from '$lib/roles';
 	import type { Agent, Task } from '$lib/mock';
-	import { cn } from '$lib/utils';
 
 	let {
 		value = $bindable(),
@@ -72,7 +72,7 @@
 								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<span class="flex items-center gap-1.5"><span class="font-medium">{a.name}</span><span class="text-xs text-muted-foreground">{roles[a.role].label}</span></span>
 									<span class="flex items-center gap-1.5 text-xs">
-										<span class="h-0.75 w-10 overflow-hidden rounded-full bg-muted"><span class={cn('block h-full rounded-full', l.pct ? 'bg-primary' : '')} style:width="{l.pct}%"></span></span>
+										<Progress value={l.pct} class="h-1 w-10" aria-label="{a.name} 부하" />
 										<span class={l.tone}>{l.note}</span>
 									</span>
 								</span>

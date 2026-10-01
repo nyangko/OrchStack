@@ -124,6 +124,10 @@
 	import UserRoundX from '@lucide/svelte/icons/user-round-x';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Kbd } from '$lib/components/ui/kbd';
+	import { mergeProps } from 'bits-ui';
+	import { Input } from '$lib/components/ui/input';
+	import * as Attachment from '$lib/components/ui/attachment';
+	import * as HoverCard from '$lib/components/ui/hover-card';
 	import { Switch } from '$lib/components/ui/switch';
 	import { applyMd, type MdFormat } from '$lib/components/ui/md-editor';
 	import AssigneePicker from '$lib/components/orch/task/assignee-picker.svelte';
@@ -486,8 +490,8 @@
 	let editor = $state<Draft>();
 	let editorWide = $state(false);
 	let more = $state(false);
-	let bodyArea = $state<HTMLTextAreaElement>();
-	let fileInput = $state<HTMLInputElement>();
+	let bodyArea = $state<HTMLTextAreaElement | null>(null);
+	let fileInput = $state<HTMLInputElement | null>(null);
 	/// 새 태스크 기본 이슈: 열린 상세의 이슈 → 첫 진행 중 이슈 → 첫 이슈.
 	const defaultIssue = () => (cur ? cur.issue : (issueList.find((i) => i.status === 'in_progress') ?? issueList[0])?.num ?? 0);
 	const blank = (over: Partial<Draft> = {}): Draft => ({ title: '', body: '', issue: defaultIssue(), status: 'backlog', priority: 'P2', criteria: [], deps: [], eta: '', labels: [], files: [], ...over });
@@ -778,30 +782,20 @@
 	}}
 />
 
-<!-- Task Editor 속성 칩 (.pen TaskEditor · Properties) -->
+<!-- 속성 칩 (.pen TaskEditor · Properties · QuickAdd · Options) — 선택 창 트리거 -->
 {#snippet propChip(props: Record<string, unknown>, Icon: Component, label: string, tone = 'text-muted-foreground')}
-	<button type="button" {...props} class="flex h-6 items-center gap-1.5 rounded-sm border px-2 text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-		<Icon class={cn('size-3.25', tone)} />{label}
-	</button>
+	<Button {...props} variant="outline" size="xs"><Icon class={tone} />{label}</Button>
 {/snippet}
-<!-- Task 상세 속성 한 줄 (.pen B3 · Properties). props가 있으면 선택 창 트리거(버튼), 없으면 표시만 -->
+<!-- Task 상세 속성 한 줄 (.pen B3 · Properties). props가 있으면 선택 창 트리거, 없으면 표시만 -->
 {#snippet propRow(props: Record<string, unknown> | undefined, label: string, Icon: Component, value: string, tone = 'text-muted-foreground')}
-	{#if props}
-		<button type="button" {...props} class="group flex h-8 items-center gap-2 rounded-sm px-2 text-left text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-			<span class="w-27 shrink-0 text-muted-foreground">{label}</span><Icon class={cn('size-3.25 shrink-0', tone)} /><span class="min-w-0 flex-1 truncate">{value}</span>
-			<ChevronsUpDown class="size-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
-		</button>
-	{:else}
-		<div class="flex h-8 items-center gap-2 px-2 text-xs">
-			<span class="w-27 shrink-0 text-muted-foreground">{label}</span><Icon class={cn('size-3.25 shrink-0', tone)} /><span class="min-w-0 flex-1 truncate">{value}</span>
-		</div>
-	{/if}
-{/snippet}
-<!-- QuickAdd 칩 (.pen QuickAdd · Options) -->
-{#snippet quickChip(props: Record<string, unknown>, Icon: Component, label: string, tone = 'text-muted-foreground')}
-	<button type="button" {...props} class="flex h-6 items-center gap-1 rounded-md border border-input bg-background px-1.5 text-xs font-medium text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-		<Icon class={cn('size-3', tone)} />{label}
-	</button>
+	<Item.Root variant="row" size="xs">
+		{#snippet child({ props: row })}
+			<svelte:element this={props ? 'button' : 'div'} {...mergeProps(row, props ?? {})}>
+				<Item.Content><Item.Description>{label}</Item.Description></Item.Content>
+				<Item.Actions class="min-w-0 text-xs font-medium"><Icon class={cn('size-3.25 shrink-0', tone)} /><span class="truncate">{value}</span>{#if props}<ChevronsUpDown class="size-3 text-muted-foreground" />{/if}</Item.Actions>
+			</svelte:element>
+		{/snippet}
+	</Item.Root>
 {/snippet}
 
 <!-- Issue Board 행: 이슈와 하위 이슈가 같은 모양이라 재귀로 그린다 -->
@@ -938,13 +932,13 @@
 							</InputGroup.Root>
 							<div class="flex items-center gap-1">
 								<StatusSelect bind:value={q.status}>
-									{#snippet trigger(props)}{@const m = statuses[q.status]}{@render quickChip(props, m.icon, m.label)}{/snippet}
+									{#snippet trigger(props)}{@const m = statuses[q.status]}{@render propChip(props, m.icon, m.label)}{/snippet}
 								</StatusSelect>
 								<AssigneePicker bind:value={q.agent} agents={agentList} tasks={list} recommend={recommendFor(q.title, [])}>
-									{#snippet trigger(props)}{@render quickChip(props, Bot, qa?.name ?? 'Assignee')}{/snippet}
+									{#snippet trigger(props)}{@render propChip(props, Bot, qa?.name ?? 'Assignee')}{/snippet}
 								</AssigneePicker>
 								<PriorityPicker bind:value={q.priority}>
-									{#snippet trigger(props)}{@render quickChip(props, Flag, q.priority)}{/snippet}
+									{#snippet trigger(props)}{@render propChip(props, Flag, q.priority)}{/snippet}
 								</PriorityPicker>
 								<span class="flex-1"></span>
 								<Kbd>↵</Kbd>
@@ -1161,38 +1155,40 @@
 					{#if hover}
 						{@const t = task(hover.num)}
 						{@const d = details[hover.num]}
-						{@const m = statuses[t.status]}
 						{@const next = d?.criteria.find((c) => !c.done)}
 						{@const blocks = (d?.deps ?? []).filter((x) => x.kind === 'blocks').map((x) => task(x.num)).filter(Boolean)}
 						{@const last = d?.activity.at(-1)}
 						{@const ctx = d?.context}
-						{@const W = 300}
-						<!-- .pen KanbanCard/HoverPreview — 화면 오른쪽 · 아래 끝에선 커서 반대쪽으로 -->
-						<div
-							role="tooltip"
-							class="pointer-events-none fixed z-50 flex w-75 flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg"
-							style:left="{hover.x + 18 + W > innerWidth ? hover.x - 18 - W : hover.x + 18}px"
-							style:top="{hover.y + 18 + 320 > innerHeight ? Math.max(8, hover.y - 18 - 320) : hover.y + 18}px"
-						>
-							<div class="flex items-start gap-2 border-b px-3 py-2.5">
-								<span class="pt-0.5 text-xs font-semibold text-muted-foreground">#{t.num}</span>
-								<span class="min-w-0 flex-1 text-body font-semibold">{t.title}</span>
-								<span class={cn('flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', m.soft, m.text)}><m.icon class="size-3" />{m.label}</span>
-							</div>
-							<dl class="flex flex-col gap-2 px-3 py-2.5 text-caption">
-								{#each [['현재 단계', t.steps[1] ? `${t.steps[0]}/${t.steps[1]}${next ? ` · ${next.text}` : d?.criteria.length ? ' · 모두 완료' : ''}` : '—'], ['최근 활동', last ? `${last.type.toLowerCase()} ${last.text}` : '—'], ['막고 있는 Task', blocks.length ? blocks.map((b) => `#${b.num} ${b.title} · ${agentName(b.agent) ?? '미배정'}`).join(', ') : '—'], ['완료 시 전달', blocks[0] ? `${agentName(blocks[0].agent) ?? '미배정'} · ${roles[agentOf(blocks[0].agent)?.role ?? 'agent'].label} (REQUEST_VERIFICATION)` : '—'], ['ETA', d?.eta || '—']] as [k, v] (k)}
-									<div class="flex gap-2"><dt class="shrink-0 text-muted-foreground">{k}</dt><dd class="min-w-0 flex-1 truncate text-right font-medium">{v}</dd></div>
-								{/each}
-								{#if ctx}
-									<div class="flex flex-col gap-1.5 pt-1.5">
-										<div class="flex text-xs font-medium"><span class="flex-1 text-muted-foreground">Context</span><span class={ctx[0] / ctx[1] > 0.9 ? 'text-warning' : ''}>{ctx[0]}K / {ctx[1]}K</span></div>
-										<Progress value={(ctx[0] / ctx[1]) * 100} class="h-2" aria-label="컨텍스트" />
-									</div>
-									{#if ctx[0] / ctx[1] > 0.9}<p class="font-medium text-warning">⚠ Context {Math.round((ctx[0] / ctx[1]) * 100)}% — 요약 또는 새 Session 권장</p>{/if}
-								{/if}
-							</dl>
-							<div class="flex items-center gap-2.5 bg-muted px-3 py-2 text-caption text-muted-foreground">클릭 → 상세 보기 <span class="text-subtle-foreground">·</span> 우클릭 → 메뉴</div>
-						</div>
+						{@const at = { x: hover.x, y: hover.y }}
+						<!-- .pen KanbanCard/HoverPreview — ui/hover-card를 커서 위치에 띄운다 (+18px, 화면 끝에선 floating-ui가 뒤집음) -->
+						<HoverCard.Root open onOpenChange={(o) => !o && hoverOff()}>
+							<HoverCard.Content
+								customAnchor={{ getBoundingClientRect: () => new DOMRect(at.x + 18, at.y, 0, 0) }}
+								side="bottom"
+								align="start"
+								sideOffset={18}
+								class="pointer-events-none w-75 gap-0 overflow-hidden p-0"
+							>
+								<div class="flex items-start gap-2 border-b px-3 py-2.5">
+									<span class="pt-0.5 text-xs font-semibold text-muted-foreground">#{t.num}</span>
+									<span class="min-w-0 flex-1 text-body font-semibold">{t.title}</span>
+									<StatusBadge status={t.status} />
+								</div>
+								<dl class="flex flex-col gap-2 px-3 py-2.5 text-caption">
+									{#each [['현재 단계', t.steps[1] ? `${t.steps[0]}/${t.steps[1]}${next ? ` · ${next.text}` : d?.criteria.length ? ' · 모두 완료' : ''}` : '—'], ['최근 활동', last ? `${last.type.toLowerCase()} ${last.text}` : '—'], ['막고 있는 Task', blocks.length ? blocks.map((b) => `#${b.num} ${b.title} · ${agentName(b.agent) ?? '미배정'}`).join(', ') : '—'], ['완료 시 전달', blocks[0] ? `${agentName(blocks[0].agent) ?? '미배정'} · ${roles[agentOf(blocks[0].agent)?.role ?? 'agent'].label} (REQUEST_VERIFICATION)` : '—'], ['ETA', d?.eta || '—']] as [k, v] (k)}
+										<div class="flex gap-2"><dt class="shrink-0 text-muted-foreground">{k}</dt><dd class="min-w-0 flex-1 truncate text-right font-medium">{v}</dd></div>
+									{/each}
+									{#if ctx}
+										<div class="flex flex-col gap-1.5 pt-1.5">
+											<div class="flex text-xs font-medium"><span class="flex-1 text-muted-foreground">Context</span><span class={ctx[0] / ctx[1] > 0.9 ? 'text-warning' : ''}>{ctx[0]}K / {ctx[1]}K</span></div>
+											<Progress value={(ctx[0] / ctx[1]) * 100} class="h-2" aria-label="컨텍스트" />
+										</div>
+										{#if ctx[0] / ctx[1] > 0.9}<p class="font-medium text-warning">⚠ Context {Math.round((ctx[0] / ctx[1]) * 100)}% — 요약 또는 새 Session 권장</p>{/if}
+									{/if}
+								</dl>
+								<p class="bg-muted px-3 py-2 text-caption text-muted-foreground">클릭 → 상세 보기 · 우클릭 → 메뉴</p>
+							</HoverCard.Content>
+						</HoverCard.Root>
 					{/if}
 				{:else if view.value === 'diagram'}
 					<SvelteFlow
@@ -1388,13 +1384,7 @@
 									<!-- .pen B · Properties hover / click: 담당 · 우선순위 · 의존은 선택 창(C), 나머지는 표시 -->
 									{@render propRow(undefined, 'Issue', CircleDotIcon, `#${cur.issue} ${iss?.title ?? ''}`, 'text-node-issue')}
 									<AssigneePicker bind:value={() => cur.agent, (v) => (task(cur.num).agent = v)} agents={agentList} tasks={list} recommend={recommendFor(cur.title, info?.labels ?? [])} onorch={() => (task(cur.num).agent = orchPick(cur.title, info?.labels ?? []))}>
-										{#snippet trigger(props)}
-											<button type="button" {...props} class="group flex h-8 items-center gap-2 rounded-sm px-2 text-left text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-												<span class="w-27 shrink-0 text-muted-foreground">Assignee</span>
-												{#if a}<RoleAvatar role={a.role} size="sm" class="size-4.5" /><span class="min-w-0 flex-1 truncate">{a.name} · {roles[a.role].label}</span>{:else}<UserRoundX class="size-3.25 text-muted-foreground" /><span class="flex-1">Unassigned</span>{/if}
-												<ChevronsUpDown class="size-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
-											</button>
-										{/snippet}
+										{#snippet trigger(props)}{@render propRow(props, 'Assignee', a ? roles[a.role].icon : UserRoundX, a ? `${a.name} · ${roles[a.role].label}` : 'Unassigned', a ? roles[a.role].text : undefined)}{/snippet}
 									</AssigneePicker>
 									<PriorityPicker bind:value={() => cur.priority, (v) => (task(cur.num).priority = v)}>
 										{#snippet trigger(props)}{@render propRow(props, 'Priority', pm.icon, cur.priority, pm.text)}{/snippet}
@@ -1962,9 +1952,7 @@
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger>
 									{#snippet child({ props })}
-										<button type="button" {...props} class="flex items-center gap-1 rounded-sm border px-1.5 py-0.75 font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-											<CircleDotIcon class="size-3 text-node-issue" />{top ? `#${top.num} ${top.title}` : '이슈 선택'}<ChevronDown class="size-2.75 text-muted-foreground" />
-										</button>
+										<Button {...props} variant="outline" size="xs"><CircleDotIcon class="text-node-issue" />{top ? `#${top.num} ${top.title}` : '이슈 선택'}<ChevronDown class="text-muted-foreground" /></Button>
 									{/snippet}
 								</DropdownMenu.Trigger>
 								<DropdownMenu.Content align="start" class="w-64">
@@ -1978,9 +1966,7 @@
 								<DropdownMenu.Root>
 									<DropdownMenu.Trigger>
 										{#snippet child({ props })}
-											<button type="button" {...props} class="flex items-center gap-1 rounded-sm border px-1.5 py-0.75 font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-												<GitBranchIcon class="size-3 text-node-issue" />{leaf?.parent ? `#${leaf.num} ${leaf.title}` : '하위 이슈'}<ChevronDown class="size-2.75 text-muted-foreground" />
-											</button>
+											<Button {...props} variant="outline" size="xs"><GitBranchIcon class="text-node-issue" />{leaf?.parent ? `#${leaf.num} ${leaf.title}` : '하위 이슈'}<ChevronDown class="text-muted-foreground" /></Button>
 										{/snippet}
 									</DropdownMenu.Trigger>
 									<DropdownMenu.Content align="start" class="w-60">
@@ -1999,38 +1985,37 @@
 
 					<Dialog.Body class="gap-3.5">
 						<!-- svelte-ignore a11y_autofocus -->
-						<input autofocus bind:value={d.title} placeholder="태스크 제목" aria-label="제목" class="w-full border-b pt-1 pb-1.5 text-2xl font-semibold outline-none placeholder:text-subtle-foreground" />
+						<Input variant="title" autofocus bind:value={d.title} placeholder="태스크 제목" aria-label="제목" />
 
 						<!-- 설명 (.pen Description Editor) -->
-						<div class="flex flex-col overflow-hidden rounded-md border focus-within:border-ring">
-							<div class="flex items-center gap-0.5 bg-muted px-2 py-1.5">
+						<InputGroup.Root>
+							<InputGroup.Addon align="block-start" class="border-b bg-muted">
 								{#each bodyTools as t (t.k)}
-									<button type="button" aria-label={t.label} title={t.label} onclick={() => format(t.k)} class="flex size-6.5 items-center justify-center rounded-xs text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"><t.icon class="size-3.5" /></button>
+									<InputGroup.Button size="icon-xs" aria-label={t.label} title={t.label} onclick={() => format(t.k)}><t.icon /></InputGroup.Button>
 								{/each}
-								<button type="button" aria-label="첨부" title="첨부" onclick={() => fileInput?.click()} class="flex size-6.5 items-center justify-center rounded-xs text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"><Paperclip class="size-3.5" /></button>
-								<input bind:this={fileInput} type="file" multiple class="hidden" onchange={(e) => (attach(e.currentTarget.files), (e.currentTarget.value = ''))} />
-								<span class="flex-1"></span>
-								<span class="text-caption text-subtle-foreground">Markdown · @ 언급</span>
-							</div>
-							<textarea bind:this={bodyArea} bind:value={d.body} placeholder="무엇을 · 왜 · 참고할 것" aria-label="설명" class="field-sizing-content min-h-16 resize-none bg-transparent px-3 py-2.5 text-body outline-none placeholder:text-subtle-foreground"></textarea>
+								<InputGroup.Button size="icon-xs" aria-label="첨부" title="첨부" onclick={() => fileInput?.click()}><Paperclip /></InputGroup.Button>
+								<Input bind:ref={fileInput} type="file" multiple class="hidden" onchange={(e) => attach(e.currentTarget.files)} />
+								<InputGroup.Text class="ml-auto text-caption">Markdown · @ 언급</InputGroup.Text>
+							</InputGroup.Addon>
+							<InputGroup.Textarea bind:ref={bodyArea} bind:value={d.body} placeholder="무엇을 · 왜 · 참고할 것" aria-label="설명" class="field-sizing-content min-h-16" />
 							{#if d.files.length}
-								<div class="flex flex-wrap gap-2.5 px-3 pb-3">
-									{#each d.files as f, i (i)}
-										<div class="relative">
-											{#if f.url}
-												<img src={f.url} alt={f.name} class="size-15 rounded-md border object-cover" />
-											{:else}
-												<div class="flex h-15 w-52 items-center gap-2.5 rounded-md border bg-card pr-3 pl-2.5">
-													<span class="flex size-9 shrink-0 items-center justify-center rounded-sm bg-primary text-on-solid"><FileText class="size-4.5" /></span>
-													<span class="flex min-w-0 flex-col gap-0.5"><span class="truncate text-xs font-medium">{f.name}</span><span class="text-caption text-muted-foreground">{fileMeta(f)}</span></span>
-												</div>
-											{/if}
-											<button type="button" aria-label="{f.name} 빼기" onclick={() => d.files.splice(i, 1)} class="absolute -top-1.5 -right-1.5 flex size-4.5 items-center justify-center rounded-full border-2 border-card bg-foreground text-background"><X class="size-2.5" /></button>
-										</div>
-									{/each}
-								</div>
+								<InputGroup.Addon align="block-end">
+									<Attachment.Group>
+										{#each d.files as f, i (i)}
+											<Attachment.Root size="sm">
+												{#if f.url}
+													<Attachment.Media variant="image"><img src={f.url} alt={f.name} /></Attachment.Media>
+												{:else}
+													<Attachment.Media><FileText /></Attachment.Media>
+													<Attachment.Content><Attachment.Title>{f.name}</Attachment.Title><Attachment.Description>{fileMeta(f)}</Attachment.Description></Attachment.Content>
+												{/if}
+												<Attachment.Actions><Attachment.Action aria-label="{f.name} 빼기" onclick={() => d.files.splice(i, 1)}><X /></Attachment.Action></Attachment.Actions>
+											</Attachment.Root>
+										{/each}
+									</Attachment.Group>
+								</InputGroup.Addon>
 							{/if}
-						</div>
+						</InputGroup.Root>
 
 						<!-- 완료 조건 -->
 						<section class="flex flex-col gap-0.5 rounded-md border p-3" aria-label="완료 조건">
@@ -2044,11 +2029,7 @@
 								{#snippet trigger(props)}{@render propChip(props, st.icon, st.label, st.text)}{/snippet}
 							</StatusSelect>
 							<AssigneePicker bind:value={d.agent} agents={agentList} tasks={list} recommend={recommendFor(d.title, d.labels)} onorch={() => (d.agent = orchPick(d.title, d.labels))}>
-								{#snippet trigger(props)}
-									<button type="button" {...props} class="flex h-6 items-center gap-1.5 rounded-sm border px-2 text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-										{#if who}<RoleAvatar role={who.role} size="sm" class="size-4" />{who.name} · {roles[who.role].label}{:else}<UserRoundX class="size-3.25 text-muted-foreground" />Unassigned{/if}
-									</button>
-								{/snippet}
+								{#snippet trigger(props)}{@render propChip(props, who ? roles[who.role].icon : UserRoundX, who ? `${who.name} · ${roles[who.role].label}` : 'Unassigned', who ? roles[who.role].text : undefined)}{/snippet}
 							</AssigneePicker>
 							<PriorityPicker bind:value={d.priority}>
 								{#snippet trigger(props)}{@render propChip(props, pr.icon, d.priority, pr.text)}{/snippet}
@@ -2060,21 +2041,21 @@
 								{/snippet}
 							</DependsPicker>
 							<!-- ETA · 라벨 선택 창은 .pen에 없어 표시만 (#60) -->
-							<span class="flex h-6 items-center gap-1.5 rounded-sm border px-2 text-xs text-muted-foreground"><TimerIcon class="size-3.25" />{d.eta || 'ETA'}</span>
-							<span class="flex h-6 items-center gap-1.5 rounded-sm border px-2 text-xs text-muted-foreground"><Tag class="size-3.25" />{d.labels.length ? d.labels.join(' · ') : 'Labels'}</span>
+							<Badge variant="outline"><TimerIcon />{d.eta || 'ETA'}</Badge>
+							<Badge variant="outline"><Tag />{d.labels.length ? d.labels.join(' · ') : 'Labels'}</Badge>
 						</div>
 
 						{#if d.num === undefined}
-							<div class="flex items-center gap-2.5 rounded-md bg-primary-soft px-3 py-2.5 text-xs">
-								<Sparkles class="size-3.75 shrink-0 text-primary" />
-								<span class="flex-1">제목만 적으면 Orch가 설명 · 완료 조건 · 담당자 · 의존 관계를 제안해요</span>
-								<Button variant="outline" size="sm" onclick={orchDraft}><WandSparkles />초안 요청</Button>
-							</div>
+							<Alert.Root variant="primary">
+								<Sparkles />
+								<Alert.Description>제목만 적으면 Orch가 설명 · 완료 조건 · 담당자 · 의존 관계를 제안해요</Alert.Description>
+								<Alert.Action><Button variant="outline" size="sm" onclick={orchDraft}><WandSparkles />초안 요청</Button></Alert.Action>
+							</Alert.Root>
 						{:else if run}
-							<div class="flex items-center gap-2.5 rounded-md bg-warning-soft px-3 py-2.5 text-xs">
-								<Radio class="size-3.75 shrink-0 text-status-waiting" />
-								<span>{who?.name ?? '담당'}이 Run #{run.num} 실행 중 — 저장하면 변경 사항이 Runtime Instruction으로 전달돼요</span>
-							</div>
+							<Alert.Root variant="warning">
+								<Radio />
+								<Alert.Description>{who?.name ?? '담당'}이 Run #{run.num} 실행 중 — 저장하면 변경 사항이 Runtime Instruction으로 전달돼요</Alert.Description>
+							</Alert.Root>
 						{/if}
 					</Dialog.Body>
 
