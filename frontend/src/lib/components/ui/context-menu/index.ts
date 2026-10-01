@@ -13,9 +13,13 @@ import SubContent from "./context-menu-sub-content.svelte";
 import SubTrigger from "./context-menu-sub-trigger.svelte";
 import Sub from "./context-menu-sub.svelte";
 import Trigger from "./context-menu-trigger.svelte";
+import Entries from "./context-menu-entries.svelte";
 import Root from "./context-menu.svelte";
 
+export { type MenuEntry } from "../dropdown-menu/menu-entry.js";
 export {
+	Entries,
+	Entries as ContextMenuEntries,
 	Root,
 	Sub,
 	Portal,

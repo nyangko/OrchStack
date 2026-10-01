@@ -14,9 +14,13 @@ import SubContent from "./dropdown-menu-sub-content.svelte";
 import SubTrigger from "./dropdown-menu-sub-trigger.svelte";
 import Sub from "./dropdown-menu-sub.svelte";
 import Trigger from "./dropdown-menu-trigger.svelte";
+import Entries from "./dropdown-menu-entries.svelte";
 import Root from "./dropdown-menu.svelte";
 
+export { type MenuEntry } from "./menu-entry.js";
 export {
+	Entries,
+	Entries as DropdownMenuEntries,
 	CheckboxGroup,
 	CheckboxItem,
 	Content,

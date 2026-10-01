@@ -330,17 +330,8 @@
 	@apply flex items-center truncate text-caption;
 }
 
-/* ── diagram/diagram-node.svelte ── */
-/* Diagram 노드 카드 (.pen DiagramNode) */
-@utility diagram-node {
-	@apply flex w-55 flex-col gap-2 rounded-lg border bg-card p-3 text-left shadow-sm;
-}
 
 /* ── diagram/sub-run-node.svelte ── */
-/* 하위 작업 노드 카드 (.pen SubRunNode) */
-@utility subrun-node {
-	@apply flex h-41 w-55 flex-col gap-2 rounded-lg border bg-card px-3.5 py-3 text-left shadow-sm;
-}
 /* 등급 칩 (.pen TierChip) */
 @utility tier-chip {
 	@apply flex items-center gap-0.5 rounded-xs px-1.5 py-px font-mono text-2xs font-bold;

@@ -1,0 +1,33 @@
+<script lang="ts">
+	/// 메뉴 항목 목록(MenuEntry[])을 그린다 — 구분선 · 하위 메뉴 · 단축키 · 비활성.
+	import Check from "@lucide/svelte/icons/check";
+	import Item from "./context-menu-item.svelte";
+	import Separator from "./context-menu-separator.svelte";
+	import Shortcut from "./context-menu-shortcut.svelte";
+	import Sub from "./context-menu-sub.svelte";
+	import SubTrigger from "./context-menu-sub-trigger.svelte";
+	import SubContent from "./context-menu-sub-content.svelte";
+	import type { MenuEntry } from "../dropdown-menu/menu-entry.js";
+
+	let { entries, subClass = "w-48" }: { entries: MenuEntry[]; subClass?: string } = $props();
+</script>
+
+{#each entries as m, i (i)}
+	{#if m === "sep"}
+		<Separator />
+	{:else if m.sub}
+		<Sub>
+			<SubTrigger disabled={m.disabled}>{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}</SubTrigger>
+			<SubContent class={subClass}>
+				{#each m.sub as x (x.label)}
+					<Item onSelect={x.onSelect}>{#if x.icon}<x.icon class={x.tone} />{/if}<span class="flex-1">{x.label}</span>{#if x.checked}<Check />{/if}</Item>
+				{/each}
+			</SubContent>
+		</Sub>
+	{:else}
+		<Item disabled={m.disabled} onSelect={m.onSelect}>
+			{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}
+			{#if m.shortcut}<Shortcut>{m.shortcut}</Shortcut>{/if}
+		</Item>
+	{/if}
+{/each}

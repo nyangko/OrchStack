@@ -2,20 +2,9 @@
 	import type { TaskStatus } from "$lib/status";
 	import type { Role } from "$lib/roles";
 	import type { Runtime } from "$lib/components/ui/runtime-logo";
-	import type { Component } from "svelte";
 
-	/// 노드 · 카드 메뉴 한 줄 (.pen ContextMenu / Task). "sep"는 구분선, sub가 있으면 하위 메뉴.
-	/// Diagram 노드 … 메뉴와 Kanban 카드 우클릭 메뉴가 같은 목록을 그린다.
-	export type MenuEntry =
-		| "sep"
-		| {
-				label: string;
-				icon?: Component;
-				shortcut?: string;
-				disabled?: boolean;
-				onSelect?: () => void;
-				sub?: { label: string; icon?: Component; tone?: string; checked?: boolean; onSelect: () => void }[];
-		  };
+	import type { MenuEntry } from "$lib/components/ui/dropdown-menu/index.js";
+	export type { MenuEntry };
 
 	/// Diagram 노드 데이터 (.pen DiagramNode). 담당 · 진행 · 경고 줄은 있을 때만 그린다.
 	export type DiagramNodeData = {
@@ -39,7 +28,7 @@
 </script>
 
 <script lang="ts">
-	/// @xyflow/svelte 노드 컴포넌트 — 라이브러리가 nodeTypes로 컴포넌트를 요구해서 분리한다.
+	/// @xyflow/svelte 노드 어댑터 — 라이브러리가 nodeTypes로 컴포넌트를 요구한다. 연결 손잡이 + ui/node-card 조립만.
 	import { Handle, Position, type NodeProps, type Node } from "@xyflow/svelte";
 	import FolderKanban from "@lucide/svelte/icons/folder-kanban";
 	import CircleDot from "@lucide/svelte/icons/circle-dot";
@@ -49,8 +38,8 @@
 	import MessageCircle from "@lucide/svelte/icons/message-circle";
 	import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
 	import Ellipsis from "@lucide/svelte/icons/ellipsis";
-	import Check from "@lucide/svelte/icons/check";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import * as NodeCard from "$lib/components/ui/node-card";
 	import { Button } from "$lib/components/ui/button";
 	import { Badge } from "$lib/components/ui/badge";
 	import { Progress } from "$lib/components/ui/progress";
@@ -79,17 +68,10 @@
 <Handle type="target" position={Position.Top} id="t" class="opacity-0" />
 <Handle type="source" position={Position.Bottom} id="b" class="opacity-0" />
 
-<div
-	class={cn(
-		"diagram-node",
-		selected && "ring-2 ring-primary"
-	)}
->
-	<div class="flex items-center gap-2">
-		<span class={cn("center-box size-6 rounded-sm text-on-solid", kind.bg)}>
-			<kind.icon class="size-3.5" />
-		</span>
-		<span class="mono-ref flex-1 truncate">{data.ref}</span>
+<NodeCard.Root {selected}>
+	<NodeCard.Header>
+		<NodeCard.Kind class={kind.bg}><kind.icon /></NodeCard.Kind>
+		<NodeCard.Ref>{data.ref}</NodeCard.Ref>
 		{#if data.menu?.length}
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
@@ -100,30 +82,12 @@
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="start" class="w-56">
 					{#if data.menuLabel}<DropdownMenu.Label class="truncate">{data.menuLabel}</DropdownMenu.Label><DropdownMenu.Separator />{/if}
-					{#each data.menu as m, i (i)}
-						{#if m === "sep"}
-							<DropdownMenu.Separator />
-						{:else if m.sub}
-							<DropdownMenu.Sub>
-								<DropdownMenu.SubTrigger disabled={m.disabled}>{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}</DropdownMenu.SubTrigger>
-								<DropdownMenu.SubContent class="w-48">
-									{#each m.sub as x (x.label)}
-										<DropdownMenu.Item onSelect={x.onSelect}>{#if x.icon}<x.icon class={x.tone} />{/if}<span class="flex-1">{x.label}</span>{#if x.checked}<Check />{/if}</DropdownMenu.Item>
-									{/each}
-								</DropdownMenu.SubContent>
-							</DropdownMenu.Sub>
-						{:else}
-							<DropdownMenu.Item disabled={m.disabled} onSelect={m.onSelect}>
-								{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}
-								{#if m.shortcut}<DropdownMenu.Shortcut>{m.shortcut}</DropdownMenu.Shortcut>{/if}
-							</DropdownMenu.Item>
-						{/if}
-					{/each}
+					<DropdownMenu.Entries entries={data.menu} />
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 		{/if}
-	</div>
-	<p class="text-sm leading-tight font-semibold">{data.title}</p>
+	</NodeCard.Header>
+	<NodeCard.Title>{data.title}</NodeCard.Title>
 	{#if data.tokens}<TokenMeter self={data.tokens.self} runner={data.tokens.runner} />{/if}
 	{#if data.who}
 		<div class="flex items-center gap-1.5 text-xs">
@@ -145,8 +109,8 @@
 			{data.alert.text}
 		</div>
 	{/if}
-	<div class="flex items-center justify-between gap-2">
+	<NodeCard.Footer>
 		{#if data.status}<StatusBadge status={data.status} />{:else if data.badge}<Badge variant="secondary">{data.badge}</Badge>{:else}<span></span>{/if}
 		{#if data.meta}<span class="mono-meta truncate">{data.meta}</span>{/if}
-	</div>
-</div>
+	</NodeCard.Footer>
+</NodeCard.Root>

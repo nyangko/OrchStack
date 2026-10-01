@@ -54,7 +54,8 @@
 	import { project as wb, openProject, closeProject, viewTasks, viewIssues, viewAgents, moveTask, runsOf, stopRun } from '$lib/project.svelte';
 	import { SvelteFlow, Background, BackgroundVariant, Controls, Panel, MarkerType, type Node, type Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
-	import DiagramNode, { type DiagramNodeData, type MenuEntry } from '$lib/components/orch/diagram/diagram-node.svelte';
+	import DiagramNode, { type DiagramNodeData } from '$lib/components/orch/diagram/diagram-node.svelte';
+	import type { MenuEntry } from '$lib/components/ui/dropdown-menu';
 	import * as ContextMenu from '$lib/components/ui/context-menu';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import StepForward from '@lucide/svelte/icons/step-forward';
@@ -1114,25 +1115,7 @@
 											<ContextMenu.Content class="w-56">
 												<ContextMenu.Label class="truncate">Task #{t.num} · {t.title}</ContextMenu.Label>
 												<ContextMenu.Separator />
-												{#each taskMenu(t.num) as m, k (k)}
-													{#if m === 'sep'}
-														<ContextMenu.Separator />
-													{:else if m.sub}
-														<ContextMenu.Sub>
-															<ContextMenu.SubTrigger disabled={m.disabled}>{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}</ContextMenu.SubTrigger>
-															<ContextMenu.SubContent class="w-48">
-																{#each m.sub as x (x.label)}
-																	<ContextMenu.Item onSelect={x.onSelect}>{#if x.icon}<x.icon class={x.tone} />{/if}<span class="flex-1">{x.label}</span>{#if x.checked}<Check />{/if}</ContextMenu.Item>
-																{/each}
-															</ContextMenu.SubContent>
-														</ContextMenu.Sub>
-													{:else}
-														<ContextMenu.Item disabled={m.disabled} onSelect={m.onSelect}>
-															{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}
-															{#if m.shortcut}<ContextMenu.Shortcut>{m.shortcut}</ContextMenu.Shortcut>{/if}
-														</ContextMenu.Item>
-													{/if}
-												{/each}
+												<ContextMenu.Entries entries={taskMenu(t.num)} />
 											</ContextMenu.Content>
 										</ContextMenu.Root>
 									{/each}
