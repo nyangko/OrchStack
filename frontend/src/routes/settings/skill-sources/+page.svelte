@@ -19,8 +19,11 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
+	import { PageHeader } from '$lib/components/ui/page-header';
 	import { Pill } from '$lib/components/ui/pill';
-	import { Switch } from '$lib/components/ui/switch';
+	import * as Field from '$lib/components/ui/field';
+	import { KeyValueRow } from '$lib/components/ui/key-value-row';
+	import { HistoryRow } from '$lib/components/ui/history-row';
 	import SkillSourcesDialog from '$lib/components/orch/agent/skill-sources-dialog.svelte';
 	import type { Skill, SkillLog } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
@@ -79,16 +82,12 @@
 <svelte:head><title>스킬 소스 · Settings · OrchStack</title></svelte:head>
 
 <main class="flex flex-col gap-5 px-8 py-7">
-	<header class="flex items-end gap-3">
-		<div class="flex flex-1 flex-col gap-1">
-			<h1 class="text-2xl font-semibold">스킬 소스</h1>
-			<p class="text-xs text-muted-foreground">스킬을 찾고 설치할 곳 · 워크스페이스 전체에 적용</p>
-		</div>
+	<PageHeader title="스킬 소스" desc="스킬을 찾고 설치할 곳 · 워크스페이스 전체에 적용" status={false}>
 		<Button variant="outline" disabled={syncing} onclick={syncAll}>
 			<RefreshCw class={cn(syncing && 'animate-spin')} />{syncing ? '동기화 중…' : '지금 동기화'}
 		</Button>
 		<Button onclick={() => (adding = true)}><Plus />소스 추가</Button>
-	</header>
+	</PageHeader>
 
 	<div class="flex items-start gap-5">
 		<div class="flex min-w-0 flex-1 flex-col gap-5">
@@ -145,10 +144,7 @@
 				</Card.Header>
 				<Card.Content>
 					{#each store.sources.policy as pol (pol.name)}
-						<label class="flex items-center gap-3 border-b py-2.5">
-							<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">{pol.name}</span><span class="text-caption text-muted-foreground">{pol.desc}</span></span>
-							<Switch bind:checked={pol.on} aria-label={pol.name} />
-						</label>
+						<Field.SwitchRow label={pol.name} hint={pol.desc} bind:checked={pol.on} />
 					{/each}
 				</Card.Content>
 			</Card.Root>
@@ -163,13 +159,7 @@
 				<Card.Content>
 					{#each store.log.slice(0, 6) as l, i (i)}
 						{@const Icon = logIcon[l.kind]}
-						<div class="flex gap-2.5 border-b py-2.5">
-							<span class={cn('flex size-6 shrink-0 items-center justify-center rounded-full', l.kind === 'BLOCK' ? 'bg-destructive-soft text-destructive' : 'bg-primary-soft text-primary')}><Icon class="size-3" /></span>
-							<span class="flex min-w-0 flex-1 flex-col gap-0.5 text-xs">
-								<span class="flex items-center gap-1.5"><span class="font-mono text-caption font-semibold text-muted-foreground">{l.kind}</span><span class="text-muted-foreground">{l.who}</span><span class="ml-auto text-caption text-subtle-foreground">{l.when}</span></span>
-								<span>{l.text}</span>
-							</span>
-						</div>
+						<HistoryRow icon={Icon} tone={l.kind === 'BLOCK' ? 'bg-destructive-soft text-destructive' : 'bg-primary-soft text-primary'} kind={l.kind} who={l.who} when={l.when} text={l.text} />
 					{/each}
 				</Card.Content>
 			</Card.Root>
@@ -192,16 +182,13 @@
 				<Card.Header>
 					<Card.Title>설치된 스킬</Card.Title>
 					<Card.Description>{installed.length}개 · 활성 {installed.filter((s) => s.on !== false && !s.blocked).length}</Card.Description>
-					<Card.Action><a href="/skills" class="text-xs font-medium text-primary hover:underline">모두 보기</a></Card.Action>
+					<Card.Action><Button variant="link" size="xs" href="/skills">모두 보기</Button></Card.Action>
 				</Card.Header>
 				<Card.Content>
 					{#each bySource as b (b.source)}
 						{@const list = installed.filter((s) => s.source === b.source)}
 						{@const updates = list.filter((s) => s.update).length}
-						<div class="flex h-9.5 items-center border-t text-xs">
-							<span class="flex-1 text-muted-foreground">{b.label}</span>
-							<span>{list.length}개{updates ? ` · 업데이트 ${updates}` : ''}{b.source === 'Local' ? ' · 로컬' : ''}</span>
-						</div>
+						<KeyValueRow label={b.label}><span class="text-body font-medium">{list.length}개{updates ? ` · 업데이트 ${updates}` : ''}{b.source === 'Local' ? ' · 로컬' : ''}</span></KeyValueRow>
 					{/each}
 				</Card.Content>
 			</Card.Root>
@@ -210,10 +197,7 @@
 				<Card.Header><Card.Title>CLI별 적용 방식</Card.Title></Card.Header>
 				<Card.Content>
 					{#each applyBy as a (a.cli)}
-						<div class="flex h-9.5 items-center border-t text-xs">
-							<span class="flex-1 text-muted-foreground">{a.cli}</span>
-							<span>{a.how}</span>
-						</div>
+						<KeyValueRow label={a.cli} value={a.how} />
 					{/each}
 				</Card.Content>
 			</Card.Root>

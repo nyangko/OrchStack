@@ -20,9 +20,12 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
+	import { PageHeader } from '$lib/components/ui/page-header';
 	import { Pill } from '$lib/components/ui/pill';
 	import { Progress } from '$lib/components/ui/progress';
 	import { MdEditor } from '$lib/components/ui/md-editor';
+	import { KeyValueRow } from '$lib/components/ui/key-value-row';
+	import { HistoryRow } from '$lib/components/ui/history-row';
 	import { presets, type Preset, type PresetKind } from '$lib/mock';
 	import { store, membersOf } from '$lib/teams.svelte';
 	import { cn } from '$lib/utils';
@@ -127,15 +130,11 @@
 <svelte:head><title>Instruction presets · Settings · OrchStack</title></svelte:head>
 
 <main class="flex flex-col gap-5 px-8 py-7">
-	<header class="flex items-end gap-3">
-		<div class="flex flex-1 flex-col gap-1">
-			<h1 class="text-2xl font-semibold">Instruction presets</h1>
-			<p class="text-xs text-muted-foreground">모델 컨텍스트에 들어가는 재사용 지침 · 역할 템플릿은 여기서 고르기만 해요 · 수정하면 새 버전</p>
-		</div>
+	<PageHeader title="Instruction presets" desc="모델 컨텍스트에 들어가는 재사용 지침 · 역할 템플릿은 여기서 고르기만 해요 · 수정하면 새 버전" status={false}>
 		<input bind:this={fileInput} type="file" accept=".md,text/markdown" class="hidden" onchange={(e) => (importFile(e.currentTarget.files?.[0]), (e.currentTarget.value = ''))} />
 		<Button variant="outline" onclick={() => fileInput?.click()}><Download />가져오기 (.md · AGENTS.md)</Button>
 		<Button onclick={create}><Plus />새 프리셋</Button>
-	</header>
+	</PageHeader>
 
 	<div class="flex items-center gap-2 rounded-md border border-primary/20 bg-primary-soft px-3.5 py-2 text-xs">
 		<Layers class="size-3.5 shrink-0 text-primary" />
@@ -229,9 +228,7 @@
 					</Card.Header>
 					<Card.Content class="gap-0">
 						{#each usage.slice(0, 8) as u (u.label)}
-							<div class="flex h-8.5 items-center border-t text-xs">
-								<span class="flex-1 text-muted-foreground">{u.label}</span><span class="font-medium">v1 고정</span>
-							</div>
+							<KeyValueRow label={u.label}><span class="font-medium">v1 고정</span></KeyValueRow>
 						{/each}
 						{#if usage.length > 8}<span class="border-t pt-2 text-caption text-subtle-foreground">외 {usage.length - 8}곳</span>{/if}
 					</Card.Content>
@@ -243,13 +240,7 @@
 					</Card.Header>
 					<Card.Content class="gap-0">
 						{#each sel.versions.toReversed() as v (v.v)}
-							<div class="flex gap-2.5 border-t py-2.5">
-								<span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-review-soft text-status-review"><Package class="size-3" /></span>
-								<span class="flex min-w-0 flex-1 flex-col gap-0.5 text-xs">
-									<span class="flex items-center gap-1.5"><span class="font-mono text-caption font-semibold text-status-review">v{v.v}</span><span class="text-muted-foreground">{v.who}</span><span class="ml-auto text-caption text-subtle-foreground">{v.when}</span></span>
-									<span>{v.note}</span>
-								</span>
-							</div>
+							<HistoryRow icon={Package} tone="bg-review-soft text-status-review" kind={`v${v.v}`} who={v.who} when={v.when} text={v.note} />
 						{/each}
 					</Card.Content>
 				</Card.Root>

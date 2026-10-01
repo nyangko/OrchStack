@@ -10,7 +10,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Pill } from '$lib/components/ui/pill';
-	import { Switch } from '$lib/components/ui/switch';
+	import * as Field from '$lib/components/ui/field';
 	import { skillSources } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
 
@@ -56,10 +56,7 @@
 				<section class="flex flex-col gap-1">
 					<span class="list-label pb-1">설치 정책</span>
 					{#each d.policy as pol (pol.name)}
-						<label class="flex items-center gap-3 border-t py-2.5">
-							<span class="flex flex-1 flex-col gap-0.5"><span class="text-body font-medium">{pol.name}</span><span class="text-xs text-muted-foreground">{pol.desc}</span></span>
-							<Switch bind:checked={pol.on} aria-label={pol.name} />
-						</label>
+						<Field.SwitchRow label={pol.name} hint={pol.desc} bind:checked={pol.on} />
 					{/each}
 				</section>
 			</Dialog.Body>

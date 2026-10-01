@@ -22,9 +22,11 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Select from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
+	import { PageHeader } from '$lib/components/ui/page-header';
 	import { Pill } from '$lib/components/ui/pill';
-	import { Switch } from '$lib/components/ui/switch';
 	import { RuntimeLogo, type Runtime } from '$lib/components/ui/runtime-logo';
+	import * as Field from '$lib/components/ui/field';
+	import { KeyValueRow } from '$lib/components/ui/key-value-row';
 	import { AddConnectionDialog, type AddedConnection } from '$lib/components/orch/connection';
 	import { runtimeClis, runSettings, type RuntimeCli } from '$lib/mock';
 	import { cn } from '$lib/utils';
@@ -108,17 +110,13 @@
 <svelte:head><title>실행기 (CLI) · Settings · OrchStack</title></svelte:head>
 
 <main class="flex flex-col gap-5 px-8 py-7">
-	<header class="flex items-end gap-3">
-		<div class="flex flex-1 flex-col gap-1">
-			<h1 class="text-2xl font-semibold">실행기 (CLI)</h1>
-			<p class="text-xs text-muted-foreground">에이전트가 도는 CLI · 설치 · 로그인 · 버전 · 공통 실행 설정</p>
-		</div>
+	<PageHeader title="실행기 (CLI)" desc="에이전트가 도는 CLI · 설치 · 로그인 · 버전 · 공통 실행 설정" status={false}>
 		<Button variant="outline" disabled={detecting} onclick={detect}>
 			{#if detecting}<LoaderCircle class="animate-spin" />감지 중…{:else}<ScanSearch />다시 감지{/if}
 		</Button>
 		<!-- 설치 안 된 실행기를 한꺼번에 설치 -->
 		<Button disabled={!clis.some((c) => c.state === 'missing' && !c.busy)} onclick={() => clis.filter((c) => c.state === 'missing' && !c.busy).forEach(act)}><Plus />실행기 설치</Button>
-	</header>
+	</PageHeader>
 
 	<Card.Root size="sm">
 		<Card.Header>
@@ -154,8 +152,7 @@
 			</Card.Header>
 			<Card.Content>
 				{#each selects as r (r.key)}
-					<div class="flex flex-col gap-2.5 border-b py-4">
-						<span class="flex items-baseline gap-2"><span class="text-xs font-semibold">{r.label}</span><span class="text-caption text-muted-foreground">{r.hint}</span></span>
+					<Field.Row label={r.label} hint={r.hint}>
 						<Select.Root type="single" bind:value={run[r.key]}>
 							<Select.Trigger class="w-full" aria-label={r.label}>
 								<span class="flex min-w-0 flex-1 items-center gap-2">
@@ -167,13 +164,10 @@
 								{#each r.options as o (o)}<Select.Item value={o} label={o} />{/each}
 							</Select.Content>
 						</Select.Root>
-					</div>
+					</Field.Row>
 				{/each}
 				{#each switches as s (s.key)}
-					<label class="flex items-center gap-3 border-b py-2.5">
-						<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">{s.label}</span><span class="text-caption text-muted-foreground">{s.hint}</span></span>
-						<Switch bind:checked={run[s.key]} aria-label={s.label} />
-					</label>
+					<Field.SwitchRow label={s.label} hint={s.hint} bind:checked={run[s.key]} />
 				{/each}
 			</Card.Content>
 		</Card.Root>
@@ -186,9 +180,7 @@
 				</Card.Header>
 				<Card.Content>
 					{#each [['검색 경로', '~/.local/bin · /opt/homebrew/bin'], ['마지막 감지', lastDetect], ['설치됨', `${installedCount} / ${clis.length}`]] as [l, v] (l)}
-						<div class="flex h-7.5 items-center border-t text-xs">
-							<span class="flex-1 text-muted-foreground">{l}</span><span>{v}</span>
-						</div>
+						<KeyValueRow label={l} value={v} />
 					{/each}
 				</Card.Content>
 			</Card.Root>
@@ -200,9 +192,7 @@
 				</Card.Header>
 				<Card.Content>
 					{#each clis.filter((c) => c.conns) as c (c.key)}
-						<div class="flex h-7.5 items-center border-t text-xs">
-							<span class="flex-1 text-muted-foreground">{c.name}</span><span>{c.conns}</span>
-						</div>
+						<KeyValueRow label={c.name} value={c.conns} />
 					{/each}
 				</Card.Content>
 			</Card.Root>

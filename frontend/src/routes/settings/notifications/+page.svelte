@@ -13,8 +13,10 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Select from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
+	import { PageHeader } from '$lib/components/ui/page-header';
 	import { Pill } from '$lib/components/ui/pill';
 	import { Switch } from '$lib/components/ui/switch';
+	import * as Field from '$lib/components/ui/field';
 	import { notifyEvents, notifyChannels, notifyQuiet, type NotifyChannel } from '$lib/mock';
 
 	let events = $state(structuredClone(notifyEvents));
@@ -41,16 +43,9 @@
 <svelte:head><title>알림 · Settings · OrchStack</title></svelte:head>
 
 <main class="flex flex-col gap-5 px-8 py-7">
-	<header class="flex items-end gap-3">
-		<div class="flex flex-1 flex-col gap-1">
-			<h1 class="text-2xl font-semibold">알림</h1>
-			<p class="text-xs text-muted-foreground">어떤 일을 · 어디로 · 언제 알릴지</p>
-		</div>
-		<span class="flex items-center gap-1 text-xs font-medium text-status-done" role="status">
-			{#if sent === 'all'}<Send class="size-3.25" />연결된 채널로 보냈어요{:else if saved}<CircleCheck class="size-3.25" />저장됨{/if}
-		</span>
+	<PageHeader title="알림" desc="어떤 일을 · 어디로 · 언제 알릴지" status={sent === 'all' ? '연결된 채널로 보냈어요' : saved && '저장됨'} statusIcon={sent === 'all' ? Send : CircleCheck}>
 		<Button variant="outline" onclick={() => test('all')}><Send />테스트 알림 보내기</Button>
-	</header>
+	</PageHeader>
 
 	<div class="flex items-start gap-5">
 		<Card.Root size="sm" class="min-w-0 flex-1">
@@ -107,8 +102,7 @@
 			<Card.Root size="sm">
 				<Card.Header><Card.Title>방해 금지</Card.Title></Card.Header>
 				<Card.Content>
-					<div class="flex flex-col gap-2.5 border-b py-4">
-						<span class="flex items-baseline gap-2"><span class="text-xs font-semibold">시간</span><span class="text-caption text-muted-foreground">이 시간에는 앱 배지만 쌓여요</span></span>
+					<Field.Row label="시간" hint="이 시간에는 앱 배지만 쌓여요">
 						<Select.Root type="single" bind:value={() => quiet.hours, (v) => ((quiet.hours = v), (saved = true))}>
 							<Select.Trigger class="w-full" aria-label="방해 금지 시간">
 								<span class="flex min-w-0 flex-1 items-center gap-2">
@@ -120,19 +114,15 @@
 								{#each ['22:00 – 08:00', '23:00 – 07:00', '끄기'] as o (o)}<Select.Item value={o} label={o} />{/each}
 							</Select.Content>
 						</Select.Root>
-					</div>
-					<label class="flex items-center gap-3 border-b py-2.5">
-						<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">L3 이상은 방해 금지 무시</span><span class="text-caption text-muted-foreground">외부 영향 · 위험 판단, 연결 오류</span></span>
-						<Switch bind:checked={() => quiet.urgentBypass, (v) => ((quiet.urgentBypass = v), (saved = true))} aria-label="L3 이상은 방해 금지 무시" />
-					</label>
+					</Field.Row>
+					<Field.SwitchRow label="L3 이상은 방해 금지 무시" hint="외부 영향 · 위험 판단, 연결 오류" bind:checked={() => quiet.urgentBypass, (v) => ((quiet.urgentBypass = v), (saved = true))} />
 				</Card.Content>
 			</Card.Root>
 
 			<Card.Root size="sm">
 				<Card.Header><Card.Title>일일 요약</Card.Title></Card.Header>
 				<Card.Content>
-					<div class="flex flex-col gap-2.5 border-b py-4">
-						<span class="flex items-baseline gap-2"><span class="text-xs font-semibold">보내는 시각</span><span class="text-caption text-muted-foreground">완료 · 실패 · 토큰 · 비용 요약</span></span>
+					<Field.Row label="보내는 시각" hint="완료 · 실패 · 토큰 · 비용 요약">
 						<Select.Root type="single" bind:value={() => quiet.digest, (v) => ((quiet.digest = v), (saved = true))}>
 							<Select.Trigger class="w-full" aria-label="일일 요약 시각">
 								<span class="flex min-w-0 flex-1 items-center gap-2">
@@ -147,7 +137,7 @@
 								{#each ['매일 09:00', '매일 18:00', '평일 18:00', '보내지 않음'] as o (o)}<Select.Item value={o} label={o} />{/each}
 							</Select.Content>
 						</Select.Root>
-					</div>
+					</Field.Row>
 				</Card.Content>
 			</Card.Root>
 		</div>

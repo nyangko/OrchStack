@@ -13,6 +13,7 @@
 	import Lock from '@lucide/svelte/icons/lock';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { Button } from '$lib/components/ui/button';
+	import { PageHeader } from '$lib/components/ui/page-header';
 	import { Pill } from '$lib/components/ui/pill';
 	import { MdEditor } from '$lib/components/ui/md-editor';
 	import { reportForms, reportSample, type ReportForm } from '$lib/mock';
@@ -70,16 +71,12 @@
 <svelte:head><title>보고서 양식 · Settings · OrchStack</title></svelte:head>
 
 <main class="flex flex-col gap-5 px-8 py-7">
-	<header class="flex items-end gap-3">
-		<div class="flex flex-1 flex-col gap-1">
-			<h1 class="text-2xl font-semibold">보고서 양식</h1>
-			<p class="text-xs text-muted-foreground">시스템이 조립하는 사용자 보고서 · 모델 호출 없음(0 tok) · 잠긴 칸은 지울 수 없어요</p>
-		</div>
+	<PageHeader title="보고서 양식" desc="시스템이 조립하는 사용자 보고서 · 모델 호출 없음(0 tok) · 잠긴 칸은 지울 수 없어요" status={false}>
 		<Button variant="outline" aria-pressed={preview} onclick={() => (preview = !preview)}>
 			{#if preview}<Eye />{:else}<EyeOff />{/if}미리보기 데이터: #{reportSample.task.num}
 		</Button>
 		<Button onclick={clone}><Copy />양식 복제</Button>
-	</header>
+	</PageHeader>
 
 	<div class="flex items-center gap-2 rounded-md border border-success/40 bg-success-soft px-3.5 py-2 text-xs">
 		<ZapOff class="size-3.5 shrink-0 text-status-done" />

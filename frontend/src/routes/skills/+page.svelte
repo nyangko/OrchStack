@@ -18,9 +18,12 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
+	import { PageHeader } from '$lib/components/ui/page-header';
 	import { Switch } from '$lib/components/ui/switch';
 	import { Pill } from '$lib/components/ui/pill';
 	import { RoleAvatar } from '$lib/components/ui/role-avatar';
+	import { KeyValueRow } from '$lib/components/ui/key-value-row';
+	import { HistoryRow } from '$lib/components/ui/history-row';
 	import SkillBrowser from '$lib/components/orch/agent/skill-browser.svelte';
 	import SkillSourcesDialog from '$lib/components/orch/agent/skill-sources-dialog.svelte';
 	import { mcpServers, type Skill, type SkillLog, type TeamMember } from '$lib/mock';
@@ -108,12 +111,6 @@
 
 <svelte:head><title>Skills & MCP · OrchStack</title></svelte:head>
 
-{#snippet kv(label: string, value: string, tone?: string)}
-	<div class="flex h-7.5 items-center border-t text-xs">
-		<span class="flex-1 text-muted-foreground">{label}</span>
-		<span class={cn('font-medium', tone)}>{value}</span>
-	</div>
-{/snippet}
 
 {#snippet kpi(label: string, value: string, sub: string)}
 	<div class="flex flex-1 flex-col gap-1 rounded-md border bg-card px-3.5 py-3">
@@ -158,14 +155,10 @@
 	</nav>
 
 	<main class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-7 *:shrink-0">
-		<header class="flex items-end gap-3">
-			<div class="flex flex-1 flex-col gap-1">
-				<h1 class="text-2xl font-bold">Skills & MCP</h1>
-				<p class="text-xs text-muted-foreground">워크스페이스에 설치된 스킬 · MCP 서버와 어디서 쓰이는지 · 켜고 끄기는 템플릿 · 멤버에서, 소스 설정은 Settings에서</p>
-			</div>
+		<PageHeader title="Skills & MCP" desc="워크스페이스에 설치된 스킬 · MCP 서버와 어디서 쓰이는지 · 켜고 끄기는 템플릿 · 멤버에서, 소스 설정은 Settings에서" status={false}>
 			<Button variant="outline" size="sm" onclick={() => (sourcesOpen = true)}><SlidersHorizontal />소스 설정</Button>
 			<Button size="sm" onclick={() => (adding = true)}><Plus />스킬 · MCP 추가</Button>
-		</header>
+		</PageHeader>
 
 		<div class="flex gap-4">
 			{@render kpi('스킬', String(store.library.length), `활성 ${activeSkills.length} · 템플릿 ${usedTemplates}개에서 사용`)}
@@ -253,12 +246,12 @@
 							<Card.Description>선택한 스킬 · {sourceMeta[s.source].label}</Card.Description>
 						</Card.Header>
 						<Card.Content class="gap-0">
-							{@render kv('버전', s.update ? `${s.version} → ${s.update} 업데이트 가능` : (s.version ?? '—'), s.update ? 'text-status-waiting' : undefined)}
-							{@render kv('소스', sourceMeta[s.source].label)}
-							{@render kv('컨텍스트', s.blocked ? '—' : `+${s.tok} tok / Run`)}
-							{@render kv('보안 검사', s.blocked ? `실패 · ${s.blocked}` : '통과 · sha256 고정', s.blocked ? 'text-destructive' : undefined)}
-							{@render kv('Codex CLI', 'AGENTS.md에 요약 포함')}
-							{@render kv('Claude Code', '~/.claude/skills 동기화')}
+							<KeyValueRow label="버전"><span class={cn('text-body font-medium', s.update ? 'text-status-waiting' : undefined)}>{s.update ? `${s.version} → ${s.update} 업데이트 가능` : (s.version ?? '—')}</span></KeyValueRow>
+							<KeyValueRow label="소스" value={sourceMeta[s.source].label} />
+							<KeyValueRow label="컨텍스트" value={s.blocked ? '—' : `+${s.tok} tok / Run`} />
+							<KeyValueRow label="보안 검사"><span class={cn('text-body font-medium', s.blocked ? 'text-destructive' : undefined)}>{s.blocked ? `실패 · ${s.blocked}` : '통과 · sha256 고정'}</span></KeyValueRow>
+							<KeyValueRow label="Codex CLI" value="AGENTS.md에 요약 포함" />
+							<KeyValueRow label="Claude Code" value="~/.claude/skills 동기화" />
 							{@render usage(selUsers)}
 							{#if s.update}
 								<Button size="sm" class="mt-3 w-fit" onclick={() => update(s)}><Download />{s.update}로 업데이트</Button>
@@ -271,10 +264,10 @@
 							<Card.Description>선택한 MCP 서버</Card.Description>
 						</Card.Header>
 						<Card.Content class="gap-0">
-							{@render kv('상태', st.auth ? '인증 필요' : st.installed ? '설치됨 · 정상' : '접근 가능 · 미설치', st.auth ? 'text-status-waiting' : undefined)}
-							{@render kv('도구', `${selMcp.tools} tools`)}
-							{@render kv('컨텍스트', st.installed ? `+${selMcp.tok} tok / Run` : '미설치 · 비용 없음')}
-							{@render kv('설명', selMcp.desc)}
+							<KeyValueRow label="상태"><span class={cn('text-body font-medium', st.auth ? 'text-status-waiting' : undefined)}>{st.auth ? '인증 필요' : st.installed ? '설치됨 · 정상' : '접근 가능 · 미설치'}</span></KeyValueRow>
+							<KeyValueRow label="도구" value={`${selMcp.tools} tools`} />
+							<KeyValueRow label="컨텍스트" value={st.installed ? `+${selMcp.tok} tok / Run` : '미설치 · 비용 없음'} />
+							<KeyValueRow label="설명" value={selMcp.desc} />
 							{@render usage(selUsers)}
 							{#if st.auth || !st.installed}
 								<Button size="sm" class="mt-3 w-fit" onclick={() => mcpAction(selMcp.name)}>{st.auth ? '인증하기' : '설치'}</Button>
@@ -290,13 +283,7 @@
 					<Card.Content class="gap-0">
 						{#each store.log.slice(0, 6) as l, i (i)}
 							{@const Icon = logIcon[l.kind]}
-							<div class="flex gap-2.5 border-t py-2.5 first:border-t-0">
-								<span class={cn('flex size-6 shrink-0 items-center justify-center rounded-full', l.kind === 'BLOCK' ? 'bg-destructive-soft text-destructive' : 'bg-primary-soft text-primary')}><Icon class="size-3" /></span>
-								<span class="flex min-w-0 flex-1 flex-col gap-0.5 text-xs">
-									<span class="flex items-center gap-1.5"><span class="font-mono text-caption font-semibold text-muted-foreground">{l.kind}</span><span class="text-muted-foreground">{l.who}</span><span class="ml-auto font-mono text-caption text-subtle-foreground">{l.when}</span></span>
-									<span>{l.text}</span>
-								</span>
-							</div>
+							<HistoryRow icon={Icon} tone={l.kind === 'BLOCK' ? 'bg-destructive-soft text-destructive' : 'bg-primary-soft text-primary'} kind={l.kind} who={l.who} when={l.when} text={l.text} class="first:border-t-0" />
 						{/each}
 					</Card.Content>
 				</Card.Root>

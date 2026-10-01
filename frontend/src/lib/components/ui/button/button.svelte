@@ -25,6 +25,7 @@
 				"icon-lg": "size-10",
 			},
 		},
+		compoundVariants: [{ variant: "link", class: "h-auto p-0" }],
 		defaultVariants: {
 			variant: "default",
 			size: "default",

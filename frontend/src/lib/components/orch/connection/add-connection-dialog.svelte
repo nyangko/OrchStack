@@ -65,10 +65,10 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Steps } from '$lib/components/ui/steps';
 	import { Pill } from '$lib/components/ui/pill';
-	import { Switch } from '$lib/components/ui/switch';
 	import { Progress } from '$lib/components/ui/progress';
 	import { Segmented } from '$lib/components/ui/segmented';
 	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
+	import * as Field from '$lib/components/ui/field';
 	import { providers, type ProviderKind } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
 	import { cn } from '$lib/utils';
@@ -468,10 +468,7 @@
 							<div class="flex flex-col border-t pt-4">
 								{@render field('알림', '한도 · 오류를 어디로 알릴지')}
 								{#each notify as n (n.name)}
-									<label class="flex items-center gap-3 border-b py-2.5">
-										<span class="flex flex-1 flex-col gap-0.5"><span class="text-body font-medium">{n.name}</span><span class="text-xs text-muted-foreground">{n.desc}</span></span>
-										<Switch bind:checked={n.on} aria-label={n.name} />
-									</label>
+									<Field.SwitchRow label={n.name} hint={n.desc} bind:checked={n.on} />
 								{/each}
 							</div>
 							<div class="flex flex-col gap-2">

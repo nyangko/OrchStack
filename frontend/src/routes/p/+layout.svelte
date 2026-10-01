@@ -19,7 +19,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Segmented } from '$lib/components/ui/segmented';
-	import { Switch } from '$lib/components/ui/switch';
+	import * as Field from '$lib/components/ui/field';
 	import { repos, type OrchPolicy } from '$lib/mock';
 	import { roles } from '$lib/roles';
 	import { store } from '$lib/teams.svelte';
@@ -131,10 +131,6 @@
 </div>
 
 <!-- 폼 한 줄 제목 (.pen FormRow) -->
-{#snippet field(label: string, hint: string)}
-	<span class="flex items-baseline gap-2"><span class="text-xs font-semibold">{label}</span><span class="text-caption text-muted-foreground">{hint}</span></span>
-{/snippet}
-
 <Dialog.Root bind:open={creating}>
 	<Dialog.Content size="lg">
 		<!-- contents — Header · Body · Footer가 Content의 세로 배치에 그대로 놓이게 -->
@@ -145,16 +141,13 @@
 			</Dialog.Header>
 
 			<Dialog.Body class="py-1">
-				<label class="flex flex-col gap-2.5 border-b py-4">
-					{@render field('이름', '프로젝트 탭 · 브레드크럼에 보여요')}
+				<Field.Row label="이름" hint="프로젝트 탭 · 브레드크럼에 보여요" as="label" error={nameTaken ? '같은 이름의 프로젝트가 있어요' : undefined}>
 					<InputGroup.Root>
 						<InputGroup.Addon><Folder /></InputGroup.Addon>
 						<InputGroup.Input bind:value={name} placeholder="예: Checkout Revamp" aria-invalid={nameTaken || undefined} class="text-xs font-medium" />
 					</InputGroup.Root>
-					{#if nameTaken}<span class="text-caption text-destructive">같은 이름의 프로젝트가 있어요</span>{/if}
-				</label>
-				<div class="flex flex-col gap-2.5 border-b py-4">
-					{@render field('저장소', 'GitHub App이 설치된 저장소만 보여요')}
+				</Field.Row>
+				<Field.Row label="저장소" hint="GitHub App이 설치된 저장소만 보여요">
 					<Select.Root type="single" bind:value={repo}>
 						<Select.Trigger class="w-full" aria-label="저장소">
 							<span class="flex min-w-0 flex-1 items-center gap-2">
@@ -164,9 +157,8 @@
 						</Select.Trigger>
 						<Select.Content>{#each repos as r (r.name)}<Select.Item value={r.name} label={r.name} />{/each}</Select.Content>
 					</Select.Root>
-				</div>
-				<div class="flex flex-col gap-2.5 border-b py-4">
-					{@render field('팀', '이 프로젝트를 맡을 팀 · 나중에 바꿀 수 있어요')}
+				</Field.Row>
+				<Field.Row label="팀" hint="이 프로젝트를 맡을 팀 · 나중에 바꿀 수 있어요">
 					<Select.Root type="single" bind:value={() => String(teamSn), (v) => ((teamSn = Number(v)), (mode = store.policies[teamSn]?.mode ?? mode))}>
 						<Select.Trigger class="w-full" aria-label="팀">
 							<span class="flex min-w-0 flex-1 items-center gap-2">
@@ -176,9 +168,8 @@
 						</Select.Trigger>
 						<Select.Content>{#each squads as t (t.sn)}<Select.Item value={String(t.sn)} label={t.name} />{/each}</Select.Content>
 					</Select.Root>
-				</div>
-				<div class="flex flex-col gap-2.5 border-b py-4">
-					{@render field('Orch 진행 방식', '팀 정책을 따르거나 이 프로젝트만 바꿔요')}
+				</Field.Row>
+				<Field.Row label="Orch 진행 방식" hint="팀 정책을 따르거나 이 프로젝트만 바꿔요">
 					<Segmented
 						aria-label="Orch 진행 방식"
 						options={[
@@ -188,16 +179,10 @@
 						]}
 						bind:value={() => mode, (v) => (mode = v as OrchPolicy['mode'])}
 					/>
-				</div>
-				<label class="flex items-center gap-3 border-b py-3">
-					<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">GitHub 이슈 가져오기</span><span class="text-caption text-muted-foreground">열린 이슈 {repoInfo.issues}개 → Backlog · 라벨 bug · feature만</span></span>
-					<Switch bind:checked={importIssues} aria-label="GitHub 이슈 가져오기" />
-				</label>
-				<label class="flex items-center gap-3 border-b py-3">
-					<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">Orch가 첫 계획 세우기</span><span class="text-caption text-muted-foreground">가져온 이슈를 태스크로 나누고 배정안을 제안해요 (승인 후 실행)</span></span>
-					<!-- 가져온 이슈가 있어야 계획을 세운다 -->
-					<Switch bind:checked={() => importIssues && firstPlan, (v) => (firstPlan = v)} disabled={!importIssues} aria-label="Orch가 첫 계획 세우기" />
-				</label>
+				</Field.Row>
+				<Field.SwitchRow label="GitHub 이슈 가져오기" hint={`열린 이슈 ${repoInfo.issues}개 → Backlog · 라벨 bug · feature만`} bind:checked={importIssues} />
+				<!-- 가져온 이슈가 있어야 계획을 세운다 -->
+				<Field.SwitchRow label="Orch가 첫 계획 세우기" hint="가져온 이슈를 태스크로 나누고 배정안을 제안해요 (승인 후 실행)" bind:checked={() => importIssues && firstPlan, (v) => (firstPlan = v)} disabled={!importIssues} />
 			</Dialog.Body>
 
 			<Dialog.Footer note="만든 뒤 Workbench에서 이슈 · 태스크를 바로 볼 수 있어요">

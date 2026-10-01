@@ -36,7 +36,6 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import * as Alert from '$lib/components/ui/alert';
 	import Link2 from '@lucide/svelte/icons/link-2';
-	import X from '@lucide/svelte/icons/x';
 	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import Square from '@lucide/svelte/icons/square';
 	import MessageCircleQuestion from '@lucide/svelte/icons/message-circle-question';
@@ -83,6 +82,7 @@
 	import { store, defaultTeam } from '$lib/teams.svelte';
 	import { Segmented } from '$lib/components/ui/segmented';
 	import { Pill } from '$lib/components/ui/pill';
+	import * as Inspector from '$lib/components/ui/inspector';
 	import Bot from '@lucide/svelte/icons/bot';
 	import Users from '@lucide/svelte/icons/users';
 	import GitFork from '@lucide/svelte/icons/git-fork';
@@ -767,17 +767,15 @@
 				{@const iss = issueOf(cur.issue)}
 				<!-- 태스크 상세: 뷰 위 scrim + 패널. Esc · 닫기 버튼으로 닫는다 -->
 				<div class="absolute inset-0 z-10 bg-foreground/5 p-5">
-					<div role="dialog" aria-modal="false" aria-label="Task #{cur.num} 상세" class="flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-lg">
-						<header class="flex flex-col gap-3 border-b pt-4 pr-4 pb-3.5 pl-5">
-							<div class="flex items-start gap-3">
+					<Inspector.Root label="Task #{cur.num} 상세">
+						<Inspector.Header onclose={() => (detail = false)} closeLabel="상세 닫기">
 								<span class="flex size-8 shrink-0 items-center justify-center rounded-md bg-node-task text-on-solid"><SquareCheck class="size-4" /></span>
 								<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<p class="truncate text-xs text-muted-foreground">{project.name} / Issue #{cur.issue} {iss?.title} / <span class="font-mono">TASK #{cur.num}</span></p>
 									<h2 class="text-lg font-semibold">{cur.title}</h2>
 								</div>
 								<Button variant="ghost" size="sm" onclick={() => navigator.clipboard?.writeText(`${page.url.origin}${page.url.pathname}?task=${cur.num}`)}><Link2 />Copy link</Button>
-								<Button variant="ghost" size="icon-sm" aria-label="상세 닫기" onclick={() => (detail = false)}><X /></Button>
-							</div>
+							{#snippet sub()}
 							<div class="flex flex-wrap items-center gap-2 pl-11">
 								<StatusSelect bind:value={() => cur.status, (v) => (task(cur.num).status = v)} />
 								<Badge variant="outline">{cur.priority}</Badge>
@@ -806,8 +804,9 @@
 									<Button size="sm" onclick={() => openDecisions(cur.num)}>답변하기</Button>
 								</Alert.Root>
 							{/if}
-						</header>
-						<div class="flex min-h-0 flex-1">
+							{/snippet}
+						</Inspector.Header>
+						<Inspector.Body class="flex-row">
 							<div class="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-5">
 								<section class="flex flex-col gap-2">
 									<h3 class="text-body font-semibold">Description</h3>
@@ -943,8 +942,8 @@
 									</section>
 								{/if}
 							</aside>
-						</div>
-					</div>
+						</Inspector.Body>
+					</Inspector.Root>
 				</div>
 			{/if}
 			{#if curIssue}
@@ -956,9 +955,8 @@
 				{@const icon = statuses[issueIcon[iss.status]]}
 				<!-- 이슈 상세: Task Detail과 같은 틀 (scrim + 패널). 하위 이슈 · 태스크를 눌러 이어서 연다 -->
 				<div class="absolute inset-0 z-10 bg-foreground/5 p-5">
-					<div role="dialog" aria-modal="false" aria-label="Issue #{iss.num} 상세" class="flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-lg">
-						<header class="flex flex-col gap-3 border-b pt-4 pr-4 pb-3.5 pl-5">
-							<div class="flex items-start gap-3">
+					<Inspector.Root label="Issue #{iss.num} 상세">
+						<Inspector.Header onclose={() => (issueSel = undefined)} closeLabel="상세 닫기">
 								<span class="flex size-8 shrink-0 items-center justify-center rounded-md bg-node-issue text-on-solid"><CircleDot class="size-4" /></span>
 								<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<p class="truncate text-xs text-muted-foreground">
@@ -967,8 +965,7 @@
 									<h2 class="text-lg font-semibold">{iss.title}</h2>
 								</div>
 								<Button variant="ghost" size="sm" onclick={() => navigator.clipboard?.writeText(`${page.url.origin}${page.url.pathname}?issue=${iss.num}`)}><Link2 />Copy link</Button>
-								<Button variant="ghost" size="icon-sm" aria-label="상세 닫기" onclick={() => (issueSel = undefined)}><X /></Button>
-							</div>
+							{#snippet sub()}
 							<div class="flex flex-wrap items-center gap-3 pl-11">
 								<span class={cn('flex items-center gap-1.5 text-xs font-medium', icon.text)}><icon.icon class="size-3.5" />{issueLabel[iss.status]}</span>
 								<span class="flex w-40 items-center gap-2">
@@ -986,8 +983,9 @@
 								<span class="flex-1"></span>
 								<Button variant="ghost" size="sm" onclick={() => askPm(`Issue #${iss.num}`)}><MessageCircleQuestion />Ask PM about this</Button>
 							</div>
-						</header>
-						<div class="flex min-h-0 flex-1">
+							{/snippet}
+						</Inspector.Header>
+						<Inspector.Body class="flex-row">
 							<div class="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-5">
 								<section class="flex flex-col gap-2">
 									<h3 class="text-body font-semibold">Description</h3>
@@ -1037,8 +1035,8 @@
 									{/each}
 								</section>
 							</aside>
-						</div>
-					</div>
+						</Inspector.Body>
+					</Inspector.Root>
 				</div>
 			{/if}
 			{#if subCur}
@@ -1048,14 +1046,10 @@
 				{@const lt = list.find((t) => t.num === s.task)}
 				{@const bad = s.paths.filter((p) => p.from === 'bad')}
 				{@const cur = s.runs.at(-1)}
-				<!-- Inspector 한 줄 (.pen Inspector/ValueRow) -->
-				{#snippet row(Icon: typeof Cpu, l: string, v: string)}
-					<div class="flex h-7 items-center gap-2"><Icon class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">{l}</span><span class="font-medium">{v}</span></div>
-				{/snippet}
+				{@const pathsTitle = `PATHS · ${s.paths.length - bad.length}` + (bad.length ? ' · 범위 위반' : s.paths.some((p) => p.from === 'ask') ? ` · 처음 ${s.paths.filter((p) => p.from === 'orig').length} + @ASK ${s.paths.filter((p) => p.from === 'ask').length}` : '')}
 				<!-- 하위 작업 카드: 뷰 오른쪽 (.pen SubRun Inspector Card, 340px) -->
-				<div role="dialog" aria-modal="false" aria-label="하위 작업 {s.id}" class="absolute top-4 right-4 bottom-4 z-10 flex w-85 flex-col overflow-hidden rounded-xl border bg-card shadow-lg">
-					<header class="flex flex-col gap-2.5 border-b p-4">
-						<div class="flex items-center gap-2.5">
+				<Inspector.Root label="하위 작업 {s.id}" floating>
+					<Inspector.Header onclose={() => (subSel = undefined)} closeLabel="하위 작업 카드 닫기">
 							<span class={cn('flex size-7 shrink-0 items-center justify-center rounded-sm text-on-solid', md.tile)}><md.icon class="size-4" /></span>
 							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="flex items-center gap-1.5 font-mono text-caption font-semibold text-muted-foreground">
@@ -1064,35 +1058,30 @@
 								</span>
 								<span class="text-sm font-semibold">{s.goal}</span>
 							</div>
-							<Button variant="ghost" size="icon-sm" aria-label="하위 작업 카드 닫기" onclick={() => (subSel = undefined)}><X /></Button>
-						</div>
+						{#snippet sub()}
 						<div class="flex items-center gap-2 text-caption text-muted-foreground">
 							<span class={cn('flex items-center gap-1 rounded-full px-2 py-0.5 font-medium', st.tone)}><st.icon class={cn('size-3', s.status === 'running' && 'animate-spin motion-reduce:animate-none')} />{st.label}</span>
 							<span class="flex-1 truncate">{agentName(s.lead)}이 spawn · #{s.task} {lt?.title}</span>
 							<Button variant="ghost" size="icon-sm" class="bg-destructive-soft text-destructive" aria-label="하위 작업 중지" disabled={s.status !== 'running'}><Square /></Button>
 						</div>
-					</header>
-					<div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
-						<section class="flex flex-col gap-0.5 border-b px-4 py-3 text-xs">
-							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">SUB-RUN</h3>
-							{@render row(Split, 'mode', { runner: 'runner · 별도 Run', sub: 'sub · 리드 Run 안', fork: 'fork · 부모 컨텍스트 상속' }[s.mode])}
-							{@render row(Play, '시작', `리드 Run #${s.leadRun}`)}
+						{/snippet}
+					</Inspector.Header>
+					<Inspector.Body>
+						<Inspector.Section title="SUB-RUN">
+							<Inspector.ValueRow icon={Split} label="mode" value={{ runner: 'runner · 별도 Run', sub: 'sub · 리드 Run 안', fork: 'fork · 부모 컨텍스트 상속' }[s.mode]} />
+							<Inspector.ValueRow icon={Play} label="시작" value={`리드 Run #${s.leadRun}`} />
 							{#if s.retry}
-								<div class="flex h-7 items-center gap-2">
-									<RotateCcw class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">재시도</span>
+								<Inspector.ValueRow icon={RotateCcw} label="재시도">
 									<span class="flex items-center gap-1 font-medium">Run #{s.runs[0].num}<ArrowRight class="size-3" /><span class="text-muted-foreground">등급</span>
 										<span class={cn('rounded-xs px-1.5 font-mono text-2xs font-bold', tierTone[s.retry.from])}>{s.retry.from}</span><ArrowRight class="size-3" /><span class={cn('rounded-xs px-1.5 font-mono text-2xs font-bold', tierTone[s.retry.to])}>{s.retry.to}</span>
 									</span>
-								</div>
+								</Inspector.ValueRow>
 							{/if}
-							{#if s.tier}{@render row(Gauge, 'tier', `${s.tier} · ${s.retry ? `재시도로 ${s.retry.from}에서 올림` : `kind ${s.kind} → 규칙 엔진`}`)}{/if}
-							{#if s.model}{@render row(Cpu, 'model', s.model)}{/if}
-							{@render row(Timer, '소요', s.status === 'queued' ? '대기 중' : `${s.minutes}m`)}
-						</section>
-						<section class="flex flex-col gap-1 border-b px-4 py-3 text-xs">
-							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">
-								PATHS · {s.paths.length - bad.length}{#if bad.length} · 범위 위반{:else if s.paths.some((p) => p.from === 'ask')} · 처음 {s.paths.filter((p) => p.from === 'orig').length} + @ASK {s.paths.filter((p) => p.from === 'ask').length}{/if}
-							</h3>
+							{#if s.tier}<Inspector.ValueRow icon={Gauge} label="tier" value={`${s.tier} · ${s.retry ? `재시도로 ${s.retry.from}에서 올림` : `kind ${s.kind} → 규칙 엔진`}`} />{/if}
+							{#if s.model}<Inspector.ValueRow icon={Cpu} label="model" value={s.model} />{/if}
+							<Inspector.ValueRow icon={Timer} label="소요" value={s.status === 'queued' ? '대기 중' : `${s.minutes}m`} />
+						</Inspector.Section>
+						<Inspector.Section title={pathsTitle}>
 							{#if bad.length}
 								<Alert.Root variant="destructive" class="mb-1">
 									<OctagonX />
@@ -1115,57 +1104,52 @@
 								{:else if bad.length}재시도하면 등급이 한 단계 올라가요. 경로가 더 필요하면 @ASK로 요청해요.
 								{:else}paths 밖 파일을 고치면 실패로 처리돼요. 겹치는 경로의 하위 작업은 순서대로 실행돼요.{/if}
 							</p>
-						</section>
-						<section class="flex flex-col gap-1 border-b px-4 py-3 text-xs">
-							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">@REPORT · ac {s.ac.filter((a) => a.ok).length}/{s.ac.length}</h3>
+						</Inspector.Section>
+						<Inspector.Section title={`@REPORT · ac ${s.ac.filter((a) => a.ok).length}/${s.ac.length}`}>
 							{#each s.ac as a (a.text)}
 								<span class="flex items-center gap-2 py-0.5"><Checkbox checked={a.ok} disabled aria-label={a.text} />{a.text}</span>
 							{/each}
 							{#if s.report}<p class="mt-1 rounded-md bg-muted px-2.5 py-2 text-caption text-muted-foreground">{s.report}</p>{/if}
-						</section>
-						<section class="flex flex-col gap-0.5 border-b px-4 py-3 text-xs">
-							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">TOKENS</h3>
-							<div class="flex h-7 items-center gap-2">
-								<Coins class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">이 Run</span>
+						</Inspector.Section>
+						<Inspector.Section title="TOKENS">
+							<Inspector.ValueRow icon={Coins} label="이 Run">
 								{#if s.mode !== 'runner'}<TokenMeter included />{:else if cur}<TokenMeter self={cur.tokens} class="text-foreground" />{:else}<span class="text-muted-foreground">시작 전</span>{/if}
-							</div>
+							</Inspector.ValueRow>
 							{#if s.runs.length > 1}
-								<div class="flex h-7 items-center gap-2"><RotateCcw class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">재시도 전 Run #{s.runs[0].num}</span><TokenMeter self={s.runs[0].tokens} /></div>
+								<Inspector.ValueRow icon={RotateCcw} label="재시도 전 Run #{s.runs[0].num}"><TokenMeter self={s.runs[0].tokens} /></Inspector.ValueRow>
 							{/if}
 							<p class="pt-1 text-caption text-muted-foreground">{s.mode === 'runner' ? '리드와 따로 쌓이고 리드 합계에만 더해져요.' : '리드 Run 안에서 돌아 리드 사용량에 이미 들어 있어요.'}</p>
-						</section>
-						<section class="flex flex-col gap-0.5 px-4 py-3 text-xs">
-							<h3 class="pb-1 text-2xs font-semibold tracking-wider text-muted-foreground">WORKTREE · {s.workdir.mode === 'repo' ? 'repo 모드' : 'worktree'}</h3>
-							{@render row(GitBranch, '모드', s.workdir.mode === 'repo' ? 'repo 모드 · worktree 없음' : 'worktree')}
-							{@render row(FolderGit2, '경로', s.workdir.path ?? '저장소 그대로 · orchstack/app')}
-							{@render row(GitBranch, '브랜치', s.workdir.branch)}
-							{#if s.workdir.mode === 'worktree'}{@render row(Trash2, '정리', s.status === 'failed' ? '실패 · 24시간 보관 후 삭제' : '완료 후 병합 · 삭제')}{/if}
-						</section>
-					</div>
-				</div>
+						</Inspector.Section>
+						<Inspector.Section title="WORKTREE · {s.workdir.mode === 'repo' ? 'repo 모드' : 'worktree'}">
+							<Inspector.ValueRow icon={GitBranch} label="모드" value={s.workdir.mode === 'repo' ? 'repo 모드 · worktree 없음' : 'worktree'} />
+							<Inspector.ValueRow icon={FolderGit2} label="경로" value={s.workdir.path ?? '저장소 그대로 · orchstack/app'} />
+							<Inspector.ValueRow icon={GitBranch} label="브랜치" value={s.workdir.branch} />
+							{#if s.workdir.mode === 'worktree'}<Inspector.ValueRow icon={Trash2} label="정리" value={s.status === 'failed' ? '실패 · 24시간 보관 후 삭제' : '완료 후 병합 · 삭제'} />{/if}
+						</Inspector.Section>
+					</Inspector.Body>
+				</Inspector.Root>
 			{/if}
 			{#if agentSel}
 				{@const a = agentSel}
 				{@const mine = list.filter((t) => t.agent === a.sn)}
 				<!-- 에이전트 카드: 뷰 오른쪽에 뜬다 (.pen Agent Inspector Card, 340px) -->
-				<div role="dialog" aria-modal="false" aria-label="{a.name} 에이전트" class="absolute top-4 right-4 bottom-4 z-10 flex w-85 flex-col overflow-hidden rounded-xl border bg-card shadow-lg">
-					<header class="flex flex-col gap-3 border-b p-4">
-						<div class="flex items-start gap-2.5">
+				<Inspector.Root label="{a.name} 에이전트" floating>
+					<Inspector.Header onclose={() => (inspect = undefined)} closeLabel="에이전트 카드 닫기">
 							<RoleAvatar role={a.role} />
 							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="flex items-center gap-1.5 text-sm font-semibold">{a.name}<RuntimeLogo runtime={a.runtime} class="size-3.5 ring-0" /></span>
 								<span class="text-xs text-muted-foreground">{roles[a.role].label}</span>
 								<Badge variant="mono" class="w-fit text-2xs">{a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'}</Badge>
 							</div>
-							<Button variant="ghost" size="icon-sm" aria-label="에이전트 카드 닫기" onclick={() => (inspect = undefined)}><X /></Button>
-						</div>
+						{#snippet sub()}
 						<div class="flex items-center gap-2">
 							<Badge variant="secondary">{a.activity.split(' · ')[0]}</Badge>
 							<span class="flex-1"></span>
 							<Button variant="ghost" size="icon-sm" class="bg-warning-soft text-warning" aria-label="일시정지 · 현재 단계 끝나면 멈춤" title="일시정지 · 현재 단계 끝나면 멈춤"><Pause /></Button>
 							<Button variant="ghost" size="icon-sm" class="bg-destructive-soft text-destructive" aria-label="중지"><Square /></Button>
 						</div>
-					</header>
+						{/snippet}
+					</Inspector.Header>
 					<Tabs.Root bind:value={inspectTab} class="flex min-h-0 flex-1 flex-col gap-0">
 						<Tabs.List variant="line" class="w-full justify-start px-4">
 							{#each [['overview', 'Overview'], ['activity', 'Activity'], ['runs', 'Runs'], ['config', 'Config']] as [v, l] (v)}<Tabs.Trigger value={v}>{l}</Tabs.Trigger>{/each}
@@ -1228,7 +1212,7 @@
 							<Button type="submit" size="icon-sm" aria-label="지시 보내기" disabled={!instruction.trim()}><ArrowUp /></Button>
 						</div>
 					</form>
-				</div>
+				</Inspector.Root>
 			{/if}
 			</div>
 

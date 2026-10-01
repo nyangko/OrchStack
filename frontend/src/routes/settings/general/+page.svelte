@@ -17,13 +17,14 @@
 	import BookMarked from '@lucide/svelte/icons/book-marked';
 	import Download from '@lucide/svelte/icons/download';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import * as Card from '$lib/components/ui/card';
 	import * as Select from '$lib/components/ui/select';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
+	import { PageHeader } from '$lib/components/ui/page-header';
 	import { Segmented } from '$lib/components/ui/segmented';
+	import * as Field from '$lib/components/ui/field';
 
 	type Key = keyof typeof s;
 	/// Select 한 줄 — note는 값 옆 회색 설명 (값에 따라 다를 수 있다).
@@ -72,15 +73,10 @@
 <svelte:head><title>일반 · Settings · OrchStack</title></svelte:head>
 
 <!-- .pen FormRow 제목 -->
-{#snippet label(title: string, hint: string)}
-	<span class="flex items-baseline gap-2"><span class="text-xs font-semibold">{title}</span><span class="text-caption text-muted-foreground">{hint}</span></span>
-{/snippet}
-
 <!-- .pen FormRow + Select -->
 {#snippet selectRow(r: Row)}
 	<!-- label로 감싸면 트리거 클릭이 두 번 전달돼 목록이 다시 열린다 -->
-	<div class="flex flex-col gap-2.5 border-b py-4">
-		{@render label(r.label, r.hint)}
+	<Field.Row label={r.label} hint={r.hint}>
 		<Select.Root type="single" value={s[r.key]} onValueChange={(v) => set(r.key, v)}>
 			<Select.Trigger class="w-full" aria-label={r.label}>
 				<span class="flex min-w-0 flex-1 items-center gap-2">
@@ -93,19 +89,11 @@
 				{#each r.options as o (o)}<Select.Item value={o} label={o} />{/each}
 			</Select.Content>
 		</Select.Root>
-	</div>
+	</Field.Row>
 {/snippet}
 
 <main class="flex flex-col gap-5 px-8 py-7">
-	<header class="flex items-end gap-3">
-		<div class="flex flex-1 flex-col gap-1">
-			<h1 class="text-2xl font-semibold">일반</h1>
-			<p class="text-xs text-muted-foreground">워크스페이스 이름 · 언어 · 시간대 · 테마 · 데이터 보관</p>
-		</div>
-		<span class="flex items-center gap-1 text-xs font-medium text-status-done" role="status">
-			{#if saved}<CircleCheck class="size-3.25" />저장됨{/if}
-		</span>
-	</header>
+	<PageHeader title="일반" desc="워크스페이스 이름 · 언어 · 시간대 · 테마 · 데이터 보관" status={saved && '저장됨'} />
 
 	<div class="flex items-start gap-5">
 		<div class="flex min-w-0 flex-1 flex-col gap-5">
@@ -115,13 +103,12 @@
 					<Card.Description>팀원 모두에게 보이는 기본 정보</Card.Description>
 				</Card.Header>
 				<Card.Content>
-					<label class="flex flex-col gap-2.5 border-b py-4">
-						<span class="text-xs font-semibold">이름</span>
+					<Field.Row label="이름" as="label">
 						<InputGroup.Root>
 							<InputGroup.Addon><Building2 /></InputGroup.Addon>
 							<InputGroup.Input class="text-xs font-medium" value={s.name} onchange={(e) => set('name', e.currentTarget.value)} />
 						</InputGroup.Root>
-					</label>
+					</Field.Row>
 					{#each workspaceRows as r (r.key)}{@render selectRow(r)}{/each}
 				</Card.Content>
 			</Card.Root>
@@ -133,8 +120,7 @@
 				</Card.Header>
 				<Card.Content>
 					{#each langRows as r (r.key)}{@render selectRow(r)}{/each}
-					<div class="flex flex-col gap-2.5 border-b py-4">
-						<span class="text-xs font-semibold">날짜 형식</span>
+					<Field.Row label="날짜 형식">
 						<Segmented
 							aria-label="날짜 형식"
 							options={[
@@ -144,7 +130,7 @@
 							]}
 							bind:value={() => s.dateFormat, (v) => set('dateFormat', v ?? 'iso')}
 						/>
-					</div>
+					</Field.Row>
 				</Card.Content>
 			</Card.Root>
 		</div>
@@ -153,8 +139,7 @@
 			<Card.Root size="sm">
 				<Card.Header><Card.Title>화면</Card.Title></Card.Header>
 				<Card.Content>
-					<div class="flex flex-col gap-2.5 border-b py-4">
-						<span class="text-xs font-semibold">테마</span>
+					<Field.Row label="테마">
 						<!-- 다크 테마는 라이트 작업 후 별도 패스에서 적용 — 지금은 값만 저장 -->
 						<Segmented
 							aria-label="테마"
@@ -165,7 +150,7 @@
 							]}
 							bind:value={() => s.theme, (v) => set('theme', v ?? 'light')}
 						/>
-					</div>
+					</Field.Row>
 				</Card.Content>
 			</Card.Root>
 

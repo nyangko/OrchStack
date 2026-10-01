@@ -32,6 +32,7 @@
 	import { RoleAvatar } from '$lib/components/ui/role-avatar';
 	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
 	import { MdEditor, estimateTokens, type MdFile } from '$lib/components/ui/md-editor';
+	import { KeyValueRow } from '$lib/components/ui/key-value-row';
 	import SkillsPanel from '$lib/components/orch/agent/skills-panel.svelte';
 	import ToolsPanel from '$lib/components/orch/agent/tools-panel.svelte';
 	import PermPanel from '$lib/components/orch/agent/perm-panel.svelte';
@@ -116,13 +117,6 @@
 
 <svelte:head><title>{t.name} · Agents · OrchStack</title></svelte:head>
 
-<!-- .pen KeyValueRow — 미리보기 카드 한 줄 -->
-{#snippet kv(label: string, value: string)}
-	<div class="flex h-7.5 items-center border-t text-xs">
-		<span class="flex-1 text-muted-foreground">{label}</span>
-		<span class="text-body font-medium">{value}</span>
-	</div>
-{/snippet}
 
 <main class="flex min-w-0 flex-1 flex-col">
 	<nav aria-label="Breadcrumb" class="flex items-center gap-1.5 border-b px-6 py-2.5 text-xs text-muted-foreground">
@@ -196,7 +190,7 @@
 							<Card.Root size="sm">
 								<Card.Header>
 									<Card.Title class="flex items-center gap-2">스킬 <Pill>{t.config.skills.length + t.config.mcp.length} 활성</Pill></Card.Title>
-									<Card.Action><button type="button" class="text-xs font-medium text-primary hover:underline" onclick={() => (tplTab = 'skills')}>관리</button></Card.Action>
+									<Card.Action><Button variant="link" size="xs" onclick={() => (tplTab = 'skills')}>관리</Button></Card.Action>
 								</Card.Header>
 								<Card.Content class="gap-2">
 									<div class="flex flex-wrap gap-1.5">
@@ -228,29 +222,29 @@
 						<div class="flex w-80 shrink-0 flex-col gap-4">
 							<Card.Root size="sm">
 								<Card.Header><Card.Title>구성 기본값</Card.Title></Card.Header>
-								<Card.Content class="gap-0">{@render kv('역할', t.focus)}{@render kv('만든 사람', t.created)}</Card.Content>
+								<Card.Content class="gap-0"><KeyValueRow label="역할" value={t.focus} /><KeyValueRow label="만든 사람" value={t.created} /></Card.Content>
 							</Card.Root>
 							<Card.Root size="sm">
 								<Card.Header><Card.Title>하네스 / 런타임</Card.Title></Card.Header>
 								<Card.Content class="gap-0">
-									{@render kv('CLI', runtimeName(t.runtime))}
-									{@render kv('모델 · Effort', `${t.model} · Auto`)}
-									{@render kv('기본 계정', accountOf(t.runtime).plan)}
+									<KeyValueRow label="CLI" value={runtimeName(t.runtime)} />
+									<KeyValueRow label="모델 · Effort" value={`${t.model} · Auto`} />
+									<KeyValueRow label="기본 계정" value={accountOf(t.runtime).plan} />
 								</Card.Content>
 							</Card.Root>
 							<Card.Root size="sm">
 								<Card.Header><Card.Title>도구 · 권한</Card.Title></Card.Header>
 								<Card.Content class="gap-0">
-									{@render kv('MCP', `${t.config.mcp.length}`)}
-									{@render kv('Trust', `${t.config.trust}`)}
-									{@render kv('파일 쓰기', scopeText(t.config))}
-									{@render kv('PR 생성', '승인 필요')}
+									<KeyValueRow label="MCP" value={`${t.config.mcp.length}`} />
+									<KeyValueRow label="Trust" value={`${t.config.trust}`} />
+									<KeyValueRow label="파일 쓰기" value={scopeText(t.config)} />
+									<KeyValueRow label="PR 생성" value="승인 필요" />
 								</Card.Content>
 							</Card.Root>
 							<Card.Root size="sm">
 								<Card.Header>
 									<Card.Title>최근 Revision</Card.Title>
-									<Card.Action><button type="button" class="text-xs font-medium text-primary hover:underline" onclick={() => (tplTab = 'revisions')}>전체</button></Card.Action>
+									<Card.Action><Button variant="link" size="xs" onclick={() => (tplTab = 'revisions')}>전체</Button></Card.Action>
 								</Card.Header>
 								<Card.Content class="gap-2">
 									{#each t.revisions.slice(0, 3) as r (r.v)}
@@ -316,7 +310,7 @@
 											<span class="w-10 text-right font-mono text-caption">{n}</span>
 										</div>
 									{/each}
-									{@render kv('합계', `${stack.reduce((s, x) => s + x[2], 0).toLocaleString()} / 권장 8K`)}
+									<KeyValueRow label="합계" value={`${stack.reduce((s, x) => s + x[2], 0).toLocaleString()} / 권장 8K`} />
 								</Card.Content>
 							</Card.Root>
 							<Card.Root size="sm">
@@ -372,7 +366,7 @@
 								<Card.Content class="gap-0">
 									{#each used as { m, team: tn } (m.sn)}
 										{@const n = (m.files ?? t.files).filter((f) => t.files.find((o) => o.name === f.name)?.body !== f.body).length}
-										{@render kv(`${m.name} · ${tn}`, n ? `개별 변경 ${n}` : '변경 없음')}
+										<KeyValueRow label={`${m.name} · ${tn}`} value={n ? `개별 변경 ${n}` : '변경 없음'} />
 									{:else}
 										<p class="text-xs text-muted-foreground">없어요.</p>
 									{/each}

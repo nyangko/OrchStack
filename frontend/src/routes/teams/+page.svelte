@@ -95,6 +95,7 @@
 	import { accounts, meters, teamPolicy, recommend, tasks, issues, memberDetails, type TeamMember, type OrchPolicy, type LevelAction, type SpawnMode } from '$lib/mock';
 	import { store, defaultTeam, glyphs, glyphOf, runtimeName, accountOf, low, scopeText, liveMap, k, putDraft } from '$lib/teams.svelte';
 	import { LimitRow } from '$lib/components/ui/limit-row';
+	import { KeyValueRow } from '$lib/components/ui/key-value-row';
 	import SkillsPanel from '$lib/components/orch/agent/skills-panel.svelte';
 	import ToolsPanel from '$lib/components/orch/agent/tools-panel.svelte';
 	import PermPanel from '$lib/components/orch/agent/perm-panel.svelte';
@@ -564,7 +565,7 @@
 				<Card.Root size="sm">
 					<Card.Header>
 						<Card.Title>모델 연결 사용량</Card.Title>
-						<Card.Action><a href="/settings" class="text-xs font-medium text-primary hover:underline">모델 연결</a></Card.Action>
+						<Card.Action><Button variant="link" size="xs" href="/settings">모델 연결</Button></Card.Action>
 					</Card.Header>
 					<Card.Content>
 						{#each accounts as a (a.runtime)}
@@ -604,7 +605,7 @@
 				<Card.Root size="sm">
 					<Card.Header>
 						<Card.Title>Orch 진행</Card.Title>
-						<Card.Action><button type="button" class="text-xs font-medium text-primary hover:underline" onclick={editPolicy}>정책 편집</button></Card.Action>
+						<Card.Action><Button variant="link" size="xs" onclick={editPolicy}>정책 편집</Button></Card.Action>
 					</Card.Header>
 					<Card.Content>
 						{@const ModeIcon = policy.mode === 'manual' ? Hand : policy.mode === 'full' ? Zap : Timer}
@@ -634,7 +635,7 @@
 				<Card.Root size="sm">
 					<Card.Header>
 						<Card.Title>팀 정책</Card.Title>
-						<Card.Action><button type="button" class="text-xs font-medium text-primary hover:underline">편집</button></Card.Action>
+						<Card.Action><Button variant="link" size="xs">편집</Button></Card.Action>
 					</Card.Header>
 					<Card.Content class="gap-1">
 						<div class="flex h-7 items-center gap-2 text-xs">
@@ -677,13 +678,6 @@
 		</div>
 </main>
 
-<!-- .pen KeyValueRow — 미리보기 카드 한 줄 -->
-{#snippet kv(label: string, value: string)}
-	<div class="flex h-7.5 items-center border-t text-xs">
-		<span class="flex-1 text-muted-foreground">{label}</span>
-		<span class="text-body font-medium">{value}</span>
-	</div>
-{/snippet}
 
 <!-- .pen FormRow 제목 -->
 {#snippet heading(title: string, desc: string)}
@@ -772,7 +766,7 @@
 								{tpl ? `${tpl.files.map((f) => f.name).join(' · ')} · 스킬 ${tpl.config.skills.length + tpl.config.mcp.length} · ${runtimeName(tpl.runtime)} · ${tpl.model} 를 복사해요` : 'Instructions를 직접 작성해요'}
 							</span>
 						</span>
-						<button type="button" class="text-xs font-medium text-primary hover:underline" onclick={() => (step = 0)}>변경</button>
+						<Button variant="link" size="xs" onclick={() => (step = 0)}>변경</Button>
 					</div>
 				{/if}
 
@@ -940,11 +934,11 @@
 								<span class="text-xs text-muted-foreground">{tpl.desc}</span>
 							</div>
 							<div>
-								{@render kv('복사되는 것', `Instructions · 파일 ${tpl.files.length}`)}
-								{@render kv('스킬', `${tpl.config.skills.length} · MCP ${tpl.config.mcp.length}`)}
-								{@render kv('기본 런타임', `${runtimeName(tpl.runtime)} · ${tpl.model}`)}
-								{@render kv('권한', `Trust ${tpl.config.trust} · ${scopeText(tpl.config)}`)}
-								{@render kv('최근 성과', tpl.success ? `멤버 ${tpl.members}명 · Run 성공률 ${tpl.success}%` : '기록 없음')}
+								<KeyValueRow label="복사되는 것" value={`Instructions · 파일 ${tpl.files.length}`} />
+								<KeyValueRow label="스킬" value={`${tpl.config.skills.length} · MCP ${tpl.config.mcp.length}`} />
+								<KeyValueRow label="기본 런타임" value={`${runtimeName(tpl.runtime)} · ${tpl.model}`} />
+								<KeyValueRow label="권한" value={`Trust ${tpl.config.trust} · ${scopeText(tpl.config)}`} />
+								<KeyValueRow label="최근 성과" value={tpl.success ? `멤버 ${tpl.members}명 · Run 성공률 ${tpl.success}%` : '기록 없음'} />
 							</div>
 							{#if soul}<pre class="rounded-sm bg-muted p-2.5 font-sans text-caption leading-relaxed whitespace-pre-wrap text-muted-foreground">{soul.body}</pre>{/if}
 						</div>
@@ -962,11 +956,11 @@
 							</span>
 						</div>
 						<div>
-							{@render kv('원본', tpl ? `${tpl.name} v${tpl.version}` : '빈 캐릭터')}
-							{@render kv('템플릿 대비', diff)}
-							{@render kv('런타임', tpl && runtime === tpl.runtime && model === tpl.model ? '템플릿과 같음' : `${runtimeName(runtime)} · ${accountOf(runtime).plan.split(' · ')[1]}`)}
-							{@render kv('컨텍스트', `약 ${(tokAll / 1000).toFixed(1)}K tok / Run`)}
-							{@render kv('첫 작업', first === 'task' ? `#${firstTask.num} 지정` : firstLabel[first])}
+							<KeyValueRow label="원본" value={tpl ? `${tpl.name} v${tpl.version}` : '빈 캐릭터'} />
+							<KeyValueRow label="템플릿 대비" value={diff} />
+							<KeyValueRow label="런타임" value={tpl && runtime === tpl.runtime && model === tpl.model ? '템플릿과 같음' : `${runtimeName(runtime)} · ${accountOf(runtime).plan.split(' · ')[1]}`} />
+							<KeyValueRow label="컨텍스트" value={`약 ${(tokAll / 1000).toFixed(1)}K tok / Run`} />
+							<KeyValueRow label="첫 작업" value={first === 'task' ? `#${firstTask.num} 지정` : firstLabel[first]} />
 						</div>
 					</div>
 					<div class="flex gap-2 rounded-md bg-primary-soft p-3 text-xs">
@@ -1123,7 +1117,7 @@
 						<Card.Root size="sm">
 							<Card.Header>
 								<Card.Title>이번 주 토큰 사용</Card.Title>
-								<Card.Action><button type="button" class="text-xs font-medium text-primary hover:underline" onclick={() => (tab = 'runs')}>Runs 보기</button></Card.Action>
+								<Card.Action><Button variant="link" size="xs" onclick={() => (tab = 'runs')}>Runs 보기</Button></Card.Action>
 							</Card.Header>
 							<Card.Content>{@render chart(det.week.days.map((d) => [d]), ['토큰 (K)'], `이번 주 · ${det.week.tokens}K · 하루 평균 ${Math.round(det.week.tokens / 7)}K`)}</Card.Content>
 						</Card.Root>
@@ -1163,7 +1157,7 @@
 						<Card.Root size="sm">
 							<Card.Header>
 								<Card.Title>다음 실행 대기열</Card.Title>
-								<Card.Action><button type="button" class="text-xs font-medium text-primary hover:underline" onclick={() => (tab = 'tasks')}>Tasks 탭</button></Card.Action>
+								<Card.Action><Button variant="link" size="xs" onclick={() => (tab = 'tasks')}>Tasks 탭</Button></Card.Action>
 							</Card.Header>
 							<Card.Content class="gap-0">
 								{#each det.queue as q, i (q.num)}
@@ -1465,7 +1459,7 @@
 							</Card.Header>
 							<Card.Content class="gap-0">
 								{#each [...det.runs].sort((a, b) => b.tokens - a.tokens) as r (r.num)}
-									{@render kv(`#${r.num} · ${r.task} · ${r.start}${r.status === 'running' ? ' (진행 중)' : r.status === 'failed' ? ' (실패)' : r.status === 'cancelled' ? ' (취소)' : ''}`, `${r.tokens.toFixed(1)}K`)}
+									<KeyValueRow label={`#${r.num} · ${r.task} · ${r.start}${r.status === 'running' ? ' (진행 중)' : r.status === 'failed' ? ' (실패)' : r.status === 'cancelled' ? ' (취소)' : ''}`} value={`${r.tokens.toFixed(1)}K`} />
 								{/each}
 							</Card.Content>
 						</Card.Root>

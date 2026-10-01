@@ -9,13 +9,15 @@
 	import Ban from '@lucide/svelte/icons/ban';
 	import GitFork from '@lucide/svelte/icons/git-fork';
 	import Settings2 from '@lucide/svelte/icons/settings-2';
-	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import X from '@lucide/svelte/icons/x';
 	import * as Card from '$lib/components/ui/card';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
+	import { PageHeader } from '$lib/components/ui/page-header';
 	import { Pill } from '$lib/components/ui/pill';
 	import { Switch } from '$lib/components/ui/switch';
+	import { KeyValueRow } from '$lib/components/ui/key-value-row';
+	import { HistoryRow } from '$lib/components/ui/history-row';
 	import TrustPicker from '$lib/components/orch/agent/trust-picker.svelte';
 	import ApprovalTable from '$lib/components/orch/agent/approval-table.svelte';
 	import { security, auditLog, type AuditLog } from '$lib/mock';
@@ -53,16 +55,9 @@
 <svelte:head><title>권한 · 보안 · Settings · OrchStack</title></svelte:head>
 
 <main class="flex flex-col gap-5 px-8 py-7">
-	<header class="flex items-end gap-3">
-		<div class="flex flex-1 flex-col gap-1">
-			<h1 class="text-2xl font-semibold">권한 · 보안</h1>
-			<p class="text-xs text-muted-foreground">기본 Trust 레벨 · 승인 규칙 · 차단 명령 · 비밀 · 감사 로그</p>
-		</div>
-		<span class="flex items-center gap-1 text-xs font-medium text-status-done" role="status">
-			{#if saved}<CircleCheck class="size-3.25" />저장됨{/if}
-		</span>
+	<PageHeader title="권한 · 보안" desc="기본 Trust 레벨 · 승인 규칙 · 차단 명령 · 비밀 · 감사 로그" status={saved && '저장됨'}>
 		<Button variant="outline" onclick={exportLog}><ScrollText />감사 로그 내보내기</Button>
-	</header>
+	</PageHeader>
 
 	<div class="flex items-start gap-5">
 		<div class="flex min-w-0 flex-1 flex-col gap-5">
@@ -86,7 +81,7 @@
 				<Card.Header>
 					<Card.Title>항상 차단</Card.Title>
 					<Card.Description>어떤 Trust 레벨 · 승인으로도 실행되지 않아요</Card.Description>
-					<Card.Action><button type="button" class="text-xs font-medium text-primary hover:underline" onclick={() => (adding = true)}>패턴 추가</button></Card.Action>
+					<Card.Action><Button variant="link" size="xs" onclick={() => (adding = true)}>패턴 추가</Button></Card.Action>
 				</Card.Header>
 				<Card.Content class="gap-0">
 					{#each s.blocked as b, i (b.pattern)}
@@ -136,9 +131,7 @@
 				<Card.Header><Card.Title>비밀 · 키</Card.Title></Card.Header>
 				<Card.Content class="gap-0">
 					{#each s.secrets as [l, v] (l)}
-						<div class="flex h-9 items-center border-t text-xs">
-							<span class="flex-1 text-muted-foreground">{l}</span><span>{v}</span>
-						</div>
+						<KeyValueRow label={l} value={v} />
 					{/each}
 				</Card.Content>
 			</Card.Root>
@@ -171,13 +164,7 @@
 				<Card.Content class="gap-0">
 					{#each log.slice(0, 5) as l, i (i)}
 						{@const Icon = logIcon[l.kind]}
-						<div class="flex gap-2.5 border-t py-2.5">
-							<span class={cn('flex size-6 shrink-0 items-center justify-center rounded-full', l.kind === 'BLOCK' ? 'bg-destructive-soft text-destructive' : 'bg-primary-soft text-primary')}><Icon class="size-3" /></span>
-							<span class="flex min-w-0 flex-1 flex-col gap-0.5 text-xs">
-								<span class="flex items-center gap-1.5"><span class="font-mono text-caption font-semibold text-muted-foreground">{l.kind}</span><span class="text-muted-foreground">{l.who}</span><span class="ml-auto text-caption text-subtle-foreground">{l.when}</span></span>
-								<span>{l.text}</span>
-							</span>
-						</div>
+						<HistoryRow icon={Icon} tone={l.kind === 'BLOCK' ? 'bg-destructive-soft text-destructive' : 'bg-primary-soft text-primary'} kind={l.kind} who={l.who} when={l.when} text={l.text} />
 					{/each}
 				</Card.Content>
 			</Card.Root>

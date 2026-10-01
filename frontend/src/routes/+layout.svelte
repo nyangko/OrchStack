@@ -207,7 +207,7 @@
 			<Popover.Content align="end" class="w-115 gap-0 p-0">
 				<div class="flex items-center gap-2 px-4 pt-3.5 pb-2.5">
 					<h2 class="flex-1 text-sm font-semibold">알림</h2>
-					<button type="button" class="text-xs font-medium text-primary hover:underline disabled:opacity-50" disabled={!unread} onclick={() => list.forEach((n) => (n.unread = false))}>모두 읽음</button>
+					<Button variant="link" size="xs" disabled={!unread} onclick={() => list.forEach((n) => (n.unread = false))}>모두 읽음</Button>
 					<Button variant="ghost" size="icon-sm" href="/settings/notifications" onclick={() => (bellOpen = false)} aria-label="알림 설정"><Settings2 /></Button>
 				</div>
 				<div class="flex gap-1.5 border-b px-4 pb-3" role="group" aria-label="알림 종류">

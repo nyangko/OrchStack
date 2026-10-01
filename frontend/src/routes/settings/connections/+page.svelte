@@ -26,6 +26,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
+	import { PageHeader } from '$lib/components/ui/page-header';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { Pill } from '$lib/components/ui/pill';
 	import { Progress } from '$lib/components/ui/progress';
@@ -134,16 +135,12 @@
 {/snippet}
 
 <main class="flex flex-col gap-5 px-8 py-7">
-	<header class="flex items-end gap-3">
-		<div class="flex flex-1 flex-col gap-1">
-			<h1 class="text-2xl font-semibold">모델 연결</h1>
-			<p class="text-xs text-muted-foreground">에이전트가 모델을 부르는 경로예요. 실행기(CLI)마다 구독 로그인 · API 키 · 게이트웨이 · 로컬 모델을 연결할 수 있어요.</p>
-		</div>
+	<PageHeader title="모델 연결" desc="에이전트가 모델을 부르는 경로예요. 실행기(CLI)마다 구독 로그인 · API 키 · 게이트웨이 · 로컬 모델을 연결할 수 있어요." status={false}>
 		<Button variant="outline" disabled={checking} onclick={checkAll}>
 			{#if checking}<LoaderCircle class="animate-spin" />점검 중…{:else}<Activity />전체 연결 점검{/if}
 		</Button>
 		<Button onclick={() => openAdd()}><Plus />연결 추가</Button>
-	</header>
+	</PageHeader>
 
 	{#if notices.length}
 		<div class="flex gap-2" role="status">
@@ -209,9 +206,9 @@
 			<Card.Header>
 				<Card.Title>폴백 체인 · {chainOf === 'claude' ? 'Claude Code' : 'Codex CLI'}</Card.Title>
 				<Card.Action>
-					<button type="button" class="text-xs font-medium text-primary hover:underline" onclick={() => (chainOf = chainOf === 'claude' ? 'codex' : 'claude')}>
+					<Button variant="link" size="xs" onclick={() => (chainOf = chainOf === 'claude' ? 'codex' : 'claude')}>
 						{chainOf === 'claude' ? 'Codex CLI' : 'Claude Code'} 체인 보기
-					</button>
+					</Button>
 				</Card.Action>
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-1.5">
