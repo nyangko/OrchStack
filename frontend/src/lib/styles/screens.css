@@ -524,15 +524,6 @@
 	@apply flex flex-1 flex-col gap-1 rounded-md border bg-card px-3.5 py-3;
 }
 
-/* ── task/criteria-list.svelte ── */
-/* 줄 hover · 포커스에만 보이는 동작 */
-@utility hover-actions {
-	@apply flex items-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100;
-}
-/* 완료 조건 한 줄 */
-@utility criterion-row {
-	@apply flex h-8 items-center gap-2 rounded-sm px-1.5 hover:bg-muted/60;
-}
 
 /* ── tasks/+page.svelte ── */
 /* 저장 보기 지우기 (hover에 보임) */

@@ -130,7 +130,7 @@
 	import AssigneePicker from '$lib/components/orch/task/assignee-picker.svelte';
 	import DependsPicker from '$lib/components/orch/task/depends-picker.svelte';
 	import PriorityPicker from '$lib/components/orch/task/priority-picker.svelte';
-	import CriteriaList from '$lib/components/orch/task/criteria-list.svelte';
+	import { Checklist } from '$lib/components/ui/checklist';
 	import { priorities, priorityOrder, type Priority } from '$lib/priority';
 	import type { Role } from '$lib/roles';
 	import type { TaskDetail } from '$lib/mock';
@@ -1289,7 +1289,7 @@
 								<section class="flex flex-col gap-1">
 									<h3 class="text-body font-semibold">Acceptance criteria</h3>
 									<!-- .pen B · 인라인: 체크 · 끌기 · hover 편집/삭제 · 조건 추가 -->
-									<CriteriaList bind:items={() => info?.criteria ?? [], (v) => (detailOf(cur.num).criteria = v)} />
+									<Checklist label="완료 조건" placeholder="조건 추가" bind:items={() => info?.criteria ?? [], (v) => (detailOf(cur.num).criteria = v)} />
 								</section>
 								{#if info?.deps.length}
 									<section class="flex flex-col gap-2">
@@ -2008,7 +2008,7 @@
 						<!-- 완료 조건 -->
 						<section class="box-col gap-0.5 rounded-md p-3" aria-label="완료 조건">
 							<h3 class="pb-1 text-xs font-semibold text-muted-foreground">완료 조건</h3>
-							<CriteriaList bind:items={d.criteria} />
+							<Checklist label="완료 조건" placeholder="조건 추가" bind:items={d.criteria} />
 						</section>
 
 						<!-- 속성 칩 (.pen Properties) — 선택 창은 C -->
