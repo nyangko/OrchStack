@@ -1,319 +1,258 @@
-/* 공용 역할 유틸리티 — 여러 화면이 같이 쓰는 모양 (frontend/CLAUDE.md §8 · #85 §4).
-   간격(gap · padding · 너비)이 화면마다 다른 경우는 유틸리티에 넣지 않고 인라인에 둔다. */
+/* 공용 역할 스타일 — 여러 화면이 같은 뜻으로 쓰는 모양 하나에 이름 하나 (docs/ui-components.md §9–11).
+   클래스 개수로 만들지 않는다: 레이아웃만 묶은 것 · 한 곳만 쓰는 것은 그 자리에 토큰으로 둔다.
+   역할 클래스는 기본 모양을 다 주고, 부르는 쪽은 다른 점(간격 · 크기 · 색 변형)만 덧붙인다. */
 
-/* 키보드 포커스 링 (버튼 · 링크 공통) · 3곳 */
+/* 키보드 포커스 링 (버튼 · 링크 공통) */
 @utility focus-ring {
 	@apply outline-none focus-visible:ring-3 focus-visible:ring-ring/50;
 }
 
-/* 누를 수 있는 면: hover 회색 + 포커스 링 · 2곳 */
+/* 누를 수 있는 면: hover 회색 + 포커스 링 */
 @utility pressable {
 	@apply outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50;
 }
 
-/* 글자 링크 포커스 = 밑줄 · 1곳 */
-@utility link-focus {
-	@apply outline-none focus-visible:underline;
-}
-
-/* 가운데 정렬 상자 (아이콘 · 숫자 원) · 6곳 */
-@utility center-box {
-	@apply flex items-center justify-center;
-}
-
-/* 목록 줄 앞 36px 아이콘 타일 (.pen ProviderTile · SourceRow) · 7곳 */
+/* 목록 줄 앞 아이콘 타일 (.pen ProviderTile · SourceRow). 기본 36px — 더 크면 그 자리에서 size-9.5 */
 @utility icon-tile {
 	@apply flex size-9 shrink-0 items-center justify-center rounded-md bg-muted;
 }
 
-/* 남은 너비를 채우는 세로 묶음 · 30곳 */
-@utility col-fill {
-	@apply flex min-w-0 flex-1 flex-col;
-}
-
-/* 줄 안의 제목 + 설명 세로 묶음 · 25곳 */
-@utility row-text {
-	@apply flex min-w-0 flex-1 flex-col gap-0.5;
-}
-
-/* 남은 너비를 채우는 가로 묶음 (Select 값 · 줄 제목) · 7곳 */
-@utility row-fill {
-	@apply flex min-w-0 flex-1 items-center gap-2;
-}
-
-/* 줄 제목 (13px · medium) · 6곳 */
+/* 줄 제목 (13px · medium) */
 @utility row-title {
 	@apply flex items-center gap-1.5 text-body font-medium;
 }
 
-/* 줄 제목 (13px · semibold) — 연결 · 실행기 · 소스 카드 · 10곳 */
+/* 줄 제목 (13px · semibold) — 연결 · 실행기 · 소스 카드 */
 @utility row-title-strong {
 	@apply flex items-center gap-2 text-body font-semibold;
 }
 
-/* 보조 정보 한 줄 (11px · 회색) · 13곳 */
+/* 보조 정보 한 줄 (11px · 회색) */
 @utility meta-line {
 	@apply flex items-center text-caption text-muted-foreground;
 }
 
-/* 보조 정보 한 줄 (12px · 회색) · 12곳 */
+/* 보조 정보 한 줄 (12px · 회색) */
 @utility meta-xs {
 	@apply flex items-center text-xs text-muted-foreground;
 }
 
-/* 저장됨 · 확인됨 표시 (초록) · 5곳 */
+/* 저장됨 · 확인됨 표시 (초록) */
 @utility saved-note {
 	@apply flex items-center gap-1 text-caption text-status-done;
 }
 
-/* 값 한 줄 28px (요약 카드 · Inspector) · 8곳 */
+/* 값 한 줄 28px (요약 카드 · Inspector) */
 @utility value-line {
 	@apply flex h-7 items-center gap-2 text-xs;
 }
 
-/* 구역 머리 라벨 (11px · semibold · 회색) · 3곳 */
+/* 구역 머리 라벨 (11px · semibold · 회색) */
 @utility section-label {
 	@apply text-caption font-semibold text-muted-foreground;
 }
 
-/* 대문자 참조 표기 (TASK #129) · 2곳 */
-@utility mono-ref {
-	@apply font-mono text-xs font-semibold tracking-wide text-muted-foreground;
-}
-
-/* 오른쪽 정렬 숫자 칸 (시각 · 토큰) · 3곳 */
+/* 오른쪽 정렬 숫자 칸 (시각 · 토큰) */
 @utility num-cell {
 	@apply text-right font-mono text-caption text-muted-foreground;
 }
 
-/* 작은 등급 · 수준 꼬리표 (TierChip · LevelBadge) · 5곳 */
+/* 작은 등급 · 수준 꼬리표 (TierChip · LevelBadge) */
 @utility mono-tag {
 	@apply rounded-xs px-1.5 font-mono text-2xs font-bold;
 }
 
-/* 회색 작은 꼬리표 · 1곳 */
-@utility soft-tag {
-	@apply rounded-xs bg-muted px-1.5 py-px text-caption text-muted-foreground;
-}
-
-/* 모델 · 실행기 코드 꼬리표 · 2곳 */
+/* 모델 · 실행기 코드 꼬리표 */
 @utility code-tag {
 	@apply inline-flex items-center gap-0.75 rounded-xs bg-muted px-1.25 py-px font-mono text-2xs text-muted-foreground;
 }
 
-/* 위 테두리로 나뉘는 목록 줄 (첫 줄은 테두리 없음) · 5곳 */
+/* 위 테두리로 나뉘는 목록 줄 (첫 줄은 테두리 없음) */
 @utility row-divided {
 	@apply flex border-t first:border-t-0;
 }
 
-/* 목록 한 줄 (아이콘 · 글 · 동작) · 5곳 */
+/* 목록 한 줄 (아이콘 · 글 · 동작) */
 @utility list-row {
 	@apply flex items-center gap-3 border-t py-2.5 first:border-t-0;
 }
 
-/* 아이콘 타일이 있는 선택 · 설정 카드 줄 · 7곳 */
+/* 아이콘 타일이 있는 선택 · 설정 카드 줄 */
 @utility option-card {
 	@apply flex items-center gap-3 border px-3.5 py-3;
 }
 
-/* 폼 구역 (제목 + 컨트롤 · 위 테두리) — 마법사 · 연결 추가 · 14곳 */
+/* 폼 구역 (제목 + 컨트롤 · 위 테두리) — 마법사 · 연결 추가 */
 @utility form-block {
 	@apply flex flex-col gap-2 border-t pt-4;
 }
 
-/* 카드 바탕 · 1곳 */
+/* 카드 바탕 (테두리 · 둥글기 · 흰 바탕). 배치(flex-col · 간격)는 그 자리에서 */
 @utility card-surface {
 	@apply rounded-lg border bg-card;
 }
 
-/* 세로 카드 · 6곳 */
-@utility card-col {
-	@apply flex flex-col rounded-lg border bg-card;
-}
-
-/* 테두리 세로 상자 · 7곳 */
-@utility box-col {
-	@apply flex flex-col border;
-}
-
-/* 안내 띠 (색은 따로) · 4곳 */
+/* 안내 띠 (레이아웃 · 글자). 색은 strip-success · strip-primary · strip-danger · strip-muted 또는 그 자리 토큰 */
 @utility strip {
 	@apply flex items-center gap-2 rounded-md px-3.5 text-xs;
 }
 
-/* 테두리 칩 · 2곳 */
+/* 테두리 칩 */
 @utility chip-box {
 	@apply flex items-center rounded-sm border px-2;
 }
 
-/* 회색 둥근 칩 · 2곳 */
+/* 회색 둥근 칩 */
 @utility pill-soft {
 	@apply flex items-center rounded-full bg-muted px-2 py-0.75;
 }
 
-/* 빈 상태 점선 상자 · 2곳 */
+/* 빈 상태 점선 상자 */
 @utility empty-note {
 	@apply rounded-lg border border-dashed p-4 text-xs;
 }
 
-/* 값을 보여 주는 입력 모양 상자 · 3곳 */
+/* 값을 보여 주는 입력 모양 상자 */
 @utility field-box {
 	@apply flex items-center gap-2 rounded-md border bg-card px-2.5 text-xs font-medium;
 }
 
-/* 설정 페이지 본문 · 8곳 */
+/* 설정 페이지 본문 */
 @utility page-main {
 	@apply flex flex-col gap-5 px-8 py-7;
 }
 
-/* 세로로 스크롤하는 본문 영역 · 3곳 */
-@utility page-scroll {
-	@apply flex min-w-0 flex-1 flex-col overflow-y-auto;
-}
-
-/* 고정 너비 옆 열 (너비는 따로) · 15곳 */
-@utility aside-col {
-	@apply flex shrink-0 flex-col;
-}
-
-/* 왼쪽 메뉴 열 (Settings · Tasks · Skills · Teams) · 4곳 */
+/* 왼쪽 메뉴 열 (Settings · Tasks · Skills · Teams) */
 @utility side-nav {
 	@apply flex shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-sidebar;
 }
 
-/* 왼쪽 메뉴 항목 (활성 색은 cn으로) · 6곳 */
+/* 왼쪽 메뉴 항목 (활성 색은 cn으로) */
 @utility side-nav-item {
 	@apply flex items-center gap-2.5 rounded-md px-2.5 text-body outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50;
 }
 
-/* 상세 본문 열 (Task · Issue) · 2곳 */
+/* 상세 본문 열 (Task · Issue) */
 @utility detail-main {
 	@apply flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-5;
 }
 
-/* 상세 오른쪽 속성 열 (Task · Issue) · 2곳 */
+/* 상세 오른쪽 속성 열 (Task · Issue) */
 @utility detail-aside {
 	@apply flex w-85 shrink-0 flex-col gap-5 overflow-y-auto border-l bg-background px-5 py-4;
 }
 
-/* 뷰를 덮는 반투명 바탕 (상세 열 때) · 2곳 */
+/* 뷰를 덮는 반투명 바탕 (상세 열 때) */
 @utility scrim {
 	@apply absolute inset-0 z-10 bg-foreground/5 p-5;
 }
 
-/* 종류 색 타일 (태스크 · 이슈) · 2곳 */
+/* 종류 색 타일 (태스크 · 이슈) */
 @utility kind-tile {
 	@apply flex shrink-0 items-center justify-center rounded-md text-on-solid;
 }
 
-/* 작은 라벨 (12px · medium · 아이콘) · 5곳 */
+/* 작은 라벨 (12px · medium · 아이콘) */
 @utility label-xs {
 	@apply flex items-center gap-1.5 text-xs font-medium;
 }
 
-/* 작은 라벨 (12px · semibold) · 3곳 */
+/* 작은 라벨 (12px · semibold) */
 @utility label-xs-strong {
 	@apply flex items-center gap-1.5 text-xs font-semibold;
 }
 
-/* 작은 제목 (14px · semibold) · 4곳 */
+/* 작은 제목 (14px · semibold) */
 @utility title-sm {
 	@apply flex items-center text-sm font-semibold;
 }
 
-/* 고정폭 보조 값 (토큰 · 번호) · 2곳 */
+/* 고정폭 보조 값 (토큰 · 번호) */
 @utility mono-meta {
 	@apply font-mono text-xs font-medium text-muted-foreground;
 }
 
-/* 패널 위쪽 구역 (검색 · 필터 · 빠른 추가) · 2곳 */
+/* 패널 위쪽 구역 (검색 · 필터 · 빠른 추가) */
 @utility panel-section {
 	@apply flex flex-col border-b p-3;
 }
 
-/* 둥근 상태 칩 · 2곳 */
+/* 둥근 상태 칩 */
 @utility chip-round {
 	@apply flex items-center rounded-full px-2 py-0.5;
 }
 
-/* 테두리 없는 입력 (입력 상자 안) · 2곳 */
+/* 테두리 없는 입력 (입력 상자 안) */
 @utility bare-input {
 	@apply min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-muted-foreground;
 }
 
-/* 테두리 카드 한 줄 · 4곳 */
-@utility card-row {
-	@apply flex items-center rounded-md border;
-}
-
-/* 작은 목록 항목 (파일 트리 · 그룹) · 5곳 */
+/* 작은 목록 항목 (파일 트리 · 그룹) */
 @utility menu-line {
 	@apply flex items-center gap-1.5 px-2 py-1 text-muted-foreground;
 }
 
-/* 회색 바탕 상자 · 2곳 */
-@utility soft-box {
-	@apply flex rounded-md bg-muted;
-}
-
-/* 목록 표 머리 줄 · 1곳 */
-@utility list-table-head {
-	@apply flex bg-muted text-caption font-medium text-muted-foreground;
-}
-
-/* 목록 표 한 줄 · 1곳 */
-@utility list-table-row {
-	@apply flex items-center border-t px-4;
-}
-
-/* 입력 오류 문구 · 2곳 */
+/* 입력 오류 문구 */
 @utility error-note {
 	@apply flex items-center gap-1 text-caption font-medium text-destructive;
 }
 
-/* 흐린 보조 정보 · 4곳 */
+/* 흐린 보조 정보 */
 @utility subtle-meta {
 	@apply flex items-center text-caption text-subtle-foreground;
 }
 
-/* 초록 안내 띠 (완료 · 확인) · 5곳 */
+/* 안내 띠 색: 초록 (완료 · 확인) — `strip strip-success` */
 @utility strip-success {
-	@apply flex items-center gap-2 rounded-md border border-success/40 bg-success-soft px-3.5 text-xs;
+	@apply border border-success/40 bg-success-soft;
 }
 
-/* 파란 안내 띠 · 1곳 */
+/* 안내 띠 색: 파랑 (안내) — `strip strip-primary` */
 @utility strip-primary {
-	@apply flex items-center gap-2 rounded-md border border-primary/20 bg-primary-soft px-3.5 text-xs;
+	@apply border border-primary/20 bg-primary-soft;
 }
 
-/* 빨간 안내 띠 (오류 · 위험) · 1곳 */
+/* 안내 띠 색: 빨강 (오류 · 위험) — `strip strip-danger` */
 @utility strip-danger {
-	@apply flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive-soft px-3.5 text-xs;
+	@apply border border-destructive/40 bg-destructive-soft;
 }
 
-/* 회색 안내 띠 · 1곳 */
+/* 안내 띠 색: 회색 — `strip strip-muted` */
 @utility strip-muted {
-	@apply flex items-center gap-2 rounded-md border bg-muted/50 px-3.5 text-xs;
+	@apply border bg-muted/50;
 }
 
-/* 목록 줄 앞 38px 아이콘 타일 (실행기 · 연결) · 2곳 */
-@utility icon-tile-lg {
-	@apply flex size-9.5 shrink-0 items-center justify-center rounded-md bg-muted;
-}
-
-
-
-/* 줄 전체가 링크인 영역 · 2곳 */
+/* 줄 전체가 링크인 영역 */
 @utility row-link {
 	@apply flex min-w-0 flex-1 items-center gap-3 text-left outline-none focus-visible:underline;
 }
 
-/* 왼쪽 메뉴가 있는 화면의 본문 (Tasks · Skills) · 2곳 */
-@utility page-scroll-pad {
-	@apply flex min-w-0 flex-1 flex-col overflow-y-auto px-8 py-7 *:shrink-0;
-}
-
-/* 종류 색 작은 표시 (이슈 · 경로) · 2곳 */
+/* 종류 색 작은 표시 (이슈 · 경로) */
 @utility kind-mark {
 	@apply flex items-center justify-center rounded-xs text-on-solid;
+}
+
+/* 회색 안내 줄 (도구 · 팀) */
+@utility info-line {
+	@apply flex items-center gap-2 rounded-sm bg-muted px-3 py-2.5 text-xs text-muted-foreground;
+}
+
+/* 잘리는 보조 정보 (연결 · 실행기 · 시작) */
+@utility meta-truncate {
+	@apply flex items-center truncate text-caption;
+}
+
+/* 왼쪽 목록 패널 (프리셋 · 보고서 양식) */
+@utility list-panel {
+	@apply flex shrink-0 flex-col gap-0.5 rounded-xl border bg-card p-3;
+}
+
+/* 왼쪽 목록 패널 항목 */
+@utility list-panel-item {
+	@apply flex items-center gap-2.5 rounded-md text-left text-xs outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50;
+}
+
+/* 요약 숫자 카드 (Skills · Tasks · Teams) */
+@utility stat-card {
+	@apply flex flex-1 flex-col gap-1 rounded-md border bg-card px-3.5 py-3;
 }

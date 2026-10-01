@@ -14,13 +14,13 @@
 	} = $props();
 </script>
 
-<div class="approval-head">
+<div class="flex gap-3 pb-2 text-caption font-medium text-muted-foreground">
 	<span class="flex-1">동작</span><span class="w-36">정책</span><span class="w-28">승인자</span><span class="w-12">알림</span>
 </div>
 {#each approvals as a, i (a.action)}
 	{@const b = base?.[i]}
-	<div class="approval-row">
-		<span class="approval-action">{a.action}{#if b && JSON.stringify(b) !== JSON.stringify(a)}<span class="size-1.5 rounded-full bg-primary" aria-label="템플릿과 다름"></span>{/if}</span>
+	<div class="flex items-center gap-3 border-t py-2 text-xs">
+		<span class="flex flex-1 items-center gap-1.5 font-medium">{a.action}{#if b && JSON.stringify(b) !== JSON.stringify(a)}<span class="size-1.5 rounded-full bg-primary" aria-label="템플릿과 다름"></span>{/if}</span>
 		<span class="w-36">
 			<!-- 승인 필요가 아니면 승인자는 없다 -->
 			<Select.Root type="single" bind:value={() => a.policy, (v) => ((a.policy = v as Approval['policy']), (a.who = v === '승인 필요' ? (a.who === '—' ? '나' : a.who) : '—'))}>

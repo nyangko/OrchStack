@@ -61,8 +61,8 @@
 			{@const isAdded = added(h.name)}
 			{@const warn = h.audit[0] < h.audit[1]}
 			<div class="row-divided items-center gap-3 py-3">
-				<span class="skill-mark">{h.name[0]}</span>
-				<button type="button" class="col-fill link-focus gap-1 text-left" onclick={() => (skillView = h)}>
+				<span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-sm font-semibold text-muted-foreground uppercase">{h.name[0]}</span>
+				<button type="button" class="flex min-w-0 flex-1 flex-col outline-none focus-visible:underline gap-1 text-left" onclick={() => (skillView = h)}>
 					<span class="flex items-baseline gap-2"><span class="text-body font-semibold">{h.name}</span><span class="font-mono text-caption text-muted-foreground">{h.repo}</span></span>
 					<span class="text-xs text-muted-foreground">{h.desc}</span>
 					<span class="meta-line flex-wrap gap-3">
@@ -91,7 +91,7 @@
 			{@const h = skillView}
 			{@const isAdded = added(h.name)}
 			<Dialog.Header>
-				{#snippet lead()}<span class="skill-mark-lg">{h.name[0]}</span>{/snippet}
+				{#snippet lead()}<span class="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-lg font-semibold text-muted-foreground uppercase">{h.name[0]}</span>{/snippet}
 					<Dialog.Title class="flex items-baseline gap-2">{h.name}<span class="font-mono text-xs font-normal text-muted-foreground">{h.repo}</span></Dialog.Title>
 					<div class="meta-line flex-wrap gap-3">
 						<span class="flex items-center gap-1"><Download class="size-3" />{h.installs} installs</span>
@@ -125,7 +125,7 @@
 						{/each}
 					</Tabs.Content>
 				</Tabs.Root>
-				<aside class="skill-detail-aside">
+				<aside class="flex w-64 shrink-0 flex-col gap-4 border-l bg-background px-5 py-4 text-xs">
 					<span class="font-semibold">이 스킬은</span>
 					{#each [[Zap, '트리거', h.skillMd.find((l) => l.startsWith('description:'))?.slice(13) ?? '관련 작업 시'], [Layers, '컨텍스트', `+${(h.tok / 1000).toFixed(1)}K tok`], [Hash, 'sha256', '3f9a…c21e'], [Users, '이 팀 사용', store.library.some((k) => k.name === h.name) ? '설치됨' : '처음 추가']] as const as [Icon, k, v] (k)}
 						<div class="flex items-start gap-2"><Icon class="mt-0.5 size-3.25 text-muted-foreground" /><span class="w-16 text-muted-foreground">{k}</span><span class="flex-1 font-medium">{v}</span></div>

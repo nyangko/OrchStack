@@ -50,7 +50,7 @@
 	<NodeCard.Header>
 		<NodeCard.Kind class={md.tile}><md.icon /></NodeCard.Kind>
 		<NodeCard.Ref>{data.mode.toUpperCase()} · {data.id}</NodeCard.Ref>
-		{#if data.tier}<span class={cn("tier-chip", tierTone[data.tier])}><Cpu class="size-2.5" />{data.tier}</span>{/if}
+		{#if data.tier}<span class={cn("flex items-center gap-0.5 rounded-xs px-1.5 py-px font-mono text-2xs font-bold", tierTone[data.tier])}><Cpu class="size-2.5" />{data.tier}</span>{/if}
 	</NodeCard.Header>
 	<!-- 글자 크기를 바꾸면 cn이 leading도 지워서 같이 넘긴다 -->
 	<NodeCard.Title class="text-body leading-tight">{data.goal}</NodeCard.Title>

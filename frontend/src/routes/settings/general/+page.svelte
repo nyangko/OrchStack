@@ -79,7 +79,7 @@
 	<Field.Row label={r.label} hint={r.hint}>
 		<Select.Root type="single" value={s[r.key]} onValueChange={(v) => set(r.key, v)}>
 			<Select.Trigger class="w-full" aria-label={r.label}>
-				<span class="row-fill">
+				<span class="flex min-w-0 flex-1 items-center gap-2">
 					<r.icon class="size-4 text-muted-foreground" />
 					{s[r.key]}
 					<span class="truncate text-caption font-normal text-muted-foreground">{r.note?.(s[r.key])}</span>
@@ -96,7 +96,7 @@
 	<PageHeader title="일반" desc="워크스페이스 이름 · 언어 · 시간대 · 테마 · 데이터 보관" status={saved && '저장됨'} />
 
 	<div class="flex items-start gap-5">
-		<div class="col-fill gap-5">
+		<div class="flex min-w-0 flex-1 flex-col gap-5">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>워크스페이스</Card.Title>
@@ -135,7 +135,7 @@
 			</Card.Root>
 		</div>
 
-		<div class="aside-col w-95 gap-5">
+		<div class="flex shrink-0 flex-col w-95 gap-5">
 			<Card.Root size="sm">
 				<Card.Header><Card.Title>화면</Card.Title></Card.Header>
 				<Card.Content>

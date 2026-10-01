@@ -168,9 +168,9 @@
 				<div class="grid grid-cols-2 gap-2.5">
 					{#each g.items as c (c.key)}
 						{@const st = stateMeta[c.state]}
-						<div class={cn('card-row gap-3 px-4 py-3.5', isOn(c) ? 'bg-card' : 'bg-muted')}>
-							<span class="icon-tile-lg">{@render mark(c.key, 'size-5')}</span>
-							<span class="col-fill gap-1.25">
+						<div class={cn('flex items-center rounded-md border gap-3 px-4 py-3.5', isOn(c) ? 'bg-card' : 'bg-muted')}>
+							<span class="icon-tile size-9.5">{@render mark(c.key, 'size-5')}</span>
+							<span class="flex min-w-0 flex-1 flex-col gap-1.25">
 								<span class="label-xs-strong">{c.name}<Pill class={kindPill[c.kind]}>{c.kind}</Pill></span>
 								<span class={cn('meta-truncate gap-1.25', st.tone)}><st.icon class="size-3 shrink-0" />{c.note}</span>
 							</span>
@@ -178,7 +178,7 @@
 								{@const money = q.limit !== undefined}
 								{@const v = money ? ((q.used ?? 0) / q.limit!) * 100 : (q.pct ?? 0)}
 								{@const tone = money ? 'text-primary' : v < 20 ? 'text-status-blocked' : 'text-status-done'}
-								<span class="quota-chip">
+								<span class="flex shrink-0 items-center gap-1.5 rounded-sm border bg-card px-2 py-0.75">
 									<span class="text-2xs font-semibold text-muted-foreground">{q.label}</span>
 									<Progress value={v} class="h-1 w-8 bg-muted" indicator={money ? 'bg-primary' : v < 20 ? 'bg-status-blocked' : 'bg-status-done'} aria-label="{c.name} {q.label}" />
 									<span class={cn('font-mono text-caption font-semibold', tone)}>{money ? `$${q.used}/$${q.limit}` : `${q.pct}%`}</span>
@@ -213,7 +213,7 @@
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-1.5">
 				<!-- 등급은 리드가 아니라 규칙 엔진이 정한다 (#67) — 이 목록은 등급별로 어느 연결 · 모델을 쓸지만 정한다 -->
-				<div class="chain-head"><Info class="size-3.5 shrink-0 text-muted-foreground" />리드는 모델을 고르지 않습니다. 작업 종류로 등급이 정해지고, 이 목록에서 위부터 시도합니다.</div>
+				<div class="flex items-center gap-2 rounded-md bg-muted px-2.5 py-2 text-xs font-medium"><Info class="size-3.5 shrink-0 text-muted-foreground" />리드는 모델을 고르지 않습니다. 작업 종류로 등급이 정해지고, 이 목록에서 위부터 시도합니다.</div>
 				<p class="py-1 text-xs text-muted-foreground">{chainOf === 'claude' ? 'Claude Code' : 'Codex CLI'} 실행기 기준 · 행 순서 = 시도 순서 · 끌어서 바꿔요. 같은 연결을 등급만 다르게 여러 번 넣을 수 있어요.</p>
 				<ol class="flex flex-col gap-1.5">
 					{#each chains[chainOf] as s, i (s.name)}
@@ -224,7 +224,7 @@
 							ondragstart={() => (dragFrom = i)}
 							ondragover={(e) => e.preventDefault()}
 							ondrop={() => move(dragFrom, i)}
-							class={cn('chain-step', off && 'opacity-60')}
+							class={cn('flex items-center gap-2.5 rounded-md border bg-card px-3 py-2.5', off && 'opacity-60')}
 						>
 							<button
 								type="button"
@@ -239,16 +239,16 @@
 							>
 								<GripVertical class="size-3.25" />
 							</button>
-							<span class="chain-num">{i + 1}</span>
-							<span class="center-box size-6 shrink-0">{@render mark(s.key, 'size-5')}</span>
-							<span class="row-text">
+							<span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-caption font-semibold text-background">{i + 1}</span>
+							<span class="flex items-center justify-center size-6 shrink-0">{@render mark(s.key, 'size-5')}</span>
+							<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="label-xs">{s.name}<Pill class={kindPill[s.kind]}>{s.kind}</Pill></span>
 								<span class="truncate text-caption text-muted-foreground">{off ? '키 만료 · 폴백에서 제외됨' : s.cond}</span>
 							</span>
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger>
 									{#snippet child({ props })}
-										<button {...props} type="button" aria-label="{s.name} 등급" class={cn('tier-button', s.tier ? `font-mono ${tierTone[s.tier]}` : 'bg-muted text-muted-foreground')}>
+										<button {...props} type="button" aria-label="{s.name} 등급" class={cn('flex shrink-0 items-center gap-1 rounded-xs px-1.5 py-px text-2xs font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50', s.tier ? `font-mono ${tierTone[s.tier]}` : 'bg-muted text-muted-foreground')}>
 											{#if s.tier}<Cpu class="size-2.5" />{s.tier}{:else}<Layers class="size-2.5" />모든 등급{/if}
 										</button>
 									{/snippet}
@@ -291,7 +291,7 @@
 					<span class="flex-1 text-muted-foreground">로컬</span>
 					<span class="font-medium"><span class="font-mono">$0</span> · 비용 없음</span>
 				</span>
-				<span class="cost-total">
+				<span class="flex items-center border-t pt-2 text-xs">
 					<span class="flex-1 text-muted-foreground">이번 달 합계</span>
 					<span class="font-mono text-sm font-semibold">${total.toFixed(1)}</span>
 				</span>

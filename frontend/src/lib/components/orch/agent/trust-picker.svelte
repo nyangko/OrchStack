@@ -26,7 +26,7 @@
 		{@const on = value === l.n}
 		<ChoiceCards.Item value={l.n} class="rounded-md">
 			<span class="row-title-strong">
-				<span class={cn('level-num', on ? 'bg-primary text-on-solid' : 'bg-muted text-muted-foreground')}>{l.n}</span>
+				<span class={cn('flex size-5 items-center justify-center rounded-full font-mono text-caption', on ? 'bg-primary text-on-solid' : 'bg-muted text-muted-foreground')}>{l.n}</span>
 				{l.t}
 			</span>
 			<span class="text-xs text-muted-foreground">{l.d}</span>

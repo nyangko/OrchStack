@@ -387,7 +387,7 @@
 <svelte:head><title>{team.name} · Teams · OrchStack</title></svelte:head>
 
 {#snippet bars(values: number[])}
-	<span class="mini-bars" aria-hidden="true">
+	<span class="flex h-6 w-18 items-end gap-0.75" aria-hidden="true">
 		{#each values as h, i (i)}
 			<span class={cn('flex-1 rounded-t-xs bg-primary', i < values.length - 1 && 'opacity-35')} style="height: {h}px"></span>
 		{/each}
@@ -395,11 +395,11 @@
 {/snippet}
 
 {#snippet kpi(label: string, value: string, sub: string, delta?: string, trend?: number[])}
-	<div class="kpi-cell">
+	<div class="flex flex-1 flex-col gap-1 border-r px-4.5 py-3.5 last:border-r-0">
 		<span class="text-xs text-muted-foreground">{label}</span>
 		<span class="flex items-end gap-2">
 			<span class="font-mono text-xl font-semibold whitespace-nowrap">{value}</span>
-			{#if delta}<span class="kpi-delta">{delta}</span>{/if}
+			{#if delta}<span class="pb-0.5 font-mono text-xs font-medium text-status-done">{delta}</span>{/if}
 			<span class="flex-1"></span>
 			{#if trend}{@render bars(trend)}{/if}
 		</span>
@@ -415,8 +415,8 @@
 {/snippet}
 
 <!-- Team Detail -->
-<main class="page-scroll">
-		<header class="team-header">
+<main class="flex min-w-0 flex-1 flex-col overflow-y-auto">
+		<header class="flex flex-col gap-4 border-b px-8 pt-6 pb-5">
 			<nav aria-label="Breadcrumb" class="meta-xs gap-1.5">
 				<span>Teams</span>
 				<ChevronRight class="size-3" />
@@ -443,8 +443,8 @@
 		</header>
 
 		<!-- 3xl(1760px) 미만에서는 사이드 카드를 멤버 아래로 내린다 (멤버 표 최소 폭 확보). -->
-		<div class="team-body">
-			<section class="col-fill gap-3" aria-label="멤버">
+		<div class="flex flex-col gap-6 px-8 py-6 3xl:flex-row">
+			<section class="flex min-w-0 flex-1 flex-col gap-3" aria-label="멤버">
 				<div class="flex items-center gap-2">
 					<h2 class="text-sm font-semibold">멤버</h2>
 					<span class="flex-1 text-body text-muted-foreground">{team.members.length}</span>
@@ -457,7 +457,7 @@
 				{#each alerts as { a, hit } (a.runtime)}
 					<Alert.Root variant="destructive" class="flex items-center gap-3">
 						<TriangleAlert />
-						<div class="row-text">
+						<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 							<Alert.Title>{a.name} 계정 주간 잔량 {a.week}% — {a.weekReset} 리셋까지 {a.left}</Alert.Title>
 							<Alert.Description>{hit.map((m) => m.name).join(' · ')} 영향. {a.forecast}. 정책: 잔량 {teamPolicy.quotaWarn}% 미만 → 확인 요청</Alert.Description>
 						</div>
@@ -489,7 +489,7 @@
 										<span class="flex items-center gap-2.5">
 											{@render who(m)}
 											<span class="flex min-w-0 flex-col gap-px">
-												<button type="button" class="member-name-link" onclick={(e) => { e.stopPropagation(); openMember(m.sn); }}>{m.name}</button>
+												<button type="button" class="text-left text-body font-semibold outline-none hover:underline focus-visible:underline" onclick={(e) => { e.stopPropagation(); openMember(m.sn); }}>{m.name}</button>
 												<span class="truncate text-caption text-muted-foreground">{m.title}</span>
 											</span>
 										</span>
@@ -546,10 +546,10 @@
 									{@render who(m, true)}
 									<span class="text-xs font-medium">{m.name}</span>
 								</span>
-								<span class="workload-bar" aria-hidden="true">
+								<span class="flex h-3.5 w-60 gap-0.5 rounded-xs bg-muted" aria-hidden="true">
 									{#each m.load as s, i (i)}<span class={cn('w-9.5 rounded-xs', loads[s].bg)}></span>{/each}
 								</span>
-								<span class="workload-count">작업 {m.load.length}개</span>
+								<span class="w-14 text-xs whitespace-nowrap text-muted-foreground tabular-nums">작업 {m.load.length}개</span>
 								<span
 									class={cn(
 										'flex-1 truncate text-xs font-medium',
@@ -562,7 +562,7 @@
 				</Card.Root>
 			</section>
 
-			<aside class="team-aside">
+			<aside class="grid shrink-0 grid-cols-1 items-start gap-5 lg:grid-cols-3 3xl:flex 3xl:w-100 3xl:flex-col 3xl:items-stretch">
 				<Card.Root size="sm">
 					<Card.Header>
 						<Card.Title>모델 연결 사용량</Card.Title>
@@ -572,7 +572,7 @@
 						{#each accounts as a (a.runtime)}
 							{@const users = team.members.filter((m) => m.runtime === a.runtime)}
 							{@const warn = low(a.week)}
-							<div class={cn('box-col gap-2.5 rounded-md p-3', warn && 'border-destructive bg-destructive-soft')}>
+							<div class={cn('flex flex-col border gap-2.5 rounded-md p-3', warn && 'border-destructive bg-destructive-soft')}>
 								<div class="flex items-center gap-2">
 									<RuntimeLogo runtime={a.runtime} class="size-5 ring-0" />
 									<span class="flex min-w-0 flex-1 flex-col">
@@ -595,7 +595,7 @@
 								{/each}
 							</div>
 						{/each}
-						<div class="level-list">
+						<div class="flex flex-col gap-0.5 border-t pt-1">
 							{#each meters as mt (mt.name)}
 								<LimitRow icon={mt.kind === 'key' ? KeyRound : Route} label={mt.name} used="${mt.used}" max="/ ${mt.limit}" value={(mt.used / mt.limit) * 100} note={mt.note} />
 							{/each}
@@ -610,14 +610,14 @@
 					</Card.Header>
 					<Card.Content>
 						{@const ModeIcon = policy.mode === 'manual' ? Hand : policy.mode === 'full' ? Zap : Timer}
-						<div class="policy-note">
+						<div class="flex items-center gap-2 rounded-sm bg-primary-soft px-2.5 py-2">
 							<ModeIcon class="size-3.5 text-primary" />
 							<span class="flex-1 text-xs font-semibold">{modeLabel(policy)}</span>
 							{#if policy.guards.find((g) => g.key === 'streak')?.on}<span class="text-caption text-muted-foreground">연속 {policy.streak}/{streakLimit(policy)}</span>{/if}
 						</div>
 						<div class="flex flex-col">
 							{#each policy.levels as l, i (i)}
-								<div class="value-line-wide">
+								<div class="flex h-7 items-center gap-2.5 text-xs">
 									<span class={cn('mono-tag py-px text-on-solid', levelTone[i].bg)}>L{i}</span>
 									<span class="flex-1">{l.name}</span>
 									<span class={cn('font-medium', levelTone[i].text)}>{actionLabel(policy, l.action, l.timeout)}</span>
@@ -696,7 +696,7 @@
 		</Sheet.Header>
 
 		<Sheet.Body class="flex-row gap-6">
-			<div class="col-fill gap-4.5">
+			<div class="flex min-w-0 flex-1 flex-col gap-4.5">
 				{#if step === 0}
 					<InputGroup.Root class="h-9">
 						<InputGroup.Addon><Search /></InputGroup.Addon>
@@ -706,7 +706,7 @@
 					<button
 						type="button"
 						onclick={() => (pick = rec.sn)}
-						class="suggest-banner"
+						class="flex items-center gap-2 rounded-sm bg-primary-soft px-3 py-2.5 text-left text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
 					>
 						<Sparkles class="size-3.5 shrink-0 text-primary" />
 						<span><span class="font-semibold">Orch 추천</span> · {recommend.reason} → {rec.name}</span>
@@ -716,7 +716,7 @@
 							{@const on = pick === t.sn}
 							<ChoiceCards.Item value={t.sn} layout="row" ondblclick={toCharacter} class="gap-2.5 bg-card px-2 py-1.75">
 								<RoleAvatar role={t.role} />
-								<span class="col-fill gap-0.75">
+								<span class="flex min-w-0 flex-1 flex-col gap-0.75">
 									<span class="text-xs font-semibold">{t.name}</span>
 									<span class="text-caption text-muted-foreground">v{t.version} · {t.focus}</span>
 									<span class="subtle-meta gap-1.25">
@@ -727,13 +727,13 @@
 								{#if on}<CircleCheck class="size-4 shrink-0 text-primary" />{/if}
 							</ChoiceCards.Item>
 						{:else}
-							<p class="grid-empty">검색 결과가 없어요.</p>
+							<p class="col-span-2 py-6 text-center text-xs text-muted-foreground">검색 결과가 없어요.</p>
 						{/each}
 					</ChoiceCards.Root>
 					<!-- 같은 선택(pick)의 한 칸 — 배치는 그대로 두려고 contents -->
 					<ChoiceCards.Root aria-label="빈 캐릭터" class="contents" bind:value={() => pick, (v) => (pick = v as typeof pick)}>
 					<ChoiceCards.Item value={null} layout="row" class="gap-2.5 p-3.5">
-						<span class="add-tile"><Plus class="size-3.5" /></span>
+						<span class="flex size-7 items-center justify-center rounded-md border border-dashed text-muted-foreground"><Plus class="size-3.5" /></span>
 						<span class="flex flex-1 flex-col gap-0.5">
 							<span class="text-xs font-semibold">빈 캐릭터로 시작</span>
 							<span class="text-caption text-muted-foreground">템플릿 없이 Instructions를 직접 작성</span>
@@ -743,9 +743,9 @@
 					</ChoiceCards.Root>
 				{:else}
 					<!-- 고른 템플릿 (2 · 3단계 공통) -->
-					<div class="soft-box items-center gap-3 p-3">
+					<div class="flex rounded-md bg-muted items-center gap-3 p-3">
 						<RoleAvatar {role} />
-						<span class="row-text">
+						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 							<span class="text-xs font-semibold">{tpl ? `템플릿 · ${tpl.name} v${tpl.version}` : '빈 캐릭터'}</span>
 							<span class="truncate text-caption text-muted-foreground">
 								{tpl ? `${tpl.files.map((f) => f.name).join(' · ')} · 스킬 ${tpl.config.skills.length + tpl.config.mcp.length} · ${runtimeName(tpl.runtime)} · ${tpl.model} 를 복사해요` : 'Instructions를 직접 작성해요'}
@@ -843,7 +843,7 @@
 								</div>
 							</Alert.Root>
 						{/if}
-						<div class="tag-row">
+						<div class="flex flex-wrap items-center gap-1.5 text-caption">
 							<span class="font-semibold text-muted-foreground">폴백</span>
 							{#each chain as a, i (a.runtime)}
 								<span class="pill-soft gap-1.25">
@@ -863,7 +863,7 @@
 					{#if tpl}
 						<section class="flex flex-col gap-2.5">
 							{@render heading('스킬 · 도구', '템플릿에서 복사 · 켜고 끄기는 추가 후 멤버 상세 › Skills · Tools & MCP에서 해요')}
-							<div class="soft-box flex-col gap-2.5 p-3.5">
+							<div class="flex rounded-md bg-muted flex-col gap-2.5 p-3.5">
 								<div class="flex text-xs">
 									<span class="flex-1 font-medium">템플릿에서 복사 · {tpl.config.skills.length + tpl.config.mcp.length}개 활성</span>
 									<span class="font-mono text-caption text-muted-foreground">+{((tpl.config.skills.length + tpl.config.mcp.length) * 0.24).toFixed(1)}K tok / Run</span>
@@ -873,7 +873,7 @@
 									{#each tpl.config.mcp as mc (mc)}<Pill class="bg-card"><Plug />{mc}</Pill>{/each}
 								</div>
 							</div>
-							<div class="info-line-wrap">
+							<div class="flex flex-wrap items-center gap-4 rounded-sm bg-muted px-3 py-2.5 text-xs text-muted-foreground">
 								<span class="flex items-center gap-1.25"><ShieldCheck class="size-3" />Trust {tpl.config.trust}</span>
 								<span class="flex items-center gap-1.25"><FolderGit2 class="size-3" />{scopeText(tpl.config)}</span>
 								<span class="flex items-center gap-1.25"><GitPullRequest class="size-3" />PR 승인 필요</span>
@@ -900,11 +900,11 @@
 			</div>
 
 			<!-- 미리보기 -->
-			<aside class="aside-col w-80 gap-3.5" aria-label="미리보기">
+			<aside class="flex shrink-0 flex-col w-80 gap-3.5" aria-label="미리보기">
 				{#if step === 0}
 					{#if tpl}
 						{@const soul = tpl.files.find((f) => f.name === 'SOUL.md')}
-						<div class="card-col gap-2.5 p-4">
+						<div class="card-surface flex flex-col gap-2.5 p-4">
 							<div class="flex flex-col gap-0.5">
 								<span class="text-sm font-semibold">{tpl.name} v{tpl.version}</span>
 								<span class="text-xs text-muted-foreground">{tpl.desc}</span>
@@ -916,13 +916,13 @@
 								<KeyValueRow label="권한" value={`Trust ${tpl.config.trust} · ${scopeText(tpl.config)}`} />
 								<KeyValueRow label="최근 성과" value={tpl.success ? `멤버 ${tpl.members}명 · Run 성공률 ${tpl.success}%` : '기록 없음'} />
 							</div>
-							{#if soul}<pre class="pre-preview">{soul.body}</pre>{/if}
+							{#if soul}<pre class="rounded-sm bg-muted p-2.5 font-sans text-caption leading-relaxed whitespace-pre-wrap text-muted-foreground">{soul.body}</pre>{/if}
 						</div>
 					{:else}
 						<div class="empty-note text-muted-foreground">빈 캐릭터는 AGENT.md 한 파일로 시작해요. 런타임은 다음 단계에서 정해요.</div>
 					{/if}
 				{:else}
-					<div class="card-col gap-2.5 p-4">
+					<div class="card-surface flex flex-col gap-2.5 p-4">
 						<span class="text-caption font-semibold text-muted-foreground">미리보기</span>
 						<div class="flex items-center gap-3 pb-1">
 							<RoleAvatar {role} icon={glyphs[role][glyph]} size="lg" />
@@ -939,7 +939,7 @@
 							<KeyValueRow label="첫 작업" value={first === 'task' ? `#${firstTask.num} 지정` : firstLabel[first]} />
 						</div>
 					</div>
-					<div class="tip-box">
+					<div class="flex gap-2 rounded-md bg-primary-soft p-3 text-xs">
 						<Info class="mt-0.5 size-3.5 shrink-0 text-primary" />
 						<span>‘팀에 추가’를 누르면 팀 멤버 목록에 들어가요. 어떤 작업을 맡을지는 Orch가 팀 진행 정책에 따라 배정해요.</span>
 					</div>
@@ -978,13 +978,13 @@
 		</div>
 		<div class="flex h-25 gap-2 border-b" role="img" aria-label="{legend[0]} {total}">
 			{#each cols as [a, b], i (i)}
-				<div class="bar-col">
+				<div class="flex flex-1 flex-col items-center justify-end gap-0.5">
 					{#if b}<span class="w-4 rounded-t-sm bg-status-blocked" style="height: {(b / max) * 88}px"></span>{/if}
 					{#if a}<span class={cn('w-4 bg-primary', !b && 'rounded-t-sm')} style="height: {(a / max) * 88}px"></span>{/if}
 				</div>
 			{/each}
 		</div>
-		<div class="bar-axis">
+		<div class="flex gap-2 text-center text-caption text-muted-foreground">
 			{#each days as d (d)}<span class="flex-1">{d}</span>{/each}
 		</div>
 	</div>
@@ -1001,10 +1001,10 @@
 <!-- .pen TaskListRow -->
 {#snippet taskRow(num: number, title: string, note: string | undefined, issue: string, meta: string, priority: string, order?: number, state: 'todo' | 'wait' | 'done' = 'todo', noteTone?: string)}
 	<div class="queue-row">
-		{#if order}<span class="queue-num">{order}</span>{/if}
+		{#if order}<span class="flex size-5 items-center justify-center rounded-full bg-muted font-mono text-caption font-semibold text-muted-foreground">{order}</span>{/if}
 		{#if state === 'done'}<CircleCheck class="size-3.5 text-status-done" />{:else if state === 'wait'}<Circle class="size-3.5 text-status-todo" />{:else}<CircleDashed class="size-3.5 text-status-todo" />{/if}
 		<span class="font-mono text-xs text-muted-foreground">#{num}</span>
-		<span class="row-text">
+		<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 			<span class="truncate text-body font-medium">{title}</span>
 			{#if note}<span class={cn('truncate text-caption', noteTone ?? 'text-muted-foreground')}>{note}</span>{/if}
 		</span>
@@ -1071,7 +1071,7 @@
 					<span class="subtle-meta gap-1.5 px-2 pt-3.5"><span class="size-1.5 rounded-full bg-primary"></span>템플릿과 다른 항목</span>
 				</nav>
 
-				<div class="member-main">
+				<div class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto bg-muted px-6 py-5 *:shrink-0">
 					{#if !det && ['overview', 'tasks', 'runs', 'activity', 'usage'].includes(tab)}
 						<Empty.Root class="bg-card">
 							<Empty.Header>
@@ -1107,7 +1107,7 @@
 										<span class="font-mono text-xs font-semibold">{det.now.pct}%</span>
 									</div>
 									<Progress value={det.now.pct} class="h-1.5" aria-label="#{now.num} 진행" />
-									<div class="meta-wrap">
+									<div class="flex flex-wrap gap-4 text-xs text-muted-foreground">
 										<span class="flex items-center gap-1.25"><LoaderCircle class="size-3" />Run #{det.now.run} · {det.now.elapsed}</span>
 										<span class="flex items-center gap-1.25"><GitBranch class="size-3" />{det.now.branch} · {det.now.commits} commits</span>
 										<span class="flex items-center gap-1.25"><Timer class="size-3" />ETA {det.now.eta}</span>
@@ -1122,7 +1122,7 @@
 									{@const Icon = at.kind === 'quota' ? TriangleAlert : at.kind === 'wait' ? Link2 : Undo2}
 									<div class={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
 										<Icon class={cn('size-4 shrink-0', at.kind === 'quota' ? 'text-destructive' : at.kind === 'wait' ? 'text-status-waiting' : 'text-status-review')} />
-										<span class="row-text">
+										<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 											<span class="text-body font-medium">{at.title}</span>
 											<span class="text-xs text-muted-foreground">{at.sub}</span>
 										</span>
@@ -1173,7 +1173,7 @@
 										<div class="queue-row">
 											<CircleDot class="size-3.5 text-status-in-progress" />
 											<span class="font-mono text-xs text-muted-foreground">#{now.num}</span>
-											<span class="row-text">
+											<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 												<span class="text-body font-medium">{now.title}</span>
 												<span class="text-caption text-status-in-progress">Run #{det.now.run} · {det.now.pct}%</span>
 											</span>
@@ -1315,7 +1315,7 @@
 									<Card.Root size="sm">
 										<Card.Header><Card.Title>실패 원인</Card.Title></Card.Header>
 										<Card.Content class="gap-2">
-											<pre class="pre-error">{sel.errors.join('\n')}</pre>
+											<pre class="rounded-sm bg-destructive-soft p-2.5 font-mono text-caption leading-relaxed whitespace-pre-wrap text-status-blocked">{sel.errors.join('\n')}</pre>
 											<span class="meta-xs gap-1.5"><Redo2 class="size-3.5 text-primary" />{sel.retry}</span>
 										</Card.Content>
 									</Card.Root>
@@ -1324,7 +1324,7 @@
 									<Card.Header><Card.Title>변경 파일 · {sel.files.length}</Card.Title></Card.Header>
 									<Card.Content class="gap-1.5">
 										{#each sel.files as f (f.path)}
-											<div class="run-meta">
+											<div class="flex items-center gap-2.5 font-mono text-xs">
 												<span class={cn('w-3 font-semibold', f.kind === 'A' ? 'text-status-done' : 'text-status-waiting')}>{f.kind}</span>
 												<span class="flex-1 truncate">{f.path}</span>
 												<span class="text-muted-foreground">{f.diff}</span>
@@ -1341,17 +1341,17 @@
 								<Toggle variant="chip" count={n} pressed={actFilter === k} onPressedChange={() => (actFilter = k)}>{k}</Toggle>
 							{/each}
 						</div>
-						<div class="card-col gap-2 px-4 py-3">
+						<div class="card-surface flex flex-col gap-2 px-4 py-3">
 							{#each det.activity as d (d.day)}
 								{@const items = d.items.filter((a) => actFilter === 'all' || actKind(a) === actFilter)}
 								{#if items.length}
 									<span class="list-label pt-1">{d.day}</span>
 									{#each items as a, i (i)}
 										{#if a.type === 'decision'}
-											<div class="outline-row">
+											<div class="flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-xs">
 												<BookMarked class={cn('size-3.5', a.orch ? 'text-status-review' : 'text-primary')} />
 												<span class="font-semibold">{a.who}</span>
-												<span class="soft-tag font-medium">{a.kind}</span>
+												<span class="rounded-xs bg-muted px-1.5 py-px text-caption text-muted-foreground font-medium">{a.kind}</span>
 												<span class="flex-1">{a.text}</span>
 												<span class="font-mono text-caption text-subtle-foreground">{a.time}</span>
 											</div>
@@ -1359,7 +1359,7 @@
 											{@const KindIcon = kindIcon[a.kind]}
 											<div class="row-divided gap-2.5 py-2">
 												<RoleAvatar role={a.role} />
-												<div class="col-fill gap-0.75">
+												<div class="flex min-w-0 flex-1 flex-col gap-0.75">
 													<div class="flex items-center gap-1.5 text-xs">
 														<span class="font-semibold">{a.who}</span>
 														<Badge variant="secondary" class="gap-1"><KindIcon class="size-3" />{a.kind}</Badge>
@@ -1409,7 +1409,7 @@
 						<div class="grid grid-cols-2 gap-3.5">
 							{#each [acc, ...accounts.filter((a) => a !== acc)] as a (a.runtime)}
 								{@const warn = low(a.week)}
-								<div class={cn('fallback-card bg-card', warn && 'border-destructive bg-destructive-soft')}>
+								<div class={cn('flex flex-col gap-2.5 rounded-md border p-3 bg-card', warn && 'border-destructive bg-destructive-soft')}>
 									<div class="flex items-center gap-2">
 										<RuntimeLogo runtime={a.runtime} class="size-5 ring-0" />
 										<span class="flex flex-1 flex-col"><span class="text-body font-semibold">{a.name}</span><span class="font-mono text-caption text-muted-foreground">{a.login}</span></span>
@@ -1466,7 +1466,7 @@
 						>
 							{#snippet status()}→ AGENTS.md / CLAUDE.md로 변환{/snippet}
 						</MdEditor>
-						<div class="picked-card">
+						<div class="flex items-center gap-2 rounded-md border bg-card px-3.5 py-2.5">
 							<span class="flex-1 text-xs text-muted-foreground">
 								{#if proposed}<span class="text-primary">{proposed}을 템플릿 초안에 제안했어요 · </span>{/if}
 								{memberChanged.length ? `템플릿과 다른 파일 ${memberChanged.length}개 · 이 멤버에게만 적용 중` : '템플릿과 같아요'}
@@ -1508,8 +1508,8 @@
 					<div role="radiogroup" aria-label="진행 모드" class="grid grid-cols-3 gap-3">
 						{#each [{ v: 'manual', icon: Hand, t: 'Manual', d: '매번 사용자가 확인해야 진행' }, { v: 'timer', icon: Timer, t: 'Auto · 타이머', d: '제안 후 카운트다운 · 개입 없으면 진행' }, { v: 'full', icon: Zap, t: 'Full auto', d: '대기 없이 바로 진행 (가드는 항상 적용)' }] as const as o (o.v)}
 							{@const on = d.mode === o.v}
-							<div class={cn('box-col gap-2 rounded-md p-3.5', on && 'option-on')}>
-								<button type="button" role="radio" aria-checked={on} onclick={() => (d.mode = o.v)} class="option-link">
+							<div class={cn('flex flex-col border gap-2 rounded-md p-3.5', on && 'option-on')}>
+								<button type="button" role="radio" aria-checked={on} onclick={() => (d.mode = o.v)} class="flex flex-col gap-2 text-left outline-none focus-visible:underline">
 									<span class="row-title-strong">
 										<o.icon class={cn('size-4', on ? 'text-primary' : 'text-muted-foreground')} />
 										<span class="flex-1">{o.t}</span>
@@ -1518,7 +1518,7 @@
 									<span class="text-xs text-muted-foreground">{o.d}</span>
 								</button>
 								{#if o.v === 'timer'}
-									<div class="tag-row-xs">
+									<div class="flex flex-wrap items-center gap-1 pt-1 text-xs">
 										<span class="mr-1 text-muted-foreground">대기</span>
 										{#each [3, 5, 10, 30] as sec (sec)}
 											{@const sel = on && !customTimer && d.timer === sec}
@@ -1526,13 +1526,13 @@
 												type="button"
 												aria-pressed={sel}
 												onclick={() => ((d.mode = 'timer'), (d.timer = sec), (customTimer = false))}
-												class={cn('toggle-tag', sel ? 'border-primary bg-primary text-on-solid' : 'bg-card')}
+												class={cn('rounded-xs border px-2 py-0.75 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', sel ? 'border-primary bg-primary text-on-solid' : 'bg-card')}
 											>{sec}초</button>
 										{/each}
 										{#if customTimer}
 											<Input type="number" min={1} max={600} bind:value={d.timer} aria-label="대기 초" class="h-6.5 w-16 px-2 text-xs" />
 										{:else}
-											<button type="button" onclick={() => ((d.mode = 'timer'), (customTimer = true))} class="toggle-tag-on">직접</button>
+											<button type="button" onclick={() => ((d.mode = 'timer'), (customTimer = true))} class="rounded-xs border bg-card px-2 py-0.75 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50">직접</button>
 										{/if}
 									</div>
 								{/if}
@@ -1544,11 +1544,11 @@
 				<section class="flex flex-col gap-3">
 					{@render heading('2 · 작업 레벨별 처리', '결정의 무게에 따라 처리 방식을 나눠요. 레벨이 높을수록 사람의 판단이 필요해요.')}
 					<div class="overflow-hidden rounded-md border">
-						<div class="list-table-head gap-4 px-4 py-2">
+						<div class="flex bg-muted text-caption font-medium text-muted-foreground gap-4 px-4 py-2">
 							<span class="w-57.5">레벨</span><span class="flex-1">예시</span><span class="w-75">처리</span><span class="w-42.5">응답 없으면</span>
 						</div>
 						{#each d.levels as l, i (i)}
-							<div class="list-table-row gap-4 py-3">
+							<div class="flex items-center border-t px-4 gap-4 py-3">
 								<span class="flex w-57.5 items-center gap-2.5">
 									<span class={cn('mono-tag py-px text-on-solid', levelTone[i].bg)}>L{i}</span>
 									<span class="text-body font-semibold">{l.name}</span>
@@ -1584,9 +1584,9 @@
 					<div class="grid grid-cols-3 gap-2.5">
 						{#each d.guards as g (g.key)}
 							{@const Icon = guardIcon[g.key]}
-							<label class="card-row gap-2.5 p-3">
+							<label class="flex items-center rounded-md border gap-2.5 p-3">
 								<Icon class="size-4 shrink-0 text-muted-foreground" />
-								<span class="row-text">
+								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<span class="text-body font-medium">{g.name}</span>
 									<span class="truncate text-caption text-muted-foreground">{g.value}</span>
 								</span>
@@ -1599,7 +1599,7 @@
 				<section class="flex flex-col gap-3">
 					{@render heading('4 · 하위 작업', '리드 에이전트가 태스크 안에서 작업을 나눠 돌리는 방식이에요. 태스크마다 바꿀 수 있고, 비워 두면 이 기본값을 써요 (Task 상세 › 하위 작업 방식).')}
 					<div class="grid grid-cols-3 gap-2.5">
-						<div class="box-col gap-2.5 rounded-md p-3.5">
+						<div class="flex flex-col border gap-2.5 rounded-md p-3.5">
 							<span class="text-caption font-semibold text-muted-foreground">기본 방식</span>
 							<Segmented
 								aria-label="기본 방식"
@@ -1613,13 +1613,13 @@
 								<span class="text-caption text-muted-foreground">runner · 별도 Run으로 돌려요. 모델 등급(S/M/L)은 작업 종류로 정해지고, 토큰은 따로 집계돼요.</span>
 							{/if}
 						</div>
-						<div class="box-col gap-2 rounded-md p-3.5">
+						<div class="flex flex-col border gap-2 rounded-md p-3.5">
 							<span class="text-caption font-semibold text-muted-foreground">허용 방식</span>
 							{#each spawnDesc as [m, desc] (m)}
 								<label class="flex items-center gap-2 text-xs"><Checkbox checked={d.spawn.allow.includes(m)} onCheckedChange={(v) => toggleAllow(d, m, !!v)} aria-label="{m} 허용" />{m} · {desc}</label>
 							{/each}
 						</div>
-						<div class="box-col gap-2.5 rounded-md p-3.5">
+						<div class="flex flex-col border gap-2.5 rounded-md p-3.5">
 							<span class="text-caption font-semibold text-muted-foreground">리드당 동시 하위 작업</span>
 							<InputGroup.Root class={cn('w-28', childError && 'border-destructive')}>
 								<InputGroup.Addon><Layers /></InputGroup.Addon>

@@ -60,7 +60,7 @@
 	</PageHeader>
 
 	<div class="flex items-start gap-5">
-		<div class="col-fill gap-5">
+		<div class="flex min-w-0 flex-1 flex-col gap-5">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>기본 Trust 레벨</Card.Title>
@@ -85,7 +85,7 @@
 				</Card.Header>
 				<Card.Content class="gap-0">
 					{#each s.blocked as b, i (b.pattern)}
-						<div class="block-row">
+						<div class="flex items-center gap-3 border-t py-2.5 text-xs">
 							<ShieldX class="size-3.5 shrink-0 text-destructive" />
 							<span class="w-60 truncate font-medium"><span class="font-mono">{b.pattern}</span>{#if b.scope}{' '}({b.scope}){/if}</span>
 							<span class="flex-1 truncate text-muted-foreground">{b.desc}</span>
@@ -96,7 +96,7 @@
 						</div>
 					{/each}
 					{#if adding}
-						<form class="inline-form" onsubmit={(e) => (e.preventDefault(), addPattern())}>
+						<form class="flex items-center gap-2 border-t pt-2.5" onsubmit={(e) => (e.preventDefault(), addPattern())}>
 							<InputGroup.Root class="flex-1">
 								<InputGroup.Addon><ShieldX /></InputGroup.Addon>
 								<!-- 패턴 추가를 눌러 연 입력 줄이라 바로 입력하게 한다 -->
@@ -111,7 +111,7 @@
 			</Card.Root>
 		</div>
 
-		<div class="aside-col w-95 gap-5">
+		<div class="flex shrink-0 flex-col w-95 gap-5">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>가드 트리거</Card.Title>
@@ -144,7 +144,7 @@
 				<Card.Content>
 					<div class="option-card rounded-md">
 						<span class="icon-tile"><GitFork class="size-4" /></span>
-						<span class="col-fill gap-1">
+						<span class="flex min-w-0 flex-1 flex-col gap-1">
 							<span class="row-title-strong">{s.github.name}<Pill dot="bg-status-done" class="bg-success-soft text-status-done">전용 계정</Pill></span>
 							<span class="text-caption text-muted-foreground">{s.github.note}</span>
 						</span>

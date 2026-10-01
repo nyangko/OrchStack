@@ -136,7 +136,7 @@
 		<Button onclick={create}><Plus />새 프리셋</Button>
 	</PageHeader>
 
-	<div class="strip-primary py-2">
+	<div class="strip strip-primary py-2">
 		<Layers class="size-3.5 shrink-0 text-primary" />
 		<span class="font-semibold">역할 1개당 기본 조합 ≈ {bundle.total} tok</span>
 		<span class="truncate text-muted-foreground">
@@ -170,7 +170,7 @@
 			{/each}
 		</nav>
 
-		<section class="col-fill gap-3.5">
+		<section class="flex min-w-0 flex-1 flex-col gap-3.5">
 			<div class="flex items-center gap-2">
 				<h2 class="text-lg font-semibold">{title}</h2>
 				<Pill class="bg-primary-soft font-mono text-primary uppercase">{sel.kind}</Pill>
@@ -209,11 +209,11 @@
 			</div>
 
 			{#if checks.length}
-				<div class="strip-danger py-2.5">
+				<div class="strip strip-danger py-2.5">
 					<CircleAlert class="size-3.5 text-destructive" /><span class="font-semibold text-destructive">검사 실패</span><span>{checks.join(' · ')}</span>
 				</div>
 			{:else}
-				<div class="strip-success py-2.5">
+				<div class="strip strip-success py-2.5">
 					<CircleCheck class="size-3.5 text-status-done" /><span class="font-semibold">검사 통과</span><span class="text-muted-foreground">상한 이내 · 비밀키 패턴 없음 · 다른 프리셋과 겹치는 규칙 없음</span>
 				</div>
 			{/if}

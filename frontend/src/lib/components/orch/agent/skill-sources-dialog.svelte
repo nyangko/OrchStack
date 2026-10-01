@@ -37,9 +37,9 @@
 					<span class="list-label">소스</span>
 					{#each d.sources as src (src.name)}
 						{@const Icon = src.kind === 'web' ? Globe : src.kind === 'github' ? Github : Folder}
-						<div class="card-row gap-3 p-3">
+						<div class="flex items-center rounded-md border gap-3 p-3">
 							<Icon class="size-4 shrink-0" />
-							<span class="row-text">
+							<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="row-title">{src.name}<Pill class={src.state === '연결됨' ? 'bg-success-soft text-status-done' : ''}>{src.state}</Pill></span>
 								<span class="text-xs text-muted-foreground">{src.desc}</span>
 							</span>

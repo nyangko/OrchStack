@@ -46,21 +46,21 @@
 <div class="flex items-center gap-2.5">
 	<h2 class="text-lg font-semibold">Tools & MCP</h2>
 	{@render sameAs(!!base && (c.mcp.join() !== base.mcp.join() || c.github !== base.github), base)}
-	<span class="saved-note-xs"><CircleCheck class="size-3.5" />MCP {c.mcp.length}/{c.mcp.length} 정상 · {mcpChecked} 점검</span>
+	<span class="flex items-center gap-1 text-xs text-status-done"><CircleCheck class="size-3.5" />MCP {c.mcp.length}/{c.mcp.length} 정상 · {mcpChecked} 점검</span>
 	<span class="flex-1"></span>
 	<Button variant="outline" size="sm" onclick={() => (mcpChecked = '방금')}><RefreshCw />다시 점검</Button>
 </div>
 <p class="info-line"><ShieldCheck class="size-3.5 shrink-0 text-primary" /><span><span class="font-medium text-foreground">적용 권한</span> · 목록에 없는 도구는 차단 · Instructions는 목록을 줄일 수만 있어요 (늘릴 수 없음)</span></p>
-<div class="card-row gap-3 bg-card p-3.5">
+<div class="flex items-center rounded-md border gap-3 bg-card p-3.5">
 	<Github class="size-4.5 shrink-0" />
-	<span class="row-text">
+	<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 		<span class="text-body font-medium">GitHub 계정 · {c.github === 'bot' ? '전용 계정 (orch-bot) 사용 중' : '내 GitHub 사용 중'}</span>
 		<span class="text-xs text-muted-foreground">{c.github === 'bot' ? '커밋 · PR 작성자가 orch-bot 으로 기록돼요. 담당자 개인 계정으로 바꾸면 사람이 한 작업과 구분이 안 돼요.' : '커밋 · PR이 내 계정으로 기록돼요. 사람이 한 작업과 구분이 안 돼요.'}</span>
 	</span>
 	<Segmented class="w-56" aria-label="GitHub 계정" options={[{ value: 'mine', label: '내 GitHub' }, { value: 'bot', label: '전용 계정' }]} bind:value={() => c.github, (v) => (c.github = v as AgentConfig['github'])} />
 </div>
 <div class="flex items-start gap-4">
-	<div class="col-fill gap-4">
+	<div class="flex min-w-0 flex-1 flex-col gap-4">
 		<Card.Root size="sm">
 			<Card.Header>
 				<Card.Title>MCP 서버</Card.Title>
@@ -71,7 +71,7 @@
 					{@const on = c.mcp.includes(srv.name)}
 					<div class="list-row">
 						<Plug class={cn('size-4 shrink-0', on ? 'text-primary' : 'text-muted-foreground')} />
-						<span class="row-text">
+						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 							<span class="row-title">
 								{srv.name}
 								<Pill class={on ? 'bg-primary-soft text-primary' : ''}>{on ? '설치됨' : '접근 가능'}</Pill>
@@ -93,7 +93,7 @@
 			</Card.Header>
 			<Card.Content class="gap-0">
 				{#each cliTools as tool (tool.name)}
-					<div class="tool-row">
+					<div class="flex items-center gap-3 border-t py-2 text-xs first:border-t-0">
 						<tool.icon class="size-3.5 text-muted-foreground" />
 						<span class="w-52 font-mono font-medium">{tool.name}</span>
 						<span class="flex-1 truncate text-muted-foreground">{tool.scope}</span>

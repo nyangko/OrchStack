@@ -128,11 +128,11 @@
 				{@const m = stateMeta[c.state]}
 				{@const L = logo[c.key]}
 				<div class="option-card rounded-md">
-					<span class="icon-tile-lg">
+					<span class="icon-tile size-9.5">
 						{#if typeof L === 'string'}<RuntimeLogo runtime={L} class="size-5 ring-0" />{:else}<L class="size-4.5" />{/if}
 					</span>
-					<span class="col-fill gap-1">
-						<span class="row-title-xs">{c.name}<Pill class="font-mono text-2xs">{c.version}</Pill></span>
+					<span class="flex min-w-0 flex-1 flex-col gap-1">
+						<span class="flex items-center gap-2 text-xs font-semibold">{c.name}<Pill class="font-mono text-2xs">{c.version}</Pill></span>
 						<span class={cn('meta-truncate gap-1.25', c.busy ? 'text-status-in-progress' : m.tone)}>
 							{#if c.busy}<LoaderCircle class="size-3 shrink-0 animate-spin" />{c.state === 'update' ? '업데이트 중…' : '설치 중…'}
 							{:else}<m.icon class="size-3 shrink-0" />{c.note}{/if}
@@ -155,7 +155,7 @@
 					<Field.Row label={r.label} hint={r.hint}>
 						<Select.Root type="single" bind:value={run[r.key]}>
 							<Select.Trigger class="w-full" aria-label={r.label}>
-								<span class="row-fill">
+								<span class="flex min-w-0 flex-1 items-center gap-2">
 									<r.icon class="size-4 text-muted-foreground" />{run[r.key]}
 									<span class="truncate text-caption font-normal text-muted-foreground">{r.note}</span>
 								</span>
@@ -172,7 +172,7 @@
 			</Card.Content>
 		</Card.Root>
 
-		<div class="aside-col w-95 gap-5">
+		<div class="flex shrink-0 flex-col w-95 gap-5">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>감지</Card.Title>

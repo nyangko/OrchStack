@@ -54,7 +54,7 @@
 				<Card.Description>무엇을 어디로 보낼지 · 멤버 · 연결별 설정이 있으면 그쪽이 우선</Card.Description>
 			</Card.Header>
 			<Card.Content class="gap-0">
-				<div class="matrix-head">
+				<div class="flex border-b pb-2 text-caption font-medium text-muted-foreground">
 					<span class="flex-1">이벤트</span>
 					{#each notifyChannels as c (c.key)}<span class="w-18 text-center">{c.name}</span>{/each}
 				</div>
@@ -77,7 +77,7 @@
 			</Card.Content>
 		</Card.Root>
 
-		<div class="aside-col w-95 gap-5">
+		<div class="flex shrink-0 flex-col w-95 gap-5">
 			<Card.Root size="sm">
 				<Card.Header><Card.Title>채널</Card.Title></Card.Header>
 				<Card.Content class="flex flex-col gap-2">
@@ -85,7 +85,7 @@
 						{@const Icon = icon[c.key]}
 						<div class="option-card rounded-md">
 							<span class="icon-tile"><Icon class="size-4" /></span>
-							<span class="col-fill gap-1">
+							<span class="flex min-w-0 flex-1 flex-col gap-1">
 								<span class="row-title-strong">
 									{c.name}<Pill dot={c.ok ? 'bg-status-done' : 'bg-muted-foreground'} class={c.ok ? 'bg-success-soft text-status-done' : ''}>{c.state}</Pill>
 								</span>
@@ -105,7 +105,7 @@
 					<Field.Row label="시간" hint="이 시간에는 앱 배지만 쌓여요">
 						<Select.Root type="single" bind:value={() => quiet.hours, (v) => ((quiet.hours = v), (saved = true))}>
 							<Select.Trigger class="w-full" aria-label="방해 금지 시간">
-								<span class="row-fill">
+								<span class="flex min-w-0 flex-1 items-center gap-2">
 									<Moon class="size-4 text-muted-foreground" />{quiet.hours}
 									<span class="truncate text-caption font-normal text-muted-foreground">{quiet.weekend ? '주말 전체 포함' : ''}</span>
 								</span>
@@ -125,7 +125,7 @@
 					<Field.Row label="보내는 시각" hint="완료 · 실패 · 토큰 · 비용 요약">
 						<Select.Root type="single" bind:value={() => quiet.digest, (v) => ((quiet.digest = v), (saved = true))}>
 							<Select.Trigger class="w-full" aria-label="일일 요약 시각">
-								<span class="row-fill">
+								<span class="flex min-w-0 flex-1 items-center gap-2">
 									<Clock class="size-4 text-muted-foreground" />{quiet.digest}
 									<!-- 일일 요약 이벤트에서 켠 채널 -->
 									<span class="truncate text-caption font-normal text-muted-foreground">

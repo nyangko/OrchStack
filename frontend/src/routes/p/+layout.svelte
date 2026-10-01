@@ -114,12 +114,12 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<div class="project-tabs">
+	<div class="flex h-10 shrink-0 items-end gap-0.5 overflow-x-auto border-b bg-muted px-3">
 		<a
 			href="/p"
 			aria-current={page.url.pathname === '/p' ? 'page' : undefined}
 			class={cn(
-				'project-tab-all text-muted-foreground',
+				'flex h-8 shrink-0 items-center gap-1.5 rounded-t-lg px-3 text-body font-medium hover:text-foreground text-muted-foreground',
 				page.url.pathname === '/p' && 'relative -mb-px border border-b-0 bg-background text-foreground'
 			)}
 		>
@@ -131,11 +131,11 @@
 			{@const on = p.sn === current}
 			<div
 				class={cn(
-					'project-tab',
+					'flex h-8 shrink-0 items-center gap-2 rounded-t-lg pr-2 pl-3',
 					on ? 'relative -mb-px border border-b-0 bg-background' : 'text-muted-foreground hover:text-foreground'
 				)}
 			>
-				<a href="/p/{p.sn}" aria-current={on ? 'page' : undefined} class="project-tab-link">
+				<a href="/p/{p.sn}" aria-current={on ? 'page' : undefined} class="flex items-center gap-2 text-body font-medium outline-none focus-visible:underline">
 					<span class={cn('size-1.5 rounded-full', p.dot)}></span>
 					{p.name}
 				</a>
@@ -176,7 +176,7 @@
 				<Field.Row label="저장소" hint="GitHub App이 설치된 저장소만 보여요">
 					<Select.Root type="single" bind:value={repo}>
 						<Select.Trigger class="w-full" aria-label="저장소">
-							<span class="row-fill">
+							<span class="flex min-w-0 flex-1 items-center gap-2">
 								<GitFork class="size-4 text-muted-foreground" />{repo}
 								<span class="truncate text-caption font-normal text-muted-foreground">{repoInfo.meta} · 이슈 {repoInfo.issues}개</span>
 							</span>
@@ -187,7 +187,7 @@
 				<Field.Row label="팀" hint="이 프로젝트를 맡을 팀 · 나중에 바꿀 수 있어요">
 					<Select.Root type="single" bind:value={() => String(teamSn), (v) => ((teamSn = Number(v)), (mode = store.policies[teamSn]?.mode ?? mode))}>
 						<Select.Trigger class="w-full" aria-label="팀">
-							<span class="row-fill">
+							<span class="flex min-w-0 flex-1 items-center gap-2">
 								<Users class="size-4 text-muted-foreground" />{team?.name}
 								{#if team}<span class="truncate text-caption font-normal text-muted-foreground">{teamMeta(team)}</span>{/if}
 							</span>

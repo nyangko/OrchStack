@@ -63,7 +63,7 @@
 						{@const l = load(a.sn)}
 						<Combobox.Item value="{a.name} {roles[a.role].label}" selected={value === a.sn} onSelect={() => (value = a.sn)} class="gap-2 py-1.5">
 							<RoleAvatar role={a.role} size="sm" />
-							<span class="row-text">
+							<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="flex items-center gap-1.5"><span class="font-medium">{a.name}</span><span class="text-xs text-muted-foreground">{roles[a.role].label}</span></span>
 								<span class="flex items-center gap-1.5 text-xs">
 									<Progress value={l.pct} class="h-1 w-10" aria-label="{a.name} 부하" />
@@ -76,7 +76,7 @@
 			{/each}
 			<Combobox.Group>
 				<Combobox.Item value="Unassigned 미배정" selected={value === undefined} onSelect={() => (value = undefined)} class="gap-2">
-					<span class="center-box size-5 rounded-xs bg-muted"><UserRoundX class="size-3 text-muted-foreground" /></span>
+					<span class="flex items-center justify-center size-5 rounded-xs bg-muted"><UserRoundX class="size-3 text-muted-foreground" /></span>
 					<span class="font-medium">Unassigned</span>
 				</Combobox.Item>
 			</Combobox.Group>

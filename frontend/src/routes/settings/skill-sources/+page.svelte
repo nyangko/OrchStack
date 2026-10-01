@@ -90,7 +90,7 @@
 	</PageHeader>
 
 	<div class="flex items-start gap-5">
-		<div class="col-fill gap-5">
+		<div class="flex min-w-0 flex-1 flex-col gap-5">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>소스</Card.Title>
@@ -101,7 +101,7 @@
 						{@const Icon = kindIcon[src.kind]}
 						<div class="option-card rounded-md">
 							<span class="icon-tile"><Icon class="size-4" /></span>
-							<span class="col-fill gap-1">
+							<span class="flex min-w-0 flex-1 flex-col gap-1">
 								<span class="row-title-strong">
 									{src.name}<Pill dot={src.state === '연결됨' ? 'bg-status-done' : 'bg-muted-foreground'} class={src.state === '연결됨' ? 'bg-success-soft text-status-done' : ''}>{src.state}</Pill>
 								</span>
@@ -165,7 +165,7 @@
 			</Card.Root>
 		</div>
 
-		<div class="aside-col w-95 gap-5">
+		<div class="flex shrink-0 flex-col w-95 gap-5">
 			<Card.Root size="sm">
 				<Card.Header><Card.Title>설치 도구</Card.Title></Card.Header>
 				<Card.Content>

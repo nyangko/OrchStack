@@ -78,7 +78,7 @@
 		<Button onclick={clone}><Copy />양식 복제</Button>
 	</PageHeader>
 
-	<div class="strip-success py-2">
+	<div class="strip strip-success py-2">
 		<ZapOff class="size-3.5 shrink-0 text-status-done" />
 		<span class="font-semibold">0 tok</span>
 		<span class="text-muted-foreground">시스템 값 {sysVar} 과 Agent 사람 칸 [[…]] 을 조립만 해요 · 모델을 부르지 않아요 · Agent 작성법은 <a href="/settings/presets" class="text-primary hover:underline">Instruction presets › REPORT</a></span>
@@ -99,7 +99,7 @@
 			{/each}
 		</nav>
 
-		<section class="col-fill gap-3">
+		<section class="flex min-w-0 flex-1 flex-col gap-3">
 			<div class="flex items-center gap-2">
 				<h2 class="shrink-0 text-sm font-semibold">양식 · {sel.label} v1</h2>
 				<span class="truncate text-caption text-muted-foreground">{sel.note}</span>
@@ -121,7 +121,7 @@
 		</section>
 
 		{#if preview}
-			<aside class="preview-panel" aria-label="미리보기">
+			<aside class="flex w-100 shrink-0 flex-col gap-2 rounded-xl border bg-card p-5 text-xs" aria-label="미리보기">
 				<span class="text-caption text-muted-foreground">미리보기 · #{reportSample.task.num} 데이터</span>
 				{#each lines as l, i (i)}
 					{#if i === 0}<h3 class="text-base font-semibold">{l.replace(/^#+\s+/, '')}</h3>

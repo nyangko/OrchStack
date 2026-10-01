@@ -69,7 +69,7 @@
 				<!-- 여러 개를 고를 수 있어 고른 뒤에도 열어 둔다 -->
 				<Combobox.Item value="#{t.num} {t.title}" selected={has(t.num)} closeOnSelect={false} disabled={loop && !has(t.num)} onSelect={() => toggle(t.num)} class="gap-2 py-1.5">
 					<m.icon class={cn('size-3.5', m.text)} />
-					<span class="row-text">
+					<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 						<span class="flex min-w-0 items-center gap-1.5"><span class="font-medium">#{t.num}</span><span class="truncate text-xs text-muted-foreground">{t.title}</span></span>
 						{#if loop}<span class="text-xs text-status-blocked">⚠ 순환 의존 — #{t.num}이 이미 #{current}{kind === 'depends' ? '에 의존' : '을 막음'}</span>{/if}
 					</span>

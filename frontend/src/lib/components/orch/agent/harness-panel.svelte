@@ -107,7 +107,7 @@
 	<span class="saved-note"><CircleCheck class="size-3" />저장됨</span>
 </div>
 <div class="flex items-start gap-4">
-	<div class="col-fill gap-4">
+	<div class="flex min-w-0 flex-1 flex-col gap-4">
 		<Card.Root size="sm">
 			<Card.Header><Card.Title>실행</Card.Title></Card.Header>
 			<Card.Content class="gap-3">
@@ -154,9 +154,9 @@
 				{#each h.fallback as key, i (key)}
 					{@const st = fallbackSteps[key]}
 					<div class="list-row">
-						<span class="step-num">{i + 1}</span>
+						<span class="flex size-5 items-center justify-center rounded-full bg-muted font-mono text-caption">{i + 1}</span>
 						{#if key === 'sub'}<RuntimeLogo runtime={runtime} class="size-4 ring-0" />{:else if key === 'omni'}<Route class="size-4 text-muted-foreground" />{:else}<Cpu class="size-4 text-muted-foreground" />{/if}
-						<span class="row-text">
+						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 							<span class="row-title">{key === 'sub' ? acc.plan : 'name' in st ? st.name : ''}<Pill class="text-2xs">{st.kind}</Pill></span>
 							<span class="text-xs text-muted-foreground">{st.desc}</span>
 						</span>
@@ -169,14 +169,14 @@
 				{/each}
 			</Card.Content>
 		</Card.Root>
-		<div class="box-col rounded-md bg-card">
-			<button type="button" aria-expanded={showCmd} onclick={() => (showCmd = !showCmd)} class="harness-preview-toggle">
+		<div class="flex flex-col border rounded-md bg-card">
+			<button type="button" aria-expanded={showCmd} onclick={() => (showCmd = !showCmd)} class="flex items-center gap-2 px-4 py-3 text-left text-body font-medium outline-none focus-visible:underline">
 				<Terminal class="size-3.5 text-muted-foreground" /><span class="flex-1">실행 명령 미리보기</span><ChevronDown class={cn('size-4 text-muted-foreground transition-transform', showCmd && 'rotate-180')} />
 			</button>
-			{#if showCmd}<pre class="harness-preview-code">{command}</pre>{/if}
+			{#if showCmd}<pre class="mx-4 mb-4 overflow-x-auto rounded-sm bg-foreground p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-background">{command}</pre>{/if}
 		</div>
 	</div>
-	<aside class="aside-col w-72 gap-4">
+	<aside class="flex shrink-0 flex-col w-72 gap-4">
 		<Card.Root size="sm">
 			<Card.Header><Card.Title>이 조합으로 실행하면</Card.Title></Card.Header>
 			<Card.Content class="gap-1">
@@ -233,7 +233,7 @@
 				{/snippet}
 			</Dialog.Header>
 			<Dialog.Body padded={false} class="flex-row">
-				<nav aria-label="제공자" class="model-provider-nav">
+				<nav aria-label="제공자" class="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-2 text-xs">
 					<span class="list-label px-2 pt-1 pb-1.5">제공자 · 연결됨 {modelCatalog.length}</span>
 					<button type="button" aria-pressed={pickProvider === 'all'} onclick={() => (pickProvider = 'all')} class={cn('model-provider-item', pickProvider === 'all' && 'bg-accent font-medium')}><Layers class="size-3.5" /><span class="flex-1">전체</span></button>
 					{#each modelCatalog as p (p.key)}
@@ -245,11 +245,11 @@
 						</button>
 					{/each}
 				</nav>
-				<div class="page-scroll gap-4 px-5 py-4">
+				<div class="flex min-w-0 flex-1 flex-col overflow-y-auto gap-4 px-5 py-4">
 					{#each pickModels as p (p.key)}
 						{@const a = p.kind === '구독' ? accountOf(p.runtime) : undefined}
 						<section class="flex flex-col gap-1">
-							<div class="model-group-head">
+							<div class="flex items-center gap-2 pb-1 text-xs">
 								<span class="font-semibold">{p.label}</span><Pill class="text-2xs">{p.kind}</Pill>
 								<span class="flex-1"></span>
 								{#if a}
@@ -266,7 +266,7 @@
 								{@const on = model === md.name && runtime === p.runtime}
 								<ChoiceCards.Item value={md.name} layout="row">
 									{#if on}<CircleDot class="size-4 text-primary" />{:else}<Circle class="size-4 text-subtle-foreground" />{/if}
-									<span class="row-text">
+									<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 										<span class="row-title">
 											{md.name}
 											{#each md.tags as tg (tg)}<Pill class={cn('text-2xs', tg === 'NEW' ? 'bg-primary-soft text-primary' : tg === '추천' ? 'bg-success-soft text-status-done' : '')}>{#if tg === '추천'}<ThumbsUp />{:else if tg === 'Tested'}<CircleCheck />{/if}{tg}</Pill>{/each}

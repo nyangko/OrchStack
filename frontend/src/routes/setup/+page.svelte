@@ -203,11 +203,11 @@
 	<span class="flex items-baseline gap-2 text-xs"><span class="font-semibold">{label}</span><span class="text-muted-foreground">{hint}</span></span>
 {/snippet}
 
-<main class="setup-shell">
+<main class="flex h-full flex-col items-center overflow-y-auto bg-muted px-6 py-10">
 	{#if step < 0}
 		<!-- 스플래시 (.pen 인트로 0 · LogoLoader) — 회전 링은 로딩 표시만, 키프레임 연출은 애니메이션 작업 때 -->
-		<div class="splash" role="status" aria-live="polite">
-			<span class="center-box relative size-30">
+		<div class="m-auto flex flex-col items-center gap-4" role="status" aria-live="polite">
+			<span class="flex items-center justify-center relative size-30">
 				<svg viewBox="0 0 120 120" class="absolute inset-0 size-full" aria-hidden="true">
 					<circle cx="60" cy="60" r="56" fill="none" stroke="var(--border)" stroke-width="4" />
 					<circle cx="60" cy="60" r="56" fill="none" stroke="var(--primary)" stroke-width="4" stroke-linecap="round" stroke-dasharray="88 264" class="origin-center animate-spin motion-reduce:animate-none" />
@@ -222,14 +222,14 @@
 		</div>
 	{:else}
 		<img src={logo} alt="OrchStack" class="mb-6 h-7 w-auto" />
-		<div class="setup-card">
-			<header class="setup-head">
+		<div class="flex w-full max-w-230 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+			<header class="flex flex-col gap-3 border-b px-8 pt-7 pb-6">
 				<Steps steps={['에이전트 연결', '프로젝트', '기본 팀']} current={step} />
 				<h1 class="mt-2 text-2xl font-bold">{stepInfo[step].title}</h1>
 				<p class="text-body text-muted-foreground">{stepInfo[step].desc}</p>
 			</header>
 
-			<div class="setup-body">
+			<div class="flex flex-col gap-4 px-8 py-6">
 				{#if step === 0}
 					<span class="text-xs font-semibold text-muted-foreground">실행기 · 이 기기에서 {detected} / {clis.length} 감지</span>
 					<div class="grid grid-cols-2 gap-2.5">
@@ -239,7 +239,7 @@
 								<span class="icon-tile">
 									{#if c.logo}<RuntimeLogo runtime={c.logo} class="size-5 ring-0" />{:else if c.icon}<c.icon class="size-4.5" />{/if}
 								</span>
-								<span class="col-fill gap-1">
+								<span class="flex min-w-0 flex-1 flex-col gap-1">
 									<span class="row-title-strong">{c.name}<Pill class="font-mono text-2xs">{c.version}</Pill></span>
 									<span class={cn('meta-truncate gap-1', m.tone)}>
 										<m.icon class={cn('size-3 shrink-0', (c.state === 'updating' || c.state === 'installing') && 'animate-spin')} />
@@ -256,7 +256,7 @@
 					{#each conns as c (c.runtime)}
 						<div class="option-card rounded-lg">
 							<span class="icon-tile"><RuntimeLogo runtime={c.runtime} class="size-5 ring-0" /></span>
-							<span class="col-fill gap-1">
+							<span class="flex min-w-0 flex-1 flex-col gap-1">
 								<span class="row-title-strong">{c.plan}<Pill class="bg-primary-soft text-primary">구독</Pill></span>
 								<span class={cn('flex items-center gap-1 text-caption', c.state === 'ok' ? 'text-status-done' : 'text-muted-foreground')}>
 									{#if c.state === 'ok'}<CircleCheck class="size-3" />연결됨 · {runtimeName(c.runtime)} {clis.find((x) => x.key === c.runtime)?.version}
@@ -280,17 +280,17 @@
 						{@const M = providerMark[a.provider.key]}
 						<div class="option-card rounded-lg">
 							<span class="icon-tile">{#if typeof M === 'string'}<RuntimeLogo runtime={M} class="size-5 ring-0" />{:else}<M class="size-4.5" />{/if}</span>
-							<span class="col-fill gap-1">
+							<span class="flex min-w-0 flex-1 flex-col gap-1">
 								<span class="row-title-strong">{a.title}<Pill class={a.provider.kind === 'API 키' ? 'bg-review-soft text-status-review' : a.provider.kind === '로컬' ? '' : 'bg-primary-soft text-primary'}>{a.provider.kind}</Pill></span>
 								<span class="saved-note"><CircleCheck class="size-3" />{a.note}</span>
 							</span>
 						</div>
 					{/each}
-					<button type="button" onclick={() => openAdd()} class="setup-more">
+					<button type="button" onclick={() => openAdd()} class="flex items-center gap-2 rounded-lg px-3.5 py-2 text-body font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
 						<Plus class="size-4" />다른 연결 추가 <span class="font-normal text-muted-foreground">(API 키 · 게이트웨이 · 로컬)</span>
 					</button>
 					{#if connOkAll}
-						<div class="strip-success py-2.5">
+						<div class="strip strip-success py-2.5">
 							<CircleCheck class="size-4 text-status-done" />
 							<span class="font-semibold">{connOkAll}개 연결 확인됨</span>
 							<span class="text-muted-foreground">다음 단계의 기본 팀 멤버에게 역할에 맞게 자동 배정돼요</span>
@@ -361,7 +361,7 @@
 							{@const on = picked.includes(m.sn)}
 							<ChoiceCards.Item value={m.sn} layout="row" tone="dim" class="items-start rounded-lg px-3.5 py-3">
 								<RoleAvatar role={m.role} />
-								<span class="row-text">
+								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<span class="text-body font-semibold">{m.name} · {m.title}</span>
 									<span class="text-caption text-muted-foreground">템플릿 {m.title}</span>
 									<span class="meta-line gap-1"><RuntimeLogo runtime={m.runtime} class="size-3 ring-0" />{m.model} · {planLabel(conns.find((c) => c.runtime === m.runtime)?.plan)}</span>
@@ -372,7 +372,7 @@
 						{#if extra}
 							<ChoiceCards.Item value="extra" layout="row" tone="dim" class="items-start rounded-lg px-3.5 py-3">
 								<RoleAvatar role={security.role} />
-								<span class="row-text">
+								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<span class="text-body font-semibold">하준 · {security.name}</span>
 									<span class="text-caption text-muted-foreground">템플릿 {security.name} v{security.version}</span>
 									<span class="meta-line gap-1"><RuntimeLogo runtime={security.runtime} class="size-3 ring-0" />{runtimeName(security.runtime)} · {security.model}</span>
@@ -380,7 +380,7 @@
 								<CircleCheck class="size-4 shrink-0 text-primary" />
 							</ChoiceCards.Item>
 						{:else}
-							<button type="button" onclick={() => (extra = true)} class="dashed-add">
+							<button type="button" onclick={() => (extra = true)} class="flex items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/50 px-3.5 py-3 text-xs text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
 								<Plus class="size-3.5" />역할 추가 (Security Reviewer 등)
 							</button>
 						{/if}
@@ -396,7 +396,7 @@
 				{/if}
 			</div>
 
-			<footer class="setup-foot">
+			<footer class="flex items-center gap-2.5 border-t bg-muted/50 px-8 py-4">
 				{#if step === 0}
 					<span class="meta-xs flex-1 gap-1.5">
 						{#if connOkAll}<CircleCheck class="size-3.5 text-status-done" />준비 완료 · 실행기 {detected} · 연결 {connOkAll}{:else}<LoaderCircle class="size-3.5 animate-spin" />연결 확인 중 · 1개 이상 확인되면 다음 버튼이 켜져요{/if}

@@ -264,9 +264,9 @@
 {#snippet preview()}
 	{#if sel}
 		<span class="list-label px-0 pt-0">추가되면 이렇게 보여요</span>
-		<div class="provider-picked">
+		<div class="flex items-center gap-3 rounded-lg border bg-card px-4 py-3.5">
 			<span class="icon-tile">{@render logoOf(sel.key, 'lg')}</span>
-			<span class="col-fill gap-1">
+			<span class="flex min-w-0 flex-1 flex-col gap-1">
 				<span class="row-title-strong">{isSub ? sel.name : title}<Pill class={kindMeta[sel.kind].pill}>{sel.kind}</Pill></span>
 				{#if authed}
 					<span class="saved-note"><CircleCheck class="size-3" />{isSub ? `${sel.plan} · ${sel.cli}` : `${name} · ${sel.models} 모델`}</span>
@@ -305,7 +305,7 @@
 								role="radio"
 								aria-checked={filter === k}
 								onclick={() => (filter = k)}
-								class={cn('filter-pill', filter === k ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground')}
+								class={cn('flex items-center gap-1 rounded-full px-2.5 py-1 text-caption font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', filter === k ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground')}
 							>
 								{k}<span class="opacity-70">{k === '전체' ? providers.length : providers.filter((p) => p.kind === k).length}</span>
 							</button>
@@ -345,7 +345,7 @@
 						{#if step === 1}
 						<div class="flex flex-col gap-2">
 							{@render field('제공자', isSub ? '구독 로그인' : sel.kind === 'API 키' ? '사용한 만큼 과금' : sel.kind === '게이트웨이' ? 'OpenAI 호환 게이트웨이' : '내 컴퓨터에서 실행')}
-							<button type="button" onclick={() => (step = 0)} class="picker-field">
+							<button type="button" onclick={() => (step = 0)} class="flex h-10 items-center gap-2 rounded-md border bg-card px-3 text-left text-body outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
 								{@render logoOf(sel.key, 'sm')}<span class="font-medium">{sel.name}</span><Pill class={kindMeta[sel.kind].pill}>{sel.kind}</Pill>
 								<span class="text-xs text-muted-foreground">변경</span><ChevronsUpDown class="ml-auto size-4 text-muted-foreground" />
 							</button>
@@ -355,7 +355,7 @@
 						{#if step === 1 && isSub}
 							<div class="form-block">
 								{@render field('실행기', '구독 로그인은 이 CLI 안에서만 쓸 수 있어요')}
-								<span class="readonly-field"><Terminal class="size-4 text-muted-foreground" /><span class="font-medium">{sel.cli}</span><span class="text-xs text-muted-foreground">설치됨</span></span>
+								<span class="flex h-10 items-center gap-2 rounded-md border bg-muted/50 px-3 text-body"><Terminal class="size-4 text-muted-foreground" /><span class="font-medium">{sel.cli}</span><span class="text-xs text-muted-foreground">설치됨</span></span>
 							</div>
 							<div class="form-block">
 								{@render field('로그인 방식', '브라우저가 없으면 기기 코드로 로그인')}
@@ -364,7 +364,7 @@
 							<div class="form-block">
 								{@render field('로그인 상태', login === 'ok' ? `브라우저에서 ${vendor} 계정으로 로그인했어요` : `${sel.cli}가 로그인 토큰을 보관해요`)}
 								{#if login === 'ok'}
-									<div class="strip-success py-2.5">
+									<div class="strip strip-success py-2.5">
 										<CircleCheck class="size-4 text-status-done" /><span class="font-semibold">로그인됨</span><span class="text-muted-foreground">{sel.plan} 플랜 감지 · 토큰은 {sel.cli}가 보관</span>
 									</div>
 								{:else if login === 'pending'}
@@ -376,7 +376,7 @@
 									</div>
 								{:else}
 									<div class="flex items-center gap-3">
-										{#if method === 'terminal'}<code class="device-code">{loginCmd[sel.cli!]}</code>{/if}
+										{#if method === 'terminal'}<code class="flex-1 rounded-md bg-code-bg px-3 py-2 font-mono text-xs text-code-fg">{loginCmd[sel.cli!]}</code>{/if}
 										<Button variant="outline" size="sm" onclick={() => run((v) => (login = v))}>
 											{#if method === 'terminal'}<RefreshCw />로그인 확인{:else if method === 'device'}<Smartphone />기기 코드 받기{:else}<LogIn />브라우저에서 로그인{/if}
 										</Button>
@@ -418,7 +418,7 @@
 									</Select.Root>
 								</div>
 							{/if}
-							<div class="form-block-wide">
+							<div class="flex flex-col gap-2.5 border-t pt-4">
 								<div class="flex items-center gap-3">
 									<Button variant="outline" size="sm" disabled={test === 'pending' || (needsKey && !apiKey.trim()) || (needsUrl && !baseUrl.trim())} onclick={() => run((v) => (test = v))}>
 										{#if test === 'pending'}<LoaderCircle class="animate-spin" />{:else}<Activity />{/if}연결 테스트
@@ -426,7 +426,7 @@
 									<span class="text-xs text-muted-foreground">{needsKey && !apiKey.trim() ? 'API 키를 넣으면 테스트할 수 있어요' : '모델 목록을 불러오고 짧은 요청 1회를 보내요'}</span>
 								</div>
 								{#if test === 'ok'}
-									<div class="strip-success py-2.5">
+									<div class="strip strip-success py-2.5">
 										<CircleCheck class="size-4 text-status-done" /><span class="font-semibold">연결 성공</span>
 										<span class="text-muted-foreground">{sel.kind === '로컬' ? `모델 ${sel.models}개 · 응답 42ms · 로컬이라 비용 없음` : `모델 ${sel.models}개 · 응답 310ms · 가격표 불러옴 (Run당 비용 추정에 사용)`}</span>
 									</div>
@@ -488,9 +488,9 @@
 						{:else}
 							<span class="list-label px-0 pt-4">확인</span>
 							{#each confirmRows as [k, v] (k)}
-								<span class="summary-row"><span class="text-muted-foreground">{k}</span><span class="text-right">{v}</span></span>
+								<span class="flex items-center justify-between gap-4 border-t py-2 text-body"><span class="text-muted-foreground">{k}</span><span class="text-right">{v}</span></span>
 							{/each}
-							<span class="strip-muted mt-2 py-2.5">
+							<span class="strip strip-muted mt-2 py-2.5">
 								<RefreshCw class="size-3.5 text-primary" /><span class="font-semibold">추가 후</span>
 								<span class="text-muted-foreground">{isSub ? `남은 한도를 5분마다 읽어 멤버 카드에 표시` : `모델 ${sel.models}개를 매일 동기화 · 가격 변경 시 알림`}</span>
 							</span>

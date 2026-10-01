@@ -813,7 +813,7 @@
 				{#if depth === 0}
 					<span class="kind-mark size-5 bg-node-issue"><CircleDot class="size-3" /></span>
 				{:else}
-					<span class="sub-issue-mark"><GitBranch class="size-2.75" /></span>
+					<span class="flex size-4.5 items-center justify-center rounded-xs border border-node-issue text-node-issue"><GitBranch class="size-2.75" /></span>
 				{/if}
 				<icon.icon class={cn('size-3.5', icon.text)} aria-label={icon.label} />
 				<span class="font-mono text-xs font-medium text-muted-foreground">#{i.num}</span>
@@ -890,7 +890,7 @@
 	<div class="flex h-full min-h-0">
 		<!-- 좌측 Quick Panel (.pen Workbench/LeftQuickPanel) -->
 		{#if leftOpen}
-			<aside class="aside-col w-66 border-r bg-card" aria-label="Quick panel">
+			<aside class="flex shrink-0 flex-col w-66 border-r bg-card" aria-label="Quick panel">
 				<Tabs.Root bind:value={panelTab} class="flex min-h-0 flex-1 flex-col gap-0">
 					<div class="panel-section gap-2.5">
 						<div class="flex items-center gap-0.5">
@@ -977,11 +977,11 @@
 
 					<Tabs.Content value="agents" class="min-h-0 flex-1 overflow-y-auto">
 						{#each agentList as a (a.sn)}
-							<button type="button" aria-pressed={inspect === a.sn} onclick={() => openAgent(a.sn)} class={cn('agent-row hover:bg-muted', inspect === a.sn && 'bg-primary-soft hover:bg-primary-soft')}>
+							<button type="button" aria-pressed={inspect === a.sn} onclick={() => openAgent(a.sn)} class={cn('flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left outline-none focus-visible:bg-muted hover:bg-muted', inspect === a.sn && 'bg-primary-soft hover:bg-primary-soft')}>
 								<RoleAvatar role={a.role}>
 									<Avatar.Badge class={a.online ? 'bg-success' : 'bg-subtle-foreground'} aria-label={a.online ? '온라인' : '오프라인'} />
 								</RoleAvatar>
-								<span class="row-text">
+								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<span class="flex items-center gap-1.5">
 										<span class="text-sm font-medium">{a.name}</span>
 										<span class="font-mono text-xs text-muted-foreground">{a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'}</span>
@@ -998,7 +998,7 @@
 
 		<main class="flex min-w-0 flex-1 flex-col">
 			<!-- 뷰 머리글 (.pen Workbench/ViewHeader) -->
-			<header class="view-header">
+			<header class="flex h-12 shrink-0 items-center gap-3 border-b bg-background px-4">
 				{#if !leftOpen}
 					<Button variant="ghost" size="icon-sm" aria-label="Quick panel 펼치기" onclick={() => (leftOpen = true)}><PanelLeftOpen /></Button>
 				{/if}
@@ -1009,7 +1009,7 @@
 						{/each}
 					</Tabs.List>
 				</Tabs.Root>
-				<p class="view-summary">
+				<p class="min-w-0 flex-1 truncate text-body text-muted-foreground">
 					{project.name} · {list.length} tasks · {agentList.length} agents
 				</p>
 				{#if !useMock && wb.state !== 'live'}
@@ -1093,7 +1093,7 @@
 															<span class="flex items-center gap-2 pt-1.5">
 																{#if t.steps[1]}
 																	<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="완료 조건 진행" />
-																	<span class="kanban-card-steps">
+																	<span class="shrink-0 font-mono text-xs font-semibold whitespace-nowrap text-muted-foreground">
 																		{t.steps[0]}/{t.steps[1]} · {Math.round((t.steps[0] / t.steps[1]) * 100)}%
 																	</span>
 																{:else}
@@ -1141,14 +1141,14 @@
 								sideOffset={18}
 								class="pointer-events-none w-75 gap-0 overflow-hidden p-0"
 							>
-								<div class="hover-preview-head">
+								<div class="flex items-start gap-2 border-b px-3 py-2.5">
 									<span class="pt-0.5 text-xs font-semibold text-muted-foreground">#{t.num}</span>
 									<span class="min-w-0 flex-1 text-body font-semibold">{t.title}</span>
 									<StatusBadge status={t.status} />
 								</div>
-								<dl class="hover-preview-body">
+								<dl class="flex flex-col gap-2 px-3 py-2.5 text-caption">
 									{#each [['현재 단계', t.steps[1] ? `${t.steps[0]}/${t.steps[1]}${next ? ` · ${next.text}` : d?.criteria.length ? ' · 모두 완료' : ''}` : '—'], ['최근 활동', last ? `${last.type.toLowerCase()} ${last.text}` : '—'], ['막고 있는 Task', blocks.length ? blocks.map((b) => `#${b.num} ${b.title} · ${agentName(b.agent) ?? '미배정'}`).join(', ') : '—'], ['완료 시 전달', blocks[0] ? `${agentName(blocks[0].agent) ?? '미배정'} · ${roles[agentOf(blocks[0].agent)?.role ?? 'agent'].label} (REQUEST_VERIFICATION)` : '—'], ['ETA', d?.eta || '—']] as [k, v] (k)}
-										<div class="flex gap-2"><dt class="shrink-0 text-muted-foreground">{k}</dt><dd class="hover-preview-value">{v}</dd></div>
+										<div class="flex gap-2"><dt class="shrink-0 text-muted-foreground">{k}</dt><dd class="min-w-0 flex-1 truncate text-right font-medium">{v}</dd></div>
 									{/each}
 									{#if ctx}
 										<div class="flex flex-col gap-1.5 pt-1.5">
@@ -1158,7 +1158,7 @@
 										{#if ctx[0] / ctx[1] > 0.9}<p class="font-medium text-warning">⚠ Context {Math.round((ctx[0] / ctx[1]) * 100)}% — 요약 또는 새 Session 권장</p>{/if}
 									{/if}
 								</dl>
-								<p class="hover-preview-foot">클릭 → 상세 보기 · 우클릭 → 메뉴</p>
+								<p class="bg-muted px-3 py-2 text-caption text-muted-foreground">클릭 → 상세 보기 · 우클릭 → 메뉴</p>
 							</HoverCard.Content>
 						</HoverCard.Root>
 					{/if}
@@ -1182,7 +1182,7 @@
 						<Background variant={BackgroundVariant.Dots} gap={20} size={1.5} patternColor="var(--input)" />
 						<Controls position="bottom-right" showLock={false} />
 						<Panel position="bottom-left">
-							<div class="diagram-legend" aria-label="연결선 범례">
+							<div class="flex items-center gap-3 rounded-md border bg-card px-2.5 py-1.5 text-xs text-muted-foreground" aria-label="연결선 범례">
 								{#each [['contains', 'bg-input', 'h-0.5'], ['delegate', 'bg-primary', 'h-0.5'], ['assigned', 'bg-node-agent', 'h-0.5'], ['interaction (idle)', 'bg-status-review', 'h-0.5'], ['live event', 'bg-primary', 'h-0.75'], ['spawn', 'bg-node-agent', 'h-0.5'], ['queued · waits', 'bg-subtle-foreground', 'h-0.5']] as [l, bg, h] (l)}
 									<span class="flex items-center gap-1.5"><span class={cn('w-3.5 rounded-full', bg, h)}></span>{l}</span>
 								{/each}
@@ -1226,14 +1226,14 @@
 					<Inspector.Root label="Task #{cur.num} 상세">
 						<Inspector.Header onclose={() => (detail = false)} closeLabel="상세 닫기">
 								<span class="kind-tile size-8 bg-node-task"><SquareCheck class="size-4" /></span>
-								<div class="row-text">
+								<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<p class="truncate text-xs text-muted-foreground">{project.name} / Issue #{cur.issue} {iss?.title} / <span class="font-mono">TASK #{cur.num}</span></p>
 									<h2 class="text-lg font-semibold">{cur.title}</h2>
 								</div>
 								<Button variant="ghost" size="icon-sm" aria-label="편집 (E)" title="편집 (E)" onclick={() => editTask(cur.num)}><Pencil /></Button>
 								<Button variant="ghost" size="sm" onclick={() => navigator.clipboard?.writeText(`${page.url.origin}${page.url.pathname}?task=${cur.num}`)}><Link2 />Copy link</Button>
 							{#snippet sub()}
-							<div class="detail-meta">
+							<div class="flex flex-wrap items-center gap-2 pl-11">
 								<StatusSelect bind:value={() => cur.status, (v) => void setStatus(cur.num, v)} />
 								<Badge variant="outline">{cur.priority}</Badge>
 								{#if a}
@@ -1282,7 +1282,7 @@
 											{@const dt = task(d.num)}
 											<div class="flex items-center gap-2 text-xs">
 												<span class="w-18 text-muted-foreground">{d.kind === 'depends' ? 'depends on' : 'blocks'}</span>
-												<button type="button" class="dep-link" onclick={() => open(d.num)}>#{d.num} {dt.title} · {agentOf(dt.agent)?.name ?? '미배정'}</button>
+												<button type="button" class="rounded-sm bg-muted px-2 py-0.5 font-medium hover:bg-muted-strong" onclick={() => open(d.num)}>#{d.num} {dt.title} · {agentOf(dt.agent)?.name ?? '미배정'}</button>
 												<StatusBadge status={dt.status} />
 											</div>
 										{/each}
@@ -1420,7 +1420,7 @@
 					<Inspector.Root label="Issue #{iss.num} 상세">
 						<Inspector.Header onclose={() => (issueSel = undefined)} closeLabel="상세 닫기">
 								<span class="kind-tile size-8 bg-node-issue"><CircleDot class="size-4" /></span>
-								<div class="row-text">
+								<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<p class="truncate text-xs text-muted-foreground">
 										{project?.name}{' / '}{#if parent}<button type="button" class="hover:underline" onclick={() => openIssue(parent.num)}>Issue #{parent.num} {parent.title}</button>{' / '}{/if}<span class="font-mono">ISSUE #{iss.num}</span>
 									</p>
@@ -1428,7 +1428,7 @@
 								</div>
 								<Button variant="ghost" size="sm" onclick={() => navigator.clipboard?.writeText(`${page.url.origin}${page.url.pathname}?issue=${iss.num}`)}><Link2 />Copy link</Button>
 							{#snippet sub()}
-							<div class="detail-meta-wide">
+							<div class="flex flex-wrap items-center gap-3 pl-11">
 								<span class={cn('label-xs', icon.text)}><icon.icon class="size-3.5" />{issueLabel[iss.status]}</span>
 								<span class="flex w-40 items-center gap-2">
 									<Progress value={all.length ? (done / all.length) * 100 : 0} class="h-1.5" aria-label="#{iss.num} 진행" />
@@ -1512,8 +1512,8 @@
 				<!-- 하위 작업 카드: 뷰 오른쪽 (.pen SubRun Inspector Card, 340px) -->
 				<Inspector.Root label="하위 작업 {s.id}" floating>
 					<Inspector.Header onclose={() => (subSel = undefined)} closeLabel="하위 작업 카드 닫기">
-							<span class={cn('subrun-mark', md.tile)}><md.icon class="size-4" /></span>
-							<div class="row-text">
+							<span class={cn('flex size-7 shrink-0 items-center justify-center rounded-sm text-on-solid', md.tile)}><md.icon class="size-4" /></span>
+							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="meta-line gap-1.5 font-mono font-semibold">
 									{s.mode.toUpperCase()} · {s.id}
 									{#if s.tier}<span class={cn('mono-tag flex items-center gap-0.5', tierTone[s.tier])}><Cpu class="size-2.5" />{s.tier}</span>{/if}
@@ -1571,7 +1571,7 @@
 							{#each s.ac as a (a.text)}
 								<span class="flex items-center gap-2 py-0.5"><Checkbox checked={a.ok} disabled aria-label={a.text} />{a.text}</span>
 							{/each}
-							{#if s.report}<p class="report-note">{s.report}</p>{/if}
+							{#if s.report}<p class="mt-1 rounded-md bg-muted px-2.5 py-2 text-caption text-muted-foreground">{s.report}</p>{/if}
 						</Inspector.Section>
 						<Inspector.Section title="TOKENS">
 							<Inspector.ValueRow icon={Coins} label="이 Run">
@@ -1598,7 +1598,7 @@
 				<Inspector.Root label="{a.name} 에이전트" floating>
 					<Inspector.Header onclose={() => (inspect = undefined)} closeLabel="에이전트 카드 닫기">
 							<RoleAvatar role={a.role} />
-							<div class="row-text">
+							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="title-sm gap-1.5">{a.name}<RuntimeLogo runtime={a.runtime} class="size-3.5 ring-0" /></span>
 								<span class="text-xs text-muted-foreground">{roles[a.role].label}</span>
 								<Badge variant="mono" class="w-fit text-2xs">{a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'}</Badge>
@@ -1630,7 +1630,7 @@
 							{:else}
 								<p class="text-xs text-muted-foreground">맡은 태스크가 없어요.</p>
 							{/each}
-							<div class="inspector-foot"><span class="text-muted-foreground">토큰 (오늘)</span><span class="font-mono">{a.tokens}</span></div>
+							<div class="mt-4 flex items-center justify-between text-xs"><span class="text-muted-foreground">토큰 (오늘)</span><span class="font-mono">{a.tokens}</span></div>
 						</Tabs.Content>
 						<Tabs.Content value="activity" class="min-h-0 flex-1 overflow-y-auto px-4 py-2">
 							{#each activity[a.sn] ?? [] as ev, i (i)}
@@ -1669,7 +1669,7 @@
 						</Tabs.Content>
 					</Tabs.Root>
 					<form class="border-t p-3" onsubmit={instruct}>
-						<div class="inspector-composer">
+						<div class="flex items-center gap-1.5 rounded-md border border-input bg-background py-1.5 pr-1.5 pl-3 focus-within:ring-3 focus-within:ring-ring/50">
 							<input bind:value={instruction} placeholder="{a.name}에게 실행 중 지시…" aria-label="{a.name}에게 실행 중 지시" class="bare-input" />
 							<Button type="submit" size="icon-sm" aria-label="지시 보내기" disabled={!instruction.trim()}><ArrowUp /></Button>
 						</div>
@@ -1679,9 +1679,9 @@
 			</div>
 
 			<!-- 하단 Ops (.pen Workbench/BottomOpsPanel) -->
-			<section class={cn('aside-col border-t bg-card', opsOpen ? 'h-49' : 'h-10')} aria-label="Ops">
+			<section class={cn('flex shrink-0 flex-col border-t bg-card', opsOpen ? 'h-49' : 'h-10')} aria-label="Ops">
 				<Tabs.Root bind:value={opsTab} class="flex min-h-0 flex-1 flex-col gap-0">
-					<div class="ops-tabbar">
+					<div class="flex h-10 shrink-0 items-center gap-4 border-b pr-3 pl-4">
 						<Tabs.List variant="line" class="h-full flex-1 justify-start border-b-0">
 							{#each opsTabs as [v, l] (v)}<Tabs.Trigger value={v} class="h-full">{l}</Tabs.Trigger>{/each}
 						</Tabs.List>
@@ -1700,7 +1700,7 @@
 					{#if opsOpen}
 						<Tabs.Content value="activity" class="min-h-0 flex-1 overflow-y-auto px-2 py-1.5 font-mono text-xs">
 							{#each logs as l, i (i)}
-								<div class="log-line">
+								<div class="flex items-center gap-3 px-2 py-1">
 									<span class="text-muted-foreground">{l.time}</span>
 									<span class={cn('font-semibold', roles[l.role].text)}>{l.source}</span>
 									<span class="min-w-0 flex-1 truncate">{l.message}</span>
@@ -1717,21 +1717,21 @@
 
 		<!-- 우측 PM Dock (.pen ProjectPMChatDock) — 메시지 종류 · 결정 패널은 #58 -->
 		{#if dockOpen}
-			<aside class="aside-col w-100 border-l bg-background" aria-label="PM Dock">
-				<header class="dock-head">
+			<aside class="flex shrink-0 flex-col w-100 border-l bg-background" aria-label="PM Dock">
+				<header class="flex items-center gap-2.5 border-b bg-card px-4 py-2.5">
 					<RoleAvatar role="orch" />
-					<span class="col-fill gap-px">
+					<span class="flex min-w-0 flex-1 flex-col gap-px">
 						<span class="text-body font-semibold">Orch · Project Manager</span>
 						<span class="truncate text-2xs text-muted-foreground">Project PM · {project.name} · 새 업무 생성/분해/할당</span>
 					</span>
 					<Button variant="ghost" size="icon-sm" aria-label="PM Dock 접기" onclick={() => (dockOpen = false)}><PanelRightClose /></Button>
 				</header>
 				<!-- 짧으면 아래에 붙고 길면 스크롤 (justify-end는 넘친 위쪽을 스크롤 밖으로 밀어낸다) -->
-				<div bind:this={threadEl} class="dock-body" aria-live="polite">
+				<div bind:this={threadEl} class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3" aria-live="polite">
 					<div class="mt-auto flex flex-col gap-3">
 					{#if pending.length}
 						<!-- Orch 카드: 판단 대기 요약 (.pen OrchCard) -->
-						<div class="card-col gap-2 p-3 shadow-xs">
+						<div class="card-surface flex flex-col gap-2 p-3 shadow-xs">
 							<div class="flex items-center gap-2">
 								<Hourglass class="size-4 text-status-waiting" />
 								<span class="flex-1 text-sm font-semibold">판단 대기 {pending.length}</span>
@@ -1759,7 +1759,7 @@
 							</Message.Root>
 						{:else if c.kind === 'proposal'}
 							<!-- 작업 제안 (.pen WorkProposalCard) -->
-							<div class="card-col gap-3 p-3 shadow-xs">
+							<div class="card-surface flex flex-col gap-3 p-3 shadow-xs">
 								<div class="flex items-center gap-2">
 									<span class="card-kicker">WORK PROPOSAL</span>
 									<span class="flex-1"></span>
@@ -1791,7 +1791,7 @@
 							</div>
 						{:else}
 							<!-- 명령 결과 (.pen CommandResultCard) -->
-							<div class="card-col gap-2 p-3 shadow-xs">
+							<div class="card-surface flex flex-col gap-2 p-3 shadow-xs">
 								<div class="flex items-center gap-2">
 									<span class="card-kicker">COMMAND RESULT</span>
 									<span class="text-xs text-muted-foreground">Orch · {c.time}</span>
@@ -1805,7 +1805,7 @@
 					</div>
 				</div>
 				<form class="px-4 pt-2 pb-3.5" onsubmit={send}>
-					<div class="dock-composer">
+					<div class="flex items-center gap-1.5 rounded-md border border-input bg-card py-2 pr-2.5 pl-2 focus-within:ring-3 focus-within:ring-ring/50">
 						<Button variant="ghost" size="icon-sm" aria-label="파일 첨부"><Paperclip /></Button>
 						<input
 							bind:value={draft}
@@ -1827,16 +1827,16 @@
 				<Dialog.Description>{scope === undefined ? `${project.name} · L2 모호한 판단` : `Task #${scope}만`}</Dialog.Description>
 			</Dialog.Header>
 			<Dialog.Body padded={false} class="flex-row">
-				<nav class="decision-queue" aria-label="판단 대기 목록">
+				<nav class="flex w-72 shrink-0 flex-col overflow-y-auto border-r bg-background p-2" aria-label="판단 대기 목록">
 					{#each shownQueue as d (d.id)}
 						{@const who = agentOf(d.agent)}
 						<button
 							type="button"
 							aria-pressed={active === d.id}
 							onclick={() => ((active = d.id), (pick = undefined), (answer = ''))}
-							class={cn('decision-item', active === d.id && 'bg-accent')}
+							class={cn('flex flex-col gap-1 rounded-md px-3 py-2.5 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50', active === d.id && 'bg-accent')}
 						>
-							<span class="label-sm">{#if who}<RoleAvatar role={who.role} size="sm" />{who.name}{/if} · #{d.task}</span>
+							<span class="flex items-center gap-1.5 text-sm font-medium">{#if who}<RoleAvatar role={who.role} size="sm" />{who.name}{/if} · #{d.task}</span>
 							<span class="truncate text-xs text-muted-foreground">{d.topic}</span>
 							<span class={cn('font-mono text-2xs', d.left ? 'text-status-waiting' : 'text-subtle-foreground')}>{d.left ? `${d.left} 남음` : `결정됨 · ${d.decided}`}</span>
 						</button>
@@ -1847,15 +1847,15 @@
 				{#if dec}
 					{@const who = agentOf(dec.agent)}
 					<section class="flex min-w-0 flex-1 flex-col">
-						<div class="decision-head">
+						<div class="flex items-start gap-3 border-b px-6 py-4">
 							{#if who}<RoleAvatar role={who.role} />{/if}
-							<div class="row-text">
+							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="text-sm font-semibold">{who?.name} · #{dec.task} {dec.title}</span>
 								<span class="text-xs text-muted-foreground">{dec.sub}</span>
 							</div>
 							<Badge variant="secondary" class="font-mono">{dec.left ? `${dec.left} 남음` : `결정됨 · ${dec.decided}`}</Badge>
 						</div>
-						<ol class="decision-body">
+						<ol class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
 							{#each dec.questions as q, n (n)}
 								<li class={cn('flex flex-col gap-2', n !== qi && 'opacity-80')}>
 									<p class="title-sm gap-2">
@@ -1880,7 +1880,7 @@
 							{/each}
 						</ol>
 						{#if qi >= 0}
-							<form class="decision-foot" onsubmit={reply}>
+							<form class="flex flex-col gap-2 border-t px-6 py-3" onsubmit={reply}>
 								<Textarea bind:value={answer} rows={2} placeholder="선택지에 덧붙일 말이나 직접 답을 적어주세요" aria-label="답변" onkeydown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.currentTarget.form?.requestSubmit()} />
 								<div class="flex items-center gap-2">
 									<p class="flex-1 text-xs text-muted-foreground">답변은 #{dec.task} 결정 기록으로 남고 {who?.name}에게 전달돼요 · ⌘↵ 보내기</p>
@@ -1909,10 +1909,10 @@
 				{@const run = liveRunOf(d.num)}
 				<form onsubmit={saveTask} class="contents">
 					<Dialog.Header>
-						{#snippet lead()}<span class="task-mark"><SquareCheck class="size-3" /></span>{/snippet}
+						{#snippet lead()}<span class="flex size-5 shrink-0 items-center justify-center rounded-xs bg-node-task text-on-solid"><SquareCheck class="size-3" /></span>{/snippet}
 						<Dialog.Title class="sr-only">{d.num === undefined ? '새 태스크' : `Task #${d.num} 편집`}</Dialog.Title>
 						<!-- 경로: 프로젝트 / 이슈 / 하위 이슈 -->
-						<div class="editor-path">
+						<div class="flex min-w-0 items-center gap-2 text-xs">
 							<span class="text-muted-foreground">{project.name}</span>
 							<span class="text-subtle-foreground">/</span>
 							<DropdownMenu.Root>
@@ -1984,7 +1984,7 @@
 						</InputGroup.Root>
 
 						<!-- 완료 조건 -->
-						<section class="box-col gap-0.5 rounded-md p-3" aria-label="완료 조건">
+						<section class="flex flex-col border gap-0.5 rounded-md p-3" aria-label="완료 조건">
 							<h3 class="pb-1 text-xs font-semibold text-muted-foreground">완료 조건</h3>
 							<Checklist label="완료 조건" placeholder="조건 추가" bind:items={d.criteria} />
 						</section>

@@ -172,18 +172,18 @@
 <div class="flex h-dvh flex-col">
 	<!-- 첫 실행(/setup)은 상단 메뉴 없이 단독 화면 -->
 	{#if !page.url.pathname.startsWith('/setup')}
-	<header class="app-header">
+	<header class="flex h-13 shrink-0 items-center gap-6 border-b bg-card px-4">
 		<a href="/" class="flex shrink-0 items-center">
 			<img src={logo} alt="OrchStack" class="h-5 w-auto" />
 		</a>
-		<nav class="app-nav" aria-label="주요 메뉴">
+		<nav class="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto" aria-label="주요 메뉴">
 			{#each links as l (l.href)}
 				{@const on = page.url.pathname.startsWith(l.href)}
 				<a
 					href={l.href}
 					aria-current={on ? 'page' : undefined}
 					class={cn(
-						'app-nav-item',
+						'flex h-8 shrink-0 items-center gap-2 rounded-md px-2 text-sm whitespace-nowrap outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-ring/50',
 						on && 'bg-sidebar-accent font-medium'
 					)}
 				>
@@ -193,7 +193,7 @@
 			{/each}
 		</nav>
 		<!-- 검색창 모양의 버튼 — 누르거나 ⌘K로 검색 팔레트를 연다 -->
-		<button type="button" onclick={openSearch} class="app-search">
+		<button type="button" onclick={openSearch} class="flex h-8 w-75 items-center gap-2 rounded-md border bg-card px-2.5 text-xs text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
 			<Search class="size-4" /><span class="flex-1 text-left">Search tasks, agents, issues</span><Kbd>⌘K</Kbd>
 		</button>
 		<Popover.Root bind:open={bellOpen}>
@@ -201,17 +201,17 @@
 				{#snippet child({ props })}
 					<Button variant="ghost" size="icon" class="relative" aria-label={unread ? `알림 · 안 읽음 ${unread}` : '알림'} {...props}>
 						<Bell />
-						{#if unread}<span class="notify-dot"></span>{/if}
+						{#if unread}<span class="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive ring-2 ring-card"></span>{/if}
 					</Button>
 				{/snippet}
 			</Popover.Trigger>
 			<Popover.Content align="end" class="w-115 gap-0 p-0">
-				<div class="popover-head">
+				<div class="flex items-center gap-2 px-4 pt-3.5 pb-2.5">
 					<h2 class="flex-1 text-sm font-semibold">알림</h2>
 					<Button variant="link" size="xs" disabled={!unread} onclick={() => list.forEach((n) => (n.unread = false))}>모두 읽음</Button>
 					<Button variant="ghost" size="icon-sm" href="/settings/notifications" onclick={() => (bellOpen = false)} aria-label="알림 설정"><Settings2 /></Button>
 				</div>
-				<div class="popover-tabs" role="group" aria-label="알림 종류">
+				<div class="flex gap-1.5 border-b px-4 pb-3" role="group" aria-label="알림 종류">
 					{#each ['전체', '확인 필요', 'Run', '한도'] as const as t (t)}
 						<Toggle variant="chip" count={list.filter(inTab[t]).length} bind:pressed={() => tab === t, (v) => { if (v) tab = t; }}>{t}</Toggle>
 					{/each}
@@ -222,13 +222,13 @@
 						{#each items as n (n.id)}
 							{@const m = noticeMeta[n.kind]}
 							{@const mem = memberOf(n.member)}
-							<div class={cn('notify-item', n.unread && 'bg-primary-soft/60')}>
+							<div class={cn('flex flex-col gap-2 border-t px-4 py-3', n.unread && 'bg-primary-soft/60')}>
 								<div class="flex gap-3">
-									{#if mem}<RoleAvatar role={mem.role} icon={glyphOf(mem)} />{:else}<span class={cn('center-box size-7 shrink-0 rounded-md', m.tile)}><m.icon class="size-3.5" /></span>{/if}
-									<div class="col-fill gap-1 text-xs">
+									{#if mem}<RoleAvatar role={mem.role} icon={glyphOf(mem)} />{:else}<span class={cn('flex items-center justify-center size-7 shrink-0 rounded-md', m.tile)}><m.icon class="size-3.5" /></span>{/if}
+									<div class="flex min-w-0 flex-1 flex-col gap-1 text-xs">
 										<span class="flex items-center gap-1.5">
 											<span class="font-semibold">{n.who}</span>
-											<span class="notify-kind">{m.tag}</span>
+											<span class="rounded-sm bg-muted px-1.5 py-px text-caption text-muted-foreground">{m.tag}</span>
 											{#if n.task}<a href="/p/1?task={n.task}" onclick={() => (bellOpen = false)} class="truncate hover:underline">{n.title}</a>{:else}<span class="truncate">{n.title}</span>{/if}
 											<span class="ml-auto shrink-0 text-caption text-subtle-foreground">{n.when}</span>
 										</span>
@@ -251,10 +251,10 @@
 					{/each}
 				</div>
 				<!-- 모든 활동 화면은 .pen에 아직 없음 -->
-				<div class="popover-foot-link">모든 활동 보기 →</div>
+				<div class="border-t py-2.5 text-center text-xs font-medium text-primary">모든 활동 보기 →</div>
 			</Popover.Content>
 		</Popover.Root>
-		<span class="user-avatar" aria-label="사용자">S</span>
+		<span class="flex size-7 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary" aria-label="사용자">S</span>
 	</header>
 	{/if}
 	<div class="min-h-0 flex-1">
@@ -275,7 +275,7 @@
 			go(h.href, true);
 		}
 	}}>
-		<div class="palette-head">
+		<div class="flex items-center gap-2 border-b p-3">
 			<div class="flex-1"><Command.Input bind:value={q} placeholder="태스크 · 이슈 · 멤버 · 설정 검색" /></div>
 			<Kbd>esc</Kbd>
 		</div>
@@ -303,7 +303,7 @@
 				</Command.Group>
 			{/each}
 		</Command.List>
-		<div class="palette-foot">
+		<div class="flex items-center gap-4 border-t px-4 py-2.5 text-caption text-muted-foreground">
 			{#each [['↑↓', '이동'], ['↵', '열기'], ['⌘↵', '새 탭'], ['esc', '닫기']] as [k, l] (k)}<span class="flex items-center gap-1.5"><Kbd>{k}</Kbd>{l}</span>{/each}
 		</div>
 	</div>

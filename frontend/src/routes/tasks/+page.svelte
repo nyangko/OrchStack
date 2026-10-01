@@ -174,7 +174,7 @@
 					type="button"
 					aria-label="{v.label} 보기 삭제"
 					onclick={() => ((saved = saved.filter((x) => x.key !== v.key)), view === v.key && pickView('all', { priorities: [] }))}
-					class="view-remove"
+					class="absolute top-2.5 right-8 rounded-xs text-subtle-foreground opacity-0 outline-none group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
 				><X class="size-3.5" /></button>
 			</div>
 		{/each}
@@ -183,7 +183,7 @@
 		</button>
 	</nav>
 
-	<main class="page-scroll-pad gap-4.5">
+	<main class="flex min-w-0 flex-1 flex-col overflow-y-auto px-8 py-7 *:shrink-0 gap-4.5">
 		<header class="flex flex-col gap-1">
 			<h1 class="text-2xl font-bold">{heading}</h1>
 			<p class="text-xs text-muted-foreground">
@@ -258,12 +258,12 @@
 
 		{#if groups.length}
 			<div class="overflow-hidden rounded-lg border bg-card">
-				<div class="tasks-table-head">
+				<div class="flex h-9 items-center gap-3 bg-muted px-4 text-caption font-medium text-muted-foreground">
 					<span class="w-3.5"></span><span class="w-12">ID</span><span class="flex-1">Title</span><span class="w-28">Status</span><span class="w-36">Progress</span><span class="w-60">담당</span><span class="w-16 text-right">Updated</span>
 				</div>
 				{#each groups as { p, team, list } (p.sn)}
 					{@const open = !folded.includes(p.sn)}
-					<div class="tasks-group-row">
+					<div class="flex items-center gap-2 border-t bg-muted px-4 py-2.5 text-xs">
 						<button
 							type="button"
 							aria-expanded={open}
@@ -286,11 +286,11 @@
 							{@const a = memberOf(t.agent)}
 							<!-- 행 클릭은 마우스 편의, 키보드는 제목 링크로 연다 -->
 							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-							<div class="task-row" onclick={() => goto(`/p/${t.project}?task=${t.num}`)}>
+							<div class="flex h-13 cursor-pointer items-center gap-3 border-t px-4 text-xs hover:bg-muted/50" onclick={() => goto(`/p/${t.project}?task=${t.num}`)}>
 								<st.icon class={cn('size-3.5 shrink-0', st.text)} aria-hidden="true" />
 								<span class="w-12 font-mono text-muted-foreground">#{t.num}</span>
-								<span class="row-fill">
-									<a href="/p/{t.project}?task={t.num}" onclick={(e) => e.stopPropagation()} class="row-link-title">{t.title}</a>
+								<span class="flex min-w-0 flex-1 items-center gap-2">
+									<a href="/p/{t.project}?task={t.num}" onclick={(e) => e.stopPropagation()} class="truncate text-body font-medium outline-none hover:underline focus-visible:underline">{t.title}</a>
 									{#if t.over}<Pill class="shrink-0 bg-warning-soft text-status-waiting"><TriangleAlert />토큰 초과</Pill>{/if}
 									{#if pending.has(t.num)}<Pill class="shrink-0 bg-warning-soft text-status-waiting"><MessageCircleQuestion />판단 대기</Pill>{/if}
 								</span>
@@ -315,7 +315,7 @@
 										<span class="text-muted-foreground">미배정</span>
 									{/if}
 								</span>
-								<span class="updated-cell">{t.updated}</span>
+								<span class="w-16 text-right font-mono text-caption text-subtle-foreground">{t.updated}</span>
 							</div>
 						{/each}
 					{/if}

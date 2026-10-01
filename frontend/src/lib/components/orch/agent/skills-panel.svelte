@@ -55,8 +55,8 @@
 <!-- .pen SkillRow — 글자 타일 · 이름 · 설명 · 출처 · 토큰 · 켜기 -->
 {#snippet skillRow(name: string, desc: string, source: string, SourceIcon: Component, tok: number, on: boolean, toggle: () => void, changed = false)}
 	<div class="list-row">
-		<span class="skill-mark-sm">{name[0]}</span>
-		<span class="row-text">
+		<span class="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-xs font-semibold text-muted-foreground uppercase">{name[0]}</span>
+		<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 			<span class="row-title">{name}{#if changed}<span class="size-1.5 rounded-full bg-primary" aria-label="템플릿과 다름"></span>{/if}</span>
 			<span class="truncate text-xs text-muted-foreground">{desc}</span>
 			<span class="subtle-meta gap-3">
@@ -109,7 +109,7 @@
 	</Tabs.Root>
 {:else}
 	<div class="flex items-start gap-4">
-		<div class="col-fill gap-4">
+		<div class="flex min-w-0 flex-1 flex-col gap-4">
 			<Card.Root size="sm">
 				<Card.Header><Card.Title class="flex items-center gap-2">이 에이전트에서 활성 <span class="font-normal text-muted-foreground">{active.length}</span></Card.Title></Card.Header>
 				<Card.Content class="gap-0">
@@ -137,7 +137,7 @@
 				</Card.Content>
 			</Card.Root>
 		</div>
-		<aside class="aside-col w-72 gap-4">
+		<aside class="flex shrink-0 flex-col w-72 gap-4">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>컨텍스트 영향</Card.Title>
@@ -149,7 +149,7 @@
 				<Card.Header><Card.Title>CLI별 적용 방식</Card.Title></Card.Header>
 				<Card.Content class="gap-2 text-xs">
 					{#each [['codex', 'Codex CLI', 'AGENTS.md에 스킬 요약을 포함'], ['claude', 'Claude Code', '~/.claude/skills 로 동기화']] as const as [r, n, d] (r)}
-						<div class={cn('skill-suggest', r === runtime && 'bg-primary-soft')}>
+						<div class={cn('flex items-start gap-2 rounded-sm p-2', r === runtime && 'bg-primary-soft')}>
 							<RuntimeLogo runtime={r} class="size-4 ring-0" />
 							<span class="flex flex-col gap-0.5"><span class="font-medium">{n}{r === runtime ? ' · 현재' : ''}</span><span class="text-muted-foreground">{d}</span></span>
 						</div>
