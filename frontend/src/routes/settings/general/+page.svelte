@@ -24,6 +24,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Segmented } from '$lib/components/orch/segmented';
+	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { FieldRow } from '$lib/components/ui/field';
 
 	type Key = keyof typeof s;
@@ -38,7 +39,6 @@
 		reportLang: '한국어',
 		commitLang: 'English',
 		dateFormat: 'iso',
-		theme: 'light',
 		runLogs: '90일',
 		usage: '1년',
 		decisions: '영구 보관'
@@ -140,7 +140,7 @@
 				<CardHeader><CardTitle>화면</CardTitle></CardHeader>
 				<CardContent>
 					<FieldRow label="테마">
-						<!-- 다크 테마는 라이트 작업 후 별도 패스에서 적용 — 지금은 값만 저장 -->
+						<!-- 바로 적용 · 이 브라우저에 저장 (워크스페이스 설정 API #47 전) -->
 						<Segmented
 							aria-label="테마"
 							options={[
@@ -148,7 +148,7 @@
 								{ value: 'dark', label: '다크', icon: Moon },
 								{ value: 'system', label: '시스템', icon: Monitor }
 							]}
-							bind:value={() => s.theme, (v) => set('theme', v ?? 'light')}
+							bind:value={() => userPrefersMode.current, (v) => (setMode(v ?? 'light'), (saved = true))}
 						/>
 					</FieldRow>
 				</CardContent>

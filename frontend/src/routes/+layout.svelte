@@ -32,6 +32,7 @@
 	import Settings2 from '@lucide/svelte/icons/settings-2';
 	import { Button } from '$lib/components/ui/button';
 	import { Toaster } from '$lib/components/ui/sonner';
+	import { ModeWatcher } from 'mode-watcher';
 	import { Kbd } from '$lib/components/ui/kbd';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { RoleAvatar } from '$lib/components/orch/role-avatar';
@@ -263,6 +264,8 @@
 
 <svelte:window onkeydown={onkey} />
 <!-- API 실패 토스트 ($lib/api/client.ts) -->
+<!-- 테마 (설정 › 일반) — 저장값이 없으면 라이트. html에 .dark를 붙이고 app.css .dark 토큰으로 그린다 (#115) -->
+<ModeWatcher defaultMode="light" />
 <Toaster position="bottom-right" />
 
 <CommandDialog bind:open={searching} bind:value={selected} shouldFilter={false} title="검색" description="태스크 · 이슈 · 멤버 · 설정 · 명령" class="sm:max-w-180">
