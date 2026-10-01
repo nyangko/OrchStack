@@ -93,7 +93,8 @@
 	import { RoleAvatar } from '$lib/components/orch/role-avatar';
 	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import { accounts, meters, teamPolicy, recommend, tasks, issues, memberDetails, type TeamMember, type OrchPolicy, type LevelAction, type SpawnMode } from '$lib/mock';
-	import { store, defaultTeam, glyphs, glyphOf, runtimeName, accountOf, low, scopeText, liveMap, k, putDraft } from '$lib/teams.svelte';
+	import { store, defaultTeam, glyphs, glyphOf, runtimeName, accountOf, low, scopeText, liveMap, k, putDraft, addMember, saveTeamSpawn } from '$lib/teams.svelte';
+	import { useMock } from '$lib/api/env';
 	import { LimitRow } from '$lib/components/orch/limit-row';
 	import { KeyValueRow } from '$lib/components/orch/key-value-row';
 	import SkillsPanel from '$lib/components/orch/agent/skills-panel.svelte';
@@ -170,8 +171,18 @@
 		draft = structuredClone($state.snapshot(policy));
 		customTimer = ![3, 5, 10, 30].includes(draft.timer);
 	}
-	function savePolicy() {
-		if (draft) store.policies[team.sn] = draft;
+	// 서버 모드 저장 — 하위 작업 정책만 서버(tbl_team)에, Orch 진행 레벨 · 가드는 아직 화면 상태(#60). 서버 검증 문구는 그 칸 아래에.
+	let policySaving = $state(false);
+	let spawnServerError = $state('');
+	async function savePolicy() {
+		if (!draft) return;
+		if (!useMock) {
+			policySaving = true;
+			spawnServerError = (await saveTeamSpawn(team.sn, draft.spawn)) ?? '';
+			policySaving = false;
+			if (spawnServerError) return;
+		}
+		store.policies[team.sn] = draft;
 		draft = undefined;
 	}
 
@@ -269,8 +280,19 @@
 		}
 		step = 1;
 	}
-	/// 팀에 추가 (목데이터). 멤버 상세 이동은 T-3 (#63).
-	function add() {
+	/// 팀에 추가. 서버 모드는 POST 후 그 팀 멤버를 다시 읽는다 — 런타임 · 모델 · 지침 파일은 프로필 API(#47 · #45) 뒤에 저장.
+	let addSaving = $state(false);
+	async function add() {
+		if (!useMock) {
+			addSaving = true;
+			// 템플릿 목록은 아직 화면 데이터라 template_sn은 보내지 않는다 — 서버 템플릿(지침 파일 · 리비전 #45) 연결 뒤에
+			const sn = await addMember(team.sn, { name: name.trim(), role_name: tpl?.name ?? 'Agent', first_task_mode: first });
+			addSaving = false;
+			if (sn === undefined) return;
+			adding = false;
+			openMember(sn);
+			return;
+		}
 		const sn = Math.max(...store.crew.flatMap((t) => t.members.map((m) => m.sn))) + 1;
 		team.members.push({
 			sn,
@@ -963,7 +985,7 @@
 				{#if step === 1}
 					<Button size="sm" disabled={!name.trim()} onclick={() => (step = 2)}>다음 · 런타임 · 도구<ArrowRight /></Button>
 				{:else}
-					<Button size="sm" disabled={!name.trim()} onclick={add}><UserPlus />팀에 추가</Button>
+					<Button size="sm" disabled={!name.trim() || addSaving} onclick={add}>{#if addSaving}<LoaderCircle class="animate-spin" />{:else}<UserPlus />{/if}팀에 추가</Button>
 				{/if}
 			{/if}
 		</SheetFooter>
@@ -1496,7 +1518,7 @@
 				<DialogDescription>다음 작업 배정 · 분배 · 사용자 판단이 필요한 순간을 Orch가 어떻게 처리할지 정해요.</DialogDescription>
 				{#snippet actions()}
 					<Button variant="ghost" size="sm" onclick={() => (draft = undefined)}>취소</Button>
-					<Button size="sm" disabled={!!spawnError || !!childError} onclick={savePolicy}>저장</Button>
+					<Button size="sm" disabled={!!spawnError || !!childError || policySaving} onclick={savePolicy}>{#if policySaving}<LoaderCircle class="animate-spin" />{/if}저장</Button>
 				{/snippet}
 			</DialogHeader>
 			<DialogBody class="gap-7">
@@ -1604,8 +1626,8 @@
 								options={spawnModes.map((m) => ({ value: m.value, label: m.value, icon: m.icon, disabled: !d.spawn.allow.includes(m.value), hint: '허용 방식에서 꺼져 있어요' }))}
 								bind:value={() => d.spawn.mode, (v) => (d.spawn.mode = v as SpawnMode)}
 							/>
-							{#if spawnError}
-								<span class="error-note"><CircleAlert class="size-3 shrink-0" />{spawnError}</span>
+							{#if spawnError || spawnServerError}
+								<span class="error-note"><CircleAlert class="size-3 shrink-0" />{spawnError || spawnServerError}</span>
 							{:else}
 								<span class="text-caption text-muted-foreground">runner · 별도 Run으로 돌려요. 모델 등급(S/M/L)은 작업 종류로 정해지고, 토큰은 따로 집계돼요.</span>
 							{/if}

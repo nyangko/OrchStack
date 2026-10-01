@@ -26,9 +26,12 @@ import PenTool from "@lucide/svelte/icons/pen-tool";
 import Shapes from "@lucide/svelte/icons/shapes";
 import type { Role } from "$lib/roles";
 import { useMock } from "$lib/api/env";
+import { api, failureOf } from "$lib/api/client";
+import { roleOf } from "$lib/project.svelte";
+import type { ApiMember } from "$lib/api/types";
 import type { Runtime } from "$lib/components/orch/runtime-logo";
 import type { MdFile } from "$lib/components/orch/md-editor";
-import { projects, teams, templates, orchPolicy, skillLibrary, skillSources, skillLog, accounts, mcpServers, teamPolicy, type AgentConfig, type OrchPolicy, type TeamMember, type Template, type Skill, type SkillHit } from "$lib/mock";
+import { projects, teams, templates, orchPolicy, skillLibrary, skillSources, skillLog, accounts, mcpServers, teamPolicy, type AgentConfig, type OrchPolicy, type TeamMember, type Team, type SpawnMode, type Template, type Skill, type SkillHit } from "$lib/mock";
 
 export const store = $state({
 	/// 프로젝트 탭 (새 프로젝트를 만들면 늘어난다).
@@ -115,4 +118,61 @@ export function toggleIn(list: string[], name: string) {
 export function putDraft(t: Template, files: MdFile[], who: string, note: string) {
 	t.draft = structuredClone(files);
 	if (!t.revisions.some((r) => r.state === "draft")) t.revisions.unshift({ v: Math.max(...t.revisions.map((r) => r.v)) + 1, state: "draft", who, when: "방금", note });
+}
+
+// ---- 서버 데이터 (A-2 #93). 화면은 목데이터 모양을 그대로 쓰고, 서버 행을 여기서 맞춘다.
+// 서버에 아직 없는 값(작업량 · 컨텍스트 · 토큰 · KPI #88, 런타임 이름 #47, 지침 파일 · 리비전 #45)은 빈 값으로 둔다 (#60).
+
+/// 불러오기 상태 — 목데이터 모드면 처음부터 ready.
+export const teamsLoad = $state({ state: (useMock ? "ready" : "idle") as "idle" | "loading" | "ready" | "error" });
+
+const emptyStats: Team["stats"] = { open: 0, openNote: "—", done: 0, doneDelta: "", doneNote: "—", doneTrend: [], tokenTrend: [], cycle: "—", cycleDelta: "", cycleTrend: [] };
+const memberStatus = (s: string): TeamMember["status"] => (s === "running" || s === "waiting" ? s : "idle");
+
+function memberView(m: ApiMember): TeamMember {
+	return {
+		sn: m.sn, name: m.name, role: roleOf(m), title: m.role_name, runtime: "claude", model: "—", status: memberStatus(m.status),
+		work: "—", context: 0, tokens: 0, load: [], loadNote: "—"
+	};
+}
+
+async function membersOfTeam(sn: number): Promise<TeamMember[]> {
+	const { data } = await api.GET("/teams/{sn}/members", { params: { path: { sn } } });
+	return (data ?? []).filter((m) => m.status !== "archived").map(memberView);
+}
+
+/// 팀 · 멤버 · 프로젝트 연결을 서버에서 읽는다. 하위 작업 정책(spawn)은 팀 행에서, Orch 진행 레벨 · 가드는 아직 서버에 없어 화면 기본값.
+export async function loadTeams() {
+	if (useMock || teamsLoad.state === "loading") return;
+	teamsLoad.state = "loading";
+	const [{ data: rows }, { data: projs }] = await Promise.all([api.GET("/teams"), api.GET("/projects")]);
+	if (!rows) return void (teamsLoad.state = "error");
+	const members = await Promise.all(rows.map((t) => membersOfTeam(t.sn)));
+	store.crew = rows.map((t, i) => ({
+		sn: t.sn, name: t.name, orch: t.kind === "orch", project: projs?.find((p) => p.team_sn === t.sn)?.name, desc: "", members: members[i], stats: emptyStats
+	}));
+	for (const t of rows) {
+		store.policies[t.sn] ??= structuredClone(orchPolicy);
+		store.policies[t.sn].spawn = { mode: t.spawn_mode as SpawnMode, allow: t.spawn_allow.split(",") as SpawnMode[], maxChild: t.max_child_run };
+	}
+	teamsLoad.state = "ready";
+}
+
+/// 멤버 추가 — 성공하면 그 팀 멤버를 다시 읽고 새 멤버 sn을 돌려준다. 실패 문구는 클라이언트가 토스트로 띄운다.
+export async function addMember(teamSn: number, body: { name: string; template_sn?: number | null; role_name?: string; icon?: string; first_task_mode?: string }): Promise<number | undefined> {
+	// 연결 실패는 클라이언트가 토스트로 알린다 — 여기서는 저장 안 됨(undefined)으로만 돌려준다.
+	const res = await api.POST("/teams/{sn}/members", { params: { path: { sn: teamSn } }, body }).catch(() => undefined);
+	if (!res || res.error) return;
+	const data = res.data;
+	const team = store.crew.find((t) => t.sn === teamSn);
+	const before = new Set(team?.members.map((m) => m.sn));
+	if (team) team.members = await membersOfTeam(teamSn);
+	return (data as { sn?: number } | undefined)?.sn ?? team?.members.find((m) => !before.has(m.sn))?.sn;
+}
+
+/// 팀 하위 작업 정책 저장 (PATCH /teams/{sn}). 서버 검증(기본 ⊂ 허용 · 동시 ≥ 1)에 걸리면 그 문구를 돌려준다.
+export async function saveTeamSpawn(teamSn: number, spawn: OrchPolicy["spawn"]): Promise<string | undefined> {
+	const res = await api.PATCH("/teams/{sn}", { params: { path: { sn: teamSn } }, body: { spawn_mode: spawn.mode, spawn_allow: spawn.allow.join(","), max_child_run: Number(spawn.maxChild) } }).catch(() => undefined);
+	if (!res) return "서버에 연결할 수 없어요";
+	return res.error ? failureOf(res.error).message : undefined;
 }

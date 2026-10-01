@@ -126,7 +126,7 @@ export function viewTasks(): Task[] {
 }
 
 /// role_name(예: "Frontend Developer")을 화면 역할로. Orch 멤버는 orch, 못 찾으면 agent.
-function roleOf(m: ApiMember): Role {
+export function roleOf(m: ApiMember): Role {
 	if (m.is_orch) return 'orch';
 	const n = m.role_name.toLowerCase();
 	return (Object.keys(roles) as Role[]).find((r) => r !== 'agent' && n.includes(roles[r].label.toLowerCase())) ?? 'agent';

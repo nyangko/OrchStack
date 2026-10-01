@@ -13,12 +13,18 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { RoleAvatar } from '$lib/components/orch/role-avatar';
-	import { store, defaultTeam, glyphOf, membersOf } from '$lib/teams.svelte';
+	import { store, defaultTeam, glyphOf, membersOf, teamsLoad, loadTeams } from '$lib/teams.svelte';
+	import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from '$lib/components/ui/empty';
 	
 	let { children } = $props();
 
+	// 서버 모드: 팀 · 멤버를 한 번 읽는다 (A-2 #93). 목데이터 모드는 처음부터 ready.
+	$effect(() => {
+		if (teamsLoad.state === 'idle') void loadTeams();
+	});
+
 	const scope = $derived(page.route.id?.startsWith('/teams/agents') ? 'agents' : 'teams');
-	const teamSn = $derived(scope === 'teams' ? Number(page.url.searchParams.get('team')) || defaultTeam().sn : undefined);
+	const teamSn = $derived(scope === 'teams' ? Number(page.url.searchParams.get('team')) || defaultTeam()?.sn : undefined);
 	const tplSn = $derived(scope === 'agents' ? Number(page.params.template) : undefined);
 
 	let query = $state('');
@@ -29,6 +35,7 @@
 	);
 </script>
 
+{#if teamsLoad.state === 'ready'}
 <div class="flex h-full">
 <aside class="flex w-70 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-sidebar px-3 py-4">
 		<div class="flex items-center px-1 pb-2">
@@ -105,3 +112,17 @@
 	</aside>
 	{@render children()}
 </div>
+{:else}
+	<Empty class="h-full">
+		<EmptyHeader>
+			{#if teamsLoad.state === 'error'}
+				<EmptyTitle>팀을 불러오지 못했어요</EmptyTitle>
+				<EmptyDescription>서버 연결을 확인하고 다시 시도하세요.</EmptyDescription>
+			{:else}
+				<LoaderCircle class="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
+				<EmptyTitle>팀을 불러오는 중…</EmptyTitle>
+			{/if}
+		</EmptyHeader>
+		{#if teamsLoad.state === 'error'}<EmptyContent><Button size="sm" onclick={() => ((teamsLoad.state = 'idle'), loadTeams())}>다시 시도</Button></EmptyContent>{/if}
+	</Empty>
+{/if}

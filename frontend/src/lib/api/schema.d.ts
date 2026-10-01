@@ -131,6 +131,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/{sn}/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 명령 사용 여부 조회 (기본 목록 + 프로필 설정). 프로필이 없으면 404 */
+        get: operations["agent_commands"];
+        /** 명령 사용 여부 전체 교체 (ProfileUpdated). 기본값과 같은 기본 명령은 저장하지 않는다. 빈 명령은 422 */
+        put: operations["agent_set_commands"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles/{sn}/fallbacks": {
         parameters: {
             query?: never;
@@ -573,6 +591,15 @@ export interface components {
             mcps: components["schemas"]["McpLink"][];
             skills: components["schemas"]["SkillLink"][];
             tools: components["schemas"]["ToolRule"][];
+        };
+        /** @description 명령 사용 여부 한 줄 */
+        Cmd: {
+            /** @description 서버 기본 목록(CMDS)에 있는 명령 (응답 전용 · 지우면 기본값으로 돌아간다) */
+            builtin?: boolean;
+            /** @description 명령 글자 (예: git push). 이 글자로 시작하는 명령 전체에 적용 */
+            cmd: string;
+            /** @description true = 사용 · false = 차단 */
+            on: boolean;
         };
         /** @description 에러 응답 본문 (OpenAPI 공통 에러 스키마) */
         ErrorBody: {
@@ -1547,6 +1574,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Caps"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    agent_commands: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로필 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cmd"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    agent_set_commands: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프로필 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Cmd"][];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cmd"][];
                 };
             };
             default: {
