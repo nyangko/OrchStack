@@ -18,16 +18,12 @@
 	import ChevronUp from '@lucide/svelte/icons/chevron-up';
 	import Paperclip from '@lucide/svelte/icons/paperclip';
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
-	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import SquareCheck from '@lucide/svelte/icons/square-check';
 	import CircleDot from '@lucide/svelte/icons/circle-dot';
 	import Gauge from '@lucide/svelte/icons/gauge';
-	import SignalHigh from '@lucide/svelte/icons/signal-high';
 	import Coins from '@lucide/svelte/icons/coins';
-	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import Cpu from '@lucide/svelte/icons/cpu';
 	import Timer from '@lucide/svelte/icons/timer';
-	import UserRound from '@lucide/svelte/icons/user-round';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import GitBranch from '@lucide/svelte/icons/git-branch';
 	import CornerDownRight from '@lucide/svelte/icons/corner-down-right';
@@ -56,12 +52,9 @@
 	import '@xyflow/svelte/dist/style.css';
 	import DiagramNode, { type DiagramNodeData } from '$lib/components/orch/diagram/diagram-node.svelte';
 	import type { MenuEntry } from '$lib/components/ui/dropdown-menu';
-	import * as ContextMenu from '$lib/components/ui/context-menu';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import StepForward from '@lucide/svelte/icons/step-forward';
 	import PanelRight from '@lucide/svelte/icons/panel-right';
-	import FilterIcon from '@lucide/svelte/icons/filter';
-	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import SubRunNode, { subRunStatus, subRunMode, tierTone } from '$lib/components/orch/diagram/sub-run-node.svelte';
 	import TokenMeter from '$lib/components/orch/diagram/token-meter.svelte';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
@@ -74,7 +67,7 @@
 	import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { Badge } from '$lib/components/ui/badge';
-	import * as Kanban from '$lib/components/ui/kanban';
+	import TaskBoard from '$lib/components/orch/board/TaskBoard.svelte';
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Empty from '$lib/components/ui/empty';
@@ -126,7 +119,6 @@
 	import { mergeProps } from 'bits-ui';
 	import { Input } from '$lib/components/ui/input';
 	import * as Attachment from '$lib/components/ui/attachment';
-	import * as HoverCard from '$lib/components/ui/hover-card';
 	import { Switch } from '$lib/components/ui/switch';
 	import { applyMd, type MdFormat } from '$lib/components/ui/md-editor';
 	import AssigneePicker from '$lib/components/orch/task/assignee-picker.svelte';
@@ -207,19 +199,9 @@
 		)
 	);
 
-	// Kanban (.pen #26 Workbench / Kanban Board) — 상태별 열. Failed 열은 해당 태스크가 있을 때만.
+	// 번호 → 담당 · 태스크 (Kanban 보드는 orch/board/TaskBoard)
 	const agentOf = (sn?: number) => agentList.find((a) => a.sn === sn);
 	const task = (num: number) => list.find((t) => t.num === num)!;
-	const lanes = $derived(statusOrder.filter((s) => s !== 'failed' || count(s) > 0));
-	// 드래그 중 열 배치는 따로 두고, 놓을 때 태스크 상태에 반영한다.
-	let board = $state<Kanban.KanbanValue>({});
-	$effect.pre(() => {
-		board = Object.fromEntries(statusOrder.map((s) => [s, list.filter((t) => t.status === s).map((t) => t.num)]));
-	});
-	/// 놓은 열을 태스크 상태로 반영한다 — 바뀐 태스크만 command.
-	function drop() {
-		for (const [s, nums] of Object.entries(board)) for (const n of nums as number[]) if (task(n).status !== s) void setStatus(n, s as TaskStatus);
-	}
 
 	// Issue Board (.pen #26 Workbench / Issue Board) — 이슈 → 하위 이슈 → 태스크 트리.
 	const issueOf = (num: number) => issueList.find((i) => i.num === num);
@@ -453,21 +435,6 @@
 			'sep',
 			{ label: 'Open Details', icon: PanelRight, shortcut: '↵', onSelect: () => open(num) }
 		];
-	}
-
-	// Kanban 카드 hover 미리보기 (.pen KanbanCard/HoverPreview) — 커서 +18px, 화면 끝에선 반대쪽. 끌 때 · 메뉴 열 때는 숨긴다.
-	let hover = $state<{ num: number; x: number; y: number }>();
-	let hoverTimer: ReturnType<typeof setTimeout> | undefined;
-	function hoverAt(num: number, e: PointerEvent) {
-		if (e.buttons) return void (hover = undefined);
-		const at = { num, x: e.clientX, y: e.clientY };
-		if (hover?.num === num) return void (hover = at);
-		clearTimeout(hoverTimer);
-		hoverTimer = setTimeout(() => (hover = at), 350);
-	}
-	function hoverOff() {
-		clearTimeout(hoverTimer);
-		hover = undefined;
 	}
 
 	// ── Task Editor (.pen XBNVi A · 새 태스크 / A' · 편집) · QuickAdd (.pen biSss) ─────────────────────
@@ -1029,139 +996,19 @@
 			<div class="relative min-h-0 flex-1">
 			<div class="h-full overflow-auto bg-canvas">
 				{#if view.value === 'kanban'}
-					<!-- ui/kanban 조립: 열 = 상태, 항목 = 태스크 번호. 놓으면 drop()이 상태를 command로 반영 -->
-					<Kanban.Root bind:value={board} onDragEnd={drop}>
-						{#each lanes as s (s)}
-							{@const meta = statuses[s]}
-							<Kanban.Column value={s}>
-								<Kanban.ColumnHeader>
-									<meta.icon class={meta.text} />
-									<Kanban.ColumnTitle>{meta.label}</Kanban.ColumnTitle>
-									<Kanban.ColumnCount />
-									<Kanban.ColumnActions>
-										<Button variant="ghost" size="icon-xs" aria-label="{meta.label}에 태스크 추가" onclick={() => openQuick(s)}><Plus /></Button>
-																<!-- 열 메뉴 — .pen에 항목이 없어 있는 동작만 (#60) -->
-																<DropdownMenu.Root>
-																	<DropdownMenu.Trigger>{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-xs" aria-label="{meta.label} 열 메뉴"><Ellipsis /></Button>{/snippet}</DropdownMenu.Trigger>
-																	<DropdownMenu.Content align="end" class="w-48">
-																		<DropdownMenu.Item onSelect={() => newTask({ status: s })}><SquarePen />{meta.label}로 새 태스크</DropdownMenu.Item>
-																		<DropdownMenu.Item onSelect={() => ((leftOpen = true), (panelTab = 'tasks'), (filter = s))}><FilterIcon />Quick Panel에서 이 상태만</DropdownMenu.Item>
-																	</DropdownMenu.Content>
-																</DropdownMenu.Root>
-									</Kanban.ColumnActions>
-								</Kanban.ColumnHeader>
-								<Kanban.ColumnContent>
-									{#each board[s] ?? [] as num (num)}
-										{@const t = task(num as number)}
-										{@const a = agentOf(t.agent)}
-										<!-- 우클릭: ContextMenu / Task (Diagram과 같은 목록) -->
-										<ContextMenu.Root onOpenChange={(o) => o && hoverOff()}>
-											<ContextMenu.Trigger>
-												{#snippet child({ props })}
-													<Kanban.Item
-														{...props}
-														value={num}
-														aria-pressed={selected === t.num}
-														onclick={() => (hoverOff(), open(t.num))}
-														onpointermove={(e) => hoverAt(t.num, e)}
-														onpointerleave={hoverOff}
-														onpointerdown={hoverOff}
-													>
-														<Kanban.ItemHeader>
-															{#if a}
-																<RoleAvatar role={a.role} size="sm" />
-																<span class="text-sm font-semibold whitespace-nowrap">{a.name}</span>
-																<span class="text-xs whitespace-nowrap text-muted-foreground">{roles[a.role].label}</span>
-															{:else}
-																<UserRound class="size-4 text-subtle-foreground" />
-																<span class="text-xs text-muted-foreground">Unassigned</span>
-															{/if}
-															<span class="flex-1"></span>
-															{#if t.effort}
-																<Badge class="rounded-xs bg-review-soft text-node-skill"><Gauge />Effort {t.effort}</Badge>
-															{/if}
-															<Badge class={cn('rounded-xs', ['P0', 'P1'].includes(t.priority) ? 'bg-destructive-soft text-destructive' : 'bg-muted text-muted-foreground')}><SignalHigh />{t.priority}</Badge>
-
-														</Kanban.ItemHeader>
-														<Kanban.ItemContent>
-															<span class="title-sm gap-2">
-																<SquareCheck class="size-3.5 shrink-0 text-node-task" />#{t.num} · {t.title}
-															</span>
-															<span class="meta-xs gap-2">
-																<CircleDot class="size-3.5 shrink-0 text-node-issue" />Issue #{t.issue} · {issueOf(t.issue)?.title}
-															</span>
-															<span class="flex items-center gap-2 pt-1.5">
-																{#if t.steps[1]}
-																	<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="완료 조건 진행" />
-																	<span class="kanban-card-steps">
-																		{t.steps[0]}/{t.steps[1]} · {Math.round((t.steps[0] / t.steps[1]) * 100)}%
-																	</span>
-																{:else}
-																	<span class="font-mono text-xs text-subtle-foreground">no steps</span>
-																{/if}
-															</span>
-
-														</Kanban.ItemContent>
-														<Kanban.ItemFooter>
-															<span class={cn('inline-flex items-center gap-1', t.over && 'text-warning')}><Coins class="size-3" />{t.tokens ?? '—'}{t.over ? ' ⚠' : ''}</span>
-															<span class="inline-flex items-center gap-1"><MessageSquare class="size-3" />{t.messages}</span>
-															{#if t.model}<Badge variant="mono" class="text-2xs"><Cpu />{t.model}</Badge>{/if}
-															<span class="ml-auto inline-flex items-center gap-1"><Timer class="size-3" />{t.run ? `Run ${t.run}` : '—'}</span>
-
-														</Kanban.ItemFooter>
-													</Kanban.Item>
-												{/snippet}
-											</ContextMenu.Trigger>
-											<ContextMenu.Content class="w-56">
-												<ContextMenu.Label class="truncate">Task #{t.num} · {t.title}</ContextMenu.Label>
-												<ContextMenu.Separator />
-												<ContextMenu.Entries entries={taskMenu(t.num)} />
-											</ContextMenu.Content>
-										</ContextMenu.Root>
-									{/each}
-									{#snippet empty()}<p class="empty-note text-center text-subtle-foreground">비어 있어요</p>{/snippet}
-								</Kanban.ColumnContent>
-							</Kanban.Column>
-						{/each}
-					</Kanban.Root>
-					{#if hover}
-						{@const t = task(hover.num)}
-						{@const d = details[hover.num]}
-						{@const next = d?.criteria.find((c) => !c.done)}
-						{@const blocks = (d?.deps ?? []).filter((x) => x.kind === 'blocks').map((x) => task(x.num)).filter(Boolean)}
-						{@const last = d?.activity.at(-1)}
-						{@const ctx = d?.context}
-						{@const at = { x: hover.x, y: hover.y }}
-						<!-- .pen KanbanCard/HoverPreview — ui/hover-card를 커서 위치에 띄운다 (+18px, 화면 끝에선 floating-ui가 뒤집음) -->
-						<HoverCard.Root open onOpenChange={(o) => !o && hoverOff()}>
-							<HoverCard.Content
-								customAnchor={{ getBoundingClientRect: () => new DOMRect(at.x + 18, at.y, 0, 0) }}
-								side="bottom"
-								align="start"
-								sideOffset={18}
-								class="pointer-events-none w-75 gap-0 overflow-hidden p-0"
-							>
-								<div class="hover-preview-head">
-									<span class="pt-0.5 text-xs font-semibold text-muted-foreground">#{t.num}</span>
-									<span class="min-w-0 flex-1 text-body font-semibold">{t.title}</span>
-									<StatusBadge status={t.status} />
-								</div>
-								<dl class="hover-preview-body">
-									{#each [['현재 단계', t.steps[1] ? `${t.steps[0]}/${t.steps[1]}${next ? ` · ${next.text}` : d?.criteria.length ? ' · 모두 완료' : ''}` : '—'], ['최근 활동', last ? `${last.type.toLowerCase()} ${last.text}` : '—'], ['막고 있는 Task', blocks.length ? blocks.map((b) => `#${b.num} ${b.title} · ${agentName(b.agent) ?? '미배정'}`).join(', ') : '—'], ['완료 시 전달', blocks[0] ? `${agentName(blocks[0].agent) ?? '미배정'} · ${roles[agentOf(blocks[0].agent)?.role ?? 'agent'].label} (REQUEST_VERIFICATION)` : '—'], ['ETA', d?.eta || '—']] as [k, v] (k)}
-										<div class="flex gap-2"><dt class="shrink-0 text-muted-foreground">{k}</dt><dd class="hover-preview-value">{v}</dd></div>
-									{/each}
-									{#if ctx}
-										<div class="flex flex-col gap-1.5 pt-1.5">
-											<div class="flex text-xs font-medium"><span class="flex-1 text-muted-foreground">Context</span><span class={ctx[0] / ctx[1] > 0.9 ? 'text-warning' : ''}>{ctx[0]}K / {ctx[1]}K</span></div>
-											<Progress value={(ctx[0] / ctx[1]) * 100} class="h-2" aria-label="컨텍스트" />
-										</div>
-										{#if ctx[0] / ctx[1] > 0.9}<p class="font-medium text-warning">⚠ Context {Math.round((ctx[0] / ctx[1]) * 100)}% — 요약 또는 새 Session 권장</p>{/if}
-									{/if}
-								</dl>
-								<p class="hover-preview-foot">클릭 → 상세 보기 · 우클릭 → 메뉴</p>
-							</HoverCard.Content>
-						</HoverCard.Root>
-					{/if}
+					<TaskBoard
+						tasks={list}
+						agents={agentList}
+						issues={issueList}
+						{details}
+						{selected}
+						menu={taskMenu}
+						onopen={open}
+						onmove={setStatus}
+						onadd={openQuick}
+						onnew={(s) => newTask({ status: s })}
+						onfilter={(s) => ((leftOpen = true), (panelTab = 'tasks'), (filter = s))}
+					/>
 				{:else if view.value === 'diagram'}
 					<SvelteFlow
 						bind:nodes
