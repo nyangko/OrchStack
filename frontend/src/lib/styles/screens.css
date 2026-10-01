@@ -13,29 +13,9 @@
 @utility view-summary {
 	@apply min-w-0 flex-1 truncate text-body text-muted-foreground;
 }
-/* Kanban 열 묶음 */
-@utility kanban-board {
-	@apply flex h-full items-start gap-3 p-4;
-}
-/* Kanban 열 머리 (.pen KanbanColumnHeader) */
-@utility kanban-column-head {
-	@apply flex h-10 items-center gap-2 pr-1 pl-2;
-}
-/* Kanban 카드 머리 (담당 · 우선순위) */
-@utility kanban-card-head {
-	@apply flex items-center gap-2 border-b px-4 py-3;
-}
-/* Kanban 카드 본문 */
-@utility kanban-card-body {
-	@apply flex flex-col gap-2.5 px-4 py-3.5;
-}
 /* Kanban 카드 진행 수 */
 @utility kanban-card-steps {
 	@apply shrink-0 font-mono text-xs font-semibold whitespace-nowrap text-muted-foreground;
-}
-/* Kanban 카드 바닥 (토큰 · 메시지 · 모델) */
-@utility kanban-card-foot {
-	@apply flex items-center gap-3.5 border-t px-4 py-2.5 font-mono text-xs text-muted-foreground;
 }
 /* 호버 미리보기 머리 */
 @utility hover-preview-head {
@@ -370,17 +350,7 @@
 	@apply flex items-center gap-0.5 rounded-xs px-1.5 py-px font-mono text-2xs font-bold;
 }
 
-/* ── kanban/kanban-card.svelte ── */
-/* Kanban 카드 (.pen KanbanCard) */
-@utility kanban-card {
-	@apply bg-card text-card-foreground border-border w-full rounded-lg border text-left text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50;
-}
 
-/* ── kanban/kanban-column.svelte ── */
-/* Kanban 열 (.pen KanbanColumn) · 드롭 대상 색은 상태로 */
-@utility kanban-column {
-	@apply flex w-85 shrink-0 flex-col gap-2 rounded-xl p-1.5 transition-colors;
-}
 
 /* ── notifications/+page.svelte ── */
 /* 알림 표 머리 */

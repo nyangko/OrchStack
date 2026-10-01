@@ -72,11 +72,8 @@
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import { DragDropProvider } from '@dnd-kit-svelte/svelte';
-	import { move } from '@dnd-kit/helpers';
-	import KanbanCard from '$lib/components/orch/kanban/kanban-card.svelte';
-	import KanbanColumn from '$lib/components/orch/kanban/kanban-column.svelte';
 	import { Badge } from '$lib/components/ui/badge';
+	import * as Kanban from '$lib/components/ui/kanban';
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Empty from '$lib/components/ui/empty';
@@ -213,13 +210,13 @@
 	const task = (num: number) => list.find((t) => t.num === num)!;
 	const lanes = $derived(statusOrder.filter((s) => s !== 'failed' || count(s) > 0));
 	// 드래그 중 열 배치는 따로 두고, 놓을 때 태스크 상태에 반영한다.
-	let board = $state<Record<string, number[]>>({});
+	let board = $state<Kanban.KanbanValue>({});
 	$effect.pre(() => {
 		board = Object.fromEntries(statusOrder.map((s) => [s, list.filter((t) => t.status === s).map((t) => t.num)]));
 	});
 	/// 놓은 열을 태스크 상태로 반영한다 — 바뀐 태스크만 command.
 	function drop() {
-		for (const [s, nums] of Object.entries(board)) for (const n of nums) if (task(n).status !== s) void setStatus(n, s as TaskStatus);
+		for (const [s, nums] of Object.entries(board)) for (const n of nums as number[]) if (task(n).status !== s) void setStatus(n, s as TaskStatus);
 	}
 
 	// Issue Board (.pen #26 Workbench / Issue Board) — 이슈 → 하위 이슈 → 태스크 트리.
@@ -1030,95 +1027,88 @@
 			<div class="relative min-h-0 flex-1">
 			<div class="h-full overflow-auto bg-canvas">
 				{#if view.value === 'kanban'}
-					<DragDropProvider
-						onDragOver={(e) => (board = move(board, e))}
-						onDragEnd={(e) => {
-							if (!e.canceled) {
-								board = move(board, e);
-								drop();
-							}
-						}}
-					>
-						<div class="kanban-board">
-							{#each lanes as s (s)}
-								{@const meta = statuses[s]}
-								<KanbanColumn id={s}>
-									<div class="kanban-column-head">
-										<meta.icon class={cn('size-3.5', meta.text)} />
-										<h3 class="text-body font-semibold">{meta.label}</h3>
-										<Badge variant="secondary" class="rounded-full px-1.5 font-mono">{board[s]?.length ?? 0}</Badge>
-										<span class="flex-1"></span>
+					<!-- ui/kanban 조립: 열 = 상태, 항목 = 태스크 번호. 놓으면 drop()이 상태를 command로 반영 -->
+					<Kanban.Root bind:value={board} onDragEnd={drop}>
+						{#each lanes as s (s)}
+							{@const meta = statuses[s]}
+							<Kanban.Column value={s}>
+								<Kanban.ColumnHeader>
+									<meta.icon class={meta.text} />
+									<Kanban.ColumnTitle>{meta.label}</Kanban.ColumnTitle>
+									<Kanban.ColumnCount />
+									<Kanban.ColumnActions>
 										<Button variant="ghost" size="icon-xs" aria-label="{meta.label}에 태스크 추가" onclick={() => openQuick(s)}><Plus /></Button>
-										<!-- 열 메뉴 — .pen에 항목이 없어 있는 동작만 (#60) -->
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger>{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-xs" aria-label="{meta.label} 열 메뉴"><Ellipsis /></Button>{/snippet}</DropdownMenu.Trigger>
-											<DropdownMenu.Content align="end" class="w-48">
-												<DropdownMenu.Item onSelect={() => newTask({ status: s })}><SquarePen />{meta.label}로 새 태스크</DropdownMenu.Item>
-												<DropdownMenu.Item onSelect={() => ((leftOpen = true), (panelTab = 'tasks'), (filter = s))}><FilterIcon />Quick Panel에서 이 상태만</DropdownMenu.Item>
-											</DropdownMenu.Content>
-										</DropdownMenu.Root>
-									</div>
-									<div class="flex min-h-24 flex-col gap-2">
-										{#each board[s] ?? [] as num, i (num)}
-											{@const t = task(num)}
-											{@const a = agentOf(t.agent)}
-											<!-- 우클릭: ContextMenu / Task (Diagram과 같은 목록) -->
-											<ContextMenu.Root onOpenChange={(o) => o && hoverOff()}>
+																<!-- 열 메뉴 — .pen에 항목이 없어 있는 동작만 (#60) -->
+																<DropdownMenu.Root>
+																	<DropdownMenu.Trigger>{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-xs" aria-label="{meta.label} 열 메뉴"><Ellipsis /></Button>{/snippet}</DropdownMenu.Trigger>
+																	<DropdownMenu.Content align="end" class="w-48">
+																		<DropdownMenu.Item onSelect={() => newTask({ status: s })}><SquarePen />{meta.label}로 새 태스크</DropdownMenu.Item>
+																		<DropdownMenu.Item onSelect={() => ((leftOpen = true), (panelTab = 'tasks'), (filter = s))}><FilterIcon />Quick Panel에서 이 상태만</DropdownMenu.Item>
+																	</DropdownMenu.Content>
+																</DropdownMenu.Root>
+									</Kanban.ColumnActions>
+								</Kanban.ColumnHeader>
+								<Kanban.ColumnContent>
+									{#each board[s] ?? [] as num (num)}
+										{@const t = task(num as number)}
+										{@const a = agentOf(t.agent)}
+										<!-- 우클릭: ContextMenu / Task (Diagram과 같은 목록) -->
+										<ContextMenu.Root onOpenChange={(o) => o && hoverOff()}>
 											<ContextMenu.Trigger>
-											{#snippet child({ props })}
-											<KanbanCard
-												{...props}
-												id={num}
-												index={i}
-												group={s}
-												aria-pressed={selected === t.num}
-												onclick={() => (hoverOff(), open(t.num))}
-												onpointermove={(e) => hoverAt(t.num, e)}
-												onpointerleave={hoverOff}
-												onpointerdown={hoverOff}
-												class={cn(selected === t.num && 'ring-2 ring-primary')}
-											>
-													<span class="kanban-card-head">
-														{#if a}
-															<RoleAvatar role={a.role} size="sm" />
-															<span class="text-sm font-semibold whitespace-nowrap">{a.name}</span>
-															<span class="text-xs whitespace-nowrap text-muted-foreground">{roles[a.role].label}</span>
-														{:else}
-															<UserRound class="size-4 text-subtle-foreground" />
-															<span class="text-xs text-muted-foreground">Unassigned</span>
-														{/if}
-														<span class="flex-1"></span>
-														{#if t.effort}
-															<Badge class="rounded-xs bg-review-soft text-node-skill"><Gauge />Effort {t.effort}</Badge>
-														{/if}
-														<Badge class={cn('rounded-xs', ['P0', 'P1'].includes(t.priority) ? 'bg-destructive-soft text-destructive' : 'bg-muted text-muted-foreground')}><SignalHigh />{t.priority}</Badge>
-													</span>
-													<span class="kanban-card-body">
-														<span class="title-sm gap-2">
-															<SquareCheck class="size-3.5 shrink-0 text-node-task" />#{t.num} · {t.title}
-														</span>
-														<span class="meta-xs gap-2">
-															<CircleDot class="size-3.5 shrink-0 text-node-issue" />Issue #{t.issue} · {issueOf(t.issue)?.title}
-														</span>
-														<span class="flex items-center gap-2 pt-1.5">
-															{#if t.steps[1]}
-																<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="완료 조건 진행" />
-																<span class="kanban-card-steps">
-																	{t.steps[0]}/{t.steps[1]} · {Math.round((t.steps[0] / t.steps[1]) * 100)}%
-																</span>
+												{#snippet child({ props })}
+													<Kanban.Item
+														{...props}
+														value={num}
+														aria-pressed={selected === t.num}
+														onclick={() => (hoverOff(), open(t.num))}
+														onpointermove={(e) => hoverAt(t.num, e)}
+														onpointerleave={hoverOff}
+														onpointerdown={hoverOff}
+													>
+														<Kanban.ItemHeader>
+															{#if a}
+																<RoleAvatar role={a.role} size="sm" />
+																<span class="text-sm font-semibold whitespace-nowrap">{a.name}</span>
+																<span class="text-xs whitespace-nowrap text-muted-foreground">{roles[a.role].label}</span>
 															{:else}
-																<span class="font-mono text-xs text-subtle-foreground">no steps</span>
+																<UserRound class="size-4 text-subtle-foreground" />
+																<span class="text-xs text-muted-foreground">Unassigned</span>
 															{/if}
-														</span>
-													</span>
-													<span class="kanban-card-foot">
-														<span class={cn('inline-flex items-center gap-1', t.over && 'text-warning')}><Coins class="size-3" />{t.tokens ?? '—'}{t.over ? ' ⚠' : ''}</span>
-														<span class="inline-flex items-center gap-1"><MessageSquare class="size-3" />{t.messages}</span>
-														{#if t.model}<Badge variant="mono" class="text-2xs"><Cpu />{t.model}</Badge>{/if}
-														<span class="ml-auto inline-flex items-center gap-1"><Timer class="size-3" />{t.run ? `Run ${t.run}` : '—'}</span>
-													</span>
-											</KanbanCard>
-											{/snippet}
+															<span class="flex-1"></span>
+															{#if t.effort}
+																<Badge class="rounded-xs bg-review-soft text-node-skill"><Gauge />Effort {t.effort}</Badge>
+															{/if}
+															<Badge class={cn('rounded-xs', ['P0', 'P1'].includes(t.priority) ? 'bg-destructive-soft text-destructive' : 'bg-muted text-muted-foreground')}><SignalHigh />{t.priority}</Badge>
+
+														</Kanban.ItemHeader>
+														<Kanban.ItemContent>
+															<span class="title-sm gap-2">
+																<SquareCheck class="size-3.5 shrink-0 text-node-task" />#{t.num} · {t.title}
+															</span>
+															<span class="meta-xs gap-2">
+																<CircleDot class="size-3.5 shrink-0 text-node-issue" />Issue #{t.issue} · {issueOf(t.issue)?.title}
+															</span>
+															<span class="flex items-center gap-2 pt-1.5">
+																{#if t.steps[1]}
+																	<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="완료 조건 진행" />
+																	<span class="kanban-card-steps">
+																		{t.steps[0]}/{t.steps[1]} · {Math.round((t.steps[0] / t.steps[1]) * 100)}%
+																	</span>
+																{:else}
+																	<span class="font-mono text-xs text-subtle-foreground">no steps</span>
+																{/if}
+															</span>
+
+														</Kanban.ItemContent>
+														<Kanban.ItemFooter>
+															<span class={cn('inline-flex items-center gap-1', t.over && 'text-warning')}><Coins class="size-3" />{t.tokens ?? '—'}{t.over ? ' ⚠' : ''}</span>
+															<span class="inline-flex items-center gap-1"><MessageSquare class="size-3" />{t.messages}</span>
+															{#if t.model}<Badge variant="mono" class="text-2xs"><Cpu />{t.model}</Badge>{/if}
+															<span class="ml-auto inline-flex items-center gap-1"><Timer class="size-3" />{t.run ? `Run ${t.run}` : '—'}</span>
+
+														</Kanban.ItemFooter>
+													</Kanban.Item>
+												{/snippet}
 											</ContextMenu.Trigger>
 											<ContextMenu.Content class="w-56">
 												<ContextMenu.Label class="truncate">Task #{t.num} · {t.title}</ContextMenu.Label>
@@ -1143,15 +1133,13 @@
 													{/if}
 												{/each}
 											</ContextMenu.Content>
-											</ContextMenu.Root>
-										{:else}
-											<p class="empty-note text-center text-subtle-foreground">비어 있어요</p>
-										{/each}
-									</div>
-								</KanbanColumn>
-							{/each}
-						</div>
-					</DragDropProvider>
+										</ContextMenu.Root>
+									{/each}
+									{#snippet empty()}<p class="empty-note text-center text-subtle-foreground">비어 있어요</p>{/snippet}
+								</Kanban.ColumnContent>
+							</Kanban.Column>
+						{/each}
+					</Kanban.Root>
 					{#if hover}
 						{@const t = task(hover.num)}
 						{@const d = details[hover.num]}
