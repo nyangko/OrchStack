@@ -14,9 +14,9 @@
 	import Ban from '@lucide/svelte/icons/ban';
 	import ToggleRight from '@lucide/svelte/icons/toggle-right';
 	import type { Component } from 'svelte';
-	import * as Card from '$lib/components/ui/card';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Avatar from '$lib/components/ui/avatar';
+	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from '$lib/components/ui/dialog';
+	import { AvatarGroup } from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Switch } from '$lib/components/ui/switch';
@@ -124,7 +124,7 @@
 	<div class="flex flex-col gap-2 border-t pt-2.5 text-xs">
 		<span class="text-muted-foreground">사용 중</span>
 		<span class="flex items-center gap-2">
-			<Avatar.Group>{#each u.members.slice(0, 5) as m (m.sn)}<RoleAvatar role={m.role} icon={glyphOf(m)} size="sm" />{/each}</Avatar.Group>
+			<AvatarGroup>{#each u.members.slice(0, 5) as m (m.sn)}<RoleAvatar role={m.role} icon={glyphOf(m)} size="sm" />{/each}</AvatarGroup>
 			<span>멤버 {u.members.length}{u.members.length ? ` · ${u.members.map((m) => m.name).join(' · ')}` : ''}</span>
 		</span>
 		<span>템플릿 {u.templates.length}{u.templates.length ? ` · ${u.templates.map((t) => `${t.name} v${t.version}`).join(' · ')}` : ''}</span>
@@ -166,12 +166,12 @@
 		<div class="flex items-start gap-4">
 			<div class="flex min-w-0 flex-1 flex-col gap-4">
 				{#if filter.kind !== 'mcp'}
-					<Card.Root size="sm">
-						<Card.Header>
-							<Card.Title>스킬 · {skills.length}</Card.Title>
-							<Card.Description>스위치 = 워크스페이스에서 허용 · 끄면 모든 멤버에서 빠져요</Card.Description>
-						</Card.Header>
-						<Card.Content class="gap-0">
+					<Card size="sm">
+						<CardHeader>
+							<CardTitle>스킬 · {skills.length}</CardTitle>
+							<CardDescription>스위치 = 워크스페이스에서 허용 · 끄면 모든 멤버에서 빠져요</CardDescription>
+						</CardHeader>
+						<CardContent class="gap-0">
 							{#each skills as s (s.name)}
 								{@const on = sel.kind === 'skill' && sel.name === s.name}
 								{@const src = sourceMeta[s.source]}
@@ -193,16 +193,16 @@
 							{:else}
 								<p class="text-xs text-muted-foreground">조건에 맞는 스킬이 없어요.</p>
 							{/each}
-						</Card.Content>
-					</Card.Root>
+						</CardContent>
+					</Card>
 				{/if}
 				{#if servers.length}
-					<Card.Root size="sm">
-						<Card.Header>
-							<Card.Title>MCP 서버 · {servers.length}</Card.Title>
-							<Card.Description>설치됨 = 매 Run 컨텍스트에 도구 추가 · 접근 가능 = 허용만</Card.Description>
-						</Card.Header>
-						<Card.Content class="gap-0">
+					<Card size="sm">
+						<CardHeader>
+							<CardTitle>MCP 서버 · {servers.length}</CardTitle>
+							<CardDescription>설치됨 = 매 Run 컨텍스트에 도구 추가 · 접근 가능 = 허용만</CardDescription>
+						</CardHeader>
+						<CardContent class="gap-0">
 							{#each servers as m (m.name)}
 								{@const st = store.mcp[m.name]}
 								{@const n = usersOf(m.name, 'mcp').members.length}
@@ -228,20 +228,20 @@
 									{/if}
 								</div>
 							{/each}
-						</Card.Content>
-					</Card.Root>
+						</CardContent>
+					</Card>
 				{/if}
 			</div>
 
 			<aside class="flex shrink-0 flex-col w-80 gap-4">
-				<Card.Root size="sm">
+				<Card size="sm">
 					{#if selSkill}
 						{@const s = selSkill}
-						<Card.Header>
-							<Card.Title class="font-mono">{s.name}</Card.Title>
-							<Card.Description>선택한 스킬 · {sourceMeta[s.source].label}</Card.Description>
-						</Card.Header>
-						<Card.Content class="gap-0">
+						<CardHeader>
+							<CardTitle class="font-mono">{s.name}</CardTitle>
+							<CardDescription>선택한 스킬 · {sourceMeta[s.source].label}</CardDescription>
+						</CardHeader>
+						<CardContent class="gap-0">
 							<KeyValueRow label="버전"><span class={['text-body font-medium', s.update ? 'text-status-waiting' : undefined]}>{s.update ? `${s.version} → ${s.update} 업데이트 가능` : (s.version ?? '—')}</span></KeyValueRow>
 							<KeyValueRow label="소스" value={sourceMeta[s.source].label} />
 							<KeyValueRow label="컨텍스트" value={s.blocked ? '—' : `+${s.tok} tok / Run`} />
@@ -252,14 +252,14 @@
 							{#if s.update}
 								<Button size="sm" class="mt-3 w-fit" onclick={() => update(s)}><Download />{s.update}로 업데이트</Button>
 							{/if}
-						</Card.Content>
+						</CardContent>
 					{:else if selMcp}
 						{@const st = store.mcp[selMcp.name]}
-						<Card.Header>
-							<Card.Title class="font-mono">{selMcp.name}</Card.Title>
-							<Card.Description>선택한 MCP 서버</Card.Description>
-						</Card.Header>
-						<Card.Content class="gap-0">
+						<CardHeader>
+							<CardTitle class="font-mono">{selMcp.name}</CardTitle>
+							<CardDescription>선택한 MCP 서버</CardDescription>
+						</CardHeader>
+						<CardContent class="gap-0">
 							<KeyValueRow label="상태"><span class={['text-body font-medium', st.auth ? 'text-status-waiting' : undefined]}>{st.auth ? '인증 필요' : st.installed ? '설치됨 · 정상' : '접근 가능 · 미설치'}</span></KeyValueRow>
 							<KeyValueRow label="도구" value={`${selMcp.tools} tools`} />
 							<KeyValueRow label="컨텍스트" value={st.installed ? `+${selMcp.tok} tok / Run` : '미설치 · 비용 없음'} />
@@ -268,37 +268,37 @@
 							{#if st.auth || !st.installed}
 								<Button size="sm" class="mt-3 w-fit" onclick={() => mcpAction(selMcp.name)}>{st.auth ? '인증하기' : '설치'}</Button>
 							{/if}
-						</Card.Content>
+						</CardContent>
 					{/if}
-				</Card.Root>
-				<Card.Root size="sm">
-					<Card.Header>
-						<Card.Title>최근 변경</Card.Title>
-						<Card.Description>7일</Card.Description>
-					</Card.Header>
-					<Card.Content class="gap-0">
+				</Card>
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>최근 변경</CardTitle>
+						<CardDescription>7일</CardDescription>
+					</CardHeader>
+					<CardContent class="gap-0">
 						{#each store.log.slice(0, 6) as l, i (i)}
 							{@const Icon = logIcon[l.kind]}
 							<HistoryRow icon={Icon} tone={l.kind === 'BLOCK' ? 'bg-destructive-soft text-destructive' : 'bg-primary-soft text-primary'} kind={l.kind} who={l.who} when={l.when} text={l.text} class="first:border-t-0" />
 						{/each}
-					</Card.Content>
-				</Card.Root>
+					</CardContent>
+				</Card>
 			</aside>
 		</div>
 	</main>
 </div>
 
 <!-- 스킬 · MCP 추가 — skills.sh에서 워크스페이스 라이브러리로 -->
-<Dialog.Root bind:open={adding}>
-	<Dialog.Content size="xl" tall>
-		<Dialog.Header>
-			<Dialog.Title>스킬 · MCP 추가</Dialog.Title>
-			<Dialog.Description>워크스페이스 라이브러리에 추가해요. 에이전트별로 켜는 건 템플릿 · 멤버 Skills 탭에서 해요.</Dialog.Description>
-		</Dialog.Header>
-		<Dialog.Body>
+<Dialog bind:open={adding}>
+	<DialogContent size="xl" tall>
+		<DialogHeader>
+			<DialogTitle>스킬 · MCP 추가</DialogTitle>
+			<DialogDescription>워크스페이스 라이브러리에 추가해요. 에이전트별로 켜는 건 템플릿 · 멤버 Skills 탭에서 해요.</DialogDescription>
+		</DialogHeader>
+		<DialogBody>
 			<SkillBrowser added={(n) => store.library.some((s) => s.name === n)} onadd={(h) => (installSkill(h), (sel = { kind: 'skill', name: h.name }))} target="워크스페이스" />
-		</Dialog.Body>
-	</Dialog.Content>
-</Dialog.Root>
+		</DialogBody>
+	</DialogContent>
+</Dialog>
 
 <SkillSourcesDialog bind:open={sourcesOpen} />

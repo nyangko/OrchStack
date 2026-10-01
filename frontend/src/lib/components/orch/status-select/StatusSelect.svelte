@@ -1,6 +1,6 @@
 <script lang="ts">
 	/// Task 상태 선택 (.pen StatusSelect + StatusMenu). 트리거는 현재 상태 색, 메뉴는 전체 상태 목록.
-	import * as Select from "$lib/components/ui/select/index.js";
+	import { Select, SelectTrigger, SelectContent, SelectItem } from "$lib/components/ui/select";
 	import ChevronDown from "@lucide/svelte/icons/chevron-down";
 	import Check from "@lucide/svelte/icons/check";
 	import { statuses, statusOrder, type TaskStatus } from "$lib/status.js";
@@ -28,16 +28,16 @@
 	const current = $derived(statuses[value]);
 </script>
 
-<Select.Root
+<Select
 	type="single"
 	bind:value={() => value, (v) => (value = v as TaskStatus)}
 	onValueChange={(v) => onValueChange?.(v as TaskStatus)}
 	{disabled}
 >
 	{#if trigger}
-		<Select.Trigger>{#snippet child({ props })}{@render trigger(props)}{/snippet}</Select.Trigger>
+		<SelectTrigger>{#snippet child({ props })}{@render trigger(props)}{/snippet}</SelectTrigger>
 	{:else}
-	<Select.Trigger
+	<SelectTrigger
 		aria-label={compact ? `Status: ${current.label}` : "Status"}
 		title={compact ? `${current.label} · 클릭하여 변경` : undefined}
 		class={cn(
@@ -54,16 +54,16 @@
 			{current.label}
 			<ChevronDown class="size-3" />
 		{/if}
-	</Select.Trigger>
+	</SelectTrigger>
 	{/if}
-	<Select.Content class="w-47 p-1">
+	<SelectContent class="w-47 p-1">
 		{#each statusOrder as s (s)}
 			{@const m = statuses[s]}
-			<Select.Item value={s} label={m.label} class="h-7 gap-2 rounded-xs px-2 text-body [&>span:first-child]:hidden">
+			<SelectItem value={s} label={m.label} class="h-7 gap-2 rounded-xs px-2 text-body [&>span:first-child]:hidden">
 				<m.icon class={cn("size-3.5", m.text)} />
 				<span class="flex-1">{m.label}</span>
 				{#if s === value}<Check class="size-3.5" />{/if}
-			</Select.Item>
+			</SelectItem>
 		{/each}
-	</Select.Content>
-</Select.Root>
+	</SelectContent>
+</Select>

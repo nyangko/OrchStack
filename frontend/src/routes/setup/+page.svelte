@@ -29,8 +29,8 @@
 	import Timer from '@lucide/svelte/icons/timer';
 	import Zap from '@lucide/svelte/icons/zap';
 	import type { Component } from 'svelte';
-	import * as Select from '$lib/components/ui/select';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Steps } from '$lib/components/orch/steps';
 	import { Switch } from '$lib/components/ui/switch';
@@ -298,28 +298,28 @@
 				{:else if step === 1}
 					<label class="flex flex-col gap-2">
 						{@render field('이름', '프로젝트 탭 · 브레드크럼에 보여요')}
-						<InputGroup.Root class="h-10">
-							<InputGroup.Addon><Folder /></InputGroup.Addon>
-							<InputGroup.Input bind:value={projectName} placeholder="프로젝트 이름" />
-						</InputGroup.Root>
+						<InputGroup class="h-10">
+							<InputGroupAddon><Folder /></InputGroupAddon>
+							<InputGroupInput bind:value={projectName} placeholder="프로젝트 이름" />
+						</InputGroup>
 					</label>
 					<div class="form-block">
 						{@render field('저장소', 'GitHub App이 설치된 저장소만 보여요')}
-						<Select.Root type="single" bind:value={repo}>
-							<Select.Trigger class="h-10 w-full" aria-label="저장소">
+						<Select type="single" bind:value={repo}>
+							<SelectTrigger class="h-10 w-full" aria-label="저장소">
 								<span class="flex items-center gap-2"><GitFork class="size-4 text-muted-foreground" /><span class="font-semibold">{repo}</span><span class="font-normal text-muted-foreground">{repoInfo.meta}</span></span>
-							</Select.Trigger>
-							<Select.Content>{#each repos as r (r.value)}<Select.Item value={r.value} label={r.value}>{r.value} <span class="text-muted-foreground">{r.meta}</span></Select.Item>{/each}</Select.Content>
-						</Select.Root>
+							</SelectTrigger>
+							<SelectContent>{#each repos as r (r.value)}<SelectItem value={r.value} label={r.value}>{r.value} <span class="text-muted-foreground">{r.meta}</span></SelectItem>{/each}</SelectContent>
+						</Select>
 					</div>
 					<div class="form-block">
 						{@render field('기본 브랜치', '에이전트는 여기서 feat/<이슈>-<slug> 브랜치를 만들어요')}
-						<Select.Root type="single" bind:value={branch}>
-							<Select.Trigger class="h-10 w-full" aria-label="기본 브랜치">
+						<Select type="single" bind:value={branch}>
+							<SelectTrigger class="h-10 w-full" aria-label="기본 브랜치">
 								<span class="flex items-center gap-2"><GitBranch class="size-4 text-muted-foreground" /><span class="font-semibold">{branch}</span><span class="font-normal text-muted-foreground">{branches.find((b) => b.value === branch)?.meta}</span></span>
-							</Select.Trigger>
-							<Select.Content>{#each branches as b (b.value)}<Select.Item value={b.value} label={b.value}>{b.value} <span class="text-muted-foreground">{b.meta}</span></Select.Item>{/each}</Select.Content>
-						</Select.Root>
+							</SelectTrigger>
+							<SelectContent>{#each branches as b (b.value)}<SelectItem value={b.value} label={b.value}>{b.value} <span class="text-muted-foreground">{b.meta}</span></SelectItem>{/each}</SelectContent>
+						</Select>
 					</div>
 					<label class="setup-toggle">
 						<span class="flex flex-1 flex-col gap-0.5">
@@ -338,10 +338,10 @@
 				{:else}
 					<label class="flex flex-col gap-2">
 						{@render field('팀 이름', `프로젝트 ${projectName || ''}을 맡아요`)}
-						<InputGroup.Root class="h-10">
-							<InputGroup.Addon><Users /></InputGroup.Addon>
-							<InputGroup.Input bind:value={teamName} placeholder="팀 이름" />
-						</InputGroup.Root>
+						<InputGroup class="h-10">
+							<InputGroupAddon><Users /></InputGroupAddon>
+							<InputGroupInput bind:value={teamName} placeholder="팀 이름" />
+						</InputGroup>
 					</label>
 					<div class="strip bg-primary-soft py-2.5">
 						<Sparkles class="size-3.5 text-primary" />

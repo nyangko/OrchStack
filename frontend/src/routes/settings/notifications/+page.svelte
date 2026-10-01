@@ -10,13 +10,13 @@
 	import Moon from '@lucide/svelte/icons/moon';
 	import Clock from '@lucide/svelte/icons/clock';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
-	import * as Card from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
+	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Pill } from '$lib/components/orch/pill';
 	import { Switch } from '$lib/components/ui/switch';
-	import * as Field from '$lib/components/ui/field';
+	import { FieldRow, FieldSwitchRow } from '$lib/components/ui/field';
 	import { notifyEvents, notifyChannels, notifyQuiet, type NotifyChannel } from '$lib/mock';
 
 	let events = $state(structuredClone(notifyEvents));
@@ -48,12 +48,12 @@
 	</PageHeader>
 
 	<div class="flex items-start gap-5">
-		<Card.Root size="sm" class="min-w-0 flex-1">
-			<Card.Header>
-				<Card.Title>이벤트별 알림</Card.Title>
-				<Card.Description>무엇을 어디로 보낼지 · 멤버 · 연결별 설정이 있으면 그쪽이 우선</Card.Description>
-			</Card.Header>
-			<Card.Content class="gap-0">
+		<Card size="sm" class="min-w-0 flex-1">
+			<CardHeader>
+				<CardTitle>이벤트별 알림</CardTitle>
+				<CardDescription>무엇을 어디로 보낼지 · 멤버 · 연결별 설정이 있으면 그쪽이 우선</CardDescription>
+			</CardHeader>
+			<CardContent class="gap-0">
 				<div class="flex border-b pb-2 text-caption font-medium text-muted-foreground">
 					<span class="flex-1">이벤트</span>
 					{#each notifyChannels as c (c.key)}<span class="w-18 text-center">{c.name}</span>{/each}
@@ -74,13 +74,13 @@
 						</div>
 					{/each}
 				{/each}
-			</Card.Content>
-		</Card.Root>
+			</CardContent>
+		</Card>
 
 		<div class="flex shrink-0 flex-col w-95 gap-5">
-			<Card.Root size="sm">
-				<Card.Header><Card.Title>채널</Card.Title></Card.Header>
-				<Card.Content class="flex flex-col gap-2">
+			<Card size="sm">
+				<CardHeader><CardTitle>채널</CardTitle></CardHeader>
+				<CardContent class="flex flex-col gap-2">
 					{#each notifyChannels as c (c.key)}
 						{@const Icon = icon[c.key]}
 						<div class="option-card rounded-md">
@@ -96,35 +96,35 @@
 							{/if}
 						</div>
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header><Card.Title>방해 금지</Card.Title></Card.Header>
-				<Card.Content>
-					<Field.Row label="시간" hint="이 시간에는 앱 배지만 쌓여요">
-						<Select.Root type="single" bind:value={() => quiet.hours, (v) => ((quiet.hours = v), (saved = true))}>
-							<Select.Trigger class="w-full" aria-label="방해 금지 시간">
+			<Card size="sm">
+				<CardHeader><CardTitle>방해 금지</CardTitle></CardHeader>
+				<CardContent>
+					<FieldRow label="시간" hint="이 시간에는 앱 배지만 쌓여요">
+						<Select type="single" bind:value={() => quiet.hours, (v) => ((quiet.hours = v), (saved = true))}>
+							<SelectTrigger class="w-full" aria-label="방해 금지 시간">
 								<span class="flex min-w-0 flex-1 items-center gap-2">
 									<Moon class="size-4 text-muted-foreground" />{quiet.hours}
 									<span class="truncate text-caption font-normal text-muted-foreground">{quiet.weekend ? '주말 전체 포함' : ''}</span>
 								</span>
-							</Select.Trigger>
-							<Select.Content>
-								{#each ['22:00 – 08:00', '23:00 – 07:00', '끄기'] as o (o)}<Select.Item value={o} label={o} />{/each}
-							</Select.Content>
-						</Select.Root>
-					</Field.Row>
-					<Field.SwitchRow label="L3 이상은 방해 금지 무시" hint="외부 영향 · 위험 판단, 연결 오류" bind:checked={() => quiet.urgentBypass, (v) => ((quiet.urgentBypass = v), (saved = true))} />
-				</Card.Content>
-			</Card.Root>
+							</SelectTrigger>
+							<SelectContent>
+								{#each ['22:00 – 08:00', '23:00 – 07:00', '끄기'] as o (o)}<SelectItem value={o} label={o} />{/each}
+							</SelectContent>
+						</Select>
+					</FieldRow>
+					<FieldSwitchRow label="L3 이상은 방해 금지 무시" hint="외부 영향 · 위험 판단, 연결 오류" bind:checked={() => quiet.urgentBypass, (v) => ((quiet.urgentBypass = v), (saved = true))} />
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header><Card.Title>일일 요약</Card.Title></Card.Header>
-				<Card.Content>
-					<Field.Row label="보내는 시각" hint="완료 · 실패 · 토큰 · 비용 요약">
-						<Select.Root type="single" bind:value={() => quiet.digest, (v) => ((quiet.digest = v), (saved = true))}>
-							<Select.Trigger class="w-full" aria-label="일일 요약 시각">
+			<Card size="sm">
+				<CardHeader><CardTitle>일일 요약</CardTitle></CardHeader>
+				<CardContent>
+					<FieldRow label="보내는 시각" hint="완료 · 실패 · 토큰 · 비용 요약">
+						<Select type="single" bind:value={() => quiet.digest, (v) => ((quiet.digest = v), (saved = true))}>
+							<SelectTrigger class="w-full" aria-label="일일 요약 시각">
 								<span class="flex min-w-0 flex-1 items-center gap-2">
 									<Clock class="size-4 text-muted-foreground" />{quiet.digest}
 									<!-- 일일 요약 이벤트에서 켠 채널 -->
@@ -132,14 +132,14 @@
 										{notifyChannels.filter((c) => digestOn?.on[c.key]).map((c) => c.name).join(' + ')}
 									</span>
 								</span>
-							</Select.Trigger>
-							<Select.Content>
-								{#each ['매일 09:00', '매일 18:00', '평일 18:00', '보내지 않음'] as o (o)}<Select.Item value={o} label={o} />{/each}
-							</Select.Content>
-						</Select.Root>
-					</Field.Row>
-				</Card.Content>
-			</Card.Root>
+							</SelectTrigger>
+							<SelectContent>
+								{#each ['매일 09:00', '매일 18:00', '평일 18:00', '보내지 않음'] as o (o)}<SelectItem value={o} label={o} />{/each}
+							</SelectContent>
+						</Select>
+					</FieldRow>
+				</CardContent>
+			</Card>
 		</div>
 	</div>
 </main>

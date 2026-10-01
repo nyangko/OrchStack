@@ -17,14 +17,14 @@
 	import BookMarked from '@lucide/svelte/icons/book-marked';
 	import Download from '@lucide/svelte/icons/download';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import * as Card from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
-	import * as InputGroup from '$lib/components/ui/input-group';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
+	import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Segmented } from '$lib/components/orch/segmented';
-	import * as Field from '$lib/components/ui/field';
+	import { FieldRow } from '$lib/components/ui/field';
 
 	type Key = keyof typeof s;
 	/// Select 한 줄 — note는 값 옆 회색 설명 (값에 따라 다를 수 있다).
@@ -76,20 +76,20 @@
 <!-- .pen FormRow + Select -->
 {#snippet selectRow(r: Row)}
 	<!-- label로 감싸면 트리거 클릭이 두 번 전달돼 목록이 다시 열린다 -->
-	<Field.Row label={r.label} hint={r.hint}>
-		<Select.Root type="single" value={s[r.key]} onValueChange={(v) => set(r.key, v)}>
-			<Select.Trigger class="w-full" aria-label={r.label}>
+	<FieldRow label={r.label} hint={r.hint}>
+		<Select type="single" value={s[r.key]} onValueChange={(v) => set(r.key, v)}>
+			<SelectTrigger class="w-full" aria-label={r.label}>
 				<span class="flex min-w-0 flex-1 items-center gap-2">
 					<r.icon class="size-4 text-muted-foreground" />
 					{s[r.key]}
 					<span class="truncate text-caption font-normal text-muted-foreground">{r.note?.(s[r.key])}</span>
 				</span>
-			</Select.Trigger>
-			<Select.Content>
-				{#each r.options as o (o)}<Select.Item value={o} label={o} />{/each}
-			</Select.Content>
-		</Select.Root>
-	</Field.Row>
+			</SelectTrigger>
+			<SelectContent>
+				{#each r.options as o (o)}<SelectItem value={o} label={o} />{/each}
+			</SelectContent>
+		</Select>
+	</FieldRow>
 {/snippet}
 
 <main class="page-main">
@@ -97,30 +97,30 @@
 
 	<div class="flex items-start gap-5">
 		<div class="flex min-w-0 flex-1 flex-col gap-5">
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>워크스페이스</Card.Title>
-					<Card.Description>팀원 모두에게 보이는 기본 정보</Card.Description>
-				</Card.Header>
-				<Card.Content>
-					<Field.Row label="이름" as="label">
-						<InputGroup.Root>
-							<InputGroup.Addon><Building2 /></InputGroup.Addon>
-							<InputGroup.Input class="text-xs font-medium" value={s.name} onchange={(e) => set('name', e.currentTarget.value)} />
-						</InputGroup.Root>
-					</Field.Row>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>워크스페이스</CardTitle>
+					<CardDescription>팀원 모두에게 보이는 기본 정보</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<FieldRow label="이름" as="label">
+						<InputGroup>
+							<InputGroupAddon><Building2 /></InputGroupAddon>
+							<InputGroupInput class="text-xs font-medium" value={s.name} onchange={(e) => set('name', e.currentTarget.value)} />
+						</InputGroup>
+					</FieldRow>
 					{#each workspaceRows as r (r.key)}{@render selectRow(r)}{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>언어 · 지역</Card.Title>
-					<Card.Description>화면과 에이전트 출력 언어의 기본값 · 연결 · 멤버별로 바꿀 수 있어요</Card.Description>
-				</Card.Header>
-				<Card.Content>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>언어 · 지역</CardTitle>
+					<CardDescription>화면과 에이전트 출력 언어의 기본값 · 연결 · 멤버별로 바꿀 수 있어요</CardDescription>
+				</CardHeader>
+				<CardContent>
 					{#each langRows as r (r.key)}{@render selectRow(r)}{/each}
-					<Field.Row label="날짜 형식">
+					<FieldRow label="날짜 형식">
 						<Segmented
 							aria-label="날짜 형식"
 							options={[
@@ -130,16 +130,16 @@
 							]}
 							bind:value={() => s.dateFormat, (v) => set('dateFormat', v ?? 'iso')}
 						/>
-					</Field.Row>
-				</Card.Content>
-			</Card.Root>
+					</FieldRow>
+				</CardContent>
+			</Card>
 		</div>
 
 		<div class="flex shrink-0 flex-col w-95 gap-5">
-			<Card.Root size="sm">
-				<Card.Header><Card.Title>화면</Card.Title></Card.Header>
-				<Card.Content>
-					<Field.Row label="테마">
+			<Card size="sm">
+				<CardHeader><CardTitle>화면</CardTitle></CardHeader>
+				<CardContent>
+					<FieldRow label="테마">
 						<!-- 다크 테마는 라이트 작업 후 별도 패스에서 적용 — 지금은 값만 저장 -->
 						<Segmented
 							aria-label="테마"
@@ -150,47 +150,47 @@
 							]}
 							bind:value={() => s.theme, (v) => set('theme', v ?? 'light')}
 						/>
-					</Field.Row>
-				</Card.Content>
-			</Card.Root>
+					</FieldRow>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>데이터 보관</Card.Title>
-					<Card.Description>오래된 기록은 자동으로 정리돼요</Card.Description>
-				</Card.Header>
-				<Card.Content>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>데이터 보관</CardTitle>
+					<CardDescription>오래된 기록은 자동으로 정리돼요</CardDescription>
+				</CardHeader>
+				<CardContent>
 					{#each keepRows as r (r.key)}{@render selectRow(r)}{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>위험 구역</Card.Title>
-					<Card.Description>되돌릴 수 없는 작업</Card.Description>
-				</Card.Header>
-				<Card.Content class="flex flex-col gap-2.5 pt-1">
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>위험 구역</CardTitle>
+					<CardDescription>되돌릴 수 없는 작업</CardDescription>
+				</CardHeader>
+				<CardContent class="flex flex-col gap-2.5 pt-1">
 					<!-- 내보내기 · 삭제는 서버 연결(#47) 후 실제 동작 -->
 					<Button variant="outline" class="w-full"><Download />워크스페이스 내보내기 (.zip)</Button>
 					<Button variant="destructive" class="w-full" onclick={() => ((confirmName = ''), (deleting = true))}><Trash2 />워크스페이스 삭제</Button>
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 		</div>
 	</div>
 </main>
 
-<AlertDialog.Root bind:open={deleting}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>워크스페이스를 삭제할까요?</AlertDialog.Title>
-			<AlertDialog.Description>팀 · 태스크 · Run 기록 · 연결이 모두 지워지고 되돌릴 수 없어요. 계속하려면 워크스페이스 이름 <b>{s.name}</b>을 입력하세요.</AlertDialog.Description>
-		</AlertDialog.Header>
-		<InputGroup.Root>
-			<InputGroup.Input bind:value={confirmName} placeholder={s.name} aria-label="워크스페이스 이름 확인" />
-		</InputGroup.Root>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel>취소</AlertDialog.Cancel>
-			<AlertDialog.Action variant="destructive" disabled={confirmName !== s.name}>삭제</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+<AlertDialog bind:open={deleting}>
+	<AlertDialogContent>
+		<AlertDialogHeader>
+			<AlertDialogTitle>워크스페이스를 삭제할까요?</AlertDialogTitle>
+			<AlertDialogDescription>팀 · 태스크 · Run 기록 · 연결이 모두 지워지고 되돌릴 수 없어요. 계속하려면 워크스페이스 이름 <b>{s.name}</b>을 입력하세요.</AlertDialogDescription>
+		</AlertDialogHeader>
+		<InputGroup>
+			<InputGroupInput bind:value={confirmName} placeholder={s.name} aria-label="워크스페이스 이름 확인" />
+		</InputGroup>
+		<AlertDialogFooter>
+			<AlertDialogCancel>취소</AlertDialogCancel>
+			<AlertDialogAction variant="destructive" disabled={confirmName !== s.name}>삭제</AlertDialogAction>
+		</AlertDialogFooter>
+	</AlertDialogContent>
+</AlertDialog>

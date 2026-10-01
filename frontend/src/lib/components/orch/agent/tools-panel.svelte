@@ -12,7 +12,7 @@
 	import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
 	import Globe from '@lucide/svelte/icons/globe';
 	import ShieldX from '@lucide/svelte/icons/shield-x';
-	import * as Card from '$lib/components/ui/card';
+	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Pill } from '$lib/components/orch/pill';
 	import { Segmented } from '$lib/components/orch/segmented';
@@ -56,12 +56,12 @@
 </div>
 <div class="flex items-start gap-4">
 	<div class="flex min-w-0 flex-1 flex-col gap-4">
-		<Card.Root size="sm">
-			<Card.Header>
-				<Card.Title>MCP 서버</Card.Title>
-				<Card.Description>설치됨 = 매 Run 컨텍스트에 도구가 추가됨 · 접근 가능 = 허용만, 비용 없음</Card.Description>
-			</Card.Header>
-			<Card.Content class="gap-0">
+		<Card size="sm">
+			<CardHeader>
+				<CardTitle>MCP 서버</CardTitle>
+				<CardDescription>설치됨 = 매 Run 컨텍스트에 도구가 추가됨 · 접근 가능 = 허용만, 비용 없음</CardDescription>
+			</CardHeader>
+			<CardContent class="gap-0">
 				{#each mcpServers as srv (srv.name)}
 					{@const on = c.mcp.includes(srv.name)}
 					<div class="list-row">
@@ -79,14 +79,14 @@
 						<Button variant={on ? 'ghost' : 'outline'} size="sm" disabled={!on && srv.auth} title={!on && srv.auth ? 'Settings › 모델 연결에서 인증 후 설치' : undefined} onclick={() => toggleIn(c.mcp, srv.name)}>{on ? '제거' : '설치'}</Button>
 					</div>
 				{/each}
-			</Card.Content>
-		</Card.Root>
-		<Card.Root size="sm">
-			<Card.Header>
-				<Card.Title>CLI 기본 도구</Card.Title>
-				<Card.Description>권한 설정(Trust · 파일 범위 · 승인 규칙)에서 계산돼요</Card.Description>
-			</Card.Header>
-			<Card.Content class="gap-0">
+			</CardContent>
+		</Card>
+		<Card size="sm">
+			<CardHeader>
+				<CardTitle>CLI 기본 도구</CardTitle>
+				<CardDescription>권한 설정(Trust · 파일 범위 · 승인 규칙)에서 계산돼요</CardDescription>
+			</CardHeader>
+			<CardContent class="gap-0">
 				{#each cliTools as tool (tool.name)}
 					<div class="flex items-center gap-3 border-t py-2 text-xs first:border-t-0">
 						<tool.icon class="size-3.5 text-muted-foreground" />
@@ -95,12 +95,12 @@
 						<Pill class={tool.v === '차단' ? 'bg-destructive-soft text-destructive' : tool.v === '승인' || tool.v === '제안' ? 'bg-warning-soft text-status-waiting' : 'bg-success-soft text-status-done'}>{tool.v}</Pill>
 					</div>
 				{/each}
-			</Card.Content>
-		</Card.Root>
+			</CardContent>
+		</Card>
 	</div>
-	<Card.Root size="sm" class="w-72 shrink-0">
-		<Card.Header><Card.Title>이 도구들이 허용된 이유</Card.Title></Card.Header>
-		<Card.Content class="gap-2.5 text-xs">
+	<Card size="sm" class="w-72 shrink-0">
+		<CardHeader><CardTitle>이 도구들이 허용된 이유</CardTitle></CardHeader>
+		<CardContent class="gap-2.5 text-xs">
 			{#each [['접근 프로필', `Trust ${c.trust} · ${scopeText(c)} 쓰기`], ['팀 정책', `${teamName} · PR 생성은 ${c.approvals.find((a) => a.action === 'PR 생성')?.policy}, Destructive git 항상 차단`], ['Instructions', "AGENT.md 의 '새 의존성 추가 금지' → pnpm add 제외 (좁히기만 가능)"]] as [k, v] (k)}
 				<span class="flex flex-col gap-0.5"><span class="font-medium">{k}</span><span class="text-muted-foreground">{v}</span></span>
 			{/each}
@@ -108,6 +108,6 @@
 			{#each ['pnpm add · npm install', ...c.exclude.slice(0, 2).map((g) => `${g} 접근`), '원격 브랜치 삭제'] as b (b)}
 				<span class="flex items-center gap-1.5 text-muted-foreground"><Ban class="size-3 text-destructive" />{b}</span>
 			{/each}
-		</Card.Content>
-	</Card.Root>
+		</CardContent>
+	</Card>
 </div>

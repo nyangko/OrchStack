@@ -10,8 +10,8 @@
 	import GitFork from '@lucide/svelte/icons/git-fork';
 	import Settings2 from '@lucide/svelte/icons/settings-2';
 	import X from '@lucide/svelte/icons/x';
-	import * as Card from '$lib/components/ui/card';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardAction } from '$lib/components/ui/card';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Pill } from '$lib/components/orch/pill';
@@ -60,29 +60,29 @@
 
 	<div class="flex items-start gap-5">
 		<div class="flex min-w-0 flex-1 flex-col gap-5">
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>기본 Trust 레벨</Card.Title>
-					<Card.Description>새 멤버 · 템플릿의 기본값 · 팀 정책에서 더 낮출 수 있어요</Card.Description>
-				</Card.Header>
-				<Card.Content><TrustPicker bind:value={s.trust} /></Card.Content>
-			</Card.Root>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>기본 Trust 레벨</CardTitle>
+					<CardDescription>새 멤버 · 템플릿의 기본값 · 팀 정책에서 더 낮출 수 있어요</CardDescription>
+				</CardHeader>
+				<CardContent><TrustPicker bind:value={s.trust} /></CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>승인 규칙</Card.Title>
-					<Card.Description>모든 팀에 적용 · 팀 · 멤버는 더 엄격하게만 바꿀 수 있어요</Card.Description>
-				</Card.Header>
-				<Card.Content class="gap-0"><ApprovalTable approvals={s.approvals} /></Card.Content>
-			</Card.Root>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>승인 규칙</CardTitle>
+					<CardDescription>모든 팀에 적용 · 팀 · 멤버는 더 엄격하게만 바꿀 수 있어요</CardDescription>
+				</CardHeader>
+				<CardContent class="gap-0"><ApprovalTable approvals={s.approvals} /></CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>항상 차단</Card.Title>
-					<Card.Description>어떤 Trust 레벨 · 승인으로도 실행되지 않아요</Card.Description>
-					<Card.Action><Button variant="link" size="xs" onclick={() => (adding = true)}>패턴 추가</Button></Card.Action>
-				</Card.Header>
-				<Card.Content class="gap-0">
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>항상 차단</CardTitle>
+					<CardDescription>어떤 Trust 레벨 · 승인으로도 실행되지 않아요</CardDescription>
+					<CardAction><Button variant="link" size="xs" onclick={() => (adding = true)}>패턴 추가</Button></CardAction>
+				</CardHeader>
+				<CardContent class="gap-0">
 					{#each s.blocked as b, i (b.pattern)}
 						<div class="flex items-center gap-3 border-t py-2.5 text-xs">
 							<ShieldX class="size-3.5 shrink-0 text-destructive" />
@@ -96,51 +96,51 @@
 					{/each}
 					{#if adding}
 						<form class="flex items-center gap-2 border-t pt-2.5" onsubmit={(e) => (e.preventDefault(), addPattern())}>
-							<InputGroup.Root class="flex-1">
-								<InputGroup.Addon><ShieldX /></InputGroup.Addon>
+							<InputGroup class="flex-1">
+								<InputGroupAddon><ShieldX /></InputGroupAddon>
 								<!-- 패턴 추가를 눌러 연 입력 줄이라 바로 입력하게 한다 -->
 								<!-- svelte-ignore a11y_autofocus -->
-								<InputGroup.Input bind:value={pattern} autofocus placeholder="명령 패턴 · 예: npm publish" aria-label="차단할 명령 패턴" class="font-mono text-xs" />
-							</InputGroup.Root>
+								<InputGroupInput bind:value={pattern} autofocus placeholder="명령 패턴 · 예: npm publish" aria-label="차단할 명령 패턴" class="font-mono text-xs" />
+							</InputGroup>
 							<Button type="submit" size="sm" disabled={!pattern.trim()}>추가</Button>
 							<Button type="button" variant="ghost" size="sm" onclick={() => ((adding = false), (pattern = ''))}>취소</Button>
 						</form>
 					{/if}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 		</div>
 
 		<div class="flex shrink-0 flex-col w-95 gap-5">
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>가드 트리거</Card.Title>
-					<Card.Description>Run 도중 위험 신호를 감지하면 멈추고 알려요</Card.Description>
-				</Card.Header>
-				<Card.Content class="gap-0">
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>가드 트리거</CardTitle>
+					<CardDescription>Run 도중 위험 신호를 감지하면 멈추고 알려요</CardDescription>
+				</CardHeader>
+				<CardContent class="gap-0">
 					{#each s.guards as g (g.name)}
 						<label class="flex items-center gap-3 py-2">
 							<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">{g.name}</span><span class="text-caption text-muted-foreground">{g.desc}</span></span>
 							<Switch bind:checked={g.on} aria-label={g.name} />
 						</label>
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header><Card.Title>비밀 · 키</Card.Title></Card.Header>
-				<Card.Content class="gap-0">
+			<Card size="sm">
+				<CardHeader><CardTitle>비밀 · 키</CardTitle></CardHeader>
+				<CardContent class="gap-0">
 					{#each s.secrets as [l, v] (l)}
 						<KeyValueRow label={l} value={v} />
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>GitHub 계정</Card.Title>
-					<Card.Description>커밋 · PR 작성자</Card.Description>
-				</Card.Header>
-				<Card.Content>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>GitHub 계정</CardTitle>
+					<CardDescription>커밋 · PR 작성자</CardDescription>
+				</CardHeader>
+				<CardContent>
 					<div class="option-card rounded-md">
 						<span class="icon-tile"><GitFork class="size-4" /></span>
 						<span class="flex min-w-0 flex-1 flex-col gap-1">
@@ -150,23 +150,23 @@
 						<!-- 계정 변경 화면은 .pen에 아직 없음 -->
 						<Button variant="outline" size="sm"><Settings2 />변경</Button>
 					</div>
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>감사 로그</Card.Title>
-					<Card.Description>권한 · 연결 · 설정 변경 기록</Card.Description>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>감사 로그</CardTitle>
+					<CardDescription>권한 · 연결 · 설정 변경 기록</CardDescription>
 					<!-- 전체 목록 화면은 .pen에 아직 없음 -->
-					<Card.Action><span class="text-xs font-medium text-primary">모두 보기</span></Card.Action>
-				</Card.Header>
-				<Card.Content class="gap-0">
+					<CardAction><span class="text-xs font-medium text-primary">모두 보기</span></CardAction>
+				</CardHeader>
+				<CardContent class="gap-0">
 					{#each log.slice(0, 5) as l, i (i)}
 						{@const Icon = logIcon[l.kind]}
 						<HistoryRow icon={Icon} tone={l.kind === 'BLOCK' ? 'bg-destructive-soft text-destructive' : 'bg-primary-soft text-primary'} kind={l.kind} who={l.who} when={l.when} text={l.text} />
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 		</div>
 	</div>
 </main>

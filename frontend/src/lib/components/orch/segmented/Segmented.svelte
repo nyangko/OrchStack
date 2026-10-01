@@ -7,7 +7,7 @@
 
 <script lang="ts">
 	import { cn } from "$lib/utils.js";
-	import * as Tooltip from "$lib/components/ui/tooltip";
+	import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "$lib/components/ui/tooltip";
 
 	let {
 		options,
@@ -37,14 +37,14 @@
 		{@const off = disabled || !!opt.disabled}
 		{#if opt.disabled && opt.hint}
 			<!-- disabled 속성을 주면 마우스 이벤트가 안 와서 툴팁이 못 뜬다 → aria-disabled로만 막는다 -->
-			<Tooltip.Provider delayDuration={150}>
-				<Tooltip.Root>
-					<Tooltip.Trigger>
+			<TooltipProvider delayDuration={150}>
+				<Tooltip>
+					<TooltipTrigger>
 						{#snippet child({ props })}{@render seg(opt, active, off, props)}{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>{opt.hint}</Tooltip.Content>
-				</Tooltip.Root>
-			</Tooltip.Provider>
+					</TooltipTrigger>
+					<TooltipContent>{opt.hint}</TooltipContent>
+				</Tooltip>
+			</TooltipProvider>
 		{:else}
 			{@render seg(opt, active, off, {})}
 		{/if}

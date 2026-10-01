@@ -5,36 +5,36 @@
 	import { Pill } from '$lib/components/orch/pill';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { Kbd } from '$lib/components/ui/kbd';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '$lib/components/ui/tooltip';
 	import { Plus, Ellipsis, Bold, Users, Search, Sparkles } from '@lucide/svelte';
 	import { Input } from '$lib/components/ui/input';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Switch } from '$lib/components/ui/switch';
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { Steps } from '$lib/components/orch/steps';
-	import * as Select from '$lib/components/ui/select';
-	import * as Field from '$lib/components/ui/field';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
+	import { FieldGroup, Field, FieldLabel, FieldDescription, FieldError, FieldContent } from '$lib/components/ui/field';
 	import { StatusSelect } from '$lib/components/orch/status-select';
 	import type { TaskStatus } from '$lib/status';
-	import * as Sidebar from '$lib/components/ui/sidebar';
-	import * as Tabs from '$lib/components/ui/tabs';
+	import { SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '$lib/components/ui/sidebar';
+	import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Workflow, KanbanSquare, Sparkles as Spark, Plug } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import * as ContextMenu from '$lib/components/ui/context-menu';
-	import * as Alert from '$lib/components/ui/alert';
+	import { Card, CardHeader, CardTitle, CardDescription, CardAction, CardContent } from '$lib/components/ui/card';
+	import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogClose } from '$lib/components/ui/dialog';
+	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuShortcut, DropdownMenuSeparator } from '$lib/components/ui/dropdown-menu';
+	import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuLabel, ContextMenuItem, ContextMenuSeparator } from '$lib/components/ui/context-menu';
+	import { Alert, AlertTitle, AlertDescription } from '$lib/components/ui/alert';
 	import { Progress } from '$lib/components/ui/progress';
 	import { Spinner } from '$lib/components/ui/spinner';
-	import * as Empty from '$lib/components/ui/empty';
+	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '$lib/components/ui/empty';
 	import { UserPlus, Play, Trash2, TriangleAlert, ShieldCheck, Inbox, Info, FileCode, Cpu } from '@lucide/svelte';
-	import * as Avatar from '$lib/components/ui/avatar';
+	import { AvatarGroup, AvatarGroupCount, Avatar, AvatarFallback } from '$lib/components/ui/avatar';
 	import { RoleAvatar } from '$lib/components/orch/role-avatar';
 	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import { StatusBadge } from '$lib/components/orch/status-badge';
 	import { statusOrder } from '$lib/status';
-	import * as Item from '$lib/components/ui/item';
-	import * as Table from '$lib/components/ui/table';
+	import { ItemGroup, Item, ItemContent, ItemDescription, ItemActions, ItemMedia, ItemTitle } from '$lib/components/ui/item';
+	import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '$lib/components/ui/table';
 	import { Puzzle, ArrowRightLeft } from '@lucide/svelte';
 
 	// .pen 색 토큰 확인용. Tailwind 클래스는 동적으로 만들 수 없어 전체 이름으로 나열한다.
@@ -122,16 +122,16 @@
 			<Pill>Pill</Pill>
 			<Pill dot="bg-status-done">Done</Pill>
 			<Kbd>⌘K</Kbd>
-			<Tooltip.Provider>
-				<Tooltip.Root>
-					<Tooltip.Trigger>
+			<TooltipProvider>
+				<Tooltip>
+					<TooltipTrigger>
 						{#snippet child({ props })}
 							<Button variant="outline" size="sm" {...props}>Hover</Button>
 						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>Agents</Tooltip.Content>
-				</Tooltip.Root>
-			</Tooltip.Provider>
+					</TooltipTrigger>
+					<TooltipContent>Agents</TooltipContent>
+				</Tooltip>
+			</TooltipProvider>
 		</div>
 		<div class="flex flex-wrap items-center gap-1.5">
 			{#each filters as f (f.label)}
@@ -142,10 +142,10 @@
 	<section class="flex flex-col gap-4">
 		<h2 class="text-sm font-semibold text-muted-foreground">Form Controls · #36</h2>
 		<div class="flex flex-wrap items-center gap-3">
-			<InputGroup.Root class="w-70">
-				<InputGroup.Addon><Search /></InputGroup.Addon>
-				<InputGroup.Input placeholder="Search tasks, agents, issues" />
-			</InputGroup.Root>
+			<InputGroup class="w-70">
+				<InputGroupAddon><Search /></InputGroupAddon>
+				<InputGroupInput placeholder="Search tasks, agents, issues" />
+			</InputGroup>
 			<Input class="w-60" placeholder="Plain input" />
 			<Input class="w-40" placeholder="Invalid" aria-invalid="true" />
 			<Switch bind:checked={on} aria-label="Toggle" />
@@ -162,72 +162,72 @@
 			]}
 		/>
 		<Steps steps={['템플릿 선택', '캐릭터', '런타임 · 도구']} current={1} />
-		<Field.Group class="max-w-3xl gap-0">
-			<Field.Field class="border-b py-4">
-				<Field.Label for="runtime">실행기</Field.Label>
-				<Select.Root type="single" bind:value={runtime}>
-					<Select.Trigger id="runtime" class="w-full">
+		<FieldGroup class="max-w-3xl gap-0">
+			<Field class="border-b py-4">
+				<FieldLabel for="runtime">실행기</FieldLabel>
+				<Select type="single" bind:value={runtime}>
+					<SelectTrigger id="runtime" class="w-full">
 						{runtime === 'codex' ? 'Codex CLI' : 'Claude Code'}
-					</Select.Trigger>
-					<Select.Content>
-						<Select.Item value="codex" label="Codex CLI" />
-						<Select.Item value="claude" label="Claude Code" />
-					</Select.Content>
-				</Select.Root>
-				<Field.Description>에이전트가 도는 CLI</Field.Description>
-			</Field.Field>
-			<Field.Field class="border-b py-4" data-invalid="true">
-				<Field.Label for="name">이름</Field.Label>
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="codex" label="Codex CLI" />
+						<SelectItem value="claude" label="Claude Code" />
+					</SelectContent>
+				</Select>
+				<FieldDescription>에이전트가 도는 CLI</FieldDescription>
+			</Field>
+			<Field class="border-b py-4" data-invalid="true">
+				<FieldLabel for="name">이름</FieldLabel>
 				<Input id="name" aria-invalid="true" />
-				<Field.Error>이름을 입력하세요</Field.Error>
-			</Field.Field>
-			<Field.Field orientation="horizontal" class="border-b py-2.5">
-				<Field.Content>
-					<Field.Label for="notify">알림</Field.Label>
-					<Field.Description>작업 완료 시 알림을 보냅니다</Field.Description>
-				</Field.Content>
+				<FieldError>이름을 입력하세요</FieldError>
+			</Field>
+			<Field orientation="horizontal" class="border-b py-2.5">
+				<FieldContent>
+					<FieldLabel for="notify">알림</FieldLabel>
+					<FieldDescription>작업 완료 시 알림을 보냅니다</FieldDescription>
+				</FieldContent>
 				<Switch id="notify" bind:checked={notify} />
-			</Field.Field>
-		</Field.Group>
+			</Field>
+		</FieldGroup>
 	</section>
 	<section class="flex flex-col gap-4">
 		<h2 class="text-sm font-semibold text-muted-foreground">Navigation & Shell · #37</h2>
 		<div class="flex gap-8">
-			<Sidebar.Provider class="min-h-0 w-60">
-				<Sidebar.Root collapsible="none" class="w-60 border-r">
-					<Sidebar.Content>
-						<Sidebar.Group>
-							<Sidebar.GroupLabel>보기</Sidebar.GroupLabel>
-							<Sidebar.Menu>
+			<SidebarProvider class="min-h-0 w-60">
+				<Sidebar collapsible="none" class="w-60 border-r">
+					<SidebarContent>
+						<SidebarGroup>
+							<SidebarGroupLabel>보기</SidebarGroupLabel>
+							<SidebarMenu>
 								{#each [{ l: 'Overview', i: Spark, a: true }, { l: '모델 연결', i: Plug, a: false }, { l: '실행기 (CLI)', i: Workflow, a: false }] as n (n.l)}
-									<Sidebar.MenuItem>
-										<Sidebar.MenuButton isActive={n.a}>
+									<SidebarMenuItem>
+										<SidebarMenuButton isActive={n.a}>
 											{#snippet child({ props })}
 												<a href="/spike/components" {...props}><n.i />{n.l}</a>
 											{/snippet}
-										</Sidebar.MenuButton>
-									</Sidebar.MenuItem>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
 								{/each}
-							</Sidebar.Menu>
-						</Sidebar.Group>
-					</Sidebar.Content>
-				</Sidebar.Root>
-			</Sidebar.Provider>
+							</SidebarMenu>
+						</SidebarGroup>
+					</SidebarContent>
+				</Sidebar>
+			</SidebarProvider>
 			<div class="flex flex-col gap-6">
-				<Tabs.Root value="diagram">
-					<Tabs.List>
-						<Tabs.Trigger value="diagram"><Workflow />Diagram</Tabs.Trigger>
-						<Tabs.Trigger value="kanban"><KanbanSquare />Kanban</Tabs.Trigger>
-						<Tabs.Trigger value="issues">Issues</Tabs.Trigger>
-					</Tabs.List>
-				</Tabs.Root>
-				<Tabs.Root value="overview">
-					<Tabs.List variant="line">
-						<Tabs.Trigger value="overview">Overview</Tabs.Trigger>
-						<Tabs.Trigger value="installed">설치됨 5</Tabs.Trigger>
-						<Tabs.Trigger value="runs">Runs</Tabs.Trigger>
-					</Tabs.List>
-				</Tabs.Root>
+				<Tabs value="diagram">
+					<TabsList>
+						<TabsTrigger value="diagram"><Workflow />Diagram</TabsTrigger>
+						<TabsTrigger value="kanban"><KanbanSquare />Kanban</TabsTrigger>
+						<TabsTrigger value="issues">Issues</TabsTrigger>
+					</TabsList>
+				</Tabs>
+				<Tabs value="overview">
+					<TabsList variant="line">
+						<TabsTrigger value="overview">Overview</TabsTrigger>
+						<TabsTrigger value="installed">설치됨 5</TabsTrigger>
+						<TabsTrigger value="runs">Runs</TabsTrigger>
+					</TabsList>
+				</Tabs>
 			</div>
 		</div>
 	</section>
@@ -235,79 +235,79 @@
 	<section class="flex flex-col gap-4">
 		<h2 class="text-sm font-semibold text-muted-foreground">Containers & Feedback · #38</h2>
 		<div class="grid grid-cols-2 gap-4">
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Card Title</Card.Title>
-					<Card.Description>Card description</Card.Description>
-				</Card.Header>
-			</Card.Root>
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>Section title</Card.Title>
-					<Card.Description>Description</Card.Description>
-					<Card.Action><Button variant="link" size="xs" class="h-auto p-0">Action</Button></Card.Action>
-				</Card.Header>
-				<Card.Content class="text-xs text-subtle-foreground">Content</Card.Content>
-			</Card.Root>
+			<Card>
+				<CardHeader>
+					<CardTitle>Card Title</CardTitle>
+					<CardDescription>Card description</CardDescription>
+				</CardHeader>
+			</Card>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>Section title</CardTitle>
+					<CardDescription>Description</CardDescription>
+					<CardAction><Button variant="link" size="xs" class="h-auto p-0">Action</Button></CardAction>
+				</CardHeader>
+				<CardContent class="text-xs text-subtle-foreground">Content</CardContent>
+			</Card>
 		</div>
 		<div class="flex flex-wrap items-center gap-3">
-			<Dialog.Root>
-				<Dialog.Trigger>
+			<Dialog>
+				<DialogTrigger>
 					{#snippet child({ props })}<Button variant="outline" {...props}>Open dialog</Button>{/snippet}
-				</Dialog.Trigger>
-				<Dialog.Content size="md">
-					<Dialog.Header icon={Plug} crumb={['Settings', '모델 연결']}>
-						<Dialog.Title>연결 추가</Dialog.Title>
-						<Dialog.Description>에이전트가 모델을 부를 경로 · 워크스페이스 전체에서 사용</Dialog.Description>
-					</Dialog.Header>
-					<Dialog.Body><Input placeholder="이름" aria-label="이름" /></Dialog.Body>
-					<Dialog.Footer note="계정 · 키를 하나 더 추가할 수 있어요">
-						<Dialog.Close>{#snippet child({ props })}<Button variant="ghost" {...props}>취소</Button>{/snippet}</Dialog.Close>
+				</DialogTrigger>
+				<DialogContent size="md">
+					<DialogHeader icon={Plug} crumb={['Settings', '모델 연결']}>
+						<DialogTitle>연결 추가</DialogTitle>
+						<DialogDescription>에이전트가 모델을 부를 경로 · 워크스페이스 전체에서 사용</DialogDescription>
+					</DialogHeader>
+					<DialogBody><Input placeholder="이름" aria-label="이름" /></DialogBody>
+					<DialogFooter note="계정 · 키를 하나 더 추가할 수 있어요">
+						<DialogClose>{#snippet child({ props })}<Button variant="ghost" {...props}>취소</Button>{/snippet}</DialogClose>
 						<Button>다음</Button>
-					</Dialog.Footer>
-				</Dialog.Content>
-			</Dialog.Root>
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+			<DropdownMenu>
+				<DropdownMenuTrigger>
 					{#snippet child({ props })}<Button variant="outline" {...props}>Menu</Button>{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content class="w-52">
-					<DropdownMenu.Label>Task #428</DropdownMenu.Label>
-					<DropdownMenu.Item><UserPlus />Assign agent</DropdownMenu.Item>
-					<DropdownMenu.Item><Play />Run<DropdownMenu.Shortcut>⌘R</DropdownMenu.Shortcut></DropdownMenu.Item>
-					<DropdownMenu.Separator />
-					<DropdownMenu.Item variant="destructive"><Trash2 />Delete</DropdownMenu.Item>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-			<ContextMenu.Root>
-				<ContextMenu.Trigger class="flex h-9 items-center rounded-md border border-dashed px-3 text-xs text-muted-foreground">우클릭</ContextMenu.Trigger>
-				<ContextMenu.Content class="w-52">
-					<ContextMenu.Label>Task #428</ContextMenu.Label>
-					<ContextMenu.Item><UserPlus />Assign agent</ContextMenu.Item>
-					<ContextMenu.Separator />
-					<ContextMenu.Item variant="destructive"><Trash2 />Delete</ContextMenu.Item>
-				</ContextMenu.Content>
-			</ContextMenu.Root>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent class="w-52">
+					<DropdownMenuLabel>Task #428</DropdownMenuLabel>
+					<DropdownMenuItem><UserPlus />Assign agent</DropdownMenuItem>
+					<DropdownMenuItem><Play />Run<DropdownMenuShortcut>⌘R</DropdownMenuShortcut></DropdownMenuItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem variant="destructive"><Trash2 />Delete</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<ContextMenu>
+				<ContextMenuTrigger class="flex h-9 items-center rounded-md border border-dashed px-3 text-xs text-muted-foreground">우클릭</ContextMenuTrigger>
+				<ContextMenuContent class="w-52">
+					<ContextMenuLabel>Task #428</ContextMenuLabel>
+					<ContextMenuItem><UserPlus />Assign agent</ContextMenuItem>
+					<ContextMenuSeparator />
+					<ContextMenuItem variant="destructive"><Trash2 />Delete</ContextMenuItem>
+				</ContextMenuContent>
+			</ContextMenu>
 			<Spinner />
 		</div>
-		<Alert.Root variant="warning">
+		<Alert variant="warning">
 			<TriangleAlert />
-			<Alert.Title>Repeated context detected</Alert.Title>
-			<Alert.Description>3 sources re-sent across the last 4 calls.</Alert.Description>
-		</Alert.Root>
-		<Alert.Root variant="info">
+			<AlertTitle>Repeated context detected</AlertTitle>
+			<AlertDescription>3 sources re-sent across the last 4 calls.</AlertDescription>
+		</Alert>
+		<Alert variant="info">
 			<ShieldCheck class="text-status-done" />
-			<Alert.Title>적용 권한</Alert.Title>
-			<Alert.Description>목록에 없는 도구는 차단 · Instructions는 목록을 줄일 수만 있어요</Alert.Description>
-		</Alert.Root>
+			<AlertTitle>적용 권한</AlertTitle>
+			<AlertDescription>목록에 없는 도구는 차단 · Instructions는 목록을 줄일 수만 있어요</AlertDescription>
+		</Alert>
 		<Progress value={68} class="w-50" />
-		<Empty.Root class="border">
-			<Empty.Header>
-				<Empty.Media variant="icon"><Inbox /></Empty.Media>
-				<Empty.Title>태스크가 없어요</Empty.Title>
-				<Empty.Description>새 태스크를 만들거나 이슈에서 가져오세요.</Empty.Description>
-			</Empty.Header>
-		</Empty.Root>
+		<Empty class="border">
+			<EmptyHeader>
+				<EmptyMedia variant="icon"><Inbox /></EmptyMedia>
+				<EmptyTitle>태스크가 없어요</EmptyTitle>
+				<EmptyDescription>새 태스크를 만들거나 이슈에서 가져오세요.</EmptyDescription>
+			</EmptyHeader>
+		</Empty>
 	</section>
 
 	<section class="flex flex-col gap-4">
@@ -319,14 +319,14 @@
 			<RoleAvatar role="reviewer" />
 			<RoleAvatar role="designer" />
 			<RoleAvatar role="agent" />
-			<Avatar.Group>
+			<AvatarGroup>
 				<RoleAvatar role="backend" size="sm" />
 				<RoleAvatar role="frontend" size="sm" />
 				<RoleAvatar role="qa" size="sm" />
 				<RoleAvatar role="reviewer" size="sm" />
-				<Avatar.GroupCount>+2</Avatar.GroupCount>
-			</Avatar.Group>
-			<Avatar.Root><Avatar.Fallback class="bg-primary-soft font-semibold text-primary">S</Avatar.Fallback></Avatar.Root>
+				<AvatarGroupCount>+2</AvatarGroupCount>
+			</AvatarGroup>
+			<Avatar><AvatarFallback class="bg-primary-soft font-semibold text-primary">S</AvatarFallback></Avatar>
 			<RuntimeLogo runtime="codex" />
 			<RuntimeLogo runtime="claude" />
 			<RuntimeLogo runtime="claude" class="size-8" />
@@ -343,38 +343,38 @@
 	<section class="flex flex-col gap-4">
 		<h2 class="text-sm font-semibold text-muted-foreground">Data Display · #40</h2>
 		<div class="grid grid-cols-2 gap-8">
-			<Item.Group>
-				<Item.Root variant="row" size="xs">
-					<Item.Content><Item.Description>역할</Item.Description></Item.Content>
-					<Item.Actions class="text-body font-medium">프론트엔드 개발</Item.Actions>
-				</Item.Root>
-				<Item.Root variant="row" size="xs">
-					<Item.Media>
+			<ItemGroup>
+				<Item variant="row" size="xs">
+					<ItemContent><ItemDescription>역할</ItemDescription></ItemContent>
+					<ItemActions class="text-body font-medium">프론트엔드 개발</ItemActions>
+				</Item>
+				<Item variant="row" size="xs">
+					<ItemMedia>
 						<span class="flex size-5 items-center justify-center rounded-xs bg-node-skill text-on-solid"><Puzzle class="size-3" /></span>
-					</Item.Media>
-					<Item.Content><Item.Title>Rust Backend</Item.Title></Item.Content>
-					<Item.Actions class="font-mono text-xs text-muted-foreground">8 calls</Item.Actions>
-				</Item.Root>
-				<Item.Root variant="row" size="xs">
-					<Item.Media>
+					</ItemMedia>
+					<ItemContent><ItemTitle>Rust Backend</ItemTitle></ItemContent>
+					<ItemActions class="font-mono text-xs text-muted-foreground">8 calls</ItemActions>
+				</Item>
+				<Item variant="row" size="xs">
+					<ItemMedia>
 						<span class="flex size-6 items-center justify-center rounded-full bg-review-soft text-status-review"><ArrowRightLeft class="size-3" /></span>
-					</Item.Media>
-					<Item.Content>
-						<Item.Title>진 → 하루 · 전달</Item.Title>
-						<Item.Description>Login 화면 시안 v2 전달 · figma/login-v2 — 설명이 길어지면 두 줄에서 잘립니다. 설명이 길어지면 두 줄에서 잘립니다.</Item.Description>
-					</Item.Content>
-				</Item.Root>
-			</Item.Group>
-			<Table.Root>
-				<Table.Header>
-					<Table.Row><Table.Head>Task</Table.Head><Table.Head>Status</Table.Head><Table.Head class="text-right">Tokens</Table.Head></Table.Row>
-				</Table.Header>
-				<Table.Body>
-					<Table.Row><Table.Cell>Login 화면</Table.Cell><Table.Cell><StatusBadge status="review" /></Table.Cell><Table.Cell class="text-right font-mono">42.3K</Table.Cell></Table.Row>
-					<Table.Row><Table.Cell>토큰 원장</Table.Cell><Table.Cell><StatusBadge status="in_progress" /></Table.Cell><Table.Cell class="text-right font-mono">1.2K</Table.Cell></Table.Row>
-					<Table.Row><Table.Cell>빈 값</Table.Cell><Table.Cell><StatusBadge status="todo" /></Table.Cell><Table.Cell class="text-right font-mono text-subtle-foreground">—</Table.Cell></Table.Row>
-				</Table.Body>
-			</Table.Root>
+					</ItemMedia>
+					<ItemContent>
+						<ItemTitle>진 → 하루 · 전달</ItemTitle>
+						<ItemDescription>Login 화면 시안 v2 전달 · figma/login-v2 — 설명이 길어지면 두 줄에서 잘립니다. 설명이 길어지면 두 줄에서 잘립니다.</ItemDescription>
+					</ItemContent>
+				</Item>
+			</ItemGroup>
+			<Table>
+				<TableHeader>
+					<TableRow><TableHead>Task</TableHead><TableHead>Status</TableHead><TableHead class="text-right">Tokens</TableHead></TableRow>
+				</TableHeader>
+				<TableBody>
+					<TableRow><TableCell>Login 화면</TableCell><TableCell><StatusBadge status="review" /></TableCell><TableCell class="text-right font-mono">42.3K</TableCell></TableRow>
+					<TableRow><TableCell>토큰 원장</TableCell><TableCell><StatusBadge status="in_progress" /></TableCell><TableCell class="text-right font-mono">1.2K</TableCell></TableRow>
+					<TableRow><TableCell>빈 값</TableCell><TableCell><StatusBadge status="todo" /></TableCell><TableCell class="text-right font-mono text-subtle-foreground">—</TableCell></TableRow>
+				</TableBody>
+			</Table>
 		</div>
 	</section>
 </main>

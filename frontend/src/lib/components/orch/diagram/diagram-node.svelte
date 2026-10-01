@@ -38,7 +38,7 @@
 	import MessageCircle from "@lucide/svelte/icons/message-circle";
 	import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
 	import Ellipsis from "@lucide/svelte/icons/ellipsis";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuEntries } from "$lib/components/ui/dropdown-menu";
 	import { NodeCard, NodeCardHeader, NodeCardKind, NodeCardRef, NodeCardTitle, NodeCardFooter } from "$lib/components/orch/node-card";
 	import { Button } from "$lib/components/ui/button";
 	import { Badge } from "$lib/components/ui/badge";
@@ -72,18 +72,18 @@
 		<NodeCardKind class={kind.bg}><kind.icon /></NodeCardKind>
 		<NodeCardRef>{data.ref}</NodeCardRef>
 		{#if data.menu?.length}
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
+			<DropdownMenu>
+				<DropdownMenuTrigger>
 					{#snippet child({ props })}
 						<!-- nodrag: 메뉴 버튼을 눌러도 노드가 끌리지 않게 (xyflow) -->
 						<Button {...props} variant="ghost" size="icon-xs" class="nodrag -my-1" aria-label="{data.ref} 메뉴"><Ellipsis /></Button>
 					{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="start" class="w-56">
-					{#if data.menuLabel}<DropdownMenu.Label class="truncate">{data.menuLabel}</DropdownMenu.Label><DropdownMenu.Separator />{/if}
-					<DropdownMenu.Entries entries={data.menu} />
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" class="w-56">
+					{#if data.menuLabel}<DropdownMenuLabel class="truncate">{data.menuLabel}</DropdownMenuLabel><DropdownMenuSeparator />{/if}
+					<DropdownMenuEntries entries={data.menu} />
+				</DropdownMenuContent>
+			</DropdownMenu>
 		{/if}
 	</NodeCardHeader>
 	<NodeCardTitle>{data.title}</NodeCardTitle>

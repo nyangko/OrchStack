@@ -23,8 +23,8 @@
 	import ListFilter from '@lucide/svelte/icons/list-filter';
 	import type { Component } from 'svelte';
 	import { goto } from '$app/navigation';
-	import * as Command from '$lib/components/ui/command';
-	import * as Popover from '$lib/components/ui/popover';
+	import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut } from '$lib/components/ui/command';
+	import { Popover, PopoverTrigger, PopoverContent } from '$lib/components/ui/popover';
 	import CircleX from '@lucide/svelte/icons/circle-x';
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
@@ -195,16 +195,16 @@
 		<button type="button" onclick={openSearch} class="flex h-8 w-75 items-center gap-2 rounded-md border bg-card px-2.5 text-xs text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
 			<Search class="size-4" /><span class="flex-1 text-left">Search tasks, agents, issues</span><Kbd>⌘K</Kbd>
 		</button>
-		<Popover.Root bind:open={bellOpen}>
-			<Popover.Trigger>
+		<Popover bind:open={bellOpen}>
+			<PopoverTrigger>
 				{#snippet child({ props })}
 					<Button variant="ghost" size="icon" class="relative" aria-label={unread ? `알림 · 안 읽음 ${unread}` : '알림'} {...props}>
 						<Bell />
 						{#if unread}<span class="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive ring-2 ring-card"></span>{/if}
 					</Button>
 				{/snippet}
-			</Popover.Trigger>
-			<Popover.Content align="end" class="w-115 gap-0 p-0">
+			</PopoverTrigger>
+			<PopoverContent align="end" class="w-115 gap-0 p-0">
 				<div class="flex items-center gap-2 px-4 pt-3.5 pb-2.5">
 					<h2 class="flex-1 text-sm font-semibold">알림</h2>
 					<Button variant="link" size="xs" disabled={!unread} onclick={() => list.forEach((n) => (n.unread = false))}>모두 읽음</Button>
@@ -251,8 +251,8 @@
 				</div>
 				<!-- 모든 활동 화면은 .pen에 아직 없음 -->
 				<div class="border-t py-2.5 text-center text-xs font-medium text-primary">모든 활동 보기 →</div>
-			</Popover.Content>
-		</Popover.Root>
+			</PopoverContent>
+		</Popover>
 		<span class="flex size-7 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary" aria-label="사용자">S</span>
 	</header>
 	{/if}
@@ -265,7 +265,7 @@
 <!-- API 실패 토스트 ($lib/api/client.ts) -->
 <Toaster position="bottom-right" />
 
-<Command.Dialog bind:open={searching} bind:value={selected} shouldFilter={false} title="검색" description="태스크 · 이슈 · 멤버 · 설정 · 명령" class="sm:max-w-180">
+<CommandDialog bind:open={searching} bind:value={selected} shouldFilter={false} title="검색" description="태스크 · 이슈 · 멤버 · 설정 · 명령" class="sm:max-w-180">
 	<!-- ⌘↵ 새 탭 · ↵ 열기 · ↑↓ 이동은 Command가 처리 -->
 	<div class="contents" role="presentation" onkeydown={(e) => {
 		const h = hits.find((x) => idOf(x) === selected);
@@ -275,7 +275,7 @@
 		}
 	}}>
 		<div class="flex items-center gap-2 border-b p-3">
-			<div class="flex-1"><Command.Input bind:value={q} placeholder="태스크 · 이슈 · 멤버 · 설정 검색" /></div>
+			<div class="flex-1"><CommandInput bind:value={q} placeholder="태스크 · 이슈 · 멤버 · 설정 검색" /></div>
 			<Kbd>esc</Kbd>
 		</div>
 		<div class="flex gap-1.5 px-3 pt-3" role="group" aria-label="범위">
@@ -283,12 +283,12 @@
 				<Toggle variant="chip" count={s === '전체' ? hits.length : hits.filter((h) => h.scope === s).length} bind:pressed={() => scope === s, (v) => { if (v) scope = s; }}>{s}</Toggle>
 			{/each}
 		</div>
-		<Command.List class="max-h-110 px-1.5 py-1">
-			<Command.Empty>{q.trim() ? '찾는 결과가 없어요' : '검색어를 입력하세요'}</Command.Empty>
+		<CommandList class="max-h-110 px-1.5 py-1">
+			<CommandEmpty>{q.trim() ? '찾는 결과가 없어요' : '검색어를 입력하세요'}</CommandEmpty>
 			{#each groups as g (g.s)}
-				<Command.Group heading={g.s}>
+				<CommandGroup heading={g.s}>
 					{#each g.list as h (idOf(h))}
-						<Command.Item value={idOf(h)} onSelect={() => go(h.href)} class="gap-2.5 py-2">
+						<CommandItem value={idOf(h)} onSelect={() => go(h.href)} class="gap-2.5 py-2">
 							{#if h.member}
 								<RoleAvatar role={h.member.role} icon={glyphOf(h.member)} size="sm" />
 								<span class="font-medium">{h.label}</span><span class="text-caption text-muted-foreground">{h.meta}</span>
@@ -296,14 +296,14 @@
 								{#if h.icon}<h.icon class={['size-4', h.tone ?? 'text-muted-foreground']} />{/if}
 								<span class="truncate">{h.label}{h.meta ? ` · ${h.meta}` : ''}</span>
 							{/if}
-							{#if h.shortcut}<Command.Shortcut>{h.shortcut}</Command.Shortcut>{/if}
-						</Command.Item>
+							{#if h.shortcut}<CommandShortcut>{h.shortcut}</CommandShortcut>{/if}
+						</CommandItem>
 					{/each}
-				</Command.Group>
+				</CommandGroup>
 			{/each}
-		</Command.List>
+		</CommandList>
 		<div class="flex items-center gap-4 border-t px-4 py-2.5 text-caption text-muted-foreground">
 			{#each [['↑↓', '이동'], ['↵', '열기'], ['⌘↵', '새 탭'], ['esc', '닫기']] as [k, l] (k)}<span class="flex items-center gap-1.5"><Kbd>{k}</Kbd>{l}</span>{/each}
 		</div>
 	</div>
-</Command.Dialog>
+</CommandDialog>

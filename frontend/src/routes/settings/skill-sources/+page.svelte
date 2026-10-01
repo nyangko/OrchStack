@@ -16,12 +16,12 @@
 	import ToggleRight from '@lucide/svelte/icons/toggle-right';
 	import KeyRound from '@lucide/svelte/icons/key-round';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import * as Card from '$lib/components/ui/card';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardAction } from '$lib/components/ui/card';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Pill } from '$lib/components/orch/pill';
-	import * as Field from '$lib/components/ui/field';
+	import { FieldSwitchRow } from '$lib/components/ui/field';
 	import { KeyValueRow } from '$lib/components/orch/key-value-row';
 	import { HistoryRow } from '$lib/components/orch/history-row';
 	import SkillSourcesDialog from '$lib/components/orch/agent/skill-sources-dialog.svelte';
@@ -90,12 +90,12 @@
 
 	<div class="flex items-start gap-5">
 		<div class="flex min-w-0 flex-1 flex-col gap-5">
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>소스</Card.Title>
-					<Card.Description>스킬을 검색 · 설치할 곳 · 위에서부터 우선</Card.Description>
-				</Card.Header>
-				<Card.Content class="flex flex-col gap-2">
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>소스</CardTitle>
+					<CardDescription>스킬을 검색 · 설치할 곳 · 위에서부터 우선</CardDescription>
+				</CardHeader>
+				<CardContent class="flex flex-col gap-2">
 					{#each store.sources.sources as src (src.name)}
 						{@const Icon = kindIcon[src.kind]}
 						<div class="option-card rounded-md">
@@ -119,12 +119,12 @@
 					{/each}
 					{#if adding}
 						<form class="flex items-center gap-2" onsubmit={(e) => (e.preventDefault(), addSource())}>
-							<InputGroup.Root class="flex-1">
-								<InputGroup.Addon><Plus /></InputGroup.Addon>
+							<InputGroup class="flex-1">
+								<InputGroupAddon><Plus /></InputGroupAddon>
 								<!-- 소스 추가를 눌러 연 입력 줄이라 바로 입력하게 한다 -->
 								<!-- svelte-ignore a11y_autofocus -->
-								<InputGroup.Input bind:value={newSource} autofocus placeholder="owner/repo 또는 ~/폴더 경로" aria-label="새 소스" class="font-mono text-xs" />
-							</InputGroup.Root>
+								<InputGroupInput bind:value={newSource} autofocus placeholder="owner/repo 또는 ~/폴더 경로" aria-label="새 소스" class="font-mono text-xs" />
+							</InputGroup>
 							<Button type="submit" size="sm" disabled={!newSource.trim()}>추가</Button>
 							<Button type="button" variant="ghost" size="sm" onclick={() => ((adding = false), (newSource = ''))}>취소</Button>
 						</form>
@@ -133,73 +133,73 @@
 							<Plus class="size-3.5" />소스 추가 · GitHub 저장소 / 폴더
 						</button>
 					{/if}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>설치 정책</Card.Title>
-					<Card.Description>워크스페이스의 모든 팀 · 멤버에 적용</Card.Description>
-				</Card.Header>
-				<Card.Content>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>설치 정책</CardTitle>
+					<CardDescription>워크스페이스의 모든 팀 · 멤버에 적용</CardDescription>
+				</CardHeader>
+				<CardContent>
 					{#each store.sources.policy as pol (pol.name)}
-						<Field.SwitchRow label={pol.name} hint={pol.desc} bind:checked={pol.on} />
+						<FieldSwitchRow label={pol.name} hint={pol.desc} bind:checked={pol.on} />
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>최근 설치 · 변경</Card.Title>
-					<Card.Description>7일</Card.Description>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>최근 설치 · 변경</CardTitle>
+					<CardDescription>7일</CardDescription>
 					<!-- 감사 로그 화면은 권한 · 보안(S-4)에서 -->
-					<Card.Action><span class="text-xs font-medium text-primary">감사 로그</span></Card.Action>
-				</Card.Header>
-				<Card.Content>
+					<CardAction><span class="text-xs font-medium text-primary">감사 로그</span></CardAction>
+				</CardHeader>
+				<CardContent>
 					{#each store.log.slice(0, 6) as l, i (i)}
 						{@const Icon = logIcon[l.kind]}
 						<HistoryRow icon={Icon} tone={l.kind === 'BLOCK' ? 'bg-destructive-soft text-destructive' : 'bg-primary-soft text-primary'} kind={l.kind} who={l.who} when={l.when} text={l.text} />
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 		</div>
 
 		<div class="flex shrink-0 flex-col w-95 gap-5">
-			<Card.Root size="sm">
-				<Card.Header><Card.Title>설치 도구</Card.Title></Card.Header>
-				<Card.Content>
+			<Card size="sm">
+				<CardHeader><CardTitle>설치 도구</CardTitle></CardHeader>
+				<CardContent>
 					<div class="flex items-center gap-2 text-xs">
 						<Terminal class="size-3.5 text-muted-foreground" />
 						<span class="flex-1 text-muted-foreground">{store.sources.tool.name}</span>
 						<span class="font-mono">{store.sources.tool.version}</span>
 						<Pill class="bg-success-soft text-status-done"><Check />설치됨</Pill>
 					</div>
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>설치된 스킬</Card.Title>
-					<Card.Description>{installed.length}개 · 활성 {installed.filter((s) => s.on !== false && !s.blocked).length}</Card.Description>
-					<Card.Action><Button variant="link" size="xs" href="/skills">모두 보기</Button></Card.Action>
-				</Card.Header>
-				<Card.Content>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>설치된 스킬</CardTitle>
+					<CardDescription>{installed.length}개 · 활성 {installed.filter((s) => s.on !== false && !s.blocked).length}</CardDescription>
+					<CardAction><Button variant="link" size="xs" href="/skills">모두 보기</Button></CardAction>
+				</CardHeader>
+				<CardContent>
 					{#each bySource as b (b.source)}
 						{@const list = installed.filter((s) => s.source === b.source)}
 						{@const updates = list.filter((s) => s.update).length}
 						<KeyValueRow label={b.label}><span class="text-body font-medium">{list.length}개{updates ? ` · 업데이트 ${updates}` : ''}{b.source === 'Local' ? ' · 로컬' : ''}</span></KeyValueRow>
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header><Card.Title>CLI별 적용 방식</Card.Title></Card.Header>
-				<Card.Content>
+			<Card size="sm">
+				<CardHeader><CardTitle>CLI별 적용 방식</CardTitle></CardHeader>
+				<CardContent>
 					{#each applyBy as a (a.cli)}
 						<KeyValueRow label={a.cli} value={a.how} />
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 		</div>
 	</div>
 </main>

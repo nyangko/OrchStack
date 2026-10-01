@@ -59,16 +59,16 @@
 	import Languages from '@lucide/svelte/icons/languages';
 	import GitCommitHorizontal from '@lucide/svelte/icons/git-commit-horizontal';
 	import Bell from '@lucide/svelte/icons/bell';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Select from '$lib/components/ui/select';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '$lib/components/ui/dialog';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Steps } from '$lib/components/orch/steps';
 	import { Pill } from '$lib/components/orch/pill';
 	import { Progress } from '$lib/components/ui/progress';
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
-	import * as Field from '$lib/components/ui/field';
+	import { FieldSwitchRow } from '$lib/components/ui/field';
 	import { providers, type ProviderKind } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
 		import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
@@ -259,21 +259,21 @@
 	{#if typeof M === 'string'}<RuntimeLogo runtime={M} class={['ring-0', size === 'lg' ? 'size-5' : 'size-4']} />{:else}<M class={size === 'lg' ? 'size-5' : 'size-4'} />{/if}
 {/snippet}
 
-<Dialog.Root bind:open={() => open, (v) => (open = v)}>
-	<Dialog.Content size="xl" tall>
-		<Dialog.Header icon={PlugZap}>
-			<Dialog.Title>연결 추가</Dialog.Title>
-			<Dialog.Description>에이전트가 모델을 부를 경로 · 워크스페이스 전체에서 사용</Dialog.Description>
+<Dialog bind:open={() => open, (v) => (open = v)}>
+	<DialogContent size="xl" tall>
+		<DialogHeader icon={PlugZap}>
+			<DialogTitle>연결 추가</DialogTitle>
+			<DialogDescription>에이전트가 모델을 부를 경로 · 워크스페이스 전체에서 사용</DialogDescription>
 			{#snippet sub()}<Steps steps={['제공자 선택', '인증', '사용 범위 · 확인']} current={step} />{/snippet}
-		</Dialog.Header>
+		</DialogHeader>
 
-		<Dialog.Body class="gap-4">
+		<DialogBody class="gap-4">
 			{#if step === 0}
 				<div class="flex items-center gap-3">
-					<InputGroup.Root class="h-9 flex-1">
-						<InputGroup.Addon><Search /></InputGroup.Addon>
-						<InputGroup.Input bind:value={q} placeholder="제공자 검색 · OpenAI, Gemini, DeepSeek, OpenAI 호환…" aria-label="제공자 검색" />
-					</InputGroup.Root>
+					<InputGroup class="h-9 flex-1">
+						<InputGroupAddon><Search /></InputGroupAddon>
+						<InputGroupInput bind:value={q} placeholder="제공자 검색 · OpenAI, Gemini, DeepSeek, OpenAI 호환…" aria-label="제공자 검색" />
+					</InputGroup>
 					<div class="flex items-center gap-1" role="radiogroup" aria-label="제공자 종류">
 						{#each ['전체', ...kinds] as const as k (k)}
 							<button
@@ -373,25 +373,25 @@
 						{:else if step === 1}
 							<label class="form-block">
 								{@render field('이름', '멤버 · 템플릿에서 이 이름으로 보여요')}
-								<InputGroup.Root class="h-10"><InputGroup.Addon><Tag /></InputGroup.Addon><InputGroup.Input bind:value={name} placeholder="연결 이름" /></InputGroup.Root>
+								<InputGroup class="h-10"><InputGroupAddon><Tag /></InputGroupAddon><InputGroupInput bind:value={name} placeholder="연결 이름" /></InputGroup>
 							</label>
 							{#if needsUrl}
 								<label class="form-block">
 									{@render field('Base URL', 'OpenAI 호환 엔드포인트')}
-									<InputGroup.Root class="h-10"><InputGroup.Addon><Link /></InputGroup.Addon><InputGroup.Input bind:value={baseUrl} oninput={() => (test = 'idle')} placeholder="http://localhost:8000/v1" class="font-mono" /></InputGroup.Root>
+									<InputGroup class="h-10"><InputGroupAddon><Link /></InputGroupAddon><InputGroupInput bind:value={baseUrl} oninput={() => (test = 'idle')} placeholder="http://localhost:8000/v1" class="font-mono" /></InputGroup>
 								</label>
 							{/if}
 							{#if needsKey}
 								<label class="form-block">
 									{@render field('API 키', '키체인에 저장 · 에이전트 프롬프트에 원문이 들어가지 않아요')}
-									<InputGroup.Root class="h-10"><InputGroup.Addon><KeyRound /></InputGroup.Addon><InputGroup.Input type="password" bind:value={apiKey} oninput={() => (test = 'idle')} placeholder="키 붙여넣기" class="font-mono" /></InputGroup.Root>
+									<InputGroup class="h-10"><InputGroupAddon><KeyRound /></InputGroupAddon><InputGroupInput type="password" bind:value={apiKey} oninput={() => (test = 'idle')} placeholder="키 붙여넣기" class="font-mono" /></InputGroup>
 								</label>
 								<div class="form-block">
 									{@render field('월 예산', '넘으면 이 연결을 폴백에서 건너뛰어요')}
-									<Select.Root type="single" bind:value={budget}>
-										<Select.Trigger class="h-10 w-full" aria-label="월 예산"><span class="flex items-center gap-2"><Wallet class="size-4 text-muted-foreground" />${budget} · 80%에서 경고</span></Select.Trigger>
-										<Select.Content>{#each ['20', '50', '100', '200'] as b (b)}<Select.Item value={b} label="${b}">${b}</Select.Item>{/each}</Select.Content>
-									</Select.Root>
+									<Select type="single" bind:value={budget}>
+										<SelectTrigger class="h-10 w-full" aria-label="월 예산"><span class="flex items-center gap-2"><Wallet class="size-4 text-muted-foreground" />${budget} · 80%에서 경고</span></SelectTrigger>
+										<SelectContent>{#each ['20', '50', '100', '200'] as b (b)}<SelectItem value={b} label="${b}">${b}</SelectItem>{/each}</SelectContent>
+									</Select>
 								</div>
 							{/if}
 							<div class="flex flex-col gap-2.5 border-t pt-4">
@@ -416,37 +416,37 @@
 							</div>
 							<div class="form-block">
 								{@render field('폴백 체인', '연결이 준비되면 이 위치에 추가돼요')}
-								<Select.Root type="single" bind:value={fallback}>
-									<Select.Trigger class="h-10 w-full" aria-label="폴백 체인"><span class="flex items-center gap-2"><Route class="size-4 text-muted-foreground" /><span class="font-medium">{fallbacks.find((f) => f.value === fallback)?.label}</span><span class="text-muted-foreground">{fallbacks.find((f) => f.value === fallback)?.meta}</span></span></Select.Trigger>
-									<Select.Content>{#each fallbacks as f (f.value)}<Select.Item value={f.value} label={f.label}>{f.label} <span class="text-muted-foreground">{f.meta}</span></Select.Item>{/each}</Select.Content>
-								</Select.Root>
+								<Select type="single" bind:value={fallback}>
+									<SelectTrigger class="h-10 w-full" aria-label="폴백 체인"><span class="flex items-center gap-2"><Route class="size-4 text-muted-foreground" /><span class="font-medium">{fallbacks.find((f) => f.value === fallback)?.label}</span><span class="text-muted-foreground">{fallbacks.find((f) => f.value === fallback)?.meta}</span></span></SelectTrigger>
+									<SelectContent>{#each fallbacks as f (f.value)}<SelectItem value={f.value} label={f.label}>{f.label} <span class="text-muted-foreground">{f.meta}</span></SelectItem>{/each}</SelectContent>
+								</Select>
 							</div>
 							<div class="form-block">
 								{@render field('응답 · 보고 언어', '완료 보고 · 요약 · 질문')}
-								<Select.Root type="single" bind:value={lang}>
-									<Select.Trigger class="h-10 w-full" aria-label="응답 · 보고 언어">{@render optLabel(Languages, lang, langs)}</Select.Trigger>
-									<Select.Content>{#each langs as o (o.value)}<Select.Item value={o.value} label={o.value}>{o.value} <span class="text-muted-foreground">{o.meta}</span></Select.Item>{/each}</Select.Content>
-								</Select.Root>
+								<Select type="single" bind:value={lang}>
+									<SelectTrigger class="h-10 w-full" aria-label="응답 · 보고 언어">{@render optLabel(Languages, lang, langs)}</SelectTrigger>
+									<SelectContent>{#each langs as o (o.value)}<SelectItem value={o.value} label={o.value}>{o.value} <span class="text-muted-foreground">{o.meta}</span></SelectItem>{/each}</SelectContent>
+								</Select>
 							</div>
 							<div class="form-block">
 								{@render field('커밋 · PR 언어', '코드 주석 · 커밋 메시지 · PR 본문')}
-								<Select.Root type="single" bind:value={commitLang}>
-									<Select.Trigger class="h-10 w-full" aria-label="커밋 · PR 언어">{@render optLabel(GitCommitHorizontal, commitLang, commitLangs)}</Select.Trigger>
-									<Select.Content>{#each commitLangs as o (o.value)}<Select.Item value={o.value} label={o.value}>{o.value} <span class="text-muted-foreground">{o.meta}</span></Select.Item>{/each}</Select.Content>
-								</Select.Root>
+								<Select type="single" bind:value={commitLang}>
+									<SelectTrigger class="h-10 w-full" aria-label="커밋 · PR 언어">{@render optLabel(GitCommitHorizontal, commitLang, commitLangs)}</SelectTrigger>
+									<SelectContent>{#each commitLangs as o (o.value)}<SelectItem value={o.value} label={o.value}>{o.value} <span class="text-muted-foreground">{o.meta}</span></SelectItem>{/each}</SelectContent>
+								</Select>
 							</div>
 							<div class="flex flex-col border-t pt-4">
 								{@render field('알림', '한도 · 오류를 어디로 알릴지')}
 								{#each notify as n (n.name)}
-									<Field.SwitchRow label={n.name} hint={n.desc} bind:checked={n.on} />
+									<FieldSwitchRow label={n.name} hint={n.desc} bind:checked={n.on} />
 								{/each}
 							</div>
 							<div class="flex flex-col gap-2">
 								{@render field('알림 채널', '설정 › 알림의 채널을 사용해요')}
-								<Select.Root type="single" bind:value={channel}>
-									<Select.Trigger class="h-10 w-full" aria-label="알림 채널"><span class="flex items-center gap-2"><Bell class="size-4 text-muted-foreground" /><span class="font-medium">{channel}</span><span class="text-muted-foreground">{channels.find((c) => c.value === channel)?.meta}</span></span></Select.Trigger>
-									<Select.Content>{#each channels as c (c.value)}<Select.Item value={c.value} label={c.value}>{c.value}</Select.Item>{/each}</Select.Content>
-								</Select.Root>
+								<Select type="single" bind:value={channel}>
+									<SelectTrigger class="h-10 w-full" aria-label="알림 채널"><span class="flex items-center gap-2"><Bell class="size-4 text-muted-foreground" /><span class="font-medium">{channel}</span><span class="text-muted-foreground">{channels.find((c) => c.value === channel)?.meta}</span></span></SelectTrigger>
+									<SelectContent>{#each channels as c (c.value)}<SelectItem value={c.value} label={c.value}>{c.value}</SelectItem>{/each}</SelectContent>
+								</Select>
 							</div>
 						{/if}
 					</div>
@@ -493,9 +493,9 @@
 					</aside>
 				</div>
 			{/if}
-		</Dialog.Body>
+		</DialogBody>
 
-		<Dialog.Footer note={step === 0 ? '이미 연결된 제공자도 계정 · 키를 하나 더 추가할 수 있어요 (예: 개인 / 팀 계정)' : step === 1 ? (isSub ? '구독 토큰은 실행기(CLI)가 보관해요 · OrchStack은 한도만 읽어요' : '키는 이 기기 키체인에만 저장돼요 · 팀원에게는 연결 이름만 공유') : '언어 · 알림 기본값은 설정 › 일반 · 알림에서 바꿀 수 있어요'}>
+		<DialogFooter note={step === 0 ? '이미 연결된 제공자도 계정 · 키를 하나 더 추가할 수 있어요 (예: 개인 / 팀 계정)' : step === 1 ? (isSub ? '구독 토큰은 실행기(CLI)가 보관해요 · OrchStack은 한도만 읽어요' : '키는 이 기기 키체인에만 저장돼요 · 팀원에게는 연결 이름만 공유') : '언어 · 알림 기본값은 설정 › 일반 · 알림에서 바꿀 수 있어요'}>
 			{#if step === 0}
 				<Button variant="ghost" size="sm" onclick={() => (open = false)}>취소</Button>
 				<Button size="sm" disabled={!sel} onclick={() => (step = 1)}><ArrowRight />다음 · 인증</Button>
@@ -506,6 +506,6 @@
 				<Button variant="ghost" size="sm" onclick={() => (step = 1)}><ArrowLeft />이전</Button>
 				<Button size="sm" onclick={add}><Check />연결 추가</Button>
 			{/if}
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+		</DialogFooter>
+	</DialogContent>
+</Dialog>

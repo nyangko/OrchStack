@@ -23,8 +23,8 @@
 	import Upload from '@lucide/svelte/icons/upload';
 	import PencilLine from '@lucide/svelte/icons/pencil-line';
 	import BadgeCheck from '@lucide/svelte/icons/badge-check';
-	import * as Card from '$lib/components/ui/card';
-	import * as Empty from '$lib/components/ui/empty';
+	import { Card, CardHeader, CardTitle, CardContent, CardAction, CardDescription } from '$lib/components/ui/card';
+	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '$lib/components/ui/empty';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Pill } from '$lib/components/orch/pill';
@@ -167,38 +167,38 @@
 				{#if tplTab === 'overview'}
 					<div class="flex items-start gap-4">
 						<div class="flex min-w-0 flex-1 flex-col gap-4">
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>설명</Card.Title></Card.Header>
-								<Card.Content class="gap-2.5">
+							<Card size="sm">
+								<CardHeader><CardTitle>설명</CardTitle></CardHeader>
+								<CardContent class="gap-2.5">
 									<p class="text-body">{t.desc}</p>
 									<div class="flex gap-1.5">{#each t.tags as tag (tag)}<Pill>#{tag}</Pill>{/each}</div>
-								</Card.Content>
-							</Card.Root>
+								</CardContent>
+							</Card>
 							{#each t.files.filter((f) => f.name === 'SOUL.md') as soul (soul.name)}
-								<Card.Root size="sm">
-									<Card.Header><Card.Title>Soul 미리보기</Card.Title></Card.Header>
-									<Card.Content class="gap-2">
+								<Card size="sm">
+									<CardHeader><CardTitle>Soul 미리보기</CardTitle></CardHeader>
+									<CardContent class="gap-2">
 										<pre class="rounded-sm bg-muted p-3 font-sans text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">{soul.body}</pre>
 										<span class="text-caption text-subtle-foreground">SOUL.md · 멤버마다 따로 다듬어져요</span>
-									</Card.Content>
-								</Card.Root>
+									</CardContent>
+								</Card>
 							{/each}
-							<Card.Root size="sm">
-								<Card.Header>
-									<Card.Title class="flex items-center gap-2">스킬 <Pill>{t.config.skills.length + t.config.mcp.length} 활성</Pill></Card.Title>
-									<Card.Action><Button variant="link" size="xs" onclick={() => (tplTab = 'skills')}>관리</Button></Card.Action>
-								</Card.Header>
-								<Card.Content class="gap-2">
+							<Card size="sm">
+								<CardHeader>
+									<CardTitle class="flex items-center gap-2">스킬 <Pill>{t.config.skills.length + t.config.mcp.length} 활성</Pill></CardTitle>
+									<CardAction><Button variant="link" size="xs" onclick={() => (tplTab = 'skills')}>관리</Button></CardAction>
+								</CardHeader>
+								<CardContent class="gap-2">
 									<div class="flex flex-wrap gap-1.5">
 										{#each t.config.skills as sk (sk)}<Pill><Sparkles />{sk}</Pill>{/each}
 										{#each t.config.mcp as mc (mc)}<Pill><Plug />{mc}</Pill>{/each}
 									</div>
 									<span class="text-caption text-muted-foreground">다음 Run부터 적용 · 컨텍스트 +{((t.config.skills.length + t.config.mcp.length) * 0.24).toFixed(1)}K tok</span>
-								</Card.Content>
-							</Card.Root>
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>이 템플릿으로 만든 멤버 · {used.length}</Card.Title></Card.Header>
-								<Card.Content class="gap-0">
+								</CardContent>
+							</Card>
+							<Card size="sm">
+								<CardHeader><CardTitle>이 템플릿으로 만든 멤버 · {used.length}</CardTitle></CardHeader>
+								<CardContent class="gap-0">
 									{#each used as { m, team: tn } (m.sn)}
 										{@const changedFiles = (m.files ?? t.files).filter((f) => t.files.find((o) => o.name === f.name)?.body !== f.body)}
 										<div class="row-divided items-center gap-2.5 py-2">
@@ -212,37 +212,37 @@
 										<p class="text-xs text-muted-foreground">아직 이 템플릿으로 만든 멤버가 없어요.</p>
 									{/each}
 									<span class="border-t pt-2 text-caption text-subtle-foreground">멤버는 추가 시점의 복사본이에요. 템플릿을 고쳐도 자동 반영되지 않아요.</span>
-								</Card.Content>
-							</Card.Root>
+								</CardContent>
+							</Card>
 						</div>
 						<div class="flex shrink-0 flex-col w-80 gap-4">
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>구성 기본값</Card.Title></Card.Header>
-								<Card.Content class="gap-0"><KeyValueRow label="역할" value={t.focus} /><KeyValueRow label="만든 사람" value={t.created} /></Card.Content>
-							</Card.Root>
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>하네스 / 런타임</Card.Title></Card.Header>
-								<Card.Content class="gap-0">
+							<Card size="sm">
+								<CardHeader><CardTitle>구성 기본값</CardTitle></CardHeader>
+								<CardContent class="gap-0"><KeyValueRow label="역할" value={t.focus} /><KeyValueRow label="만든 사람" value={t.created} /></CardContent>
+							</Card>
+							<Card size="sm">
+								<CardHeader><CardTitle>하네스 / 런타임</CardTitle></CardHeader>
+								<CardContent class="gap-0">
 									<KeyValueRow label="CLI" value={runtimeName(t.runtime)} />
 									<KeyValueRow label="모델 · Effort" value={`${t.model} · Auto`} />
 									<KeyValueRow label="기본 계정" value={accountOf(t.runtime).plan} />
-								</Card.Content>
-							</Card.Root>
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>도구 · 권한</Card.Title></Card.Header>
-								<Card.Content class="gap-0">
+								</CardContent>
+							</Card>
+							<Card size="sm">
+								<CardHeader><CardTitle>도구 · 권한</CardTitle></CardHeader>
+								<CardContent class="gap-0">
 									<KeyValueRow label="MCP" value={`${t.config.mcp.length}`} />
 									<KeyValueRow label="Trust" value={`${t.config.trust}`} />
 									<KeyValueRow label="파일 쓰기" value={scopeText(t.config)} />
 									<KeyValueRow label="PR 생성" value="승인 필요" />
-								</Card.Content>
-							</Card.Root>
-							<Card.Root size="sm">
-								<Card.Header>
-									<Card.Title>최근 Revision</Card.Title>
-									<Card.Action><Button variant="link" size="xs" onclick={() => (tplTab = 'revisions')}>전체</Button></Card.Action>
-								</Card.Header>
-								<Card.Content class="gap-2">
+								</CardContent>
+							</Card>
+							<Card size="sm">
+								<CardHeader>
+									<CardTitle>최근 Revision</CardTitle>
+									<CardAction><Button variant="link" size="xs" onclick={() => (tplTab = 'revisions')}>전체</Button></CardAction>
+								</CardHeader>
+								<CardContent class="gap-2">
 									{#each t.revisions.slice(0, 3) as r (r.v)}
 										<div class="flex items-center gap-2 text-xs">
 											<Pill class={['font-mono', r.state === 'draft' && 'bg-warning-soft text-status-waiting']}>v{r.v}</Pill>
@@ -250,8 +250,8 @@
 											<span class="font-mono text-caption text-subtle-foreground">{r.when}</span>
 										</div>
 									{/each}
-								</Card.Content>
-							</Card.Root>
+								</CardContent>
+							</Card>
 						</div>
 					</div>
 				{:else if tplTab === 'instructions'}
@@ -295,9 +295,9 @@
 							{#snippet status()}{t.draft ? '초안 편집 중' : `v${t.version} 기준`}{/snippet}
 						</MdEditor>
 						<aside class="flex shrink-0 flex-col w-64 gap-3.5">
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>Run 시 합성되는 컨텍스트</Card.Title></Card.Header>
-								<Card.Content class="gap-0">
+							<Card size="sm">
+								<CardHeader><CardTitle>Run 시 합성되는 컨텍스트</CardTitle></CardHeader>
+								<CardContent class="gap-0">
 									{#each stack as [label, kind, n], i (label)}
 										<div class="flex items-center gap-2 border-t py-1.75 text-xs first:border-t-0">
 											<span class="flex size-4.5 items-center justify-center rounded-full bg-muted font-mono text-2xs">{i + 1}</span>
@@ -307,16 +307,16 @@
 										</div>
 									{/each}
 									<KeyValueRow label="합계" value={`${stack.reduce((s, x) => s + x[2], 0).toLocaleString()} / 권장 8K`} />
-								</Card.Content>
-							</Card.Root>
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>사용 가능한 변수</Card.Title></Card.Header>
-								<Card.Content class="gap-1.5">
+								</CardContent>
+							</Card>
+							<Card size="sm">
+								<CardHeader><CardTitle>사용 가능한 변수</CardTitle></CardHeader>
+								<CardContent class="gap-1.5">
 									{#each [['{{team.name}}', team.name], ['{{agent.alias}}', t.name], ['{{task.title}}', '태스크 제목'], ['{{task.criteria}}', '완료 조건']] as [k, v] (k)}
 										<div class="flex items-center justify-between gap-2 text-xs"><code class="font-mono text-primary">{k}</code><span class="truncate text-muted-foreground">{v}</span></div>
 									{/each}
-								</Card.Content>
-							</Card.Root>
+								</CardContent>
+							</Card>
 						</aside>
 					</div>
 				{:else if tplTab === 'harness'}
@@ -336,12 +336,12 @@
 					</div>
 					<div class="flex items-start gap-4">
 						<div class="flex shrink-0 flex-col w-80 gap-4">
-							<Card.Root size="sm">
-								<Card.Header>
-									<Card.Title>버전</Card.Title>
-									<Card.Description>멤버는 복사본 · 새 버전은 자동 반영되지 않아요</Card.Description>
-								</Card.Header>
-								<Card.Content class="gap-0">
+							<Card size="sm">
+								<CardHeader>
+									<CardTitle>버전</CardTitle>
+									<CardDescription>멤버는 복사본 · 새 버전은 자동 반영되지 않아요</CardDescription>
+								</CardHeader>
+								<CardContent class="gap-0">
 									{#each t.revisions as r (r.v)}
 										{@const Icon = r.state === 'draft' ? PencilLine : r.state === 'live' ? BadgeCheck : History}
 										<div class="row-divided gap-2.5 py-2.5">
@@ -352,22 +352,22 @@
 											</span>
 										</div>
 									{/each}
-								</Card.Content>
-							</Card.Root>
-							<Card.Root size="sm">
-								<Card.Header>
-									<Card.Title>이 템플릿을 쓰는 멤버</Card.Title>
-									<Card.Description>v{t.version} 기준 · 개별 변경은 유지돼요</Card.Description>
-								</Card.Header>
-								<Card.Content class="gap-0">
+								</CardContent>
+							</Card>
+							<Card size="sm">
+								<CardHeader>
+									<CardTitle>이 템플릿을 쓰는 멤버</CardTitle>
+									<CardDescription>v{t.version} 기준 · 개별 변경은 유지돼요</CardDescription>
+								</CardHeader>
+								<CardContent class="gap-0">
 									{#each used as { m, team: tn } (m.sn)}
 										{@const n = (m.files ?? t.files).filter((f) => t.files.find((o) => o.name === f.name)?.body !== f.body).length}
 										<KeyValueRow label={`${m.name} · ${tn}`} value={n ? `개별 변경 ${n}` : '변경 없음'} />
 									{:else}
 										<p class="text-xs text-muted-foreground">없어요.</p>
 									{/each}
-								</Card.Content>
-							</Card.Root>
+								</CardContent>
+							</Card>
 						</div>
 						{#if t.draft && cur}
 							<div class="flex min-w-0 flex-1 flex-col gap-2.5">
@@ -392,23 +392,23 @@
 								/>
 							</div>
 						{:else}
-							<Empty.Root class="flex-1 bg-card">
-								<Empty.Header>
-									<Empty.Media variant="icon"><History /></Empty.Media>
-									<Empty.Title>게시할 초안이 없어요</Empty.Title>
-									<Empty.Description>Instructions에서 고치고 저장하면 다음 버전 초안이 생기고, 여기서 배포 중인 버전과 비교해 게시해요.</Empty.Description>
-								</Empty.Header>
-							</Empty.Root>
+							<Empty class="flex-1 bg-card">
+								<EmptyHeader>
+									<EmptyMedia variant="icon"><History /></EmptyMedia>
+									<EmptyTitle>게시할 초안이 없어요</EmptyTitle>
+									<EmptyDescription>Instructions에서 고치고 저장하면 다음 버전 초안이 생기고, 여기서 배포 중인 버전과 비교해 게시해요.</EmptyDescription>
+								</EmptyHeader>
+							</Empty>
 						{/if}
 					</div>
 				{:else}
-					<Empty.Root class="bg-card">
-						<Empty.Header>
-							<Empty.Media variant="icon"><SlidersHorizontal /></Empty.Media>
-							<Empty.Title>{tplNav.flatMap((g) => g.items).find((i) => i.v === tplTab)?.label}</Empty.Title>
-							<Empty.Description>이어서 만들어요. (#65 · #63 T-3b)</Empty.Description>
-						</Empty.Header>
-					</Empty.Root>
+					<Empty class="bg-card">
+						<EmptyHeader>
+							<EmptyMedia variant="icon"><SlidersHorizontal /></EmptyMedia>
+							<EmptyTitle>{tplNav.flatMap((g) => g.items).find((i) => i.v === tplTab)?.label}</EmptyTitle>
+							<EmptyDescription>이어서 만들어요. (#65 · #63 T-3b)</EmptyDescription>
+						</EmptyHeader>
+					</Empty>
 				{/if}
 			</div>
 		</div>

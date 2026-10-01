@@ -14,9 +14,9 @@
 	import Users from '@lucide/svelte/icons/users';
 	import Zap from '@lucide/svelte/icons/zap';
 	import GitCommitHorizontal from '@lucide/svelte/icons/git-commit-horizontal';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '$lib/components/ui/dialog';
+	import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { Pill } from '$lib/components/orch/pill';
@@ -46,10 +46,10 @@
 
 <div class="flex flex-col gap-3">
 	<div class="flex flex-wrap items-center gap-2">
-		<InputGroup.Root class="h-8 w-64 bg-card">
-			<InputGroup.Addon><Search /></InputGroup.Addon>
-			<InputGroup.Input bind:value={shQuery} placeholder="skills.sh 검색" aria-label="skills.sh 검색" />
-		</InputGroup.Root>
+		<InputGroup class="h-8 w-64 bg-card">
+			<InputGroupAddon><Search /></InputGroupAddon>
+			<InputGroupInput bind:value={shQuery} placeholder="skills.sh 검색" aria-label="skills.sh 검색" />
+		</InputGroup>
 		{#each [['all', '전체'], ['trending', 'Trending'], ['official', '공식'], ['test', '테스트'], ['a11y', '접근성']] as const as [v, l] (v)}
 			<Toggle variant="chip" pressed={shFilter === v} onPressedChange={() => (shFilter = v)}>{l}</Toggle>
 		{/each}
@@ -85,14 +85,14 @@
 </div>
 
 <!-- 스킬 상세 (.pen Skill Detail Dialog) -->
-<Dialog.Root bind:open={() => skillView !== undefined, (v) => !v && (skillView = undefined)}>
-	<Dialog.Content size="xl" tall>
+<Dialog bind:open={() => skillView !== undefined, (v) => !v && (skillView = undefined)}>
+	<DialogContent size="xl" tall>
 		{#if skillView}
 			{@const h = skillView}
 			{@const isAdded = added(h.name)}
-			<Dialog.Header>
+			<DialogHeader>
 				{#snippet lead()}<span class="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-lg font-semibold text-muted-foreground uppercase">{h.name[0]}</span>{/snippet}
-					<Dialog.Title class="flex items-baseline gap-2">{h.name}<span class="font-mono text-xs font-normal text-muted-foreground">{h.repo}</span></Dialog.Title>
+					<DialogTitle class="flex items-baseline gap-2">{h.name}<span class="font-mono text-xs font-normal text-muted-foreground">{h.repo}</span></DialogTitle>
 					<div class="meta-line flex-wrap gap-3">
 						<span class="flex items-center gap-1"><Download class="size-3" />{h.installs} installs</span>
 						<span class="flex items-center gap-1"><GitCommitHorizontal class="size-3" />{h.version}</span>
@@ -100,22 +100,22 @@
 						<Pill class={h.audit[0] < h.audit[1] ? 'bg-warning-soft text-status-waiting' : 'bg-success-soft text-status-done'}><ShieldCheck />보안 검사 {h.audit[0]}/{h.audit[1]}</Pill>
 					</div>
 				{#snippet actions()}<Button variant="ghost" size="icon-sm" href="https://skills.sh" target="_blank" rel="noreferrer" aria-label="skills.sh에서 보기"><ExternalLink /></Button>{/snippet}
-			</Dialog.Header>
-			<Dialog.Body padded={false} class="flex-row">
-				<Tabs.Root value="overview" class="min-w-0 flex-1 gap-0 overflow-y-auto px-6 py-4">
-					<Tabs.List variant="line" class="mb-4">
-						<Tabs.Trigger value="overview">개요</Tabs.Trigger>
-						<Tabs.Trigger value="md">SKILL.md</Tabs.Trigger>
-						<Tabs.Trigger value="audit">보안 검사</Tabs.Trigger>
-					</Tabs.List>
-					<Tabs.Content value="overview" class="flex flex-col gap-2 text-body">
+			</DialogHeader>
+			<DialogBody padded={false} class="flex-row">
+				<Tabs value="overview" class="min-w-0 flex-1 gap-0 overflow-y-auto px-6 py-4">
+					<TabsList variant="line" class="mb-4">
+						<TabsTrigger value="overview">개요</TabsTrigger>
+						<TabsTrigger value="md">SKILL.md</TabsTrigger>
+						<TabsTrigger value="audit">보안 검사</TabsTrigger>
+					</TabsList>
+					<TabsContent value="overview" class="flex flex-col gap-2 text-body">
 						<p>{h.desc}</p>
 						{#each h.skillMd.filter((l) => l.startsWith('- ')) as l (l)}<p class="text-xs text-muted-foreground">• {l.slice(2)}</p>{/each}
-					</Tabs.Content>
-					<Tabs.Content value="md">
+					</TabsContent>
+					<TabsContent value="md">
 						<MdEditor files={[{ name: 'SKILL.md', body: h.skillMd.join('\n') }]} readonly tabs={false} class="h-100" />
-					</Tabs.Content>
-					<Tabs.Content value="audit" class="flex flex-col gap-2">
+					</TabsContent>
+					<TabsContent value="audit" class="flex flex-col gap-2">
 						{#each ['Socket', 'Snyk', 'skills.sh 검토'] as a, i (a)}
 							{@const ok = i < h.audit[0]}
 							<div class="flex items-center gap-2 text-xs">
@@ -123,8 +123,8 @@
 								<Pill class={ok ? 'bg-success-soft text-status-done' : 'bg-warning-soft text-status-waiting'}>{#if ok}<Check />통과{:else}<TriangleAlert />경고 · 외부 네트워크 호출{/if}</Pill>
 							</div>
 						{/each}
-					</Tabs.Content>
-				</Tabs.Root>
+					</TabsContent>
+				</Tabs>
 				<aside class="flex w-64 shrink-0 flex-col gap-4 border-l bg-background px-5 py-4 text-xs">
 					<span class="font-semibold">이 스킬은</span>
 					{#each [[Zap, '트리거', h.skillMd.find((l) => l.startsWith('description:'))?.slice(13) ?? '관련 작업 시'], [Layers, '컨텍스트', `+${(h.tok / 1000).toFixed(1)}K tok`], [Hash, 'sha256', '3f9a…c21e'], [Users, '이 팀 사용', store.library.some((k) => k.name === h.name) ? '설치됨' : '처음 추가']] as const as [Icon, k, v] (k)}
@@ -134,11 +134,11 @@
 					<div class="flex items-center gap-2"><RuntimeLogo runtime="claude" class="size-4 ring-0" />Claude Code</div>
 					<div class="flex items-center gap-2"><RuntimeLogo runtime="codex" class="size-4 ring-0" />Codex CLI<span class="text-muted-foreground">+{h.agents - 2}</span></div>
 				</aside>
-			</Dialog.Body>
-			<Dialog.Footer note="{target}에 추가 · 다음 Run부터 적용">
+			</DialogBody>
+			<DialogFooter note="{target}에 추가 · 다음 Run부터 적용">
 				<Button variant="ghost" size="sm" onclick={() => (skillView = undefined)}>닫기</Button>
 				<Button size="sm" disabled={isAdded} onclick={() => (onadd(h), (skillView = undefined))}>{#if isAdded}<Check />추가됨{:else}<Plus />{h.audit[0] < h.audit[1] ? '검토했어요 · 추가' : '추가'}{/if}</Button>
-			</Dialog.Footer>
+			</DialogFooter>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</DialogContent>
+</Dialog>

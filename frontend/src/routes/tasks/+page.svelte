@@ -23,9 +23,9 @@
 	import ListTodo from '@lucide/svelte/icons/list-todo';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import type { Component } from 'svelte';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuCheckboxItem } from '$lib/components/ui/dropdown-menu';
+	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '$lib/components/ui/empty';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { Pill } from '$lib/components/orch/pill';
@@ -195,61 +195,61 @@
 		</div>
 
 		<div class="flex flex-wrap items-center gap-2">
-			<InputGroup.Root class="h-8 w-64 bg-card">
-				<InputGroup.Addon><Search /></InputGroup.Addon>
-				<InputGroup.Input bind:value={query} placeholder="태스크 · 이슈 · 담당 검색" aria-label="태스크 검색" />
-			</InputGroup.Root>
+			<InputGroup class="h-8 w-64 bg-card">
+				<InputGroupAddon><Search /></InputGroupAddon>
+				<InputGroupInput bind:value={query} placeholder="태스크 · 이슈 · 담당 검색" aria-label="태스크 검색" />
+			</InputGroup>
 			{#each chips as c (c.l)}
 				<Toggle variant="chip" count={count({ ...f, status: c.v })} pressed={f.status === c.v} onPressedChange={() => (f.status = c.v)}>{c.l}</Toggle>
 			{/each}
 			<span class="flex-1"></span>
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
+			<DropdownMenu>
+				<DropdownMenuTrigger>
 					{#snippet child({ props })}<Button variant="outline" size="sm" {...props}><Folder />프로젝트: {f.project ? store.projects.find((p) => p.sn === f.project)?.name : '전체'}</Button>{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="end">
-					<DropdownMenu.RadioGroup bind:value={() => String(f.project ?? ''), (v) => (f.project = v ? Number(v) : undefined)}>
-						<DropdownMenu.RadioItem value="">전체</DropdownMenu.RadioItem>
-						{#each store.projects as p (p.sn)}<DropdownMenu.RadioItem value={String(p.sn)}>{p.name}</DropdownMenu.RadioItem>{/each}
-					</DropdownMenu.RadioGroup>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuRadioGroup bind:value={() => String(f.project ?? ''), (v) => (f.project = v ? Number(v) : undefined)}>
+						<DropdownMenuRadioItem value="">전체</DropdownMenuRadioItem>
+						{#each store.projects as p (p.sn)}<DropdownMenuRadioItem value={String(p.sn)}>{p.name}</DropdownMenuRadioItem>{/each}
+					</DropdownMenuRadioGroup>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<DropdownMenu>
+				<DropdownMenuTrigger>
 					{#snippet child({ props })}<Button variant="outline" size="sm" {...props}><User />담당: {f.agent !== undefined ? memberOf(f.agent)?.name : '전체'}</Button>{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="end">
-					<DropdownMenu.RadioGroup bind:value={() => String(f.agent ?? ''), (v) => (f.agent = v ? Number(v) : undefined)}>
-						<DropdownMenu.RadioItem value="">전체</DropdownMenu.RadioItem>
-						{#each assignees as m (m.sn)}<DropdownMenu.RadioItem value={String(m.sn)}>{m.name} · {roles[m.role].label}</DropdownMenu.RadioItem>{/each}
-					</DropdownMenu.RadioGroup>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuRadioGroup bind:value={() => String(f.agent ?? ''), (v) => (f.agent = v ? Number(v) : undefined)}>
+						<DropdownMenuRadioItem value="">전체</DropdownMenuRadioItem>
+						{#each assignees as m (m.sn)}<DropdownMenuRadioItem value={String(m.sn)}>{m.name} · {roles[m.role].label}</DropdownMenuRadioItem>{/each}
+					</DropdownMenuRadioGroup>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<DropdownMenu>
+				<DropdownMenuTrigger>
 					{#snippet child({ props })}<Button variant="outline" size="sm" {...props}><Flag />우선순위{f.priorities.length ? `: ${f.priorities.join('·')}` : ''}</Button>{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="end">
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
 					{#each ['P0', 'P1', 'P2', 'P3'] as pr (pr)}
-						<DropdownMenu.CheckboxItem
+						<DropdownMenuCheckboxItem
 							checked={f.priorities.includes(pr)}
 							onCheckedChange={(on) => (f.priorities = on ? [...f.priorities, pr] : f.priorities.filter((x) => x !== pr))}
-						>{pr}</DropdownMenu.CheckboxItem>
+						>{pr}</DropdownMenuCheckboxItem>
 					{/each}
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<DropdownMenu>
+				<DropdownMenuTrigger>
 					{#snippet child({ props })}<Button variant="outline" size="sm" {...props}><ArrowDownUp />{sort === 'updated' ? '업데이트순' : sort === 'priority' ? '우선순위순' : '번호순'}</Button>{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="end">
-					<DropdownMenu.RadioGroup bind:value={sort}>
-						<DropdownMenu.RadioItem value="updated">업데이트순</DropdownMenu.RadioItem>
-						<DropdownMenu.RadioItem value="priority">우선순위순</DropdownMenu.RadioItem>
-						<DropdownMenu.RadioItem value="num">번호순</DropdownMenu.RadioItem>
-					</DropdownMenu.RadioGroup>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuRadioGroup bind:value={sort}>
+						<DropdownMenuRadioItem value="updated">업데이트순</DropdownMenuRadioItem>
+						<DropdownMenuRadioItem value="priority">우선순위순</DropdownMenuRadioItem>
+						<DropdownMenuRadioItem value="num">번호순</DropdownMenuRadioItem>
+					</DropdownMenuRadioGroup>
+				</DropdownMenuContent>
+			</DropdownMenu>
 		</div>
 
 		{#if groups.length}
@@ -320,20 +320,20 @@
 		{:else}
 			<!-- 빈 상태 (.pen 빈 상태 · 새 프로젝트에 태스크 없음) -->
 			{@const noTasks = f.project !== undefined && !all.some((t) => t.project === f.project)}
-			<Empty.Root class="card py-16 rounded-lg">
-				<Empty.Header>
-					<Empty.Media variant="icon"><ListTodo /></Empty.Media>
-					<Empty.Title>{noTasks ? '아직 태스크가 없어요' : '조건에 맞는 태스크가 없어요'}</Empty.Title>
-					<Empty.Description>{noTasks ? 'Orch에게 목표를 알려주면 태스크로 나누고 배정안을 제안해요.' : '필터를 바꾸거나 전체 보기로 돌아가세요.'}</Empty.Description>
-				</Empty.Header>
-				<Empty.Content>
+			<Empty class="card py-16 rounded-lg">
+				<EmptyHeader>
+					<EmptyMedia variant="icon"><ListTodo /></EmptyMedia>
+					<EmptyTitle>{noTasks ? '아직 태스크가 없어요' : '조건에 맞는 태스크가 없어요'}</EmptyTitle>
+					<EmptyDescription>{noTasks ? 'Orch에게 목표를 알려주면 태스크로 나누고 배정안을 제안해요.' : '필터를 바꾸거나 전체 보기로 돌아가세요.'}</EmptyDescription>
+				</EmptyHeader>
+				<EmptyContent>
 					{#if noTasks}
 						<Button href="/p/{f.project}"><Sparkles />Orch에게 계획 요청</Button>
 					{:else}
 						<Button variant="outline" onclick={() => pickView('all', { priorities: [] })}>전체 보기</Button>
 					{/if}
-				</Empty.Content>
-			</Empty.Root>
+				</EmptyContent>
+			</Empty>
 		{/if}
 	</main>
 </div>

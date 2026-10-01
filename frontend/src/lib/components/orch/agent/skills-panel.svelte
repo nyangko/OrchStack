@@ -8,9 +8,9 @@
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import Plug from '@lucide/svelte/icons/plug';
 	import Layers from '@lucide/svelte/icons/layers';
-	import * as Card from '$lib/components/ui/card';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '$lib/components/ui/card';
+	import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Pill } from '$lib/components/orch/pill';
 	import { Switch } from '$lib/components/ui/switch';
@@ -73,41 +73,41 @@
 	{#if skillAdd}
 		<Button variant="outline" size="sm" onclick={() => (skillAdd = false)}><ArrowLeft />설치된 스킬 {c.skills.length + c.mcp.length}</Button>
 	{:else}
-		<InputGroup.Root class="h-8 w-52 bg-card">
-			<InputGroup.Addon><Search /></InputGroup.Addon>
-			<InputGroup.Input bind:value={skillQuery} placeholder="스킬 검색" aria-label="스킬 검색" />
-		</InputGroup.Root>
+		<InputGroup class="h-8 w-52 bg-card">
+			<InputGroupAddon><Search /></InputGroupAddon>
+			<InputGroupInput bind:value={skillQuery} placeholder="스킬 검색" aria-label="스킬 검색" />
+		</InputGroup>
 		<Button variant="outline" size="sm" onclick={() => ((skillAdd = true), (shTab = 'sh'))}><Plus />스킬 추가</Button>
 	{/if}
 </div>
 {#if skillAdd}
-	<Tabs.Root bind:value={shTab} class="gap-3.5">
+	<Tabs bind:value={shTab} class="gap-3.5">
 		<div class="flex items-center gap-2 border-b">
-			<Tabs.List variant="line">
-				<Tabs.Trigger value="installed">설치됨 {store.library.length}</Tabs.Trigger>
-				<Tabs.Trigger value="sh">skills.sh 탐색</Tabs.Trigger>
-				<Tabs.Trigger value="team">팀 스킬 {store.library.filter((k) => k.source === 'Team').length}</Tabs.Trigger>
-			</Tabs.List>
+			<TabsList variant="line">
+				<TabsTrigger value="installed">설치됨 {store.library.length}</TabsTrigger>
+				<TabsTrigger value="sh">skills.sh 탐색</TabsTrigger>
+				<TabsTrigger value="team">팀 스킬 {store.library.filter((k) => k.source === 'Team').length}</TabsTrigger>
+			</TabsList>
 			<span class="flex-1"></span>
 			<Button variant="ghost" size="sm" onclick={() => (sourcesOpen = true)}><Plug />소스 연동 · skills.sh {store.sources.sources[0].state}</Button>
 		</div>
-		<Tabs.Content value="sh" class="flex flex-col gap-3">
+		<TabsContent value="sh" class="flex flex-col gap-3">
 			<SkillBrowser added={(n) => c.skills.includes(n)} onadd={(h) => (installSkill(h), c.skills.includes(h.name) || c.skills.push(h.name))} {target} />
-		</Tabs.Content>
+		</TabsContent>
 		{#each ['installed', 'team'] as v (v)}
-			<Tabs.Content value={v} class="card px-4 py-1 rounded-lg">
+			<TabsContent value={v} class="card px-4 py-1 rounded-lg">
 				{#each store.library.filter((k) => v === 'installed' || k.source === 'Team') as k (k.name)}
 					{@render skillRow(k.name, k.desc, k.version ? `${sourceMeta[k.source].label} · ${k.version}` : sourceMeta[k.source].label, sourceMeta[k.source].icon, k.tok, c.skills.includes(k.name), () => toggleIn(c.skills, k.name))}
 				{/each}
-			</Tabs.Content>
+			</TabsContent>
 		{/each}
-	</Tabs.Root>
+	</Tabs>
 {:else}
 	<div class="flex items-start gap-4">
 		<div class="flex min-w-0 flex-1 flex-col gap-4">
-			<Card.Root size="sm">
-				<Card.Header><Card.Title class="flex items-center gap-2">이 에이전트에서 활성 <span class="font-normal text-muted-foreground">{active.length}</span></Card.Title></Card.Header>
-				<Card.Content class="gap-0">
+			<Card size="sm">
+				<CardHeader><CardTitle class="flex items-center gap-2">이 에이전트에서 활성 <span class="font-normal text-muted-foreground">{active.length}</span></CardTitle></CardHeader>
+				<CardContent class="gap-0">
 					{#each active as k (k)}
 						{@const lib = store.library.find((x) => x.name === k)}
 						{@const srv = mcpServers.find((x) => x.name === k)}
@@ -119,38 +119,38 @@
 					{:else}
 						<p class="text-xs text-muted-foreground">켜진 스킬이 없어요.</p>
 					{/each}
-				</Card.Content>
-			</Card.Root>
-			<Card.Root size="sm">
-				<Card.Header><Card.Title class="flex items-center gap-2">라이브러리에서 사용 가능 <span class="font-normal text-muted-foreground">{avail.length}</span></Card.Title></Card.Header>
-				<Card.Content class="gap-0">
+				</CardContent>
+			</Card>
+			<Card size="sm">
+				<CardHeader><CardTitle class="flex items-center gap-2">라이브러리에서 사용 가능 <span class="font-normal text-muted-foreground">{avail.length}</span></CardTitle></CardHeader>
+				<CardContent class="gap-0">
 					{#each avail as k (k.name)}
 						{@render skillRow(k.name, k.desc, k.version ? `${sourceMeta[k.source].label} · ${k.version}` : sourceMeta[k.source].label, sourceMeta[k.source].icon, k.tok, false, () => toggleIn(c.skills, k.name), !!base && base.skills.includes(k.name))}
 					{:else}
 						<p class="text-xs text-muted-foreground">모두 켜져 있어요. 새 스킬은 ‘스킬 추가’에서 찾아요.</p>
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 		</div>
 		<aside class="flex shrink-0 flex-col w-72 gap-4">
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>컨텍스트 영향</Card.Title>
-					<Card.Description>활성 스킬은 매 Run 컨텍스트에 추가돼요.</Card.Description>
-				</Card.Header>
-				<Card.Content><LimitRow icon={Layers} label="활성 스킬 합계" used="{(tok / 1000).toFixed(1)}K" max="/ 권장 8K" value={(tok / 8000) * 100} note="{Math.round((tok / 8000) * 100)}% · {tok < 6000 ? '여유 있음' : '많아요'}" warn={tok >= 6000} /></Card.Content>
-			</Card.Root>
-			<Card.Root size="sm">
-				<Card.Header><Card.Title>CLI별 적용 방식</Card.Title></Card.Header>
-				<Card.Content class="gap-2 text-xs">
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>컨텍스트 영향</CardTitle>
+					<CardDescription>활성 스킬은 매 Run 컨텍스트에 추가돼요.</CardDescription>
+				</CardHeader>
+				<CardContent><LimitRow icon={Layers} label="활성 스킬 합계" used="{(tok / 1000).toFixed(1)}K" max="/ 권장 8K" value={(tok / 8000) * 100} note="{Math.round((tok / 8000) * 100)}% · {tok < 6000 ? '여유 있음' : '많아요'}" warn={tok >= 6000} /></CardContent>
+			</Card>
+			<Card size="sm">
+				<CardHeader><CardTitle>CLI별 적용 방식</CardTitle></CardHeader>
+				<CardContent class="gap-2 text-xs">
 					{#each [['codex', 'Codex CLI', 'AGENTS.md에 스킬 요약을 포함'], ['claude', 'Claude Code', '~/.claude/skills 로 동기화']] as const as [r, n, d] (r)}
 						<div class={['flex items-start gap-2 rounded-sm p-2', r === runtime && 'bg-primary-soft']}>
 							<RuntimeLogo runtime={r} class="size-4 ring-0" />
 							<span class="flex flex-col gap-0.5"><span class="font-medium">{n}{r === runtime ? ' · 현재' : ''}</span><span class="text-muted-foreground">{d}</span></span>
 						</div>
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 		</aside>
 	</div>
 {/if}

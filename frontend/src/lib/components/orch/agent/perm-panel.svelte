@@ -2,7 +2,7 @@
 	/// 에이전트 권한 (.pen 권한 기본값). Trust 레벨 · 파일 범위 glob · 승인 규칙. used가 있으면(템플릿) 쓰는 멤버별 차이도 보인다.
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import X from '@lucide/svelte/icons/x';
-	import * as Card from '$lib/components/ui/card';
+	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
 	import { Pill } from '$lib/components/orch/pill';
 	import { RoleAvatar } from '$lib/components/orch/role-avatar';
@@ -52,35 +52,35 @@
 	<span class="flex-1"></span>
 	<span class="saved-note"><CircleCheck class="size-3" />저장됨</span>
 </div>
-<Card.Root size="sm">
-	<Card.Header>
-		<Card.Title>Trust 레벨</Card.Title>
-		<Card.Description>에이전트가 사람 확인 없이 할 수 있는 범위</Card.Description>
-	</Card.Header>
-	<Card.Content>
+<Card size="sm">
+	<CardHeader>
+		<CardTitle>Trust 레벨</CardTitle>
+		<CardDescription>에이전트가 사람 확인 없이 할 수 있는 범위</CardDescription>
+	</CardHeader>
+	<CardContent>
 		<TrustPicker bind:value={c.trust} base={base?.trust} />
-	</Card.Content>
-</Card.Root>
-<Card.Root size="sm">
-	<Card.Header>
-		<Card.Title>파일 범위</Card.Title>
-		<Card.Description>glob 패턴 · 제외가 포함보다 우선</Card.Description>
-	</Card.Header>
-	<Card.Content class="gap-3.5">
+	</CardContent>
+</Card>
+<Card size="sm">
+	<CardHeader>
+		<CardTitle>파일 범위</CardTitle>
+		<CardDescription>glob 패턴 · 제외가 포함보다 우선</CardDescription>
+	</CardHeader>
+	<CardContent class="gap-3.5">
 		{@render globs(c.include, includeDraft, (v) => (includeDraft = v), '포함')}
 		{@render globs(c.exclude, excludeDraft, (v) => (excludeDraft = v), '제외')}
-	</Card.Content>
-</Card.Root>
-<Card.Root size="sm">
-	<Card.Header><Card.Title>승인 규칙</Card.Title></Card.Header>
-	<Card.Content class="gap-0">
+	</CardContent>
+</Card>
+<Card size="sm">
+	<CardHeader><CardTitle>승인 규칙</CardTitle></CardHeader>
+	<CardContent class="gap-0">
 		<ApprovalTable approvals={c.approvals} base={base?.approvals} />
-	</Card.Content>
-</Card.Root>
+	</CardContent>
+</Card>
 {#if used}
-	<Card.Root size="sm">
-		<Card.Header><Card.Title>이 템플릿을 쓰는 멤버 · {used.length}</Card.Title></Card.Header>
-		<Card.Content class="gap-0">
+	<Card size="sm">
+		<CardHeader><CardTitle>이 템플릿을 쓰는 멤버 · {used.length}</CardTitle></CardHeader>
+		<CardContent class="gap-0">
 			{#each used as { m, team: tn } (m.sn)}
 				{@const n = cfgDiff(m.config, c)}
 				<div class="row-divided items-center gap-2.5 py-2">
@@ -91,6 +91,6 @@
 				<p class="text-xs text-muted-foreground">없어요.</p>
 			{/each}
 			<span class="border-t pt-2 text-caption text-subtle-foreground">기본값을 바꿔도 이미 만든 멤버에게는 반영되지 않아요.</span>
-		</Card.Content>
-	</Card.Root>
+		</CardContent>
+	</Card>
 {/if}

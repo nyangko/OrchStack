@@ -8,8 +8,8 @@
 	import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import CirclePause from '@lucide/svelte/icons/circle-pause';
-	import * as Avatar from '$lib/components/ui/avatar';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { AvatarGroup } from '$lib/components/ui/avatar';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { RoleAvatar } from '$lib/components/orch/role-avatar';
@@ -42,10 +42,10 @@
 			bind:value={() => scope, (v) => goto(v === 'agents' ? `/teams/agents/${tplSn ?? store.templates[0].sn}` : `/teams?team=${teamSn ?? defaultTeam().sn}`)}
 		/>
 		{#if scope === 'agents'}
-			<InputGroup.Root class="h-8">
-				<InputGroup.Addon><Search /></InputGroup.Addon>
-				<InputGroup.Input bind:value={tplQuery} placeholder="템플릿 검색" aria-label="템플릿 검색" />
-			</InputGroup.Root>
+			<InputGroup class="h-8">
+				<InputGroupAddon><Search /></InputGroupAddon>
+				<InputGroupInput bind:value={tplQuery} placeholder="템플릿 검색" aria-label="템플릿 검색" />
+			</InputGroup>
 			{#each tplGroups as { g, list } (g)}
 				{#if list.length}
 					<span class="list-label px-1 pt-3.5 pb-1">{g}</span>
@@ -67,10 +67,10 @@
 				{/if}
 			{/each}
 		{:else}
-		<InputGroup.Root class="h-8">
-			<InputGroup.Addon><Search /></InputGroup.Addon>
-			<InputGroup.Input bind:value={query} placeholder="Filter teams" aria-label="팀 검색" />
-		</InputGroup.Root>
+		<InputGroup class="h-8">
+			<InputGroupAddon><Search /></InputGroupAddon>
+			<InputGroupInput bind:value={query} placeholder="Filter teams" aria-label="팀 검색" />
+		</InputGroup>
 		{#each [true, false] as orch (orch)}
 			{@const list = shown.filter((t) => !!t.orch === orch)}
 			{#if list.length}
@@ -82,9 +82,9 @@
 						aria-current={on ? 'page' : undefined}
 						class={['flex items-center gap-2.5 rounded-md p-2 outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50', on && 'bg-accent']}
 					>
-						<Avatar.Group class={on ? '*:data-[slot=avatar]:ring-accent' : '*:data-[slot=avatar]:ring-sidebar'}>
+						<AvatarGroup class={on ? '*:data-[slot=avatar]:ring-accent' : '*:data-[slot=avatar]:ring-sidebar'}>
 							{#each t.members.slice(0, 3) as m (m.sn)}<RoleAvatar role={m.role} icon={glyphOf(m)} size="sm" />{/each}
-						</Avatar.Group>
+						</AvatarGroup>
 						<span class="flex min-w-0 flex-1 flex-col gap-px">
 							<span class={['truncate text-body', on ? 'font-semibold' : 'font-medium']}>{t.name}</span>
 							<span class="truncate text-caption text-muted-foreground">{t.orch ? '모든 프로젝트 · PM' : t.project}</span>

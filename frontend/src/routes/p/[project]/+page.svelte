@@ -31,10 +31,10 @@
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import GitBranch from '@lucide/svelte/icons/git-branch';
 	import CornerDownRight from '@lucide/svelte/icons/corner-down-right';
-	import * as Table from '$lib/components/ui/table';
+	import { TableRow, TableCell, Table, TableHeader, TableHead, TableBody } from '$lib/components/ui/table';
 	import { StatusSelect } from '$lib/components/orch/status-select';
 	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Alert from '$lib/components/ui/alert';
+	import { Alert, AlertTitle, AlertDescription } from '$lib/components/ui/alert';
 	import Link2 from '@lucide/svelte/icons/link-2';
 	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import Square from '@lucide/svelte/icons/square';
@@ -43,7 +43,7 @@
 	import Hourglass from '@lucide/svelte/icons/hourglass';
 	import { Message, MessageContent, MessageFooter, MessageHeader } from '$lib/components/orch/message';
 	import { Bubble, BubbleContent } from '$lib/components/orch/bubble';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from '$lib/components/ui/dialog';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { untrack, onDestroy, type Component } from 'svelte';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
@@ -56,7 +56,7 @@
 	import '@xyflow/svelte/dist/style.css';
 	import DiagramNode, { type DiagramNodeData } from '$lib/components/orch/diagram/diagram-node.svelte';
 	import type { MenuEntry } from '$lib/components/ui/dropdown-menu';
-	import * as ContextMenu from '$lib/components/ui/context-menu';
+	import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuLabel, ContextMenuSeparator, ContextMenuEntries } from '$lib/components/ui/context-menu';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import StepForward from '@lucide/svelte/icons/step-forward';
 	import PanelRight from '@lucide/svelte/icons/panel-right';
@@ -75,11 +75,11 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { KanbanBoard, KanbanColumn, KanbanColumnHeader, KanbanColumnTitle, KanbanColumnCount, KanbanColumnActions, KanbanColumnContent, KanbanCard, KanbanCardHeader, KanbanCardContent, KanbanCardFooter, type KanbanValue } from '$lib/components/orch/kanban';
 	import { Progress } from '$lib/components/ui/progress';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as InputGroup from '$lib/components/ui/input-group';
-	import * as Item from '$lib/components/ui/item';
-	import * as Avatar from '$lib/components/ui/avatar';
+	import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
+	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '$lib/components/ui/empty';
+	import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupButton } from '$lib/components/ui/input-group';
+	import { Item, ItemContent, ItemDescription, ItemActions, ItemTitle } from '$lib/components/ui/item';
+	import { AvatarGroup, AvatarBadge } from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { StatusBadge } from '$lib/components/orch/status-badge';
@@ -106,12 +106,12 @@
 	import Tag from '@lucide/svelte/icons/tag';
 	import Flag from '@lucide/svelte/icons/flag';
 	import UserRoundX from '@lucide/svelte/icons/user-round-x';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '$lib/components/ui/dropdown-menu';
 	import { Kbd } from '$lib/components/ui/kbd';
 	import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 	import { mergeProps } from 'bits-ui';
 	import { Input } from '$lib/components/ui/input';
-	import * as HoverCard from '$lib/components/ui/hover-card';
+	import { HoverCard, HoverCardContent } from '$lib/components/ui/hover-card';
 	import AssigneePicker from '$lib/components/orch/task/assignee-picker.svelte';
 	import TaskEditorDialog, { blankDraft, type TaskDraft } from '$lib/components/orch/task/task-editor-dialog.svelte';
 	import { recommendFor, orchPick } from '$lib/assign';
@@ -681,14 +681,14 @@
 {/snippet}
 <!-- Task 상세 속성 한 줄 (.pen B3 · Properties). props가 있으면 선택 창 트리거, 없으면 표시만 -->
 {#snippet propRow(props: Record<string, unknown> | undefined, label: string, Icon: Component, value: string, tone = 'text-muted-foreground')}
-	<Item.Root variant="row" size="xs">
+	<Item variant="row" size="xs">
 		{#snippet child({ props: row })}
 			<svelte:element this={props ? 'button' : 'div'} {...mergeProps(row, props ?? {})}>
-				<Item.Content><Item.Description>{label}</Item.Description></Item.Content>
-				<Item.Actions class="min-w-0 text-xs font-medium"><Icon class={['size-3.25 shrink-0', tone]} /><span class="truncate">{value}</span>{#if props}<ChevronsUpDown class="size-3 text-muted-foreground" />{/if}</Item.Actions>
+				<ItemContent><ItemDescription>{label}</ItemDescription></ItemContent>
+				<ItemActions class="min-w-0 text-xs font-medium"><Icon class={['size-3.25 shrink-0', tone]} /><span class="truncate">{value}</span>{#if props}<ChevronsUpDown class="size-3 text-muted-foreground" />{/if}</ItemActions>
 			</svelte:element>
 		{/snippet}
-	</Item.Root>
+	</Item>
 {/snippet}
 
 <!-- Issue Board 행: 이슈와 하위 이슈가 같은 모양이라 재귀로 그린다 -->
@@ -698,8 +698,8 @@
 	{@const who = [...new Set(all.map((t) => t.agent).filter((a) => a !== undefined))].map((sn) => agentOf(sn)!)}
 	{@const isOpen = expanded.has(i.num)}
 	{@const icon = statuses[issueIcon[i.status]]}
-	<Table.Row class={depth === 0 ? 'h-13 bg-card' : 'h-11'}>
-		<Table.Cell class={depth === 0 ? 'pl-4' : 'pl-10'}>
+	<TableRow class={depth === 0 ? 'h-13 bg-card' : 'h-11'}>
+		<TableCell class={depth === 0 ? 'pl-4' : 'pl-10'}>
 			<span class="flex items-center gap-3">
 				<button type="button" aria-expanded={isOpen} aria-label="#{i.num} {isOpen ? '접기' : '펼치기'}" onclick={() => toggle(i.num)} class="rounded-xs text-muted-foreground hover:text-foreground">
 					<ChevronRight class={['size-3.5 transition-transform', isOpen && 'rotate-90']} />
@@ -712,47 +712,47 @@
 				<icon.icon class={['size-3.5', icon.text]} aria-label={icon.label} />
 				<span class="font-mono text-xs font-medium text-muted-foreground">#{i.num}</span>
 			</span>
-		</Table.Cell>
-		<Table.Cell class={depth === 0 ? 'font-semibold' : 'font-medium'}>
+		</TableCell>
+		<TableCell class={depth === 0 ? 'font-semibold' : 'font-medium'}>
 			<button type="button" aria-pressed={issueSel === i.num} onclick={() => openIssue(i.num)} class="text-left outline-none hover:underline focus-visible:underline">{i.title}</button>
-		</Table.Cell>
-		<Table.Cell>
+		</TableCell>
+		<TableCell>
 			<span class="flex items-center gap-2">
 				<Progress value={all.length ? (done / all.length) * 100 : 0} class="h-1.5" aria-label="#{i.num} 진행" />
 				<span class="font-mono text-xs text-muted-foreground">{done}/{all.length}</span>
 			</span>
-		</Table.Cell>
-		<Table.Cell>
+		</TableCell>
+		<TableCell>
 			<span class="flex items-center gap-2">
-				<Avatar.Group>
+				<AvatarGroup>
 					{#each who as a (a.sn)}<RoleAvatar role={a.role} size="sm" />{/each}
-				</Avatar.Group>
+				</AvatarGroup>
 				<span class="truncate text-xs text-muted-foreground">{who.map((a) => a.name).join(' · ') || 'Unassigned'}</span>
 			</span>
-		</Table.Cell>
-		<Table.Cell class="pr-4 text-right font-mono text-xs text-subtle-foreground">{i.updated}</Table.Cell>
-	</Table.Row>
+		</TableCell>
+		<TableCell class="pr-4 text-right font-mono text-xs text-subtle-foreground">{i.updated}</TableCell>
+	</TableRow>
 	{#if isOpen}
 		{#each subIssues(i.num) as sub (sub.num)}
 			{@render issueRow(sub, depth + 1)}
 		{/each}
 		{#each tasksOf(i.num) as t (t.num)}
 			{@const a = agentOf(t.agent)}
-			<Table.Row
+			<TableRow
 				onclick={() => open(t.num)}
 				class={['h-10 cursor-pointer', selected === t.num && 'bg-primary-soft hover:bg-primary-soft']}
 			>
-				<Table.Cell class={depth === 0 ? 'pl-14.5' : 'pl-21'}>
+				<TableCell class={depth === 0 ? 'pl-14.5' : 'pl-21'}>
 					<span class="flex items-center gap-3">
 						<CornerDownRight class="size-3 text-subtle-foreground" />
 						<StatusSelect bind:value={t.status} compact />
 						<span class="font-mono text-xs text-muted-foreground">#{t.num}</span>
 					</span>
-				</Table.Cell>
-				<Table.Cell>
+				</TableCell>
+				<TableCell>
 					<button type="button" aria-pressed={selected === t.num} onclick={() => open(t.num)} class="text-left outline-none hover:underline focus-visible:underline">{t.title}</button>
-				</Table.Cell>
-				<Table.Cell>
+				</TableCell>
+				<TableCell>
 					<span class="flex items-center gap-2">
 						{#if t.steps[1]}
 							<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="#{t.num} 진행" />
@@ -761,8 +761,8 @@
 							<span class="font-mono text-xs text-subtle-foreground">no steps</span>
 						{/if}
 					</span>
-				</Table.Cell>
-				<Table.Cell>
+				</TableCell>
+				<TableCell>
 					{#if a}
 						<span class="flex items-center gap-1.5 text-xs">
 							<RoleAvatar role={a.role} size="sm" />
@@ -773,9 +773,9 @@
 					{:else}
 						<span class="text-xs text-muted-foreground">Unassigned</span>
 					{/if}
-				</Table.Cell>
-				<Table.Cell class="pr-4 text-right font-mono text-xs text-subtle-foreground">{t.updated}</Table.Cell>
-			</Table.Row>
+				</TableCell>
+				<TableCell class="pr-4 text-right font-mono text-xs text-subtle-foreground">{t.updated}</TableCell>
+			</TableRow>
 		{/each}
 	{/if}
 {/snippet}
@@ -785,22 +785,22 @@
 		<!-- 좌측 Quick Panel (.pen Workbench/LeftQuickPanel) -->
 		{#if leftOpen}
 			<aside class="flex shrink-0 flex-col w-66 border-r bg-card" aria-label="Quick panel">
-				<Tabs.Root bind:value={panelTab} class="flex min-h-0 flex-1 flex-col gap-0">
+				<Tabs bind:value={panelTab} class="flex min-h-0 flex-1 flex-col gap-0">
 					<div class="panel-section gap-2.5">
 						<div class="flex items-center gap-0.5">
-							<Tabs.List>
-								<Tabs.Trigger value="tasks">Tasks</Tabs.Trigger>
-								<Tabs.Trigger value="agents">Agents</Tabs.Trigger>
-							</Tabs.List>
+							<TabsList>
+								<TabsTrigger value="tasks">Tasks</TabsTrigger>
+								<TabsTrigger value="agents">Agents</TabsTrigger>
+							</TabsList>
 							<span class="flex-1"></span>
 							<Button variant="ghost" size="icon-sm" aria-label="새 태스크" aria-expanded={quick !== undefined} onclick={() => (quick ? (quick = undefined) : openQuick())}><Plus /></Button>
 							<Button variant="ghost" size="icon-sm" aria-label="Quick panel 접기" onclick={() => (leftOpen = false)}><PanelLeftClose /></Button>
 						</div>
 						{#if panelTab === 'tasks'}
-							<InputGroup.Root class="h-8">
-								<InputGroup.Addon><Search /></InputGroup.Addon>
-								<InputGroup.Input bind:value={query} placeholder="Filter tasks" aria-label="태스크 검색" />
-							</InputGroup.Root>
+							<InputGroup class="h-8">
+								<InputGroupAddon><Search /></InputGroupAddon>
+								<InputGroupInput bind:value={query} placeholder="Filter tasks" aria-label="태스크 검색" />
+							</InputGroup>
 							<div class="flex flex-wrap gap-1" role="group" aria-label="상태 필터">
 								<Toggle variant="chip" count={list.length} pressed={filter === 'all'} onPressedChange={() => (filter = 'all')}>All</Toggle>
 								{#each statusOrder as s (s)}
@@ -815,14 +815,14 @@
 						{@const qa = agentOf(q.agent)}
 						<!-- QuickAdd (.pen QuickAdd · open) — Enter 만들기 · Esc 닫기 · ⤢ 편집기 -->
 						<form onsubmit={quickSubmit} class="panel-section gap-2" aria-label="빠른 태스크 추가">
-							<InputGroup.Root class="h-8 border-ring">
-								<InputGroup.Addon><Plus /></InputGroup.Addon>
+							<InputGroup class="h-8 border-ring">
+								<InputGroupAddon><Plus /></InputGroupAddon>
 								<!-- svelte-ignore a11y_autofocus -->
-								<InputGroup.Input autofocus bind:value={q.title} placeholder="태스크 제목" aria-label="태스크 제목" onkeydown={(e) => e.key === 'Escape' && (quick = undefined)} />
-								<InputGroup.Addon align="inline-end">
-									<InputGroup.Button size="icon-xs" aria-label="편집기로 열기" title="편집기로 열기" onclick={() => newTask({ title: q.title, status: q.status, agent: q.agent, priority: q.priority })}><Maximize2 /></InputGroup.Button>
-								</InputGroup.Addon>
-							</InputGroup.Root>
+								<InputGroupInput autofocus bind:value={q.title} placeholder="태스크 제목" aria-label="태스크 제목" onkeydown={(e) => e.key === 'Escape' && (quick = undefined)} />
+								<InputGroupAddon align="inline-end">
+									<InputGroupButton size="icon-xs" aria-label="편집기로 열기" title="편집기로 열기" onclick={() => newTask({ title: q.title, status: q.status, agent: q.agent, priority: q.priority })}><Maximize2 /></InputGroupButton>
+								</InputGroupAddon>
+							</InputGroup>
 							<div class="flex items-center gap-1">
 								<StatusSelect bind:value={q.status}>
 									{#snippet trigger(props)}{@const m = statuses[q.status]}{@render propChip(props, m.icon, m.label)}{/snippet}
@@ -839,9 +839,9 @@
 						</form>
 					{/if}
 
-					<Tabs.Content value="tasks" class="min-h-0 flex-1 overflow-y-auto">
+					<TabsContent value="tasks" class="min-h-0 flex-1 overflow-y-auto">
 						{#each shown as t (t.num)}
-							<Item.Root
+							<Item
 								variant="row"
 								size="sm"
 								aria-pressed={selected === t.num}
@@ -850,30 +850,30 @@
 							>
 								{#snippet child({ props })}
 									<button type="button" {...props}>
-										<Item.Content class="gap-1.5">
+										<ItemContent class="gap-1.5">
 											<span class="flex items-center justify-between">
 												<span class="font-mono text-xs font-medium text-muted-foreground">#{t.num}</span>
 												<StatusBadge status={t.status} />
 											</span>
-											<Item.Title class="text-sm">{t.title}</Item.Title>
-											<Item.Description class="flex items-center gap-1.5">
+											<ItemTitle class="text-sm">{t.title}</ItemTitle>
+											<ItemDescription class="flex items-center gap-1.5">
 												{agentName(t.agent) ?? '미배정'}
 												<span class={['font-mono font-semibold', t.priority === 'P0' ? 'text-destructive' : 'text-subtle-foreground']}>{t.priority}</span>
-											</Item.Description>
-										</Item.Content>
+											</ItemDescription>
+										</ItemContent>
 									</button>
 								{/snippet}
-							</Item.Root>
+							</Item>
 						{:else}
 							<p class="p-6 text-center text-xs text-muted-foreground">조건에 맞는 태스크가 없어요.</p>
 						{/each}
-					</Tabs.Content>
+					</TabsContent>
 
-					<Tabs.Content value="agents" class="min-h-0 flex-1 overflow-y-auto">
+					<TabsContent value="agents" class="min-h-0 flex-1 overflow-y-auto">
 						{#each agentList as a (a.sn)}
 							<button type="button" aria-pressed={inspect === a.sn} onclick={() => openAgent(a.sn)} class={['flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left outline-none focus-visible:bg-muted', inspect === a.sn ? 'bg-primary-soft hover:bg-primary-soft' : 'hover:bg-muted']}>
 								<RoleAvatar role={a.role}>
-									<Avatar.Badge class={a.online ? 'bg-success' : 'bg-subtle-foreground'} aria-label={a.online ? '온라인' : '오프라인'} />
+									<AvatarBadge class={a.online ? 'bg-success' : 'bg-subtle-foreground'} aria-label={a.online ? '온라인' : '오프라인'} />
 								</RoleAvatar>
 								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<span class="flex items-center gap-1.5">
@@ -885,8 +885,8 @@
 								<span class="font-mono text-xs font-medium text-muted-foreground">{a.tokens}</span>
 							</button>
 						{/each}
-					</Tabs.Content>
-				</Tabs.Root>
+					</TabsContent>
+				</Tabs>
 			</aside>
 		{/if}
 
@@ -896,13 +896,13 @@
 				{#if !leftOpen}
 					<Button variant="ghost" size="icon-sm" aria-label="Quick panel 펼치기" onclick={() => (leftOpen = true)}><PanelLeftOpen /></Button>
 				{/if}
-				<Tabs.Root value={view.value} onValueChange={setView}>
-					<Tabs.List aria-label="보기">
+				<Tabs value={view.value} onValueChange={setView}>
+					<TabsList aria-label="보기">
 						{#each views as v (v.value)}
-							<Tabs.Trigger value={v.value}><v.icon />{v.label}</Tabs.Trigger>
+							<TabsTrigger value={v.value}><v.icon />{v.label}</TabsTrigger>
 						{/each}
-					</Tabs.List>
-				</Tabs.Root>
+					</TabsList>
+				</Tabs>
 				<p class="min-w-0 flex-1 truncate text-body text-muted-foreground">
 					{project.name} · {list.length} tasks · {agentList.length} agents
 				</p>
@@ -935,13 +935,13 @@
 									<KanbanColumnActions>
 										<Button variant="ghost" size="icon-xs" aria-label="{meta.label}에 태스크 추가" onclick={() => openQuick(s)}><Plus /></Button>
 																<!-- 열 메뉴 — .pen에 항목이 없어 있는 동작만 (#60) -->
-																<DropdownMenu.Root>
-																	<DropdownMenu.Trigger>{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-xs" aria-label="{meta.label} 열 메뉴"><Ellipsis /></Button>{/snippet}</DropdownMenu.Trigger>
-																	<DropdownMenu.Content align="end" class="w-48">
-																		<DropdownMenu.Item onSelect={() => newTask({ status: s })}><SquarePen />{meta.label}로 새 태스크</DropdownMenu.Item>
-																		<DropdownMenu.Item onSelect={() => ((leftOpen = true), (panelTab = 'tasks'), (filter = s))}><FilterIcon />Quick Panel에서 이 상태만</DropdownMenu.Item>
-																	</DropdownMenu.Content>
-																</DropdownMenu.Root>
+																<DropdownMenu>
+																	<DropdownMenuTrigger>{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-xs" aria-label="{meta.label} 열 메뉴"><Ellipsis /></Button>{/snippet}</DropdownMenuTrigger>
+																	<DropdownMenuContent align="end" class="w-48">
+																		<DropdownMenuItem onSelect={() => newTask({ status: s })}><SquarePen />{meta.label}로 새 태스크</DropdownMenuItem>
+																		<DropdownMenuItem onSelect={() => ((leftOpen = true), (panelTab = 'tasks'), (filter = s))}><FilterIcon />Quick Panel에서 이 상태만</DropdownMenuItem>
+																	</DropdownMenuContent>
+																</DropdownMenu>
 									</KanbanColumnActions>
 								</KanbanColumnHeader>
 								<KanbanColumnContent>
@@ -949,8 +949,8 @@
 										{@const t = task(num as number)}
 										{@const a = agentOf(t.agent)}
 										<!-- 우클릭: ContextMenu / Task (Diagram과 같은 목록) -->
-										<ContextMenu.Root onOpenChange={(o) => o && hoverOff()}>
-											<ContextMenu.Trigger>
+										<ContextMenu onOpenChange={(o) => o && hoverOff()}>
+											<ContextMenuTrigger>
 												{#snippet child({ props })}
 													<KanbanCard
 														{...props}
@@ -1005,13 +1005,13 @@
 														</KanbanCardFooter>
 													</KanbanCard>
 												{/snippet}
-											</ContextMenu.Trigger>
-											<ContextMenu.Content class="w-56">
-												<ContextMenu.Label class="truncate">Task #{t.num} · {t.title}</ContextMenu.Label>
-												<ContextMenu.Separator />
-												<ContextMenu.Entries entries={taskMenu(t.num)} />
-											</ContextMenu.Content>
-										</ContextMenu.Root>
+											</ContextMenuTrigger>
+											<ContextMenuContent class="w-56">
+												<ContextMenuLabel class="truncate">Task #{t.num} · {t.title}</ContextMenuLabel>
+												<ContextMenuSeparator />
+												<ContextMenuEntries entries={taskMenu(t.num)} />
+											</ContextMenuContent>
+										</ContextMenu>
 									{/each}
 									{#snippet empty()}<p class="empty-note text-center text-subtle-foreground">비어 있어요</p>{/snippet}
 								</KanbanColumnContent>
@@ -1027,8 +1027,8 @@
 						{@const ctx = d?.context}
 						{@const at = { x: hover.x, y: hover.y }}
 						<!-- .pen KanbanCard/HoverPreview — ui/hover-card를 커서 위치에 띄운다 (+18px, 화면 끝에선 floating-ui가 뒤집음) -->
-						<HoverCard.Root open onOpenChange={(o) => !o && hoverOff()}>
-							<HoverCard.Content
+						<HoverCard open onOpenChange={(o) => !o && hoverOff()}>
+							<HoverCardContent
 								customAnchor={{ getBoundingClientRect: () => new DOMRect(at.x + 18, at.y, 0, 0) }}
 								side="bottom"
 								align="start"
@@ -1053,8 +1053,8 @@
 									{/if}
 								</dl>
 								<p class="bg-muted px-3 py-2 text-caption text-muted-foreground">클릭 → 상세 보기 · 우클릭 → 메뉴</p>
-							</HoverCard.Content>
-						</HoverCard.Root>
+							</HoverCardContent>
+						</HoverCard>
 					{/if}
 				{:else if view.value === 'diagram'}
 					<SvelteFlow
@@ -1084,30 +1084,30 @@
 						</Panel>
 					</SvelteFlow>
 				{:else if view.value === 'issues'}
-					<Table.Root class="bg-background">
-						<Table.Header class="bg-muted">
-							<Table.Row>
-								<Table.Head class="w-40 pl-4">Issue</Table.Head>
-								<Table.Head>Title</Table.Head>
-								<Table.Head class="w-44">Progress</Table.Head>
-								<Table.Head class="w-75">Agents</Table.Head>
-								<Table.Head class="w-20 pr-4 text-right">Updated</Table.Head>
-							</Table.Row>
-						</Table.Header>
-						<Table.Body>
+					<Table class="bg-background">
+						<TableHeader class="bg-muted">
+							<TableRow>
+								<TableHead class="w-40 pl-4">Issue</TableHead>
+								<TableHead>Title</TableHead>
+								<TableHead class="w-44">Progress</TableHead>
+								<TableHead class="w-75">Agents</TableHead>
+								<TableHead class="w-20 pr-4 text-right">Updated</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
 							{#each issueList.filter((i) => !i.parent) as i (i.num)}
 								{@render issueRow(i, 0)}
 							{/each}
-						</Table.Body>
-					</Table.Root>
+						</TableBody>
+					</Table>
 				{:else}
-				<Empty.Root class="h-full">
-					<Empty.Header>
-						<Empty.Media variant="icon"><view.icon /></Empty.Media>
-						<Empty.Title>{view.label}</Empty.Title>
-						<Empty.Description>{view.issue}에서 구현해요.</Empty.Description>
-					</Empty.Header>
-				</Empty.Root>
+				<Empty class="h-full">
+					<EmptyHeader>
+						<EmptyMedia variant="icon"><view.icon /></EmptyMedia>
+						<EmptyTitle>{view.label}</EmptyTitle>
+						<EmptyDescription>{view.issue}에서 구현해요.</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
 				{/if}
 			</div>
 			{#if cur}
@@ -1146,15 +1146,15 @@
 								<Button variant="ghost" size="sm" onclick={() => askPm(`Task #${cur.num}`)}><MessageCircleQuestion />Ask PM about this</Button>
 							</div>
 							{#if info?.decision}
-								<Alert.Root variant="warning" class="flex items-center gap-2.5">
+								<Alert variant="warning" class="flex items-center gap-2.5">
 									<MessageCircleQuestion />
 									<div class="flex-1">
-										<Alert.Title>{info.decision.question}</Alert.Title>
-										<Alert.Description>{info.decision.note}</Alert.Description>
+										<AlertTitle>{info.decision.question}</AlertTitle>
+										<AlertDescription>{info.decision.note}</AlertDescription>
 									</div>
 									<Badge class="rounded-xs bg-status-waiting font-mono text-2xs text-on-solid">{info.decision.level}</Badge>
 									<Button size="sm" onclick={() => openDecisions(cur.num)}>답변하기</Button>
-								</Alert.Root>
+								</Alert>
 							{/if}
 							{/snippet}
 						</InspectorHeader>
@@ -1186,13 +1186,13 @@
 									<section class="flex flex-col">
 										<h3 class="mb-1 text-body font-semibold">Runs</h3>
 										{#each runs as r (r.num)}
-											<Item.Root variant="row" size="xs">
-												<Item.Content>
-													<Item.Title>Run #{r.num} {#if r.live}<span class="size-1.5 rounded-full bg-success" aria-label="진행 중"></span>{/if}</Item.Title>
-													<Item.Description>{r.note}</Item.Description>
-												</Item.Content>
-												<Item.Actions class="font-mono text-xs text-muted-foreground">{r.time} · {r.tokens}</Item.Actions>
-											</Item.Root>
+											<Item variant="row" size="xs">
+												<ItemContent>
+													<ItemTitle>Run #{r.num} {#if r.live}<span class="size-1.5 rounded-full bg-success" aria-label="진행 중"></span>{/if}</ItemTitle>
+													<ItemDescription>{r.note}</ItemDescription>
+												</ItemContent>
+												<ItemActions class="font-mono text-xs text-muted-foreground">{r.time} · {r.tokens}</ItemActions>
+											</Item>
 										{/each}
 									</section>
 								{/if}
@@ -1201,29 +1201,29 @@
 									<!-- Run 토큰 (.pen Run 상세 · 토큰) — Run마다 따로 쌓고 여기서만 합친다. runner는 리드와 따로, sub · fork는 리드 사용량에 포함 -->
 									<section class="flex flex-col">
 										<h3 class="mb-1 text-body font-semibold">Run 토큰</h3>
-										<Item.Root variant="row" size="xs">
-											<Item.Content><Item.Title><Bot class="size-3.5 text-muted-foreground" />리드 Run #{leadRuns[cur.num].run} · {agentName(a?.sn)}</Item.Title></Item.Content>
-											<Item.Actions><TokenMeter self={leadRuns[cur.num].self} runner={runnerTotal(cur.num)} /></Item.Actions>
-										</Item.Root>
+										<Item variant="row" size="xs">
+											<ItemContent><ItemTitle><Bot class="size-3.5 text-muted-foreground" />리드 Run #{leadRuns[cur.num].run} · {agentName(a?.sn)}</ItemTitle></ItemContent>
+											<ItemActions><TokenMeter self={leadRuns[cur.num].self} runner={runnerTotal(cur.num)} /></ItemActions>
+										</Item>
 										{#each subs as s (s.id)}
 											{#if s.mode === 'runner'}
 												{#each s.runs as r, i (r.num)}
-													<Item.Root variant="row" size="xs">
-														<Item.Content><Item.Title><Cpu class="size-3.5 text-muted-foreground" />Run #{r.num} · {s.id} runner{i < s.runs.length - 1 ? ' · 실패(재시도 전)' : ''}</Item.Title></Item.Content>
-														<Item.Actions><TokenMeter self={r.tokens} /></Item.Actions>
-													</Item.Root>
+													<Item variant="row" size="xs">
+														<ItemContent><ItemTitle><Cpu class="size-3.5 text-muted-foreground" />Run #{r.num} · {s.id} runner{i < s.runs.length - 1 ? ' · 실패(재시도 전)' : ''}</ItemTitle></ItemContent>
+														<ItemActions><TokenMeter self={r.tokens} /></ItemActions>
+													</Item>
 												{:else}
-													<Item.Root variant="row" size="xs">
-														<Item.Content><Item.Title><Cpu class="size-3.5 text-muted-foreground" />{s.id} runner · 대기</Item.Title></Item.Content>
-														<Item.Actions><TokenMeter self={0} /></Item.Actions>
-													</Item.Root>
+													<Item variant="row" size="xs">
+														<ItemContent><ItemTitle><Cpu class="size-3.5 text-muted-foreground" />{s.id} runner · 대기</ItemTitle></ItemContent>
+														<ItemActions><TokenMeter self={0} /></ItemActions>
+													</Item>
 												{/each}
 											{:else}
 												{@const M = subRunMode[s.mode].icon}
-												<Item.Root variant="row" size="xs">
-													<Item.Content><Item.Title><M class="size-3.5 text-muted-foreground" />{s.id} {s.mode}</Item.Title></Item.Content>
-													<Item.Actions><TokenMeter included /></Item.Actions>
-												</Item.Root>
+												<Item variant="row" size="xs">
+													<ItemContent><ItemTitle><M class="size-3.5 text-muted-foreground" />{s.id} {s.mode}</ItemTitle></ItemContent>
+													<ItemActions><TokenMeter included /></ItemActions>
+												</Item>
 											{/if}
 										{/each}
 										<p class="pt-1.5 text-caption text-muted-foreground">runner는 리드와 따로 보이고 합계에만 더해요. sub · fork는 리드 Run 안에서 돌아 리드 사용량에 이미 들어 있어요.</p>
@@ -1233,13 +1233,13 @@
 									<section class="flex flex-col">
 										<h3 class="mb-1 text-body font-semibold">Activity</h3>
 										{#each info.activity as ev, i (i)}
-											<Item.Root variant="row" size="xs">
-												<Item.Content>
-													<Item.Title><Badge variant="mono" class="text-2xs">{ev.type}</Badge><span class="text-xs font-normal text-muted-foreground">{ev.who}</span></Item.Title>
-													<Item.Description>{ev.text}</Item.Description>
-												</Item.Content>
-												<Item.Actions class="font-mono text-xs text-subtle-foreground">{ev.time}</Item.Actions>
-											</Item.Root>
+											<Item variant="row" size="xs">
+												<ItemContent>
+													<ItemTitle><Badge variant="mono" class="text-2xs">{ev.type}</Badge><span class="text-xs font-normal text-muted-foreground">{ev.who}</span></ItemTitle>
+													<ItemDescription>{ev.text}</ItemDescription>
+												</ItemContent>
+												<ItemActions class="font-mono text-xs text-subtle-foreground">{ev.time}</ItemActions>
+											</Item>
 										{/each}
 									</section>
 								{/if}
@@ -1271,11 +1271,11 @@
 									</div>
 									<Segmented aria-label="하위 작업 방식" options={spawnOptions} bind:value={() => cur.spawnMode ?? 'team', (v) => (task(cur.num).spawnMode = v === 'team' ? undefined : (v as SpawnMode))} />
 									{#if (cur.spawnMode ?? spawnPolicy.mode) === 'fork'}
-										<Alert.Root variant="warning">
+										<Alert variant="warning">
 											<GitFork />
-											<Alert.Title>fork는 부모 컨텍스트를 상속해요</Alert.Title>
-											<Alert.Description>부모 컨텍스트를 그대로 복사해 비용이 커요.</Alert.Description>
-										</Alert.Root>
+											<AlertTitle>fork는 부모 컨텍스트를 상속해요</AlertTitle>
+											<AlertDescription>부모 컨텍스트를 그대로 복사해 비용이 커요.</AlertDescription>
+										</Alert>
 									{/if}
 									<p class="text-caption text-muted-foreground">바꾸면 이 태스크에만 저장돼요. 비워 두면 팀 기본값을 써요 (Teams › Orch 진행 정책).</p>
 								</section>
@@ -1290,10 +1290,10 @@
 									<section class="flex flex-col">
 										<h3 class="mb-1 text-body font-semibold">Git</h3>
 										{#each [['Branch', info.git.branch], ['Commits', info.git.commits], ['PR', info.git.pr ?? '—']] as [k, v] (k)}
-											<Item.Root variant="row" size="xs">
-												<Item.Content><Item.Description>{k}</Item.Description></Item.Content>
-												<Item.Actions class="font-mono text-xs">{v}</Item.Actions>
-											</Item.Root>
+											<Item variant="row" size="xs">
+												<ItemContent><ItemDescription>{k}</ItemDescription></ItemContent>
+												<ItemActions class="font-mono text-xs">{v}</ItemActions>
+											</Item>
 										{/each}
 									</section>
 								{/if}
@@ -1330,9 +1330,9 @@
 								</span>
 								{#if who.length}
 									<span class="flex items-center gap-1.5 text-xs">
-										<Avatar.Group>
+										<AvatarGroup>
 											{#each who as a (a.sn)}<RoleAvatar role={a.role} size="sm" />{/each}
-										</Avatar.Group>
+										</AvatarGroup>
 										<span class="text-muted-foreground">{who.map((a) => a.name).join(' · ')}</span>
 									</span>
 								{/if}
@@ -1353,12 +1353,12 @@
 										{#each subIssues(iss.num) as sub (sub.num)}
 											{@const st = allTasks(sub.num)}
 											{@const si = statuses[issueIcon[sub.status]]}
-											<Item.Root variant="row" size="xs" onclick={() => openIssue(sub.num)}>
-												<Item.Content>
-													<Item.Title><si.icon class={['size-3.5', si.text]} aria-label={issueLabel[sub.status]} /><span class="font-mono text-xs text-muted-foreground">#{sub.num}</span>{sub.title}</Item.Title>
-												</Item.Content>
-												<Item.Actions class="font-mono text-xs text-muted-foreground">{st.filter((t) => t.status === 'done').length}/{st.length}</Item.Actions>
-											</Item.Root>
+											<Item variant="row" size="xs" onclick={() => openIssue(sub.num)}>
+												<ItemContent>
+													<ItemTitle><si.icon class={['size-3.5', si.text]} aria-label={issueLabel[sub.status]} /><span class="font-mono text-xs text-muted-foreground">#{sub.num}</span>{sub.title}</ItemTitle>
+												</ItemContent>
+												<ItemActions class="font-mono text-xs text-muted-foreground">{st.filter((t) => t.status === 'done').length}/{st.length}</ItemActions>
+											</Item>
 										{/each}
 									</section>
 								{/if}
@@ -1366,15 +1366,15 @@
 									<h3 class="mb-1 text-body font-semibold">Tasks</h3>
 									{#each tasksOf(iss.num) as t (t.num)}
 										{@const a = agentOf(t.agent)}
-										<Item.Root variant="row" size="xs" onclick={() => open(t.num)}>
-											<Item.Content>
-												<Item.Title><span class="font-mono text-xs text-muted-foreground">#{t.num}</span>{t.title}</Item.Title>
-											</Item.Content>
-											<Item.Actions class="gap-2 text-xs text-muted-foreground">
+										<Item variant="row" size="xs" onclick={() => open(t.num)}>
+											<ItemContent>
+												<ItemTitle><span class="font-mono text-xs text-muted-foreground">#{t.num}</span>{t.title}</ItemTitle>
+											</ItemContent>
+											<ItemActions class="gap-2 text-xs text-muted-foreground">
 												{#if a}<RoleAvatar role={a.role} size="sm" />{a.name}{:else}Unassigned{/if}
 												<StatusBadge status={t.status} />
-											</Item.Actions>
-										</Item.Root>
+											</ItemActions>
+										</Item>
 									{:else}
 										<p class="text-xs text-muted-foreground">이 이슈에 직접 속한 태스크가 없어요.</p>
 									{/each}
@@ -1384,10 +1384,10 @@
 								<section class="flex flex-col">
 									<h3 class="mb-1 text-body font-semibold">Properties</h3>
 									{#each [['Parent', parent ? `#${parent.num} ${parent.title}` : '—'], ['Status', issueLabel[iss.status]], ['Tasks', `${done} / ${all.length} done`], ['Assignees', who.map((a) => a.name).join(' · ') || 'Unassigned'], ['Updated', iss.updated], ['Labels', iss.labels.join(' · ') || '—']] as [k, v] (k)}
-										<Item.Root variant="row" size="xs">
-											<Item.Content><Item.Description>{k}</Item.Description></Item.Content>
-											<Item.Actions class="min-w-0 truncate text-xs font-medium">{v}</Item.Actions>
-										</Item.Root>
+										<Item variant="row" size="xs">
+											<ItemContent><ItemDescription>{k}</ItemDescription></ItemContent>
+											<ItemActions class="min-w-0 truncate text-xs font-medium">{v}</ItemActions>
+										</Item>
 									{/each}
 								</section>
 							</aside>
@@ -1439,11 +1439,11 @@
 						</InspectorSection>
 						<InspectorSection title={pathsTitle}>
 							{#if bad.length}
-								<Alert.Root variant="destructive" class="mb-1">
+								<Alert variant="destructive" class="mb-1">
 									<OctagonX />
-									<Alert.Title>paths 밖 변경 · {bad.map((p) => p.path).join(', ')}</Alert.Title>
-									<Alert.Description>허용된 paths 밖 파일을 고쳐 실패로 처리됐어요. 변경은 적용되지 않았어요.</Alert.Description>
-								</Alert.Root>
+									<AlertTitle>paths 밖 변경 · {bad.map((p) => p.path).join(', ')}</AlertTitle>
+									<AlertDescription>허용된 paths 밖 파일을 고쳐 실패로 처리됐어요. 변경은 적용되지 않았어요.</AlertDescription>
+								</Alert>
 							{/if}
 							{#each s.paths as p (p.path)}
 								{@const Icon = p.from === 'ask' ? FilePlus : p.from === 'bad' ? FileX : FileCode}
@@ -1506,62 +1506,62 @@
 						</div>
 						{/snippet}
 					</InspectorHeader>
-					<Tabs.Root bind:value={inspectTab} class="flex min-h-0 flex-1 flex-col gap-0">
-						<Tabs.List variant="line" class="w-full justify-start px-4">
-							{#each [['overview', 'Overview'], ['activity', 'Activity'], ['runs', 'Runs'], ['config', 'Config']] as [v, l] (v)}<Tabs.Trigger value={v}>{l}</Tabs.Trigger>{/each}
-						</Tabs.List>
-						<Tabs.Content value="overview" class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3">
+					<Tabs bind:value={inspectTab} class="flex min-h-0 flex-1 flex-col gap-0">
+						<TabsList variant="line" class="w-full justify-start px-4">
+							{#each [['overview', 'Overview'], ['activity', 'Activity'], ['runs', 'Runs'], ['config', 'Config']] as [v, l] (v)}<TabsTrigger value={v}>{l}</TabsTrigger>{/each}
+						</TabsList>
+						<TabsContent value="overview" class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3">
 							<h3 class="mb-1 text-body font-semibold">맡은 태스크</h3>
 							{#each mine as t (t.num)}
-								<Item.Root variant="row" size="xs" onclick={() => open(t.num)}>
+								<Item variant="row" size="xs" onclick={() => open(t.num)}>
 									{#snippet child({ props })}
 										<button type="button" {...props}>
-											<Item.Content><Item.Title>#{t.num} {t.title}</Item.Title></Item.Content>
-											<Item.Actions><StatusBadge status={t.status} /></Item.Actions>
+											<ItemContent><ItemTitle>#{t.num} {t.title}</ItemTitle></ItemContent>
+											<ItemActions><StatusBadge status={t.status} /></ItemActions>
 										</button>
 									{/snippet}
-								</Item.Root>
+								</Item>
 							{:else}
 								<p class="text-xs text-muted-foreground">맡은 태스크가 없어요.</p>
 							{/each}
 							<div class="mt-4 flex items-center justify-between text-xs"><span class="text-muted-foreground">토큰 (오늘)</span><span class="font-mono">{a.tokens}</span></div>
-						</Tabs.Content>
-						<Tabs.Content value="activity" class="min-h-0 flex-1 overflow-y-auto px-4 py-2">
+						</TabsContent>
+						<TabsContent value="activity" class="min-h-0 flex-1 overflow-y-auto px-4 py-2">
 							{#each activity[a.sn] ?? [] as ev, i (i)}
-								<Item.Root variant="row" size="xs">
-									<Item.Content>
-										<Item.Title><Badge variant="mono" class="text-2xs">{ev.type}</Badge><span class="text-xs font-normal text-muted-foreground">{ev.who}</span></Item.Title>
-										<Item.Description>{ev.text}</Item.Description>
-									</Item.Content>
-									<Item.Actions class="font-mono text-xs text-subtle-foreground">{ev.time}</Item.Actions>
-								</Item.Root>
+								<Item variant="row" size="xs">
+									<ItemContent>
+										<ItemTitle><Badge variant="mono" class="text-2xs">{ev.type}</Badge><span class="text-xs font-normal text-muted-foreground">{ev.who}</span></ItemTitle>
+										<ItemDescription>{ev.text}</ItemDescription>
+									</ItemContent>
+									<ItemActions class="font-mono text-xs text-subtle-foreground">{ev.time}</ItemActions>
+								</Item>
 							{:else}
 								<p class="py-4 text-center text-xs text-muted-foreground">활동 기록이 없어요.</p>
 							{/each}
-						</Tabs.Content>
-						<Tabs.Content value="runs" class="min-h-0 flex-1 overflow-y-auto px-4 py-2">
+						</TabsContent>
+						<TabsContent value="runs" class="min-h-0 flex-1 overflow-y-auto px-4 py-2">
 							{#each mine.flatMap((t) => (details[t.num]?.runs ?? []).map((r) => ({ ...r, task: t.num }))) as r (r.num)}
-								<Item.Root variant="row" size="xs">
-									<Item.Content>
-										<Item.Title>Run #{r.num} · #{r.task}</Item.Title>
-										<Item.Description>{r.note}</Item.Description>
-									</Item.Content>
-									<Item.Actions class="font-mono text-xs text-muted-foreground">{r.time} · {r.tokens}</Item.Actions>
-								</Item.Root>
+								<Item variant="row" size="xs">
+									<ItemContent>
+										<ItemTitle>Run #{r.num} · #{r.task}</ItemTitle>
+										<ItemDescription>{r.note}</ItemDescription>
+									</ItemContent>
+									<ItemActions class="font-mono text-xs text-muted-foreground">{r.time} · {r.tokens}</ItemActions>
+								</Item>
 							{:else}
 								<p class="py-4 text-center text-xs text-muted-foreground">Run 기록이 없어요.</p>
 							{/each}
-						</Tabs.Content>
-						<Tabs.Content value="config" class="min-h-0 flex-1 overflow-y-auto px-4 py-2">
+						</TabsContent>
+						<TabsContent value="config" class="min-h-0 flex-1 overflow-y-auto px-4 py-2">
 							{#each [['Role', roles[a.role].label], ['Runtime', a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'], ['Status', a.online ? 'Online' : 'Offline']] as [k, v] (k)}
-								<Item.Root variant="row" size="xs">
-									<Item.Content><Item.Description>{k}</Item.Description></Item.Content>
-									<Item.Actions class="text-xs font-medium">{v}</Item.Actions>
-								</Item.Root>
+								<Item variant="row" size="xs">
+									<ItemContent><ItemDescription>{k}</ItemDescription></ItemContent>
+									<ItemActions class="text-xs font-medium">{v}</ItemActions>
+								</Item>
 							{/each}
 							<p class="mt-3 text-xs text-muted-foreground">스킬 · 도구 · 권한 편집은 Teams › 멤버 상세(#27)에서.</p>
-						</Tabs.Content>
-					</Tabs.Root>
+						</TabsContent>
+					</Tabs>
 					<form class="border-t p-3" onsubmit={instruct}>
 						<div class="flex items-center gap-1.5 rounded-md border border-input bg-background py-1.5 pr-1.5 pl-3 focus-within:ring-3 focus-within:ring-ring/50">
 							<input bind:value={instruction} placeholder="{a.name}에게 실행 중 지시…" aria-label="{a.name}에게 실행 중 지시" class="bare-input" />
@@ -1574,11 +1574,11 @@
 
 			<!-- 하단 Ops (.pen Workbench/BottomOpsPanel) -->
 			<section class={['flex shrink-0 flex-col border-t bg-card', opsOpen ? 'h-49' : 'h-10']} aria-label="Ops">
-				<Tabs.Root bind:value={opsTab} class="flex min-h-0 flex-1 flex-col gap-0">
+				<Tabs bind:value={opsTab} class="flex min-h-0 flex-1 flex-col gap-0">
 					<div class="flex h-10 shrink-0 items-center gap-4 border-b pr-3 pl-4">
-						<Tabs.List variant="line" class="h-full flex-1 justify-start border-b-0">
-							{#each opsTabs as [v, l] (v)}<Tabs.Trigger value={v} class="h-full">{l}</Tabs.Trigger>{/each}
-						</Tabs.List>
+						<TabsList variant="line" class="h-full flex-1 justify-start border-b-0">
+							{#each opsTabs as [v, l] (v)}<TabsTrigger value={v} class="h-full">{l}</TabsTrigger>{/each}
+						</TabsList>
 						<span class={['label-xs', live ? 'text-success' : 'text-muted-foreground']}>
 							<span class={['size-1.5 rounded-full', live ? 'bg-success' : 'bg-subtle-foreground']}></span>
 							{live ? 'Live' : 'Paused'}
@@ -1592,7 +1592,7 @@
 						</Button>
 					</div>
 					{#if opsOpen}
-						<Tabs.Content value="activity" class="min-h-0 flex-1 overflow-y-auto px-2 py-1.5 font-mono text-xs">
+						<TabsContent value="activity" class="min-h-0 flex-1 overflow-y-auto px-2 py-1.5 font-mono text-xs">
 							{#each logs as l, i (i)}
 								<div class="flex items-center gap-3 px-2 py-1">
 									<span class="text-muted-foreground">{l.time}</span>
@@ -1600,12 +1600,12 @@
 									<span class="min-w-0 flex-1 truncate">{l.message}</span>
 								</div>
 							{/each}
-						</Tabs.Content>
+						</TabsContent>
 						{#each opsTabs.slice(1) as [v] (v)}
-							<Tabs.Content value={v} class="flex flex-1 items-center justify-center text-xs text-muted-foreground">실행기 연동 후 표시돼요.</Tabs.Content>
+							<TabsContent value={v} class="flex flex-1 items-center justify-center text-xs text-muted-foreground">실행기 연동 후 표시돼요.</TabsContent>
 						{/each}
 					{/if}
-				</Tabs.Root>
+				</Tabs>
 			</section>
 		</main>
 
@@ -1714,13 +1714,13 @@
 		{/if}
 	</div>
 	<!-- 판단 대기 패널 (.pen DecisionPanel) — 전체 / 이 태스크만 -->
-	<Dialog.Root bind:open={panel}>
-		<Dialog.Content size="xl" tall>
-			<Dialog.Header>
-				<Dialog.Title class="flex items-center gap-2">판단 대기 <Badge variant="secondary">{pending.length}</Badge></Dialog.Title>
-				<Dialog.Description>{scope === undefined ? `${project.name} · L2 모호한 판단` : `Task #${scope}만`}</Dialog.Description>
-			</Dialog.Header>
-			<Dialog.Body padded={false} class="flex-row">
+	<Dialog bind:open={panel}>
+		<DialogContent size="xl" tall>
+			<DialogHeader>
+				<DialogTitle class="flex items-center gap-2">판단 대기 <Badge variant="secondary">{pending.length}</Badge></DialogTitle>
+				<DialogDescription>{scope === undefined ? `${project.name} · L2 모호한 판단` : `Task #${scope}만`}</DialogDescription>
+			</DialogHeader>
+			<DialogBody padded={false} class="flex-row">
 				<nav class="flex w-72 shrink-0 flex-col overflow-y-auto border-r bg-background p-2" aria-label="판단 대기 목록">
 					{#each shownQueue as d (d.id)}
 						{@const who = agentOf(d.agent)}
@@ -1784,17 +1784,17 @@
 						{/if}
 					</section>
 				{/if}
-			</Dialog.Body>
-		</Dialog.Content>
-	</Dialog.Root>
+			</DialogBody>
+		</DialogContent>
+	</Dialog>
 
 	<!-- Task Editor (.pen XBNVi A · 새 태스크 / A' · 편집) -->
 	<TaskEditorDialog bind:this={editor} bind:open={editorOpen} project={project.name} tasks={list} issues={issueList} agents={agentList} {details} onsave={saveDraft} oncreated={open} />
 {:else}
-	<Empty.Root class="h-full">
-		<Empty.Header>
-			<Empty.Title>프로젝트를 찾을 수 없어요</Empty.Title>
-			<Empty.Description><a href="/p">All Projects</a>에서 다시 선택하세요.</Empty.Description>
-		</Empty.Header>
-	</Empty.Root>
+	<Empty class="h-full">
+		<EmptyHeader>
+			<EmptyTitle>프로젝트를 찾을 수 없어요</EmptyTitle>
+			<EmptyDescription><a href="/p">All Projects</a>에서 다시 선택하세요.</EmptyDescription>
+		</EmptyHeader>
+	</Empty>
 {/if}

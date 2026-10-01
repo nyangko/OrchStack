@@ -19,13 +19,13 @@
 	import Timer from '@lucide/svelte/icons/timer';
 	import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
 	import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
-	import * as Card from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
+	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Pill } from '$lib/components/orch/pill';
 	import { RuntimeLogo, type Runtime } from '$lib/components/orch/runtime-logo';
-	import * as Field from '$lib/components/ui/field';
+	import { FieldRow, FieldSwitchRow } from '$lib/components/ui/field';
 	import { KeyValueRow } from '$lib/components/orch/key-value-row';
 	import { AddConnectionDialog, type AddedConnection } from '$lib/components/orch/connection';
 	import { runtimeClis, runSettings, type RuntimeCli } from '$lib/mock';
@@ -117,12 +117,12 @@
 		<Button disabled={!clis.some((c) => c.state === 'missing' && !c.busy)} onclick={() => clis.filter((c) => c.state === 'missing' && !c.busy).forEach(act)}><Plus />실행기 설치</Button>
 	</PageHeader>
 
-	<Card.Root size="sm">
-		<Card.Header>
-			<Card.Title>설치된 실행기</Card.Title>
-			<Card.Description>이 기기에서 감지한 CLI · 에이전트가 실제로 도는 프로그램</Card.Description>
-		</Card.Header>
-		<Card.Content class="grid grid-cols-2 gap-2.5">
+	<Card size="sm">
+		<CardHeader>
+			<CardTitle>설치된 실행기</CardTitle>
+			<CardDescription>이 기기에서 감지한 CLI · 에이전트가 실제로 도는 프로그램</CardDescription>
+		</CardHeader>
+		<CardContent class="grid grid-cols-2 gap-2.5">
 			{#each clis as c (c.key)}
 				{@const m = stateMeta[c.state]}
 				{@const L = logo[c.key]}
@@ -140,61 +140,61 @@
 					<Button variant="ghost" size="sm" disabled={c.busy} onclick={() => act(c)}><m.action.icon />{m.action.label}</Button>
 				</div>
 			{/each}
-		</Card.Content>
-	</Card.Root>
+		</CardContent>
+	</Card>
 
 	<div class="flex items-start gap-5">
-		<Card.Root size="sm" class="min-w-0 flex-1">
-			<Card.Header>
-				<Card.Title>공통 실행 설정</Card.Title>
-				<Card.Description>모든 실행기에 적용 · 팀 정책 · 멤버 권한이 더 좁으면 그쪽이 우선</Card.Description>
-			</Card.Header>
-			<Card.Content>
+		<Card size="sm" class="min-w-0 flex-1">
+			<CardHeader>
+				<CardTitle>공통 실행 설정</CardTitle>
+				<CardDescription>모든 실행기에 적용 · 팀 정책 · 멤버 권한이 더 좁으면 그쪽이 우선</CardDescription>
+			</CardHeader>
+			<CardContent>
 				{#each selects as r (r.key)}
-					<Field.Row label={r.label} hint={r.hint}>
-						<Select.Root type="single" bind:value={run[r.key]}>
-							<Select.Trigger class="w-full" aria-label={r.label}>
+					<FieldRow label={r.label} hint={r.hint}>
+						<Select type="single" bind:value={run[r.key]}>
+							<SelectTrigger class="w-full" aria-label={r.label}>
 								<span class="flex min-w-0 flex-1 items-center gap-2">
 									<r.icon class="size-4 text-muted-foreground" />{run[r.key]}
 									<span class="truncate text-caption font-normal text-muted-foreground">{r.note}</span>
 								</span>
-							</Select.Trigger>
-							<Select.Content>
-								{#each r.options as o (o)}<Select.Item value={o} label={o} />{/each}
-							</Select.Content>
-						</Select.Root>
-					</Field.Row>
+							</SelectTrigger>
+							<SelectContent>
+								{#each r.options as o (o)}<SelectItem value={o} label={o} />{/each}
+							</SelectContent>
+						</Select>
+					</FieldRow>
 				{/each}
 				{#each switches as s (s.key)}
-					<Field.SwitchRow label={s.label} hint={s.hint} bind:checked={run[s.key]} />
+					<FieldSwitchRow label={s.label} hint={s.hint} bind:checked={run[s.key]} />
 				{/each}
-			</Card.Content>
-		</Card.Root>
+			</CardContent>
+		</Card>
 
 		<div class="flex shrink-0 flex-col w-95 gap-5">
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title>감지</Card.Title>
-					<Card.Description>PATH에서 CLI를 찾아요</Card.Description>
-				</Card.Header>
-				<Card.Content>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle>감지</CardTitle>
+					<CardDescription>PATH에서 CLI를 찾아요</CardDescription>
+				</CardHeader>
+				<CardContent>
 					{#each [['검색 경로', '~/.local/bin · /opt/homebrew/bin'], ['마지막 감지', lastDetect], ['설치됨', `${installedCount} / ${clis.length}`]] as [l, v] (l)}
 						<KeyValueRow label={l} value={v} />
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 
-			<Card.Root size="sm">
-				<Card.Header>
-					<Card.Title class="flex items-center gap-1.5">실행기 <ArrowLeftRight class="size-3.5" /> 연결</Card.Title>
-					<Card.Description>실행기마다 쓸 수 있는 연결 · 폴백은 <a href="/settings/connections" class="text-primary hover:underline">모델 연결</a>에서</Card.Description>
-				</Card.Header>
-				<Card.Content>
+			<Card size="sm">
+				<CardHeader>
+					<CardTitle class="flex items-center gap-1.5">실행기 <ArrowLeftRight class="size-3.5" /> 연결</CardTitle>
+					<CardDescription>실행기마다 쓸 수 있는 연결 · 폴백은 <a href="/settings/connections" class="text-primary hover:underline">모델 연결</a>에서</CardDescription>
+				</CardHeader>
+				<CardContent>
 					{#each clis.filter((c) => c.conns) as c (c.key)}
 						<KeyValueRow label={c.name} value={c.conns} />
 					{/each}
-				</Card.Content>
-			</Card.Root>
+				</CardContent>
+			</Card>
 		</div>
 	</div>
 </main>

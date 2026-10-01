@@ -14,7 +14,7 @@
 	import Plus from "@lucide/svelte/icons/plus";
 	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import * as InputGroup from "$lib/components/ui/input-group/index.js";
+	import { InputGroup, InputGroupInput, InputGroupAddon } from "$lib/components/ui/input-group";
 	import { cn, type WithElementRef } from "$lib/utils.js";
 
 	let {
@@ -74,16 +74,16 @@
 			{/if}
 			<Checkbox bind:checked={c.done} aria-label={c.text} />
 			{#if editing === i}
-				<InputGroup.Root class="h-7 flex-1">
+				<InputGroup class="h-7 flex-1">
 					<!-- svelte-ignore a11y_autofocus -->
-					<InputGroup.Input
+					<InputGroupInput
 						autofocus
 						bind:value={c.text}
 						aria-label="{label} 고치기"
 						onblur={() => (editing = undefined)}
 						onkeydown={(e) => (e.key === "Enter" || e.key === "Escape") && !e.isComposing && (e.preventDefault(), (editing = undefined))}
 					/>
-				</InputGroup.Root>
+				</InputGroup>
 			{:else}
 				<span class="min-w-0 flex-1 text-body group-data-done:text-muted-foreground">{c.text}</span>
 				{#if editable}
@@ -97,10 +97,10 @@
 	{/each}
 	{#if addable}
 		<li data-slot="checklist-add" class="pl-5">
-			<InputGroup.Root class="h-8">
-				<InputGroup.Addon><Plus /></InputGroup.Addon>
-				<InputGroup.Input bind:value={draft} onkeydown={add} {placeholder} aria-label="{label} 추가" />
-			</InputGroup.Root>
+			<InputGroup class="h-8">
+				<InputGroupAddon><Plus /></InputGroupAddon>
+				<InputGroupInput bind:value={draft} onkeydown={add} {placeholder} aria-label="{label} 추가" />
+			</InputGroup>
 		</li>
 	{/if}
 </ul>

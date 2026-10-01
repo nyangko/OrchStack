@@ -17,8 +17,8 @@
 	import Package from '@lucide/svelte/icons/package';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import CircleAlert from '@lucide/svelte/icons/circle-alert';
-	import * as Card from '$lib/components/ui/card';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Pill } from '$lib/components/orch/pill';
@@ -145,10 +145,10 @@
 
 	<div class="flex items-start gap-5">
 		<nav class="list-panel w-72" aria-label="프리셋">
-			<InputGroup.Root class="mb-1 h-8">
-				<InputGroup.Addon><Search /></InputGroup.Addon>
-				<InputGroup.Input bind:value={query} placeholder="프리셋 검색" aria-label="프리셋 검색" />
-			</InputGroup.Root>
+			<InputGroup class="mb-1 h-8">
+				<InputGroupAddon><Search /></InputGroupAddon>
+				<InputGroupInput bind:value={query} placeholder="프리셋 검색" aria-label="프리셋 검색" />
+			</InputGroup>
 			{#each kinds as k (k.kind)}
 				{@const items = shown(k.kind)}
 				{#if items.length}
@@ -218,31 +218,31 @@
 			{/if}
 
 			<div class="grid grid-cols-2 items-start gap-5">
-				<Card.Root size="sm">
-					<Card.Header>
-						<Card.Title>사용처</Card.Title>
-						<Card.Description>
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>사용처</CardTitle>
+						<CardDescription>
 							{usage.length ? `역할 템플릿 ${usage.filter((u) => u.tpl).length} · 멤버 ${usage.filter((u) => !u.tpl).length}` : '아직 연결된 곳이 없어요 · 템플릿 화면에서 연결해요'}
-						</Card.Description>
-					</Card.Header>
-					<Card.Content class="gap-0">
+						</CardDescription>
+					</CardHeader>
+					<CardContent class="gap-0">
 						{#each usage.slice(0, 8) as u (u.label)}
 							<KeyValueRow label={u.label}><span class="font-medium">v1 고정</span></KeyValueRow>
 						{/each}
 						{#if usage.length > 8}<span class="border-t pt-2 text-caption text-subtle-foreground">외 {usage.length - 8}곳</span>{/if}
-					</Card.Content>
-				</Card.Root>
-				<Card.Root size="sm">
-					<Card.Header>
-						<Card.Title>버전</Card.Title>
-						<Card.Description>수정할 때마다 새 버전 · 연결은 고정 버전 사용</Card.Description>
-					</Card.Header>
-					<Card.Content class="gap-0">
+					</CardContent>
+				</Card>
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>버전</CardTitle>
+						<CardDescription>수정할 때마다 새 버전 · 연결은 고정 버전 사용</CardDescription>
+					</CardHeader>
+					<CardContent class="gap-0">
 						{#each sel.versions.toReversed() as v (v.v)}
 							<HistoryRow icon={Package} tone="bg-review-soft text-status-review" kind={`v${v.v}`} who={v.who} when={v.when} text={v.note} />
 						{/each}
-					</Card.Content>
-				</Card.Root>
+					</CardContent>
+				</Card>
 			</div>
 		</section>
 	</div>

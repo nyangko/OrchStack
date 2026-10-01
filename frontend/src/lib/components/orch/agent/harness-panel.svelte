@@ -23,10 +23,10 @@
 	import CircleDot from '@lucide/svelte/icons/circle-dot';
 	import Circle from '@lucide/svelte/icons/circle';
 	import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
-	import * as Card from '$lib/components/ui/card';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Select from '$lib/components/ui/select';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '$lib/components/ui/card';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from '$lib/components/ui/dialog';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { Pill } from '$lib/components/orch/pill';
@@ -103,16 +103,16 @@
 </div>
 <div class="flex items-start gap-4">
 	<div class="flex min-w-0 flex-1 flex-col gap-4">
-		<Card.Root size="sm">
-			<Card.Header><Card.Title>실행</Card.Title></Card.Header>
-			<Card.Content class="gap-3">
+		<Card size="sm">
+			<CardHeader><CardTitle>실행</CardTitle></CardHeader>
+			<CardContent class="gap-3">
 				<div class="grid grid-cols-2 gap-2.5">
 					<div class="flex flex-col gap-1.5">
 						<span class="text-caption font-semibold text-muted-foreground">실행기</span>
-						<Select.Root type="single" value={runtime} onValueChange={(v) => onchange(v as Runtime, modelCatalog.find((p) => p.runtime === v)!.models[0].name)}>
-							<Select.Trigger class="w-full"><span class="flex items-center gap-2"><RuntimeLogo runtime={runtime} class="size-4 ring-0" />{runtimeName(runtime)}<span class="font-normal text-muted-foreground">로그인됨</span></span></Select.Trigger>
-							<Select.Content>{#each ['codex', 'claude'] as const as r (r)}<Select.Item value={r} label={runtimeName(r)} />{/each}</Select.Content>
-						</Select.Root>
+						<Select type="single" value={runtime} onValueChange={(v) => onchange(v as Runtime, modelCatalog.find((p) => p.runtime === v)!.models[0].name)}>
+							<SelectTrigger class="w-full"><span class="flex items-center gap-2"><RuntimeLogo runtime={runtime} class="size-4 ring-0" />{runtimeName(runtime)}<span class="font-normal text-muted-foreground">로그인됨</span></span></SelectTrigger>
+							<SelectContent>{#each ['codex', 'claude'] as const as r (r)}<SelectItem value={r} label={runtimeName(r)} />{/each}</SelectContent>
+						</Select>
 					</div>
 					<div class="flex flex-col gap-1.5">
 						<span class="text-caption font-semibold text-muted-foreground">연결</span>
@@ -131,21 +131,21 @@
 					</div>
 					<div class="flex flex-col gap-1.5">
 						<span class="text-caption font-semibold text-muted-foreground">Effort</span>
-						<Select.Root type="single" bind:value={h.effort}>
-							<Select.Trigger class="w-full"><span class="flex items-center gap-2"><Gauge class="size-3.5 text-muted-foreground" />{h.effort}</span></Select.Trigger>
-							<Select.Content>{#each ['Auto', 'Low', 'Medium', 'High'] as e (e)}<Select.Item value={e} label={e} />{/each}</Select.Content>
-						</Select.Root>
+						<Select type="single" bind:value={h.effort}>
+							<SelectTrigger class="w-full"><span class="flex items-center gap-2"><Gauge class="size-3.5 text-muted-foreground" />{h.effort}</span></SelectTrigger>
+							<SelectContent>{#each ['Auto', 'Low', 'Medium', 'High'] as e (e)}<SelectItem value={e} label={e} />{/each}</SelectContent>
+						</Select>
 					</div>
 				</div>
 				<span class="text-caption text-muted-foreground">한도가 소진된 연결의 모델은 폴백으로만 쓰여요</span>
-			</Card.Content>
-		</Card.Root>
-		<Card.Root size="sm">
-			<Card.Header>
-				<Card.Title>폴백</Card.Title>
-				<Card.Description>첫 연결이 막히면 순서대로 시도</Card.Description>
-			</Card.Header>
-			<Card.Content class="gap-0">
+			</CardContent>
+		</Card>
+		<Card size="sm">
+			<CardHeader>
+				<CardTitle>폴백</CardTitle>
+				<CardDescription>첫 연결이 막히면 순서대로 시도</CardDescription>
+			</CardHeader>
+			<CardContent class="gap-0">
 				{#each h.fallback as key, i (key)}
 					{@const st = fallbackSteps[key]}
 					<div class="list-row">
@@ -162,8 +162,8 @@
 						</span>
 					</div>
 				{/each}
-			</Card.Content>
-		</Card.Root>
+			</CardContent>
+		</Card>
 		<div class="card flex flex-col rounded-md">
 			<button type="button" aria-expanded={showCmd} onclick={() => (showCmd = !showCmd)} class="flex items-center gap-2 px-4 py-3 text-left text-body font-medium outline-none focus-visible:underline">
 				<Terminal class="size-3.5 text-muted-foreground" /><span class="flex-1">실행 명령 미리보기</span><ChevronDown class={['size-4 text-muted-foreground transition-transform', showCmd && 'rotate-180']} />
@@ -172,24 +172,24 @@
 		</div>
 	</div>
 	<aside class="flex shrink-0 flex-col w-72 gap-4">
-		<Card.Root size="sm">
-			<Card.Header><Card.Title>이 조합으로 실행하면</Card.Title></Card.Header>
-			<Card.Content class="gap-1">
+		<Card size="sm">
+			<CardHeader><CardTitle>이 조합으로 실행하면</CardTitle></CardHeader>
+			<CardContent class="gap-1">
 				<div class="value-line"><Coins class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">Run당 평균</span><span class="font-mono font-medium">35K tok</span></div>
 				<LimitRow icon={BadgeCheck} label="구독 주간 창 사용" used="{perRun(runtime)}%" max="/ Run" value={perRun(runtime) * 10} note="주간 잔량 {acc.week}% → 약 {Math.floor(acc.week / perRun(runtime))} Run 가능" warn={low(acc.week)} />
 				<div class="value-line"><Wallet class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">폴백 시 비용</span><span class="font-medium">{h.fallback[0] === 'sub' ? 'OmniRoute · Run당 ~$0.4' : '첫 단계부터 과금'}</span></div>
 				<div class="value-line"><PlugZap class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">호환성</span><Pill class="bg-success-soft text-status-done"><Check />모두 호환</Pill></div>
-			</Card.Content>
-		</Card.Root>
-		<Card.Root size="sm">
-			<Card.Header><Card.Title>실행 한도</Card.Title></Card.Header>
-			<Card.Content class="gap-1.5 text-xs">
+			</CardContent>
+		</Card>
+		<Card size="sm">
+			<CardHeader><CardTitle>실행 한도</CardTitle></CardHeader>
+			<CardContent class="gap-1.5 text-xs">
 				<div class="flex items-center gap-2">
 					<Timer class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">Run 최대 시간</span>
-					<Select.Root type="single" bind:value={h.maxTime}>
-						<Select.Trigger size="sm" class="h-7 w-24">{h.maxTime}</Select.Trigger>
-						<Select.Content>{#each ['30m', '1h', '2h', '4h'] as t (t)}<Select.Item value={t} label={t} />{/each}</Select.Content>
-					</Select.Root>
+					<Select type="single" bind:value={h.maxTime}>
+						<SelectTrigger size="sm" class="h-7 w-24">{h.maxTime}</SelectTrigger>
+						<SelectContent>{#each ['30m', '1h', '2h', '4h'] as t (t)}<SelectItem value={t} label={t} />{/each}</SelectContent>
+					</Select>
 				</div>
 				<label class="flex items-center gap-2">
 					<Repeat class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">최대 turn</span>
@@ -201,24 +201,24 @@
 				<label class="flex h-7 items-center gap-2">
 					<Play class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">한도 리셋 후 자동 재개</span><Switch bind:checked={h.autoResume} />
 				</label>
-			</Card.Content>
-		</Card.Root>
+			</CardContent>
+		</Card>
 	</aside>
 </div>
 
 <!-- 모델 선택 (.pen Model Picker Dialog) — 연결별 모델 · 한도 잔량 -->
-<Dialog.Root bind:open={picker}>
-	<Dialog.Content size="xl" tall>
+<Dialog bind:open={picker}>
+	<DialogContent size="xl" tall>
 		{#if picker}
-			<Dialog.Header>
-				<Dialog.Title>모델 선택</Dialog.Title>
-				<Dialog.Description>연결별 모델 목록 · 한도 잔량을 보고 고르세요 · 소진된 제공자는 폴백으로만 쓰여요</Dialog.Description>
+			<DialogHeader>
+				<DialogTitle>모델 선택</DialogTitle>
+				<DialogDescription>연결별 모델 목록 · 한도 잔량을 보고 고르세요 · 소진된 제공자는 폴백으로만 쓰여요</DialogDescription>
 				{#snippet sub()}
 			<div class="flex flex-wrap items-center gap-2">
-				<InputGroup.Root class="h-8 w-60">
-					<InputGroup.Addon><Search /></InputGroup.Addon>
-					<InputGroup.Input bind:value={pickQuery} placeholder="모델 검색…" aria-label="모델 검색" />
-				</InputGroup.Root>
+				<InputGroup class="h-8 w-60">
+					<InputGroupAddon><Search /></InputGroupAddon>
+					<InputGroupInput bind:value={pickQuery} placeholder="모델 검색…" aria-label="모델 검색" />
+				</InputGroup>
 				{#each [['all', '전체'], ['추천', '추천'], ['Tested', 'Tested'], ['NEW', 'NEW'], ['cheap', '저렴한 순'], ['long', '긴 컨텍스트']] as const as [v, l] (v)}
 					<Toggle variant="chip" pressed={pickFilter === v} onPressedChange={() => (pickFilter = v)}>{l}</Toggle>
 				{/each}
@@ -226,8 +226,8 @@
 				<span class="text-caption text-muted-foreground">{pickModels.reduce((n, p) => n + p.models.length, 0)}개 · 가격 in/out per 1M</span>
 			</div>
 				{/snippet}
-			</Dialog.Header>
-			<Dialog.Body padded={false} class="flex-row">
+			</DialogHeader>
+			<DialogBody padded={false} class="flex-row">
 				<nav aria-label="제공자" class="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-2 text-xs">
 					<span class="list-label px-2 pt-1 pb-1.5">제공자 · 연결됨 {modelCatalog.length}</span>
 					<button type="button" aria-pressed={pickProvider === 'all'} onclick={() => (pickProvider = 'all')} class={['model-provider-item', pickProvider === 'all' && 'bg-accent font-medium']}><Layers class="size-3.5" /><span class="flex-1">전체</span></button>
@@ -279,7 +279,7 @@
 						<p class="py-10 text-center text-xs text-muted-foreground">조건에 맞는 모델이 없어요.</p>
 					{/each}
 				</div>
-			</Dialog.Body>
+			</DialogBody>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</DialogContent>
+</Dialog>

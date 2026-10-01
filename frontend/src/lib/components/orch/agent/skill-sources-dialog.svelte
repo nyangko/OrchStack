@@ -7,10 +7,10 @@
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import Terminal from '@lucide/svelte/icons/terminal';
 	import Check from '@lucide/svelte/icons/check';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Pill } from '$lib/components/orch/pill';
-	import * as Field from '$lib/components/ui/field';
+	import { FieldSwitchRow } from '$lib/components/ui/field';
 	import { skillSources } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
 
@@ -24,15 +24,15 @@
 </script>
 
 <!-- 스킬 소스 연동 (.pen Skill Sources Dialog) — 워크스페이스 전체 설정 -->
-<Dialog.Root bind:open={() => open, (v) => (open = v)}>
-	<Dialog.Content size="md">
+<Dialog bind:open={() => open, (v) => (open = v)}>
+	<DialogContent size="md">
 		{#if sourcesDraft}
 			{@const d = sourcesDraft}
-			<Dialog.Header icon={Plug}>
-				<Dialog.Title>스킬 소스 연동</Dialog.Title>
-				<Dialog.Description>스킬을 찾고 설치할 곳 · 워크스페이스 전체에 적용</Dialog.Description>
-			</Dialog.Header>
-			<Dialog.Body class="gap-4">
+			<DialogHeader icon={Plug}>
+				<DialogTitle>스킬 소스 연동</DialogTitle>
+				<DialogDescription>스킬을 찾고 설치할 곳 · 워크스페이스 전체에 적용</DialogDescription>
+			</DialogHeader>
+			<DialogBody class="gap-4">
 				<section class="flex flex-col gap-2">
 					<span class="list-label">소스</span>
 					{#each d.sources as src (src.name)}
@@ -56,14 +56,14 @@
 				<section class="flex flex-col gap-1">
 					<span class="list-label pb-1">설치 정책</span>
 					{#each d.policy as pol (pol.name)}
-						<Field.SwitchRow label={pol.name} hint={pol.desc} bind:checked={pol.on} />
+						<FieldSwitchRow label={pol.name} hint={pol.desc} bind:checked={pol.on} />
 					{/each}
 				</section>
-			</Dialog.Body>
-			<Dialog.Footer note="API 한도 600회/분 · 캐시 15분">
+			</DialogBody>
+			<DialogFooter note="API 한도 600회/분 · 캐시 15분">
 				<Button variant="ghost" size="sm" onclick={() => (open = false)}>취소</Button>
 				<Button size="sm" onclick={() => ((store.sources = d), (open = false))}>저장</Button>
-			</Dialog.Footer>
+			</DialogFooter>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</DialogContent>
+</Dialog>

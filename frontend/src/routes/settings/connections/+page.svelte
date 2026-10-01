@@ -21,10 +21,10 @@
 	import Layers from '@lucide/svelte/icons/layers';
 	import Info from '@lucide/svelte/icons/info';
 	import Cpu from '@lucide/svelte/icons/cpu';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '$lib/components/ui/dropdown-menu';
 	import { tierTone } from '$lib/components/orch/diagram/sub-run-node.svelte';
-	import * as Card from '$lib/components/ui/card';
-	import * as Alert from '$lib/components/ui/alert';
+	import { Card, CardHeader, CardTitle, CardAction, CardContent } from '$lib/components/ui/card';
+	import { Alert, AlertTitle, AlertDescription } from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Toggle } from '$lib/components/ui/toggle';
@@ -145,11 +145,11 @@
 		<div class="flex gap-2" role="status">
 			{#each notices as n (n.key)}
 				{@const expired = list.find((c) => c.key === n.key)?.state === 'expired'}
-				<Alert.Root variant={expired ? 'destructive' : 'warning'}>
+				<Alert variant={expired ? 'destructive' : 'warning'}>
 					{#if expired}<KeyRound />{:else}<TriangleAlert />{/if}
-					<Alert.Title>{n.title}</Alert.Title>
-					<Alert.Description>{n.desc}</Alert.Description>
-				</Alert.Root>
+					<AlertTitle>{n.title}</AlertTitle>
+					<AlertDescription>{n.desc}</AlertDescription>
+				</Alert>
 			{/each}
 		</div>
 	{/if}
@@ -201,16 +201,16 @@
 	{/each}
 
 	<div class="flex items-start gap-5">
-		<Card.Root size="sm" class="min-w-0 flex-1">
-			<Card.Header>
-				<Card.Title>폴백 체인 · {chainOf === 'claude' ? 'Claude Code' : 'Codex CLI'}</Card.Title>
-				<Card.Action>
+		<Card size="sm" class="min-w-0 flex-1">
+			<CardHeader>
+				<CardTitle>폴백 체인 · {chainOf === 'claude' ? 'Claude Code' : 'Codex CLI'}</CardTitle>
+				<CardAction>
 					<Button variant="link" size="xs" onclick={() => (chainOf = chainOf === 'claude' ? 'codex' : 'claude')}>
 						{chainOf === 'claude' ? 'Codex CLI' : 'Claude Code'} 체인 보기
 					</Button>
-				</Card.Action>
-			</Card.Header>
-			<Card.Content class="flex flex-col gap-1.5">
+				</CardAction>
+			</CardHeader>
+			<CardContent class="flex flex-col gap-1.5">
 				<!-- 등급은 리드가 아니라 규칙 엔진이 정한다 (#67) — 이 목록은 등급별로 어느 연결 · 모델을 쓸지만 정한다 -->
 				<div class="flex items-center gap-2 rounded-md bg-muted px-2.5 py-2 text-xs font-medium"><Info class="size-3.5 shrink-0 text-muted-foreground" />리드는 모델을 고르지 않습니다. 작업 종류로 등급이 정해지고, 이 목록에서 위부터 시도합니다.</div>
 				<p class="py-1 text-xs text-muted-foreground">{chainOf === 'claude' ? 'Claude Code' : 'Codex CLI'} 실행기 기준 · 행 순서 = 시도 순서 · 끌어서 바꿔요. 같은 연결을 등급만 다르게 여러 번 넣을 수 있어요.</p>
@@ -244,34 +244,34 @@
 								<span class="label-xs">{s.name}<Pill class={kindPill[s.kind]}>{s.kind}</Pill></span>
 								<span class="truncate text-caption text-muted-foreground">{off ? '키 만료 · 폴백에서 제외됨' : s.cond}</span>
 							</span>
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger>
+							<DropdownMenu>
+								<DropdownMenuTrigger>
 									{#snippet child({ props })}
 										<button {...props} type="button" aria-label="{s.name} 등급" class={['flex shrink-0 items-center gap-1 rounded-xs px-1.5 py-px text-2xs font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50', s.tier ? `font-mono ${tierTone[s.tier]}` : 'bg-muted text-muted-foreground']}>
 											{#if s.tier}<Cpu class="size-2.5" />{s.tier}{:else}<Layers class="size-2.5" />모든 등급{/if}
 										</button>
 									{/snippet}
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Content align="end" class="w-36">
-									<DropdownMenu.RadioGroup value={s.tier ?? 'all'} onValueChange={(v) => (s.tier = v === 'all' ? undefined : (v as SubRunTier))}>
-										{#each [['all', '모든 등급'], ['S', 'S · 소형'], ['M', 'M · 중형'], ['L', 'L · 대형']] as [v, l] (v)}<DropdownMenu.RadioItem value={v}>{l}</DropdownMenu.RadioItem>{/each}
-									</DropdownMenu.RadioGroup>
-								</DropdownMenu.Content>
-							</DropdownMenu.Root>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end" class="w-36">
+									<DropdownMenuRadioGroup value={s.tier ?? 'all'} onValueChange={(v) => (s.tier = v === 'all' ? undefined : (v as SubRunTier))}>
+										{#each [['all', '모든 등급'], ['S', 'S · 소형'], ['M', 'M · 중형'], ['L', 'L · 대형']] as [v, l] (v)}<DropdownMenuRadioItem value={v}>{l}</DropdownMenuRadioItem>{/each}
+									</DropdownMenuRadioGroup>
+								</DropdownMenuContent>
+							</DropdownMenu>
 							<span class="w-14 text-right text-caption text-subtle-foreground">{s.cost}</span>
 						</li>
 					{/each}
 				</ol>
-			</Card.Content>
-		</Card.Root>
+			</CardContent>
+		</Card>
 
-		<Card.Root size="sm" class="w-105 shrink-0">
-			<Card.Header>
-				<Card.Title>이번 달 비용</Card.Title>
+		<Card size="sm" class="w-105 shrink-0">
+			<CardHeader>
+				<CardTitle>이번 달 비용</CardTitle>
 				<!-- 비용 상세 화면은 .pen에 아직 없음 -->
-				<Card.Action><span class="text-xs font-medium text-primary">상세</span></Card.Action>
-			</Card.Header>
-			<Card.Content class="flex flex-col gap-1.5">
+				<CardAction><span class="text-xs font-medium text-primary">상세</span></CardAction>
+			</CardHeader>
+			<CardContent class="flex flex-col gap-1.5">
 				{#each monthCost as c, i (c.label)}
 					{@const Icon = costIcon[i]}
 					<div class="flex flex-col gap-1.5 py-1.5">
@@ -294,8 +294,8 @@
 					<span class="flex-1 text-muted-foreground">이번 달 합계</span>
 					<span class="font-mono text-sm font-semibold">${total.toFixed(1)}</span>
 				</span>
-			</Card.Content>
-		</Card.Root>
+			</CardContent>
+		</Card>
 	</div>
 </main>
 

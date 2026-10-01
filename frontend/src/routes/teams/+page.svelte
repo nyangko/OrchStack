@@ -58,8 +58,8 @@
 	import MessageSquarePlus from '@lucide/svelte/icons/message-square-plus';
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '$lib/components/ui/empty';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from '$lib/components/ui/dialog';
 	import { goto } from '$app/navigation';
 	import { MdEditor, estimateTokens, type MdFile } from '$lib/components/orch/md-editor';
 	import Upload from '@lucide/svelte/icons/upload';
@@ -74,18 +74,18 @@
 	import ListPlus from '@lucide/svelte/icons/list-plus';
 	import Moon from '@lucide/svelte/icons/moon';
 	import type { Component } from 'svelte';
-	import * as Sheet from '$lib/components/ui/sheet';
-	import * as Select from '$lib/components/ui/select';
+	import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetBody, SheetFooter } from '$lib/components/ui/sheet';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
 	import { Steps } from '$lib/components/orch/steps';
 	import { Input } from '$lib/components/ui/input';
 	import { Badge } from '$lib/components/ui/badge';
 	import type { Role } from '$lib/roles';
 	import type { Runtime } from '$lib/components/orch/runtime-logo';
-	import * as Avatar from '$lib/components/ui/avatar';
-	import * as Card from '$lib/components/ui/card';
-	import * as Table from '$lib/components/ui/table';
-	import * as Alert from '$lib/components/ui/alert';
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import { AvatarGroup } from '$lib/components/ui/avatar';
+	import { Card, CardHeader, CardTitle, CardContent, CardAction, CardDescription } from '$lib/components/ui/card';
+	import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '$lib/components/ui/table';
+	import { Alert, AlertTitle, AlertDescription } from '$lib/components/ui/alert';
+	import { InputGroup, InputGroupAddon, InputGroupInput } from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { Pill } from '$lib/components/orch/pill';
@@ -452,37 +452,37 @@
 				</div>
 
 				{#each alerts as { a, hit } (a.runtime)}
-					<Alert.Root variant="destructive" class="flex items-center gap-3">
+					<Alert variant="destructive" class="flex items-center gap-3">
 						<TriangleAlert />
 						<div class="flex min-w-0 flex-1 flex-col gap-0.5">
-							<Alert.Title>{a.name} 계정 주간 잔량 {a.week}% — {a.weekReset} 리셋까지 {a.left}</Alert.Title>
-							<Alert.Description>{hit.map((m) => m.name).join(' · ')} 영향. {a.forecast}. 정책: 잔량 {teamPolicy.quotaWarn}% 미만 → 확인 요청</Alert.Description>
+							<AlertTitle>{a.name} 계정 주간 잔량 {a.week}% — {a.weekReset} 리셋까지 {a.left}</AlertTitle>
+							<AlertDescription>{hit.map((m) => m.name).join(' · ')} 영향. {a.forecast}. 정책: 잔량 {teamPolicy.quotaWarn}% 미만 → 확인 요청</AlertDescription>
 						</div>
 						<Button variant="outline" size="sm" class="h-7.5 text-xs"><Filter class="size-3.25" />P0–P1만 실행</Button>
 						<Button variant="outline" size="sm" class="h-7.5 text-xs"><Route class="size-3.25" />폴백 적용 · Anthropic Max</Button>
-					</Alert.Root>
+					</Alert>
 				{/each}
 
 				<div class="card overflow-hidden rounded-lg">
-					<Table.Root class="table-fixed">
-						<Table.Header class="bg-muted">
-							<Table.Row class="hover:bg-muted">
-								<Table.Head class="h-11 w-48 pl-4">멤버</Table.Head>
-								<Table.Head class="h-11 w-28">상태</Table.Head>
-								<Table.Head class="h-11">현재 작업</Table.Head>
-								<Table.Head class="h-11 w-56">Runtime</Table.Head>
-								<Table.Head class="h-11 w-28">컨텍스트</Table.Head>
-								<Table.Head class="h-11 w-32 leading-tight">주간 잔량<br /><span class="text-2xs font-normal text-subtle-foreground">계정 공유</span></Table.Head>
-								<Table.Head class="h-11 w-22 pr-4 text-right">오늘 토큰</Table.Head>
-							</Table.Row>
-						</Table.Header>
-						<Table.Body>
+					<Table class="table-fixed">
+						<TableHeader class="bg-muted">
+							<TableRow class="hover:bg-muted">
+								<TableHead class="h-11 w-48 pl-4">멤버</TableHead>
+								<TableHead class="h-11 w-28">상태</TableHead>
+								<TableHead class="h-11">현재 작업</TableHead>
+								<TableHead class="h-11 w-56">Runtime</TableHead>
+								<TableHead class="h-11 w-28">컨텍스트</TableHead>
+								<TableHead class="h-11 w-32 leading-tight">주간 잔량<br /><span class="text-2xs font-normal text-subtle-foreground">계정 공유</span></TableHead>
+								<TableHead class="h-11 w-22 pr-4 text-right">오늘 토큰</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
 							{#each members as m (m.sn)}
 								{@const st = states[m.status]}
 								{@const week = weekOf(m)}
 								{@const full = m.context >= teamPolicy.contextWarn}
-								<Table.Row class="h-15 cursor-pointer" onclick={() => openMember(m.sn)}>
-									<Table.Cell class="pl-4">
+								<TableRow class="h-15 cursor-pointer" onclick={() => openMember(m.sn)}>
+									<TableCell class="pl-4">
 										<span class="flex items-center gap-2.5">
 											{@render who(m)}
 											<span class="flex min-w-0 flex-col gap-px">
@@ -490,48 +490,48 @@
 												<span class="truncate text-caption text-muted-foreground">{m.title}</span>
 											</span>
 										</span>
-									</Table.Cell>
-									<Table.Cell>
+									</TableCell>
+									<TableCell>
 										<span class={['label-xs', st.text]}><st.icon class="size-3.5" />{st.label}</span>
-									</Table.Cell>
-									<Table.Cell>
+									</TableCell>
+									<TableCell>
 										<span class={['flex items-center gap-1.5 text-xs', m.status === 'idle' && 'text-muted-foreground']}>
 											{#if m.next}<CircleDashed class="size-3.25 shrink-0 text-node-task" />{:else}<SquareCheck class="size-3.25 shrink-0 text-node-task" />{/if}
 											<span class="truncate">{m.work}</span>
 										</span>
-									</Table.Cell>
-									<Table.Cell>
+									</TableCell>
+									<TableCell>
 										<span class="code-tag font-medium">
 											<Terminal class="size-2.25" />{m.model}
 										</span>
-									</Table.Cell>
-									<Table.Cell>
+									</TableCell>
+									<TableCell>
 										<span class="flex items-center gap-2">
 											<Progress value={m.context} class="h-1.25 bg-muted" indicator={full ? 'bg-status-blocked' : undefined} aria-label="{m.name} 컨텍스트" />
 											<span class={['font-mono text-caption', full ? 'font-semibold text-status-blocked' : 'text-muted-foreground']}>{m.context}%</span>
 										</span>
-									</Table.Cell>
-									<Table.Cell>
+									</TableCell>
+									<TableCell>
 										<span class="flex items-center gap-1.5 text-caption">
 											<span class="font-medium text-muted-foreground">주</span>
 											<Progress value={week} class="h-1 w-16 bg-muted" indicator={low(week) ? 'bg-destructive' : 'bg-success'} aria-label="{m.name} 주간 잔량" />
 											<span class={['font-mono', low(week) ? 'font-semibold text-destructive' : 'font-medium']}>{week}%</span>
 										</span>
-									</Table.Cell>
-									<Table.Cell class="pr-4 text-right font-mono text-xs">{k(m.tokens)}</Table.Cell>
-								</Table.Row>
+									</TableCell>
+									<TableCell class="pr-4 text-right font-mono text-xs">{k(m.tokens)}</TableCell>
+								</TableRow>
 							{:else}
-								<Table.Row>
-									<Table.Cell colspan={7} class="h-15 text-center text-xs text-muted-foreground">해당 상태의 멤버가 없어요.</Table.Cell>
-								</Table.Row>
+								<TableRow>
+									<TableCell colspan={7} class="h-15 text-center text-xs text-muted-foreground">해당 상태의 멤버가 없어요.</TableCell>
+								</TableRow>
 							{/each}
-						</Table.Body>
-					</Table.Root>
+						</TableBody>
+					</Table>
 				</div>
 
-				<Card.Root size="sm">
-					<Card.Header><Card.Title>작업량</Card.Title></Card.Header>
-					<Card.Content>
+				<Card size="sm">
+					<CardHeader><CardTitle>작업량</CardTitle></CardHeader>
+					<CardContent>
 						<div class="flex items-center gap-3">
 							{#each Object.values(loads) as l (l.label)}
 								<span class="meta-line gap-1.25"><span class={['size-2 rounded-xs', l.bg]}></span>{l.label}</span>
@@ -555,17 +555,17 @@
 								>
 							</div>
 						{/each}
-					</Card.Content>
-				</Card.Root>
+					</CardContent>
+				</Card>
 			</section>
 
 			<aside class="grid shrink-0 grid-cols-1 items-start gap-5 lg:grid-cols-3 3xl:flex 3xl:w-100 3xl:flex-col 3xl:items-stretch">
-				<Card.Root size="sm">
-					<Card.Header>
-						<Card.Title>모델 연결 사용량</Card.Title>
-						<Card.Action><Button variant="link" size="xs" href="/settings">모델 연결</Button></Card.Action>
-					</Card.Header>
-					<Card.Content>
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>모델 연결 사용량</CardTitle>
+						<CardAction><Button variant="link" size="xs" href="/settings">모델 연결</Button></CardAction>
+					</CardHeader>
+					<CardContent>
 						{#each accounts as a (a.runtime)}
 							{@const users = team.members.filter((m) => m.runtime === a.runtime)}
 							{@const warn = low(a.week)}
@@ -576,9 +576,9 @@
 										<span class="text-body font-semibold">{a.name}</span>
 										<span class="font-mono text-caption text-muted-foreground">{a.login}</span>
 									</span>
-									<Avatar.Group class={warn ? '*:data-[slot=avatar]:ring-destructive-soft' : undefined}>
+									<AvatarGroup class={warn ? '*:data-[slot=avatar]:ring-destructive-soft' : undefined}>
 										{#each users as m (m.sn)}<RoleAvatar role={m.role} icon={glyphOf(m)} size="sm" />{/each}
-									</Avatar.Group>
+									</AvatarGroup>
 								</div>
 								{#each [{ label: '5H', pct: a.h5, reset: a.h5Reset }, { label: '주간', pct: a.week, reset: a.weekReset }] as q (q.label)}
 									<div class="flex flex-col gap-1">
@@ -597,15 +597,15 @@
 								<LimitRow icon={mt.kind === 'key' ? KeyRound : Route} label={mt.name} used="${mt.used}" max="/ ${mt.limit}" value={(mt.used / mt.limit) * 100} note={mt.note} />
 							{/each}
 						</div>
-					</Card.Content>
-				</Card.Root>
+					</CardContent>
+				</Card>
 
-				<Card.Root size="sm">
-					<Card.Header>
-						<Card.Title>Orch 진행</Card.Title>
-						<Card.Action><Button variant="link" size="xs" onclick={editPolicy}>정책 편집</Button></Card.Action>
-					</Card.Header>
-					<Card.Content>
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>Orch 진행</CardTitle>
+						<CardAction><Button variant="link" size="xs" onclick={editPolicy}>정책 편집</Button></CardAction>
+					</CardHeader>
+					<CardContent>
 						{@const ModeIcon = policy.mode === 'manual' ? Hand : policy.mode === 'full' ? Zap : Timer}
 						<div class="flex items-center gap-2 rounded-sm bg-primary-soft px-2.5 py-2">
 							<ModeIcon class="size-3.5 text-primary" />
@@ -627,15 +627,15 @@
 						<div class="meta-xs gap-1.5">
 							<Layers class="size-3.25 shrink-0" />하위 작업 · 기본 {policy.spawn.mode} · 허용 {policy.spawn.allow.join(' · ')} · 리드당 {policy.spawn.maxChild}
 						</div>
-					</Card.Content>
-				</Card.Root>
+					</CardContent>
+				</Card>
 
-				<Card.Root size="sm">
-					<Card.Header>
-						<Card.Title>팀 정책</Card.Title>
-						<Card.Action><Button variant="link" size="xs">편집</Button></Card.Action>
-					</Card.Header>
-					<Card.Content class="gap-1">
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>팀 정책</CardTitle>
+						<CardAction><Button variant="link" size="xs">편집</Button></CardAction>
+					</CardHeader>
+					<CardContent class="gap-1">
 						<div class="value-line">
 							<Terminal class="size-3.25 text-muted-foreground" />
 							<span class="flex-1 text-muted-foreground">기본 Runtime</span>
@@ -670,8 +670,8 @@
 							<span class="flex-1 text-muted-foreground">Repo 권한</span>
 							<span class="font-mono font-medium">{teamPolicy.repo}</span>
 						</div>
-					</Card.Content>
-				</Card.Root>
+					</CardContent>
+				</Card>
 			</aside>
 		</div>
 </main>
@@ -685,20 +685,20 @@
 	</div>
 {/snippet}
 
-<Sheet.Root bind:open={adding}>
-	<Sheet.Content side="right" size="xl">
-		<Sheet.Header>
-			<Sheet.Title>{team.name}에 멤버 추가</Sheet.Title>
+<Sheet bind:open={adding}>
+	<SheetContent side="right" size="xl">
+		<SheetHeader>
+			<SheetTitle>{team.name}에 멤버 추가</SheetTitle>
 			{#snippet sub()}<Steps steps={['템플릿 선택', '캐릭터', '런타임 · 도구']} current={step} />{/snippet}
-		</Sheet.Header>
+		</SheetHeader>
 
-		<Sheet.Body class="flex-row gap-6">
+		<SheetBody class="flex-row gap-6">
 			<div class="flex min-w-0 flex-1 flex-col gap-4.5">
 				{#if step === 0}
-					<InputGroup.Root class="h-9">
-						<InputGroup.Addon><Search /></InputGroup.Addon>
-						<InputGroup.Input bind:value={tq} placeholder="템플릿 검색 · 역할, 스킬" aria-label="템플릿 검색" />
-					</InputGroup.Root>
+					<InputGroup class="h-9">
+						<InputGroupAddon><Search /></InputGroupAddon>
+						<InputGroupInput bind:value={tq} placeholder="템플릿 검색 · 역할, 스킬" aria-label="템플릿 검색" />
+					</InputGroup>
 					{@const rec = store.templates.find((t) => t.sn === recommend.template)!}
 					<button
 						type="button"
@@ -793,14 +793,14 @@
 						<div class="grid grid-cols-2 gap-2.5">
 							<label class="flex flex-col gap-1.5">
 								<span class="text-caption font-semibold text-muted-foreground">실행기</span>
-								<Select.Root type="single" bind:value={runtime} onValueChange={(v) => (model = models[v as Runtime][0])}>
-									<Select.Trigger class="w-full">
+								<Select type="single" bind:value={runtime} onValueChange={(v) => (model = models[v as Runtime][0])}>
+									<SelectTrigger class="w-full">
 										<span class="flex items-center gap-2"><RuntimeLogo runtime={runtime} class="size-4 ring-0" />{runtimeName(runtime)}</span>
-									</Select.Trigger>
-									<Select.Content>
-										{#each ['claude', 'codex'] as const as r (r)}<Select.Item value={r} label={runtimeName(r)} />{/each}
-									</Select.Content>
-								</Select.Root>
+									</SelectTrigger>
+									<SelectContent>
+										{#each ['claude', 'codex'] as const as r (r)}<SelectItem value={r} label={runtimeName(r)} />{/each}
+									</SelectContent>
+								</Select>
 							</label>
 							<div class="flex flex-col gap-1.5">
 								<span class="text-caption font-semibold text-muted-foreground">연결</span>
@@ -814,31 +814,31 @@
 							</div>
 							<label class="flex flex-col gap-1.5">
 								<span class="text-caption font-semibold text-muted-foreground">모델</span>
-								<Select.Root type="single" bind:value={model}>
-									<Select.Trigger class="w-full"><span class="flex items-center gap-2"><Cpu class="size-3.5 text-muted-foreground" />{model}</span></Select.Trigger>
-									<Select.Content>
-										{#each models[runtime] as m (m)}<Select.Item value={m} label={m} />{/each}
-									</Select.Content>
-								</Select.Root>
+								<Select type="single" bind:value={model}>
+									<SelectTrigger class="w-full"><span class="flex items-center gap-2"><Cpu class="size-3.5 text-muted-foreground" />{model}</span></SelectTrigger>
+									<SelectContent>
+										{#each models[runtime] as m (m)}<SelectItem value={m} label={m} />{/each}
+									</SelectContent>
+								</Select>
 							</label>
 							<label class="flex flex-col gap-1.5">
 								<span class="text-caption font-semibold text-muted-foreground">Effort</span>
-								<Select.Root type="single" bind:value={effort}>
-									<Select.Trigger class="w-full"><span class="flex items-center gap-2"><Gauge class="size-3.5 text-muted-foreground" />{effort}</span></Select.Trigger>
-									<Select.Content>
-										{#each ['Auto', 'Low', 'Medium', 'High'] as e (e)}<Select.Item value={e} label={e} />{/each}
-									</Select.Content>
-								</Select.Root>
+								<Select type="single" bind:value={effort}>
+									<SelectTrigger class="w-full"><span class="flex items-center gap-2"><Gauge class="size-3.5 text-muted-foreground" />{effort}</span></SelectTrigger>
+									<SelectContent>
+										{#each ['Auto', 'Low', 'Medium', 'High'] as e (e)}<SelectItem value={e} label={e} />{/each}
+									</SelectContent>
+								</Select>
 							</label>
 						</div>
 						{#if fellBack && tpl}
-							<Alert.Root variant="warning" class="flex items-center gap-2.5">
+							<Alert variant="warning" class="flex items-center gap-2.5">
 								<Route />
 								<div class="flex-1">
-									<Alert.Title>폴백 2순위로 시작해요</Alert.Title>
-									<Alert.Description>템플릿 기본 {accountOf(tpl.runtime).plan}가 주간 {accountOf(tpl.runtime).week}% 남음 → {accountOf(runtime).plan} ({runtimeName(runtime)})</Alert.Description>
+									<AlertTitle>폴백 2순위로 시작해요</AlertTitle>
+									<AlertDescription>템플릿 기본 {accountOf(tpl.runtime).plan}가 주간 {accountOf(tpl.runtime).week}% 남음 → {accountOf(runtime).plan} ({runtimeName(runtime)})</AlertDescription>
 								</div>
-							</Alert.Root>
+							</Alert>
 						{/if}
 						<div class="flex flex-wrap items-center gap-1.5 text-caption">
 							<span class="font-semibold text-muted-foreground">폴백</span>
@@ -942,9 +942,9 @@
 					</div>
 				{/if}
 			</aside>
-		</Sheet.Body>
+		</SheetBody>
 
-		<Sheet.Footer
+		<SheetFooter
 			note={step === 0 ? '다음 단계에서 이름 · 성격 · 런타임을 다듬어요' : step === 1 ? '이름 · 성격을 정해요 · 이후 변경은 이 멤버에게만' : '추가 후 멤버 상세에서 계속 편집할 수 있어요'}
 			noteIcon={step === 0 ? Info : Copy}
 		>
@@ -959,9 +959,9 @@
 					<Button size="sm" disabled={!name.trim()} onclick={add}><UserPlus />팀에 추가</Button>
 				{/if}
 			{/if}
-		</Sheet.Footer>
-	</Sheet.Content>
-</Sheet.Root>
+		</SheetFooter>
+	</SheetContent>
+</Sheet>
 
 <!-- .pen BarChart — 요일별 막대. b가 있으면 위에 실패색으로 쌓는다 -->
 {#snippet chart(cols: [number, number?][], legend: [string, string?], total: string)}
@@ -1011,16 +1011,16 @@
 	</div>
 {/snippet}
 
-<Sheet.Root bind:open={() => viewing !== undefined, (v) => !v && (viewing = undefined)}>
-	<Sheet.Content side="right" size="xl">
+<Sheet bind:open={() => viewing !== undefined, (v) => !v && (viewing = undefined)}>
+	<SheetContent side="right" size="xl">
 		{#if viewed}
 			{@const m = viewed}
 			{@const st = states[m.status]}
 			{@const isPaused = paused.includes(m.sn)}
-			<Sheet.Header>
+			<SheetHeader>
 				{#snippet lead()}<RoleAvatar role={m.role} icon={glyphOf(m)} size="lg" />{/snippet}
 					<div class="flex items-center gap-2.5">
-						<Sheet.Title class="text-xl font-bold">{m.name}</Sheet.Title>
+						<SheetTitle class="text-xl font-bold">{m.name}</SheetTitle>
 						{#if isPaused}
 							<Pill class="rounded-sm bg-warning-soft px-2 text-warning"><Pause />Paused</Pill>
 						{:else}
@@ -1043,9 +1043,9 @@
 						{#if isPaused}<Play />Resume{:else}<Pause />Pause{/if}
 					</Button>
 				{/snippet}
-			</Sheet.Header>
+			</SheetHeader>
 
-			<Sheet.Body padded={false} class="flex-row">
+			<SheetBody padded={false} class="flex-row">
 				<nav aria-label="멤버 메뉴" class="side-nav w-52.5 px-2.5 py-3.5">
 					{#each nav as g, gi (g.group)}
 						<span class={['list-label px-2 pb-1.5', gi > 0 ? 'mt-1.5 border-t pt-3.5' : 'pt-0.5']}>{g.group}</span>
@@ -1067,13 +1067,13 @@
 
 				<div class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto bg-muted px-6 py-5 *:shrink-0">
 					{#if !det && ['overview', 'tasks', 'runs', 'activity', 'usage'].includes(tab)}
-						<Empty.Root class="bg-card">
-							<Empty.Header>
-								<Empty.Media variant="icon"><Activity /></Empty.Media>
-								<Empty.Title>아직 기록이 없어요</Empty.Title>
-								<Empty.Description>{m.name}의 태스크 · Run · 활동이 쌓이면 여기에 보여요. 지금: {m.work}</Empty.Description>
-							</Empty.Header>
-						</Empty.Root>
+						<Empty class="bg-card">
+							<EmptyHeader>
+								<EmptyMedia variant="icon"><Activity /></EmptyMedia>
+								<EmptyTitle>아직 기록이 없어요</EmptyTitle>
+								<EmptyDescription>{m.name}의 태스크 · Run · 활동이 쌓이면 여기에 보여요. 지금: {m.work}</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
 					{:else if det && tab === 'overview'}
 						{@const ok = det.runs.filter((r) => r.status === 'done').length}
 						{@const ended = det.runs.filter((r) => r.status === 'done' || r.status === 'failed').length}
@@ -1084,17 +1084,17 @@
 							{@render mini('평균 Cycle', det.week.cycle, `팀 평균 ${team.stats.cycle}`)}
 							{@render mini('이번 주 토큰', `${det.week.tokens}K`, `${acc.name} 계정 주간의 62%`)}
 						</div>
-						<Card.Root size="sm">
-							<Card.Header>
-								<Card.Title>이번 주 토큰 사용</Card.Title>
-								<Card.Action><Button variant="link" size="xs" onclick={() => (tab = 'runs')}>Runs 보기</Button></Card.Action>
-							</Card.Header>
-							<Card.Content>{@render chart(det.week.days.map((d) => [d]), ['토큰 (K)'], `이번 주 · ${det.week.tokens}K · 하루 평균 ${Math.round(det.week.tokens / 7)}K`)}</Card.Content>
-						</Card.Root>
+						<Card size="sm">
+							<CardHeader>
+								<CardTitle>이번 주 토큰 사용</CardTitle>
+								<CardAction><Button variant="link" size="xs" onclick={() => (tab = 'runs')}>Runs 보기</Button></CardAction>
+							</CardHeader>
+							<CardContent>{@render chart(det.week.days.map((d) => [d]), ['토큰 (K)'], `이번 주 · ${det.week.tokens}K · 하루 평균 ${Math.round(det.week.tokens / 7)}K`)}</CardContent>
+						</Card>
 						{#if det.now && now}
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>지금 하는 일</Card.Title></Card.Header>
-								<Card.Content class="gap-2.5">
+							<Card size="sm">
+								<CardHeader><CardTitle>지금 하는 일</CardTitle></CardHeader>
+								<CardContent class="gap-2.5">
 									<div class="flex items-center gap-2 text-body">
 										<SquareCheck class="size-3.5 text-node-task" />
 										<span class="flex-1 font-medium">#{now.num} · {now.title}</span>
@@ -1106,12 +1106,12 @@
 										<span class="flex items-center gap-1.25"><GitBranch class="size-3" />{det.now.branch} · {det.now.commits} commits</span>
 										<span class="flex items-center gap-1.25"><Timer class="size-3" />ETA {det.now.eta}</span>
 									</div>
-								</Card.Content>
-							</Card.Root>
+								</CardContent>
+							</Card>
 						{/if}
-						<Card.Root size="sm">
-							<Card.Header><Card.Title>주의 필요 · {det.attention.length}</Card.Title></Card.Header>
-							<Card.Content class="gap-0">
+						<Card size="sm">
+							<CardHeader><CardTitle>주의 필요 · {det.attention.length}</CardTitle></CardHeader>
+							<CardContent class="gap-0">
 								{#each det.attention as at, i (i)}
 									{@const Icon = at.kind === 'quota' ? TriangleAlert : at.kind === 'wait' ? Link2 : Undo2}
 									<div class={['flex items-center gap-3 py-2.5', i > 0 && 'border-t']}>
@@ -1122,22 +1122,22 @@
 										</span>
 									</div>
 								{/each}
-							</Card.Content>
-						</Card.Root>
-						<Card.Root size="sm">
-							<Card.Header>
-								<Card.Title>다음 실행 대기열</Card.Title>
-								<Card.Action><Button variant="link" size="xs" onclick={() => (tab = 'tasks')}>Tasks 탭</Button></Card.Action>
-							</Card.Header>
-							<Card.Content class="gap-0">
+							</CardContent>
+						</Card>
+						<Card size="sm">
+							<CardHeader>
+								<CardTitle>다음 실행 대기열</CardTitle>
+								<CardAction><Button variant="link" size="xs" onclick={() => (tab = 'tasks')}>Tasks 탭</Button></CardAction>
+							</CardHeader>
+							<CardContent class="gap-0">
 								{#each det.queue as q, i (q.num)}
 									{@render taskRow(q.num, q.title, q.note, q.issue, q.est, q.priority, i + 1, q.blocked ? 'wait' : 'todo', q.blocked ? 'text-status-waiting' : undefined)}
 								{/each}
-							</Card.Content>
-						</Card.Root>
-						<Card.Root size="sm">
-							<Card.Header><Card.Title>템플릿 대비 변경 · {det.diff.length}</Card.Title></Card.Header>
-							<Card.Content class="gap-2">
+							</CardContent>
+						</Card>
+						<Card size="sm">
+							<CardHeader><CardTitle>템플릿 대비 변경 · {det.diff.length}</CardTitle></CardHeader>
+							<CardContent class="gap-2">
 								{#each det.diff as d (d.file)}
 									<div class="flex gap-2.5 text-xs">
 										{#if d.file === 'SOUL.md'}<BookOpen class="mt-0.5 size-3.5 text-muted-foreground" />{:else}<FileText class="mt-0.5 size-3.5 text-muted-foreground" />{/if}
@@ -1145,8 +1145,8 @@
 									</div>
 								{/each}
 								<span class="meta-line gap-1.5 border-t pt-2"><GitCompare class="size-3" />템플릿이 새 버전으로 바뀌면 여기서 골라서 가져올 수 있어요 (자동 반영 없음)</span>
-							</Card.Content>
-						</Card.Root>
+							</CardContent>
+						</Card>
 					{:else if det && tab === 'tasks'}
 						{@const active = (det.now ? 1 : 0) + det.queue.length}
 						<div class="flex items-center gap-2">
@@ -1154,16 +1154,16 @@
 								<Toggle variant="chip" count={n} pressed={taskFilter === v} onPressedChange={() => (taskFilter = v)}>{l}</Toggle>
 							{/each}
 							<span class="flex-1"></span>
-							<InputGroup.Root class="h-8 w-56 bg-card">
-								<InputGroup.Addon><Search /></InputGroup.Addon>
-								<InputGroup.Input bind:value={taskQuery} placeholder="태스크 검색" aria-label="태스크 검색" />
-							</InputGroup.Root>
+							<InputGroup class="h-8 w-56 bg-card">
+								<InputGroupAddon><Search /></InputGroupAddon>
+								<InputGroupInput bind:value={taskQuery} placeholder="태스크 검색" aria-label="태스크 검색" />
+							</InputGroup>
 						</div>
 						{#if taskFilter !== 'done'}
 							{#if det.now && now && hit(now.title)}
-								<Card.Root size="sm">
-									<Card.Header><Card.Title>진행 중 · 1</Card.Title></Card.Header>
-									<Card.Content class="gap-0">
+								<Card size="sm">
+									<CardHeader><CardTitle>진행 중 · 1</CardTitle></CardHeader>
+									<CardContent class="gap-0">
 										<div class="queue-row">
 											<CircleDot class="size-3.5 text-status-in-progress" />
 											<span class="font-mono text-xs text-muted-foreground">#{now.num}</span>
@@ -1175,49 +1175,49 @@
 											<span class="num-cell w-28 whitespace-nowrap">{det.now.eta} 남음</span>
 											<span class="w-5 text-caption font-semibold text-muted-foreground">{now.priority}</span>
 										</div>
-									</Card.Content>
-								</Card.Root>
+									</CardContent>
+								</Card>
 							{/if}
-							<Card.Root size="sm">
-								<Card.Header>
-									<Card.Title>실행 대기열 · {det.queue.length}</Card.Title>
-									<Card.Description>위에서부터 순서대로 실행돼요.</Card.Description>
-								</Card.Header>
-								<Card.Content class="gap-0">
+							<Card size="sm">
+								<CardHeader>
+									<CardTitle>실행 대기열 · {det.queue.length}</CardTitle>
+									<CardDescription>위에서부터 순서대로 실행돼요.</CardDescription>
+								</CardHeader>
+								<CardContent class="gap-0">
 									{#each det.queue.filter((q) => hit(q.title)) as q, i (q.num)}
 										{@render taskRow(q.num, q.title, q.note, q.issue, q.est, q.priority, i + 1, q.blocked ? 'wait' : 'todo', q.blocked ? 'text-status-waiting' : undefined)}
 									{:else}
 										<p class="border-t py-3 text-xs text-muted-foreground">대기 중인 태스크가 없어요.</p>
 									{/each}
-								</Card.Content>
-							</Card.Root>
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>막힘 · {blocked.length}</Card.Title></Card.Header>
-								<Card.Content class="gap-0">
+								</CardContent>
+							</Card>
+							<Card size="sm">
+								<CardHeader><CardTitle>막힘 · {blocked.length}</CardTitle></CardHeader>
+								<CardContent class="gap-0">
 									{#each blocked as b (b.num)}
 										{@render taskRow(b.num, b.title, '막힘', issuePath(b.issue), b.updated, b.priority, undefined, 'wait', 'text-status-blocked')}
 									{:else}
 										<p class="text-xs text-muted-foreground">막힌 태스크가 없어요.</p>
 									{/each}
-								</Card.Content>
-							</Card.Root>
+								</CardContent>
+							</Card>
 						{/if}
 						{#if taskFilter !== 'active'}
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>최근 완료 · 7일</Card.Title></Card.Header>
-								<Card.Content class="gap-0">
+							<Card size="sm">
+								<CardHeader><CardTitle>최근 완료 · 7일</CardTitle></CardHeader>
+								<CardContent class="gap-0">
 									{#each det.done.filter((d) => hit(d.title)) as d (d.num)}
 										{@render taskRow(d.num, d.title, undefined, d.tokens, d.when, '', undefined, 'done')}
 									{:else}
 										<p class="border-t py-3 text-xs text-muted-foreground">검색 결과가 없어요.</p>
 									{/each}
-								</Card.Content>
-							</Card.Root>
+								</CardContent>
+							</Card>
 						{/if}
 						<div class="grid grid-cols-2 gap-3.5">
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>대기열 규칙</Card.Title></Card.Header>
-								<Card.Content class="gap-0">
+							<Card size="sm">
+								<CardHeader><CardTitle>대기열 규칙</CardTitle></CardHeader>
+								<CardContent class="gap-0">
 									{#each [[ArrowDownWideNarrow, '정렬 기준', det.rules.sort], [Play, '자동 시작', det.rules.autostart ? '켜짐' : '꺼짐'], [Shuffle, 'Orch 재배치', det.rules.rebalance ? '허용' : '안 함'], [Layers, '동시 실행', det.rules.runs]] as const as [Icon, l, v] (l)}
 										<div class="value-line">
 											<Icon class="size-3.25 text-muted-foreground" />
@@ -1225,19 +1225,19 @@
 											<span class="font-medium">{v}</span>
 										</div>
 									{/each}
-								</Card.Content>
-							</Card.Root>
-							<Card.Root size="sm">
-								<Card.Header><Card.Title>배정 출처 · 30일</Card.Title></Card.Header>
-								<Card.Content class="gap-2.5">
+								</CardContent>
+							</Card>
+							<Card size="sm">
+								<CardHeader><CardTitle>배정 출처 · 30일</CardTitle></CardHeader>
+								<CardContent class="gap-2.5">
 									{#each [['Orch 자동 배정', det.source.orch], ['사용자 수동', det.source.manual]] as const as [l, n] (l)}
 										<div class="flex flex-col gap-1">
 											<span class="flex text-xs"><span class="flex-1 text-muted-foreground">{l}</span><span class="font-mono font-medium">{n}</span></span>
 											<Progress value={(n / (det.source.orch + det.source.manual)) * 100} class="h-1.5 bg-muted" aria-label={l} />
 										</div>
 									{/each}
-								</Card.Content>
-							</Card.Root>
+								</CardContent>
+							</Card>
 						</div>
 					{:else if det && tab === 'runs'}
 						{@const ok = det.runs.filter((r) => r.status === 'done').length}
@@ -1250,41 +1250,41 @@
 							{@render mini('실패', String(fail), det.runs.find((r) => r.status === 'failed')?.result ?? '—', fail ? 'text-status-blocked' : undefined)}
 							{@render mini('토큰', `${Math.round(total)}K`, `Run당 ${Math.round(total / Math.max(1, det.runs.length))}K`)}
 						</div>
-						<Card.Root size="sm">
-							<Card.Header><Card.Title>최근 7일 Run</Card.Title></Card.Header>
-							<Card.Content>{@render chart(det.runDays, ['성공', '실패'], `7일 · ${det.runs.length} runs · 성공 ${ok} · 실패 ${fail}`)}</Card.Content>
-						</Card.Root>
+						<Card size="sm">
+							<CardHeader><CardTitle>최근 7일 Run</CardTitle></CardHeader>
+							<CardContent>{@render chart(det.runDays, ['성공', '실패'], `7일 · ${det.runs.length} runs · 성공 ${ok} · 실패 ${fail}`)}</CardContent>
+						</Card>
 						<div class="card overflow-hidden rounded-lg">
-							<Table.Root class="table-fixed">
-								<Table.Header>
-									<Table.Row class="hover:bg-transparent">
-										<Table.Head class="w-10 pl-3.5"><span class="sr-only">상태</span></Table.Head>
-										<Table.Head class="w-15">Run</Table.Head>
-										<Table.Head>Task</Table.Head>
-										<Table.Head class="w-24">시작</Table.Head>
-										<Table.Head class="w-16">소요</Table.Head>
-										<Table.Head class="w-16">토큰</Table.Head>
-										<Table.Head class="w-40 pr-3.5">결과</Table.Head>
-									</Table.Row>
-								</Table.Header>
-								<Table.Body>
+							<Table class="table-fixed">
+								<TableHeader>
+									<TableRow class="hover:bg-transparent">
+										<TableHead class="w-10 pl-3.5"><span class="sr-only">상태</span></TableHead>
+										<TableHead class="w-15">Run</TableHead>
+										<TableHead>Task</TableHead>
+										<TableHead class="w-24">시작</TableHead>
+										<TableHead class="w-16">소요</TableHead>
+										<TableHead class="w-16">토큰</TableHead>
+										<TableHead class="w-40 pr-3.5">결과</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
 									{#each det.runs as r (r.num)}
 										{@const ri = runIcon[r.status]}
-										<Table.Row
+										<TableRow
 											class={['h-11 text-xs', det.failure?.run === r.num && 'cursor-pointer', runSel === r.num && 'bg-primary-soft hover:bg-primary-soft']}
 											onclick={() => det.failure?.run === r.num && (runSel = runSel === r.num ? undefined : r.num)}
 										>
-											<Table.Cell class="pl-3.5"><ri.icon class={['size-3.5', ri.text]} aria-label={r.status} /></Table.Cell>
-											<Table.Cell class="font-mono font-semibold text-muted-foreground">#{r.num}</Table.Cell>
-											<Table.Cell class="truncate">{r.task}</Table.Cell>
-											<Table.Cell class="font-mono text-muted-foreground">{r.start}</Table.Cell>
-											<Table.Cell class="font-mono text-muted-foreground">{r.dur}</Table.Cell>
-											<Table.Cell class="font-mono text-muted-foreground">{r.tokens.toFixed(1)}K</Table.Cell>
-											<Table.Cell class={['truncate pr-3.5', r.status === 'failed' ? 'text-status-blocked' : 'text-muted-foreground']}>{r.result}</Table.Cell>
-										</Table.Row>
+											<TableCell class="pl-3.5"><ri.icon class={['size-3.5', ri.text]} aria-label={r.status} /></TableCell>
+											<TableCell class="font-mono font-semibold text-muted-foreground">#{r.num}</TableCell>
+											<TableCell class="truncate">{r.task}</TableCell>
+											<TableCell class="font-mono text-muted-foreground">{r.start}</TableCell>
+											<TableCell class="font-mono text-muted-foreground">{r.dur}</TableCell>
+											<TableCell class="font-mono text-muted-foreground">{r.tokens.toFixed(1)}K</TableCell>
+											<TableCell class={['truncate pr-3.5', r.status === 'failed' ? 'text-status-blocked' : 'text-muted-foreground']}>{r.result}</TableCell>
+										</TableRow>
 									{/each}
-								</Table.Body>
-							</Table.Root>
+								</TableBody>
+							</Table>
 						</div>
 						{#if sel}
 							<section class="flex flex-col gap-3.5" aria-label="Run #{sel.run} 상세">
@@ -1294,9 +1294,9 @@
 									<span class="text-xs text-muted-foreground">{sel.meta}</span>
 								</div>
 								<div class="grid grid-cols-2 gap-3.5">
-									<Card.Root size="sm">
-										<Card.Header><Card.Title>실행 단계</Card.Title></Card.Header>
-										<Card.Content class="gap-1.5">
+									<Card size="sm">
+										<CardHeader><CardTitle>실행 단계</CardTitle></CardHeader>
+										<CardContent class="gap-1.5">
 											{#each sel.steps as step (step.name)}
 												<div class="flex items-center gap-2 text-xs">
 													{#if step.state === 'done'}<CircleCheck class="size-3.5 text-status-done" />{:else if step.state === 'failed'}<CircleX class="size-3.5 text-status-blocked" />{:else}<CircleDashed class="size-3.5 text-subtle-foreground" />{/if}
@@ -1304,19 +1304,19 @@
 													<span class="font-mono text-caption text-muted-foreground">{step.time}</span>
 												</div>
 											{/each}
-										</Card.Content>
-									</Card.Root>
-									<Card.Root size="sm">
-										<Card.Header><Card.Title>실패 원인</Card.Title></Card.Header>
-										<Card.Content class="gap-2">
+										</CardContent>
+									</Card>
+									<Card size="sm">
+										<CardHeader><CardTitle>실패 원인</CardTitle></CardHeader>
+										<CardContent class="gap-2">
 											<pre class="rounded-sm bg-destructive-soft p-2.5 font-mono text-caption leading-relaxed whitespace-pre-wrap text-status-blocked">{sel.errors.join('\n')}</pre>
 											<span class="meta-xs gap-1.5"><Redo2 class="size-3.5 text-primary" />{sel.retry}</span>
-										</Card.Content>
-									</Card.Root>
+										</CardContent>
+									</Card>
 								</div>
-								<Card.Root size="sm">
-									<Card.Header><Card.Title>변경 파일 · {sel.files.length}</Card.Title></Card.Header>
-									<Card.Content class="gap-1.5">
+								<Card size="sm">
+									<CardHeader><CardTitle>변경 파일 · {sel.files.length}</CardTitle></CardHeader>
+									<CardContent class="gap-1.5">
 										{#each sel.files as f (f.path)}
 											<div class="flex items-center gap-2.5 font-mono text-xs">
 												<span class={['w-3 font-semibold', f.kind === 'A' ? 'text-status-done' : 'text-status-waiting']}>{f.kind}</span>
@@ -1324,8 +1324,8 @@
 												<span class="text-muted-foreground">{f.diff}</span>
 											</div>
 										{/each}
-									</Card.Content>
-								</Card.Root>
+									</CardContent>
+								</Card>
 							</section>
 						{/if}
 					{:else if det && tab === 'activity'}
@@ -1368,9 +1368,9 @@
 								{/if}
 							{/each}
 						</div>
-						<Card.Root size="sm">
-							<Card.Header><Card.Title>협업 관계 · 7일</Card.Title></Card.Header>
-							<Card.Content class="gap-2.5">
+						<Card size="sm">
+							<CardHeader><CardTitle>협업 관계 · 7일</CardTitle></CardHeader>
+							<CardContent class="gap-2.5">
 								{#each det.relations as r (r.name)}
 									<div class="flex items-center gap-2.5">
 										<RoleAvatar role={r.role} />
@@ -1381,8 +1381,8 @@
 										<Progress value={r.value} class="h-1.5 bg-muted" aria-label="{r.name} 협업 빈도" />
 									</div>
 								{/each}
-							</Card.Content>
-						</Card.Root>
+							</CardContent>
+						</Card>
 					{:else if det && tab === 'usage'}
 						{@const acc = accounts.find((a) => a.runtime === m.runtime)!}
 						{@const top = det.runs.reduce((a, b) => (b.tokens > a.tokens ? b : a))}
@@ -1396,10 +1396,10 @@
 							{@render mini('Run당 평균', `${Math.round(det.runs.reduce((s, r) => s + r.tokens, 0) / det.runs.length)}K`, `${det.runs.length} Run · 최대 ${top.tokens.toFixed(1)}K (#${top.num})`)}
 							{@render mini('비용 환산', '$0', '구독 내 사용 · 폴백 API $0')}
 						</div>
-						<Card.Root size="sm">
-							<Card.Header><Card.Title>이번 주 토큰 사용</Card.Title></Card.Header>
-							<Card.Content>{@render chart(det.week.days.map((d) => [d]), ['토큰 (K)'], `이번 주 · ${det.week.tokens}K · 하루 평균 ${Math.round(det.week.tokens / 7)}K`)}</Card.Content>
-						</Card.Root>
+						<Card size="sm">
+							<CardHeader><CardTitle>이번 주 토큰 사용</CardTitle></CardHeader>
+							<CardContent>{@render chart(det.week.days.map((d) => [d]), ['토큰 (K)'], `이번 주 · ${det.week.tokens}K · 하루 평균 ${Math.round(det.week.tokens / 7)}K`)}</CardContent>
+						</Card>
 						<div class="grid grid-cols-2 gap-3.5">
 							{#each [acc, ...accounts.filter((a) => a !== acc)] as a (a.runtime)}
 								{@const warn = low(a.week)}
@@ -1422,17 +1422,17 @@
 								</div>
 							{/each}
 						</div>
-						<Card.Root size="sm">
-							<Card.Header>
-								<Card.Title>Run별 토큰</Card.Title>
-								<Card.Description>이번 주 {det.runs.length} Run · 합계 {det.runs.reduce((s, r) => s + r.tokens, 0).toFixed(1)}K</Card.Description>
-							</Card.Header>
-							<Card.Content class="gap-0">
+						<Card size="sm">
+							<CardHeader>
+								<CardTitle>Run별 토큰</CardTitle>
+								<CardDescription>이번 주 {det.runs.length} Run · 합계 {det.runs.reduce((s, r) => s + r.tokens, 0).toFixed(1)}K</CardDescription>
+							</CardHeader>
+							<CardContent class="gap-0">
 								{#each [...det.runs].sort((a, b) => b.tokens - a.tokens) as r (r.num)}
 									<KeyValueRow label={`#${r.num} · ${r.task} · ${r.start}${r.status === 'running' ? ' (진행 중)' : r.status === 'failed' ? ' (실패)' : r.status === 'cancelled' ? ' (취소)' : ''}`} value={`${r.tokens.toFixed(1)}K`} />
 								{/each}
-							</Card.Content>
-						</Card.Root>
+							</CardContent>
+						</Card>
 					{:else if viewed?.config && tab === 'harness'}
 						<HarnessPanel
 							config={viewed.config}
@@ -1469,34 +1469,34 @@
 							<Button size="sm" disabled={!memberChanged.some((f) => f.name === memberFiles[memberFile]?.name)} onclick={propose}><Upload />템플릿에 제안</Button>
 						</div>
 					{:else}
-						<Empty.Root class="bg-card">
-							<Empty.Header>
-								<Empty.Media variant="icon"><SlidersHorizontal /></Empty.Media>
-								<Empty.Title>{nav.flatMap((g) => g.items).find((i) => i.v === tab)?.label}</Empty.Title>
-								<Empty.Description>템플릿 상세(#65)와 같은 설정 화면이라 함께 만들어요. (#63 T-3b)</Empty.Description>
-							</Empty.Header>
-						</Empty.Root>
+						<Empty class="bg-card">
+							<EmptyHeader>
+								<EmptyMedia variant="icon"><SlidersHorizontal /></EmptyMedia>
+								<EmptyTitle>{nav.flatMap((g) => g.items).find((i) => i.v === tab)?.label}</EmptyTitle>
+								<EmptyDescription>템플릿 상세(#65)와 같은 설정 화면이라 함께 만들어요. (#63 T-3b)</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
 					{/if}
 				</div>
-			</Sheet.Body>
+			</SheetBody>
 		{/if}
-	</Sheet.Content>
-</Sheet.Root>
+	</SheetContent>
+</Sheet>
 
 <!-- Orch 진행 정책 편집 (.pen Team Settings · Orch 진행) -->
-<Dialog.Root bind:open={() => draft !== undefined, (v) => !v && (draft = undefined)}>
-	<Dialog.Content size="full" tall>
+<Dialog bind:open={() => draft !== undefined, (v) => !v && (draft = undefined)}>
+	<DialogContent size="full" tall>
 		{#if draft}
 			{@const d = draft}
-			<Dialog.Header crumb={[team.name, '팀 설정']} closable={false}>
-				<Dialog.Title>Orch 진행 정책</Dialog.Title>
-				<Dialog.Description>다음 작업 배정 · 분배 · 사용자 판단이 필요한 순간을 Orch가 어떻게 처리할지 정해요.</Dialog.Description>
+			<DialogHeader crumb={[team.name, '팀 설정']} closable={false}>
+				<DialogTitle>Orch 진행 정책</DialogTitle>
+				<DialogDescription>다음 작업 배정 · 분배 · 사용자 판단이 필요한 순간을 Orch가 어떻게 처리할지 정해요.</DialogDescription>
 				{#snippet actions()}
 					<Button variant="ghost" size="sm" onclick={() => (draft = undefined)}>취소</Button>
 					<Button size="sm" disabled={!!spawnError || !!childError} onclick={savePolicy}>저장</Button>
 				{/snippet}
-			</Dialog.Header>
-			<Dialog.Body class="gap-7">
+			</DialogHeader>
+			<DialogBody class="gap-7">
 				<section class="flex flex-col gap-3">
 					{@render heading('1 · 진행 모드', '태스크가 끝났을 때 Orch가 다음 행동을 제안하고 실행하는 방식')}
 					<div role="radiogroup" aria-label="진행 모드" class="grid grid-cols-3 gap-3">
@@ -1555,12 +1555,12 @@
 									{:else if l.action === 'timer'}
 										<span>{d.mode === 'timer' ? `${d.timer}초 후 진행` : '모드 타이머 사용'}</span>
 									{:else if l.action === 'wait'}
-										<Select.Root type="single" bind:value={l.timeout}>
-											<Select.Trigger size="sm" class="h-7 w-full">{l.timeout ? `${l.timeout} 후 Orch가 판단` : '계속 대기'}</Select.Trigger>
-											<Select.Content>
-												{#each waitOptions as o (o)}<Select.Item value={o} label={o ? `${o} 후 Orch가 판단` : '계속 대기'} />{/each}
-											</Select.Content>
-										</Select.Root>
+										<Select type="single" bind:value={l.timeout}>
+											<SelectTrigger size="sm" class="h-7 w-full">{l.timeout ? `${l.timeout} 후 Orch가 판단` : '계속 대기'}</SelectTrigger>
+											<SelectContent>
+												{#each waitOptions as o (o)}<SelectItem value={o} label={o ? `${o} 후 Orch가 판단` : '계속 대기'} />{/each}
+											</SelectContent>
+										</Select>
 									{:else}
 										<span class="text-subtle-foreground">—</span>
 									{/if}
@@ -1615,10 +1615,10 @@
 						</div>
 						<div class="flex flex-col border gap-2.5 rounded-md p-3.5">
 							<span class="text-caption font-semibold text-muted-foreground">리드당 동시 하위 작업</span>
-							<InputGroup.Root class={['w-28', childError && 'border-destructive']}>
-								<InputGroup.Addon><Layers /></InputGroup.Addon>
-								<InputGroup.Input type="number" min="1" bind:value={d.spawn.maxChild} aria-label="리드당 동시 하위 작업" class="font-mono" />
-							</InputGroup.Root>
+							<InputGroup class={['w-28', childError && 'border-destructive']}>
+								<InputGroupAddon><Layers /></InputGroupAddon>
+								<InputGroupInput type="number" min="1" bind:value={d.spawn.maxChild} aria-label="리드당 동시 하위 작업" class="font-mono" />
+							</InputGroup>
 							{#if childError}
 								<span class="error-note"><CircleAlert class="size-3 shrink-0" />{childError}</span>
 							{/if}
@@ -1626,14 +1626,14 @@
 						</div>
 					</div>
 					{#if d.spawn.allow.includes('fork')}
-						<Alert.Root variant="warning">
+						<Alert variant="warning">
 							<GitFork />
-							<Alert.Title>fork는 부모 컨텍스트를 그대로 상속해요</Alert.Title>
-							<Alert.Description>켜면 부모 컨텍스트를 그대로 복사해 비용이 커요.</Alert.Description>
-						</Alert.Root>
+							<AlertTitle>fork는 부모 컨텍스트를 그대로 상속해요</AlertTitle>
+							<AlertDescription>켜면 부모 컨텍스트를 그대로 복사해 비용이 커요.</AlertDescription>
+						</Alert>
 					{/if}
 				</section>
-			</Dialog.Body>
+			</DialogBody>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</DialogContent>
+</Dialog>

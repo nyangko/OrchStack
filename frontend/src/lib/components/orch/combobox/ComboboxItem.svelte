@@ -1,7 +1,7 @@
 <script lang="ts">
 	/// 선택 창 항목. selected면 체크 표시, 고르면 onSelect 뒤 창을 닫는다(closeOnSelect=false면 열어 둠 · 여러 개 고를 때).
 	import type { ComponentProps } from "svelte";
-	import * as Command from "$lib/components/ui/command/index.js";
+	import { CommandItem } from "$lib/components/ui/command";
 	import { getCombobox } from "./context.js";
 
 	let {
@@ -10,12 +10,12 @@
 		onSelect,
 		children,
 		...restProps
-	}: ComponentProps<typeof Command.Item> & { selected?: boolean; closeOnSelect?: boolean } = $props();
+	}: ComponentProps<typeof CommandItem> & { selected?: boolean; closeOnSelect?: boolean } = $props();
 
 	const close = getCombobox();
 </script>
 
-<Command.Item
+<CommandItem
 	data-slot="combobox-item"
 	data-checked={selected}
 	onSelect={() => {
@@ -25,4 +25,4 @@
 	{...restProps}
 >
 	{@render children?.()}
-</Command.Item>
+</CommandItem>
