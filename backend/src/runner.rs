@@ -23,6 +23,7 @@ You are a sub-task worker. Rules:
 - Do only the @TASK below. Edit only files in `paths`. Read nothing else.
 - Follow the existing code style of the given files. Smallest change that meets every `ac`.
 - No git commands (commit, stash, checkout, reset). No new dependencies.
+- Before reporting, run format, lint and type check on your `paths` files only. Fix what they flag.
 - If you cannot finish without another file or a decision, stop and reply with one `@ASK v1` block (`need: [path, ...]` or `q: ...`).
 - When done, reply with only this block (English, no prose, no diff):
 @REPORT v1
@@ -40,7 +41,8 @@ pub fn block(code: &str) -> Vec<String> {
         "claude_code" => &[
             "--setting-sources", "",
             "--settings", r#"{"claudeMdExcludes":["**/CLAUDE.md","**/CLAUDE.local.md","**/.claude/**"],"autoMemoryEnabled":false}"#,
-            "--strict-mcp-config", "--disable-slash-commands", "--disallowedTools", "mcp__*",
+            // Bash는 열고 git만 막는다 (커밋 · 되돌리기는 리드 · OrchStack만). 범위 밖 변경은 실행 후 paths 검사가 잡는다
+            "--strict-mcp-config", "--disable-slash-commands", "--allowedTools", "Bash", "--disallowedTools", "mcp__*", "Bash(git:*)",
             "--permission-mode", "acceptEdits", "--permission-prompts", "none",
         ],
         "codex" => &["--ignore-user-config", "--ignore-rules", "--ephemeral", "--disable", "plugins", "-c", "project_doc_max_bytes=0", "--sandbox", "workspace-write"],
@@ -432,6 +434,7 @@ mod tests {
         assert!(p.contains("--- src/* (not read"));
         assert!(RULES.len() / 4 < 300);
         assert!(block("claude_code").contains(&"--strict-mcp-config".to_owned()));
+        assert!(block("claude_code").contains(&"Bash(git:*)".to_owned()));
         assert!(block("codex").contains(&"project_doc_max_bytes=0".to_owned()));
     }
 
