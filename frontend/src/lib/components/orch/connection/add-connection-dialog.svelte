@@ -263,17 +263,17 @@
 {#snippet preview()}
 	{#if sel}
 		<span class="list-label px-0 pt-0">추가되면 이렇게 보여요</span>
-		<div class="flex items-center gap-3 rounded-lg border bg-card px-4 py-3.5">
-			<span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">{@render logoOf(sel.key, 'lg')}</span>
-			<span class="flex min-w-0 flex-1 flex-col gap-1">
-				<span class="flex items-center gap-2 text-body font-semibold">{isSub ? sel.name : title}<Pill class={kindMeta[sel.kind].pill}>{sel.kind}</Pill></span>
+		<div class="provider-picked">
+			<span class="icon-tile">{@render logoOf(sel.key, 'lg')}</span>
+			<span class="col-fill gap-1">
+				<span class="row-title-strong">{isSub ? sel.name : title}<Pill class={kindMeta[sel.kind].pill}>{sel.kind}</Pill></span>
 				{#if authed}
-					<span class="flex items-center gap-1 text-caption text-status-done"><CircleCheck class="size-3" />{isSub ? `${sel.plan} · ${sel.cli}` : `${name} · ${sel.models} 모델`}</span>
+					<span class="saved-note"><CircleCheck class="size-3" />{isSub ? `${sel.plan} · ${sel.cli}` : `${name} · ${sel.models} 모델`}</span>
 				{:else}
 					<span class="text-caption text-muted-foreground">{isSub ? '로그인 전' : '연결 테스트 전'}</span>
 				{/if}
 			</span>
-			<span class="flex items-center gap-1.5 rounded-sm border px-2 py-1 text-caption text-muted-foreground">
+			<span class="menu-line rounded-sm border text-caption">
 				{#if isSub}일<Progress value={authed ? 100 : 0} class="h-1 w-10 bg-muted" indicator="bg-success" aria-label="일 한도" /><span class="font-mono text-status-done">{authed ? '100%' : '—'}</span>
 				{:else if needsKey}월<Progress value={0} class="h-1 w-10 bg-muted" aria-label="월 예산" /><span class="font-mono text-primary">$0/${budget}</span>
 				{:else}한도 없음{/if}
@@ -304,7 +304,7 @@
 								role="radio"
 								aria-checked={filter === k}
 								onclick={() => (filter = k)}
-								class={cn('flex items-center gap-1 rounded-full px-2.5 py-1 text-caption font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', filter === k ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground')}
+								class={cn('filter-pill', filter === k ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground')}
 							>
 								{k}<span class="opacity-70">{k === '전체' ? providers.length : providers.filter((p) => p.kind === k).length}</span>
 							</button>
@@ -326,9 +326,9 @@
 										aria-checked={on}
 										onclick={() => pick(p)}
 										ondblclick={() => (pick(p), (step = 1))}
-										class={cn('flex flex-col gap-2 rounded-lg border px-3.5 py-3 text-left outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50', on && 'option-on')}
+										class={cn('provider-option', on && 'option-on')}
 									>
-										<span class="flex items-center gap-2 text-body font-semibold">
+										<span class="row-title-strong">
 											{@render logoOf(p.key, 'sm')}<span class="flex-1 truncate">{p.name}</span>
 											{#if on}<CircleDot class="size-4 text-primary" />{:else}<Circle class="size-4 text-subtle-foreground" />{/if}
 										</span>
@@ -351,7 +351,7 @@
 						{#if step === 1}
 						<div class="flex flex-col gap-2">
 							{@render field('제공자', isSub ? '구독 로그인' : sel.kind === 'API 키' ? '사용한 만큼 과금' : sel.kind === '게이트웨이' ? 'OpenAI 호환 게이트웨이' : '내 컴퓨터에서 실행')}
-							<button type="button" onclick={() => (step = 0)} class="flex h-10 items-center gap-2 rounded-md border bg-card px-3 text-left text-body outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 ">
+							<button type="button" onclick={() => (step = 0)} class="picker-field">
 								{@render logoOf(sel.key, 'sm')}<span class="font-medium">{sel.name}</span><Pill class={kindMeta[sel.kind].pill}>{sel.kind}</Pill>
 								<span class="text-xs text-muted-foreground">변경</span><ChevronsUpDown class="ml-auto size-4 text-muted-foreground" />
 							</button>
@@ -359,22 +359,22 @@
 						{/if}
 
 						{#if step === 1 && isSub}
-							<div class="flex flex-col gap-2 border-t pt-4">
+							<div class="form-block">
 								{@render field('실행기', '구독 로그인은 이 CLI 안에서만 쓸 수 있어요')}
-								<span class="flex h-10 items-center gap-2 rounded-md border bg-muted/50 px-3 text-body"><Terminal class="size-4 text-muted-foreground" /><span class="font-medium">{sel.cli}</span><span class="text-xs text-muted-foreground">설치됨</span></span>
+								<span class="readonly-field"><Terminal class="size-4 text-muted-foreground" /><span class="font-medium">{sel.cli}</span><span class="text-xs text-muted-foreground">설치됨</span></span>
 							</div>
-							<div class="flex flex-col gap-2 border-t pt-4">
+							<div class="form-block">
 								{@render field('로그인 방식', '브라우저가 없으면 기기 코드로 로그인')}
 								<Segmented aria-label="로그인 방식" disabled={login !== 'idle'} options={[{ value: 'browser', label: '브라우저 로그인', icon: Globe }, { value: 'device', label: '기기 코드', icon: Smartphone }, { value: 'terminal', label: '터미널에서 직접', icon: Terminal }]} bind:value={method} />
 							</div>
-							<div class="flex flex-col gap-2 border-t pt-4">
+							<div class="form-block">
 								{@render field('로그인 상태', login === 'ok' ? `브라우저에서 ${vendor} 계정으로 로그인했어요` : `${sel.cli}가 로그인 토큰을 보관해요`)}
 								{#if login === 'ok'}
-									<div class="flex items-center gap-2 rounded-md border border-success/40 bg-success-soft px-3.5 py-2.5 text-xs">
+									<div class="strip-success py-2.5">
 										<CircleCheck class="size-4 text-status-done" /><span class="font-semibold">로그인됨</span><span class="text-muted-foreground">{sel.plan} 플랜 감지 · 토큰은 {sel.cli}가 보관</span>
 									</div>
 								{:else if login === 'pending'}
-									<div class="flex items-center gap-2 rounded-md border px-3.5 py-2.5 text-xs text-muted-foreground">
+									<div class="strip border py-2.5 text-muted-foreground">
 										<LoaderCircle class="size-4 animate-spin text-primary" />
 										{#if method === 'device'}<span>코드 <span class="font-mono font-semibold text-foreground">WDJB-MJHT</span> 를 다른 기기에서 입력하는 중…</span>
 										{:else if method === 'terminal'}<span>터미널에서 로그인 확인 중…</span>
@@ -382,7 +382,7 @@
 									</div>
 								{:else}
 									<div class="flex items-center gap-3">
-										{#if method === 'terminal'}<code class="flex-1 rounded-md bg-code-bg px-3 py-2 font-mono text-xs text-code-fg">{loginCmd[sel.cli!]}</code>{/if}
+										{#if method === 'terminal'}<code class="device-code">{loginCmd[sel.cli!]}</code>{/if}
 										<Button variant="outline" size="sm" onclick={() => run((v) => (login = v))}>
 											{#if method === 'terminal'}<RefreshCw />로그인 확인{:else if method === 'device'}<Smartphone />기기 코드 받기{:else}<LogIn />브라우저에서 로그인{/if}
 										</Button>
@@ -390,33 +390,33 @@
 								{/if}
 							</div>
 							{#if login === 'ok'}
-								<div class="flex flex-col gap-2 border-t pt-4">
+								<div class="form-block">
 									{@render field('감지된 한도', '구독은 금액 대신 남은 비율로 보여요')}
-									<span class="flex items-center gap-2 text-caption text-muted-foreground">
+									<span class="meta-line gap-2">
 										{#each ['5H', '주간'] as l (l)}
-											<span class="flex items-center gap-1.5 rounded-sm border px-2 py-1">{l}<Progress value={100} class="h-1 w-10 bg-muted" indicator="bg-success" aria-label="{l} 잔량" /><span class="font-mono text-status-done">100%</span></span>
+											<span class="chip-box gap-1.5 py-1">{l}<Progress value={100} class="h-1 w-10 bg-muted" indicator="bg-success" aria-label="{l} 잔량" /><span class="font-mono text-status-done">100%</span></span>
 										{/each}
 										리셋 시각은 첫 사용부터 계산돼요
 									</span>
 								</div>
 							{/if}
 						{:else if step === 1}
-							<label class="flex flex-col gap-2 border-t pt-4">
+							<label class="form-block">
 								{@render field('이름', '멤버 · 템플릿에서 이 이름으로 보여요')}
 								<InputGroup.Root class="h-10"><InputGroup.Addon><Tag /></InputGroup.Addon><InputGroup.Input bind:value={name} placeholder="연결 이름" /></InputGroup.Root>
 							</label>
 							{#if needsUrl}
-								<label class="flex flex-col gap-2 border-t pt-4">
+								<label class="form-block">
 									{@render field('Base URL', 'OpenAI 호환 엔드포인트')}
 									<InputGroup.Root class="h-10"><InputGroup.Addon><Link /></InputGroup.Addon><InputGroup.Input bind:value={baseUrl} oninput={() => (test = 'idle')} placeholder="http://localhost:8000/v1" class="font-mono" /></InputGroup.Root>
 								</label>
 							{/if}
 							{#if needsKey}
-								<label class="flex flex-col gap-2 border-t pt-4">
+								<label class="form-block">
 									{@render field('API 키', '키체인에 저장 · 에이전트 프롬프트에 원문이 들어가지 않아요')}
 									<InputGroup.Root class="h-10"><InputGroup.Addon><KeyRound /></InputGroup.Addon><InputGroup.Input type="password" bind:value={apiKey} oninput={() => (test = 'idle')} placeholder="키 붙여넣기" class="font-mono" /></InputGroup.Root>
 								</label>
-								<div class="flex flex-col gap-2 border-t pt-4">
+								<div class="form-block">
 									{@render field('월 예산', '넘으면 이 연결을 폴백에서 건너뛰어요')}
 									<Select.Root type="single" bind:value={budget}>
 										<Select.Trigger class="h-10 w-full" aria-label="월 예산"><span class="flex items-center gap-2"><Wallet class="size-4 text-muted-foreground" />${budget} · 80%에서 경고</span></Select.Trigger>
@@ -424,7 +424,7 @@
 									</Select.Root>
 								</div>
 							{/if}
-							<div class="flex flex-col gap-2.5 border-t pt-4">
+							<div class="form-block-wide">
 								<div class="flex items-center gap-3">
 									<Button variant="outline" size="sm" disabled={test === 'pending' || (needsKey && !apiKey.trim()) || (needsUrl && !baseUrl.trim())} onclick={() => run((v) => (test = v))}>
 										{#if test === 'pending'}<LoaderCircle class="animate-spin" />{:else}<Activity />{/if}연결 테스트
@@ -432,7 +432,7 @@
 									<span class="text-xs text-muted-foreground">{needsKey && !apiKey.trim() ? 'API 키를 넣으면 테스트할 수 있어요' : '모델 목록을 불러오고 짧은 요청 1회를 보내요'}</span>
 								</div>
 								{#if test === 'ok'}
-									<div class="flex items-center gap-2 rounded-md border border-success/40 bg-success-soft px-3.5 py-2.5 text-xs">
+									<div class="strip-success py-2.5">
 										<CircleCheck class="size-4 text-status-done" /><span class="font-semibold">연결 성공</span>
 										<span class="text-muted-foreground">{sel.kind === '로컬' ? `모델 ${sel.models}개 · 응답 42ms · 로컬이라 비용 없음` : `모델 ${sel.models}개 · 응답 310ms · 가격표 불러옴 (Run당 비용 추정에 사용)`}</span>
 									</div>
@@ -444,21 +444,21 @@
 								{@render field('허용 대상', scope === 'team' ? `${teamNames} 멤버만 모델 선택 · 폴백에서 볼 수 있어요` : scope === 'workspace' ? '모든 팀 멤버가 모델 선택 · 폴백에서 볼 수 있어요' : '내가 시작한 Run에서만 써요')}
 								<Segmented aria-label="허용 대상" options={[{ value: 'workspace', label: '워크스페이스', icon: Globe }, { value: 'team', label: '선택한 팀', icon: Users }, { value: 'me', label: '나만', icon: User }]} bind:value={scope} />
 							</div>
-							<div class="flex flex-col gap-2 border-t pt-4">
+							<div class="form-block">
 								{@render field('폴백 체인', '연결이 준비되면 이 위치에 추가돼요')}
 								<Select.Root type="single" bind:value={fallback}>
 									<Select.Trigger class="h-10 w-full" aria-label="폴백 체인"><span class="flex items-center gap-2"><Route class="size-4 text-muted-foreground" /><span class="font-medium">{fallbacks.find((f) => f.value === fallback)?.label}</span><span class="text-muted-foreground">{fallbacks.find((f) => f.value === fallback)?.meta}</span></span></Select.Trigger>
 									<Select.Content>{#each fallbacks as f (f.value)}<Select.Item value={f.value} label={f.label}>{f.label} <span class="text-muted-foreground">{f.meta}</span></Select.Item>{/each}</Select.Content>
 								</Select.Root>
 							</div>
-							<div class="flex flex-col gap-2 border-t pt-4">
+							<div class="form-block">
 								{@render field('응답 · 보고 언어', '완료 보고 · 요약 · 질문')}
 								<Select.Root type="single" bind:value={lang}>
 									<Select.Trigger class="h-10 w-full" aria-label="응답 · 보고 언어">{@render optLabel(Languages, lang, langs)}</Select.Trigger>
 									<Select.Content>{#each langs as o (o.value)}<Select.Item value={o.value} label={o.value}>{o.value} <span class="text-muted-foreground">{o.meta}</span></Select.Item>{/each}</Select.Content>
 								</Select.Root>
 							</div>
-							<div class="flex flex-col gap-2 border-t pt-4">
+							<div class="form-block">
 								{@render field('커밋 · PR 언어', '코드 주석 · 커밋 메시지 · PR 본문')}
 								<Select.Root type="single" bind:value={commitLang}>
 									<Select.Trigger class="h-10 w-full" aria-label="커밋 · PR 언어">{@render optLabel(GitCommitHorizontal, commitLang, commitLangs)}</Select.Trigger>
@@ -494,9 +494,9 @@
 						{:else}
 							<span class="list-label px-0 pt-4">확인</span>
 							{#each confirmRows as [k, v] (k)}
-								<span class="flex items-center justify-between gap-4 border-t py-2 text-body"><span class="text-muted-foreground">{k}</span><span class="text-right">{v}</span></span>
+								<span class="summary-row"><span class="text-muted-foreground">{k}</span><span class="text-right">{v}</span></span>
 							{/each}
-							<span class="mt-2 flex items-center gap-2 rounded-md border bg-muted/50 px-3.5 py-2.5 text-xs">
+							<span class="strip-muted mt-2 py-2.5">
 								<RefreshCw class="size-3.5 text-primary" /><span class="font-semibold">추가 후</span>
 								<span class="text-muted-foreground">{isSub ? `남은 한도를 5분마다 읽어 멤버 카드에 표시` : `모델 ${sel.models}개를 매일 동기화 · 가격 변경 시 알림`}</span>
 							</span>

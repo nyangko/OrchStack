@@ -313,6 +313,10 @@
 }
 
 /* 목록 그룹 제목 (.pen ListGroupLabel) */
+/* 이름 붙인 유틸리티 — 공용 역할 · 화면 요소 (src/lib/styles) */
+@import "./lib/styles/roles.css";
+@import "./lib/styles/screens.css";
+
 @utility list-label {
 	@apply px-2 pt-3 pb-1.5 text-caption font-semibold text-muted-foreground;
 }

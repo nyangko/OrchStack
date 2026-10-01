@@ -70,7 +70,7 @@
 
 <svelte:head><title>보고서 양식 · Settings · OrchStack</title></svelte:head>
 
-<main class="flex flex-col gap-5 px-8 py-7">
+<main class="page-main">
 	<PageHeader title="보고서 양식" desc="시스템이 조립하는 사용자 보고서 · 모델 호출 없음(0 tok) · 잠긴 칸은 지울 수 없어요" status={false}>
 		<Button variant="outline" aria-pressed={preview} onclick={() => (preview = !preview)}>
 			{#if preview}<Eye />{:else}<EyeOff />{/if}미리보기 데이터: #{reportSample.task.num}
@@ -78,28 +78,28 @@
 		<Button onclick={clone}><Copy />양식 복제</Button>
 	</PageHeader>
 
-	<div class="flex items-center gap-2 rounded-md border border-success/40 bg-success-soft px-3.5 py-2 text-xs">
+	<div class="strip-success py-2">
 		<ZapOff class="size-3.5 shrink-0 text-status-done" />
 		<span class="font-semibold">0 tok</span>
 		<span class="text-muted-foreground">시스템 값 {sysVar} 과 Agent 사람 칸 [[…]] 을 조립만 해요 · 모델을 부르지 않아요 · Agent 작성법은 <a href="/settings/presets" class="text-primary hover:underline">Instruction presets › REPORT</a></span>
 	</div>
 
 	<div class="flex items-start gap-5">
-		<nav class="flex w-52 shrink-0 flex-col gap-0.5 rounded-xl border bg-card p-3" aria-label="양식">
+		<nav class="list-panel w-52" aria-label="양식">
 			{#each forms as f (f.key)}
 				{@const Icon = icon[f.base ?? f.key]}
 				<button
 					type="button"
 					aria-current={f.key === sel.key ? 'true' : undefined}
 					onclick={() => (selKey = f.key)}
-					class={cn('flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50', f.key === sel.key && 'bg-accent font-semibold text-foreground')}
+					class={cn('list-panel-item px-2.5 py-2 text-muted-foreground', f.key === sel.key && 'bg-accent font-semibold text-foreground')}
 				>
 					<Icon class="size-3.5 shrink-0" /><span class="truncate">{f.label}</span>
 				</button>
 			{/each}
 		</nav>
 
-		<section class="flex min-w-0 flex-1 flex-col gap-3">
+		<section class="col-fill gap-3">
 			<div class="flex items-center gap-2">
 				<h2 class="shrink-0 text-sm font-semibold">양식 · {sel.label} v1</h2>
 				<span class="truncate text-caption text-muted-foreground">{sel.note}</span>
@@ -107,7 +107,7 @@
 				{#if sel.base}<Button variant="ghost" size="sm" onclick={remove}><Trash2 />삭제</Button>{/if}
 			</div>
 			{#key sel.key}<MdEditor files={[sel]} tabs={false} base={{ [sel.name]: original }} baseLabel="기본 양식" class="h-100" />{/key}
-			<div class={cn('flex items-center gap-2 rounded-md border px-3.5 py-2.5 text-xs', missing.length ? 'border-destructive/40 bg-destructive-soft' : 'bg-muted')}>
+			<div class={cn('strip border py-2.5', missing.length ? 'border-destructive/40 bg-destructive-soft' : 'bg-muted')}>
 				<Lock class={cn('size-3.5 shrink-0', missing.length && 'text-destructive')} />
 				<span class="shrink-0 font-semibold">잠긴 칸</span>
 				{#if missing.length}
@@ -121,7 +121,7 @@
 		</section>
 
 		{#if preview}
-			<aside class="flex w-100 shrink-0 flex-col gap-2 rounded-xl border bg-card p-5 text-xs" aria-label="미리보기">
+			<aside class="preview-panel" aria-label="미리보기">
 				<span class="text-caption text-muted-foreground">미리보기 · #{reportSample.task.num} 데이터</span>
 				{#each lines as l, i (i)}
 					{#if i === 0}<h3 class="text-base font-semibold">{l.replace(/^#+\s+/, '')}</h3>

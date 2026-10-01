@@ -113,7 +113,7 @@
 
 
 {#snippet kpi(label: string, value: string, sub: string)}
-	<div class="flex flex-1 flex-col gap-1 rounded-md border bg-card px-3.5 py-3">
+	<div class="stat-card">
 		<span class="text-xs text-muted-foreground">{label}</span>
 		<span class="font-mono text-xl font-semibold">{value}</span>
 		<span class="truncate text-caption text-subtle-foreground">{sub}</span>
@@ -122,7 +122,7 @@
 
 <!-- 쓰는 멤버 · 템플릿 -->
 {#snippet usage(u: { members: TeamMember[]; templates: { name: string; version: number }[] })}
-	<div class="flex flex-col gap-2 border-t pt-2.5 text-xs">
+	<div class="detail-block">
 		<span class="text-muted-foreground">사용 중</span>
 		<span class="flex items-center gap-2">
 			<Avatar.Group>{#each u.members.slice(0, 5) as m (m.sn)}<RoleAvatar role={m.role} icon={glyphOf(m)} size="sm" />{/each}</Avatar.Group>
@@ -133,16 +133,16 @@
 {/snippet}
 
 <div class="flex h-full">
-	<nav aria-label="필터" class="flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-sidebar px-3 py-5">
+	<nav aria-label="필터" class="side-nav w-52 px-3 py-5">
 		{#each navGroups as g (g.label)}
-			<span class="list-label px-2 pt-3 pb-1.5 first:pt-0">{g.label}</span>
+			<span class="nav-group-label">{g.label}</span>
 			{#each g.items as it (it.key)}
 				<button
 					type="button"
 					aria-current={filterKey === it.key ? 'page' : undefined}
 					onclick={() => ((filterKey = it.key), (filter = it.f))}
 					class={cn(
-						'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-body text-muted-foreground outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50',
+						'side-nav-item h-8 text-muted-foreground',
 						filterKey === it.key && 'bg-accent font-semibold text-foreground'
 					)}
 				>
@@ -154,7 +154,7 @@
 		{/each}
 	</nav>
 
-	<main class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-7 *:shrink-0">
+	<main class="page-scroll-pad gap-4">
 		<PageHeader title="Skills & MCP" desc="워크스페이스에 설치된 스킬 · MCP 서버와 어디서 쓰이는지 · 켜고 끄기는 템플릿 · 멤버에서, 소스 설정은 Settings에서" status={false}>
 			<Button variant="outline" size="sm" onclick={() => (sourcesOpen = true)}><SlidersHorizontal />소스 설정</Button>
 			<Button size="sm" onclick={() => (adding = true)}><Plus />스킬 · MCP 추가</Button>
@@ -168,7 +168,7 @@
 		</div>
 
 		<div class="flex items-start gap-4">
-			<div class="flex min-w-0 flex-1 flex-col gap-4">
+			<div class="col-fill gap-4">
 				{#if filter.kind !== 'mcp'}
 					<Card.Root size="sm">
 						<Card.Header>
@@ -179,13 +179,13 @@
 							{#each skills as s (s.name)}
 								{@const on = sel.kind === 'skill' && sel.name === s.name}
 								{@const src = sourceMeta[s.source]}
-								<div class={cn('-mx-2 flex items-center gap-3 rounded-md border-t px-2 py-2.5 first:border-t-0', on && 'bg-primary-soft', (s.on === false || s.blocked) && 'opacity-60')}>
-									<button type="button" onclick={() => (sel = { kind: 'skill', name: s.name })} class="flex min-w-0 flex-1 items-center gap-3 text-left outline-none focus-visible:underline">
-										<span class={cn('flex size-8 shrink-0 items-center justify-center rounded-md font-mono text-xs font-semibold text-on-solid uppercase', tileOf(s.name))}>{s.name[0]}</span>
-										<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+								<div class={cn('list-row -mx-2 rounded-md px-2', on && 'bg-primary-soft', (s.on === false || s.blocked) && 'opacity-60')}>
+									<button type="button" onclick={() => (sel = { kind: 'skill', name: s.name })} class="row-link">
+										<span class={cn('skill-mark-solid', tileOf(s.name))}>{s.name[0]}</span>
+										<span class="row-text">
 											<span class="font-mono text-body font-medium">{s.name}</span>
 											<span class="truncate text-xs text-muted-foreground">{s.blocked ? s.blocked + ' → 차단됨' : s.desc}</span>
-											<span class="flex items-center gap-1 text-caption text-subtle-foreground">
+											<span class="subtle-meta gap-1">
 												<src.icon class="size-3" />{src.label}{s.version ? ` · ${s.version}` : ''}
 												{#if s.update}<span class="text-status-waiting">→ {s.update} 업데이트</span>{/if}
 												<span class="ml-2 font-mono">{s.blocked ? '—' : `+${s.tok} tok`}</span>
@@ -211,11 +211,11 @@
 								{@const st = store.mcp[m.name]}
 								{@const n = usersOf(m.name, 'mcp').members.length}
 								{@const on = sel.kind === 'mcp' && sel.name === m.name}
-								<div class={cn('-mx-2 flex items-center gap-3 rounded-md border-t px-2 py-2.5 first:border-t-0', on && 'bg-primary-soft')}>
-									<button type="button" onclick={() => (sel = { kind: 'mcp', name: m.name })} class="flex min-w-0 flex-1 items-center gap-3 text-left outline-none focus-visible:underline">
+								<div class={cn('list-row -mx-2 rounded-md px-2', on && 'bg-primary-soft')}>
+									<button type="button" onclick={() => (sel = { kind: 'mcp', name: m.name })} class="row-link">
 										<Plug class={cn('size-4 shrink-0', st.installed ? 'text-primary' : 'text-muted-foreground')} />
-										<span class="flex min-w-0 flex-1 flex-col gap-0.5">
-											<span class="flex items-center gap-1.5 font-mono text-body font-medium">
+										<span class="row-text">
+											<span class="row-title font-mono">
 												{m.name}
 												<Pill class={st.installed ? 'bg-success-soft font-sans text-status-done' : 'font-sans'}>{st.installed ? '설치됨' : '접근 가능'}</Pill>
 												{#if st.auth}<Pill class="bg-warning-soft font-sans text-status-waiting">인증 필요</Pill>{/if}
@@ -237,7 +237,7 @@
 				{/if}
 			</div>
 
-			<aside class="flex w-80 shrink-0 flex-col gap-4">
+			<aside class="aside-col w-80 gap-4">
 				<Card.Root size="sm">
 					{#if selSkill}
 						{@const s = selSkill}

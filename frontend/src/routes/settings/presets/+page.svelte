@@ -129,14 +129,14 @@
 
 <svelte:head><title>Instruction presets · Settings · OrchStack</title></svelte:head>
 
-<main class="flex flex-col gap-5 px-8 py-7">
+<main class="page-main">
 	<PageHeader title="Instruction presets" desc="모델 컨텍스트에 들어가는 재사용 지침 · 역할 템플릿은 여기서 고르기만 해요 · 수정하면 새 버전" status={false}>
 		<input bind:this={fileInput} type="file" accept=".md,text/markdown" class="hidden" onchange={(e) => (importFile(e.currentTarget.files?.[0]), (e.currentTarget.value = ''))} />
 		<Button variant="outline" onclick={() => fileInput?.click()}><Download />가져오기 (.md · AGENTS.md)</Button>
 		<Button onclick={create}><Plus />새 프리셋</Button>
 	</PageHeader>
 
-	<div class="flex items-center gap-2 rounded-md border border-primary/20 bg-primary-soft px-3.5 py-2 text-xs">
+	<div class="strip-primary py-2">
 		<Layers class="size-3.5 shrink-0 text-primary" />
 		<span class="font-semibold">역할 1개당 기본 조합 ≈ {bundle.total} tok</span>
 		<span class="truncate text-muted-foreground">
@@ -145,7 +145,7 @@
 	</div>
 
 	<div class="flex items-start gap-5">
-		<nav class="flex w-72 shrink-0 flex-col gap-0.5 rounded-xl border bg-card p-3" aria-label="프리셋">
+		<nav class="list-panel w-72" aria-label="프리셋">
 			<InputGroup.Root class="mb-1 h-8">
 				<InputGroup.Addon><Search /></InputGroup.Addon>
 				<InputGroup.Input bind:value={query} placeholder="프리셋 검색" aria-label="프리셋 검색" />
@@ -159,7 +159,7 @@
 							type="button"
 							aria-current={p.key === sel.key ? 'true' : undefined}
 							onclick={() => (selKey = p.key)}
-							class={cn('flex items-center gap-2.5 rounded-md px-2 py-1.75 text-left text-xs text-muted-foreground outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50', p.key === sel.key && 'bg-accent font-semibold text-foreground')}
+							class={cn('list-panel-item px-2 py-1.75 text-muted-foreground', p.key === sel.key && 'bg-accent font-semibold text-foreground')}
 						>
 							<k.icon class="size-3.5 shrink-0" />
 							<span class="truncate">{p.key} · {p.tok} tok{p.kind === 'style' && p.default ? ' (기본)' : ''}</span>
@@ -170,7 +170,7 @@
 			{/each}
 		</nav>
 
-		<section class="flex min-w-0 flex-1 flex-col gap-3.5">
+		<section class="col-fill gap-3.5">
 			<div class="flex items-center gap-2">
 				<h2 class="text-lg font-semibold">{title}</h2>
 				<Pill class="bg-primary-soft font-mono text-primary uppercase">{sel.kind}</Pill>
@@ -203,17 +203,17 @@
 			/>
 			{/key}
 
-			<div class="flex items-center gap-3 text-xs text-muted-foreground">
+			<div class="meta-xs gap-3">
 				<Progress value={Math.min(100, (tok / sel.limit) * 100)} class="h-1.5 w-60 bg-muted" indicator={tok > sel.limit ? 'bg-destructive' : 'bg-status-done'} aria-label="토큰 상한" />
 				<span><span class="font-mono">{tok} / {sel.limit} tok</span> · {lang} · {vars ? `변수 ${vars}` : '변수 없음'}</span>
 			</div>
 
 			{#if checks.length}
-				<div class="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive-soft px-3.5 py-2.5 text-xs">
+				<div class="strip-danger py-2.5">
 					<CircleAlert class="size-3.5 text-destructive" /><span class="font-semibold text-destructive">검사 실패</span><span>{checks.join(' · ')}</span>
 				</div>
 			{:else}
-				<div class="flex items-center gap-2 rounded-md border border-success/40 bg-success-soft px-3.5 py-2.5 text-xs">
+				<div class="strip-success py-2.5">
 					<CircleCheck class="size-3.5 text-status-done" /><span class="font-semibold">검사 통과</span><span class="text-muted-foreground">상한 이내 · 비밀키 패턴 없음 · 다른 프리셋과 겹치는 규칙 없음</span>
 				</div>
 			{/if}

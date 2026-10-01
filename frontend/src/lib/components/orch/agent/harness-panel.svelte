@@ -103,10 +103,10 @@
 	{@render sameAs(changed, base)}
 	<Pill>다음 Run부터 적용</Pill>
 	<span class="flex-1"></span>
-	<span class="flex items-center gap-1 text-caption text-status-done"><CircleCheck class="size-3" />저장됨</span>
+	<span class="saved-note"><CircleCheck class="size-3" />저장됨</span>
 </div>
 <div class="flex items-start gap-4">
-	<div class="flex min-w-0 flex-1 flex-col gap-4">
+	<div class="col-fill gap-4">
 		<Card.Root size="sm">
 			<Card.Header><Card.Title>실행</Card.Title></Card.Header>
 			<Card.Content class="gap-3">
@@ -120,14 +120,14 @@
 					</div>
 					<div class="flex flex-col gap-1.5">
 						<span class="text-caption font-semibold text-muted-foreground">연결</span>
-						<div class="flex h-9 items-center gap-2 rounded-md border bg-card px-2.5 text-xs font-medium">
+						<div class="field-box h-9">
 							<RuntimeLogo runtime={runtime} class="size-4 ring-0" /><span class="truncate">{acc.plan}</span><Pill class="text-2xs">구독</Pill>
 							<span class={cn('ml-auto text-caption font-normal whitespace-nowrap', low(acc.week) ? 'text-destructive' : 'text-muted-foreground')}>주간 {acc.week}%</span>
 						</div>
 					</div>
 					<div class="flex flex-col gap-1.5">
 						<span class="text-caption font-semibold text-muted-foreground">모델</span>
-						<button type="button" onclick={() => ((picker = true), (pickQuery = ''), (pickFilter = 'all'), (pickProvider = 'all'))} class="flex h-9 items-center gap-2 rounded-md border bg-card px-2.5 text-left text-xs font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+						<button type="button" onclick={() => ((picker = true), (pickQuery = ''), (pickFilter = 'all'), (pickProvider = 'all'))} class="field-box pressable h-9 text-left">
 							<Cpu class="size-3.5 text-muted-foreground" />{model}
 							<span class="flex-1 truncate font-normal text-muted-foreground">{modelCatalog.flatMap((p) => p.models).find((m) => m.name === model)?.ctx ?? ''}</span>
 							<ChevronsUpDown class="size-3.5 text-muted-foreground" />
@@ -152,11 +152,11 @@
 			<Card.Content class="gap-0">
 				{#each h.fallback as key, i (key)}
 					{@const st = fallbackSteps[key]}
-					<div class="flex items-center gap-3 border-t py-2.5 first:border-t-0">
-						<span class="flex size-5 items-center justify-center rounded-full bg-muted font-mono text-caption">{i + 1}</span>
+					<div class="list-row">
+						<span class="step-num">{i + 1}</span>
 						{#if key === 'sub'}<RuntimeLogo runtime={runtime} class="size-4 ring-0" />{:else if key === 'omni'}<Route class="size-4 text-muted-foreground" />{:else}<Cpu class="size-4 text-muted-foreground" />{/if}
-						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
-							<span class="flex items-center gap-1.5 text-body font-medium">{key === 'sub' ? acc.plan : 'name' in st ? st.name : ''}<Pill class="text-2xs">{st.kind}</Pill></span>
+						<span class="row-text">
+							<span class="row-title">{key === 'sub' ? acc.plan : 'name' in st ? st.name : ''}<Pill class="text-2xs">{st.kind}</Pill></span>
 							<span class="text-xs text-muted-foreground">{st.desc}</span>
 						</span>
 						<span class="font-mono text-caption text-muted-foreground">{st.cost}</span>
@@ -168,21 +168,21 @@
 				{/each}
 			</Card.Content>
 		</Card.Root>
-		<div class="flex flex-col rounded-md border bg-card">
-			<button type="button" aria-expanded={showCmd} onclick={() => (showCmd = !showCmd)} class="flex items-center gap-2 px-4 py-3 text-left text-body font-medium outline-none focus-visible:underline">
+		<div class="box-col rounded-md bg-card">
+			<button type="button" aria-expanded={showCmd} onclick={() => (showCmd = !showCmd)} class="harness-preview-toggle">
 				<Terminal class="size-3.5 text-muted-foreground" /><span class="flex-1">실행 명령 미리보기</span><ChevronDown class={cn('size-4 text-muted-foreground transition-transform', showCmd && 'rotate-180')} />
 			</button>
-			{#if showCmd}<pre class="mx-4 mb-4 overflow-x-auto rounded-sm bg-foreground p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-background">{command}</pre>{/if}
+			{#if showCmd}<pre class="harness-preview-code">{command}</pre>{/if}
 		</div>
 	</div>
-	<aside class="flex w-72 shrink-0 flex-col gap-4">
+	<aside class="aside-col w-72 gap-4">
 		<Card.Root size="sm">
 			<Card.Header><Card.Title>이 조합으로 실행하면</Card.Title></Card.Header>
 			<Card.Content class="gap-1">
-				<div class="flex h-7 items-center gap-2 text-xs"><Coins class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">Run당 평균</span><span class="font-mono font-medium">35K tok</span></div>
+				<div class="value-line"><Coins class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">Run당 평균</span><span class="font-mono font-medium">35K tok</span></div>
 				<LimitRow icon={BadgeCheck} label="구독 주간 창 사용" used="{perRun(runtime)}%" max="/ Run" value={perRun(runtime) * 10} note="주간 잔량 {acc.week}% → 약 {Math.floor(acc.week / perRun(runtime))} Run 가능" warn={low(acc.week)} />
-				<div class="flex h-7 items-center gap-2 text-xs"><Wallet class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">폴백 시 비용</span><span class="font-medium">{h.fallback[0] === 'sub' ? 'OmniRoute · Run당 ~$0.4' : '첫 단계부터 과금'}</span></div>
-				<div class="flex h-7 items-center gap-2 text-xs"><PlugZap class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">호환성</span><Pill class="bg-success-soft text-status-done"><Check />모두 호환</Pill></div>
+				<div class="value-line"><Wallet class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">폴백 시 비용</span><span class="font-medium">{h.fallback[0] === 'sub' ? 'OmniRoute · Run당 ~$0.4' : '첫 단계부터 과금'}</span></div>
+				<div class="value-line"><PlugZap class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">호환성</span><Pill class="bg-success-soft text-status-done"><Check />모두 호환</Pill></div>
 			</Card.Content>
 		</Card.Root>
 		<Card.Root size="sm">
@@ -232,28 +232,28 @@
 				{/snippet}
 			</Dialog.Header>
 			<Dialog.Body padded={false} class="flex-row">
-				<nav aria-label="제공자" class="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-2 text-xs">
+				<nav aria-label="제공자" class="model-provider-nav">
 					<span class="list-label px-2 pt-1 pb-1.5">제공자 · 연결됨 {modelCatalog.length}</span>
-					<button type="button" aria-pressed={pickProvider === 'all'} onclick={() => (pickProvider = 'all')} class={cn('flex items-center gap-2 rounded-sm px-2 py-1.5 text-left outline-none hover:bg-muted', pickProvider === 'all' && 'bg-accent font-medium')}><Layers class="size-3.5" /><span class="flex-1">전체</span></button>
+					<button type="button" aria-pressed={pickProvider === 'all'} onclick={() => (pickProvider = 'all')} class={cn('model-provider-item', pickProvider === 'all' && 'bg-accent font-medium')}><Layers class="size-3.5" /><span class="flex-1">전체</span></button>
 					{#each modelCatalog as p (p.key)}
 						{@const a = p.kind === '구독' ? accountOf(p.runtime) : undefined}
-						<button type="button" aria-pressed={pickProvider === p.key} onclick={() => (pickProvider = p.key)} class={cn('flex items-center gap-2 rounded-sm px-2 py-1.5 text-left outline-none hover:bg-muted', pickProvider === p.key && 'bg-accent font-medium')}>
+						<button type="button" aria-pressed={pickProvider === p.key} onclick={() => (pickProvider = p.key)} class={cn('model-provider-item', pickProvider === p.key && 'bg-accent font-medium')}>
 							{#if a}<RuntimeLogo runtime={p.runtime} class="size-3.5 ring-0" />{:else}<Route class="size-3.5" />{/if}
 							<span class="flex-1 truncate">{p.label}</span>
 							<span class={cn('font-mono text-caption', a && low(a.week) ? 'text-destructive' : 'text-muted-foreground')}>{a ? `${a.week}%` : `$${Math.round(gateway.used)}`}</span>
 						</button>
 					{/each}
 				</nav>
-				<div class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+				<div class="page-scroll gap-4 px-5 py-4">
 					{#each pickModels as p (p.key)}
 						{@const a = p.kind === '구독' ? accountOf(p.runtime) : undefined}
 						<section class="flex flex-col gap-1">
-							<div class="flex items-center gap-2 pb-1 text-xs">
+							<div class="model-group-head">
 								<span class="font-semibold">{p.label}</span><Pill class="text-2xs">{p.kind}</Pill>
 								<span class="flex-1"></span>
 								{#if a}
 									{#each [['5H', a.h5], ['주간', a.week]] as const as [l, v] (l)}
-										<span class="flex items-center gap-1.5 text-caption text-muted-foreground">{l}<Progress value={v} class="h-1 w-12 bg-muted" indicator={low(v) ? 'bg-destructive' : 'bg-success'} aria-label="{p.label} {l}" /><span class={cn('font-mono', low(v) && 'text-destructive')}>{v}%</span></span>
+										<span class="meta-line gap-1.5">{l}<Progress value={v} class="h-1 w-12 bg-muted" indicator={low(v) ? 'bg-destructive' : 'bg-success'} aria-label="{p.label} {l}" /><span class={cn('font-mono', low(v) && 'text-destructive')}>{v}%</span></span>
 									{/each}
 								{:else}
 									<span class="font-mono text-caption text-muted-foreground">월 ${gateway.used}/${gateway.limit}</span>
@@ -265,17 +265,17 @@
 									type="button"
 									aria-pressed={on}
 									onclick={() => (onchange(p.runtime, md.name), (picker = false))}
-									class={cn('flex items-center gap-3 rounded-md border px-3 py-2.5 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50', on && 'option-on')}
+									class={cn('card-press gap-3 px-3 py-2.5', on && 'option-on')}
 								>
 									{#if on}<CircleDot class="size-4 text-primary" />{:else}<Circle class="size-4 text-subtle-foreground" />{/if}
-									<span class="flex min-w-0 flex-1 flex-col gap-0.5">
-										<span class="flex items-center gap-1.5 text-body font-medium">
+									<span class="row-text">
+										<span class="row-title">
 											{md.name}
 											{#each md.tags as tg (tg)}<Pill class={cn('text-2xs', tg === 'NEW' ? 'bg-primary-soft text-primary' : tg === '추천' ? 'bg-success-soft text-status-done' : '')}>{#if tg === '추천'}<ThumbsUp />{:else if tg === 'Tested'}<CircleCheck />{/if}{tg}</Pill>{/each}
 										</span>
 										<span class="text-xs text-muted-foreground">{md.vendor}</span>
 									</span>
-									<span class="w-24 text-right font-mono text-caption text-muted-foreground">{md.price}</span>
+									<span class="num-cell w-24">{md.price}</span>
 									<span class="w-12 text-right font-mono text-caption">{md.ctx}</span>
 									<span class="w-12 text-right text-caption text-muted-foreground">● {md.speed}</span>
 								</button>

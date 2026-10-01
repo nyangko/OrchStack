@@ -37,7 +37,7 @@
 		<span class="text-caption font-semibold text-muted-foreground">{label}</span>
 		<div class="flex flex-wrap items-center gap-1.5">
 			{#each list as g, i (g)}
-				<span class="flex items-center gap-1 rounded-sm border bg-muted px-2 py-0.75 font-mono text-xs">
+				<span class="path-chip">
 					{g}
 					<button type="button" aria-label="{g} 삭제" onclick={() => list.splice(i, 1)} class="text-subtle-foreground hover:text-foreground"><X class="size-3" /></button>
 				</span>
@@ -53,7 +53,7 @@
 	<h2 class="text-lg font-semibold">{base ? '권한' : '권한 기본값'}</h2>
 	{@render sameAs(cfgDiff(c, base) > 0, base)}
 	<span class="flex-1"></span>
-	<span class="flex items-center gap-1 text-caption text-status-done"><CircleCheck class="size-3" />저장됨</span>
+	<span class="saved-note"><CircleCheck class="size-3" />저장됨</span>
 </div>
 <Card.Root size="sm">
 	<Card.Header>
@@ -86,9 +86,9 @@
 		<Card.Content class="gap-0">
 			{#each used as { m, team: tn } (m.sn)}
 				{@const n = cfgDiff(m.config, c)}
-				<div class="flex items-center gap-2.5 border-t py-2 first:border-t-0">
+				<div class="row-divided items-center gap-2.5 py-2">
 					<RoleAvatar role={m.role} icon={glyphOf(m)} size="sm" />
-					<span class="flex flex-1 flex-col gap-px text-xs"><span class="font-medium">{m.name} · {tn}</span><span class="text-muted-foreground">{!m.config || n === 0 ? '권한 템플릿과 동일' : `권한 설정 ${n}곳 다름`}</span></span>
+					<span class="trust-desc"><span class="font-medium">{m.name} · {tn}</span><span class="text-muted-foreground">{!m.config || n === 0 ? '권한 템플릿과 동일' : `권한 설정 ${n}곳 다름`}</span></span>
 				</div>
 			{:else}
 				<p class="text-xs text-muted-foreground">없어요.</p>

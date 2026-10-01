@@ -25,7 +25,7 @@
 	} = $props();
 </script>
 
-<span class={cn("flex items-center gap-1 text-caption text-muted-foreground", className)}>
+<span class={cn("meta-line gap-1", className)}>
 	<Coins class="size-3 shrink-0" />
 	{#if included}
 		리드 합계에 포함

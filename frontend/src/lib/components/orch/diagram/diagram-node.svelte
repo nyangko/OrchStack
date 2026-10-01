@@ -81,15 +81,15 @@
 
 <div
 	class={cn(
-		"flex w-55 flex-col gap-2 rounded-lg border bg-card p-3 text-left shadow-sm",
+		"diagram-node",
 		selected && "ring-2 ring-primary"
 	)}
 >
 	<div class="flex items-center gap-2">
-		<span class={cn("flex size-6 items-center justify-center rounded-sm text-on-solid", kind.bg)}>
+		<span class={cn("center-box size-6 rounded-sm text-on-solid", kind.bg)}>
 			<kind.icon class="size-3.5" />
 		</span>
-		<span class="flex-1 truncate font-mono text-xs font-semibold tracking-wide text-muted-foreground">{data.ref}</span>
+		<span class="mono-ref flex-1 truncate">{data.ref}</span>
 		{#if data.menu?.length}
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
@@ -136,17 +136,17 @@
 	{#if data.progress}
 		<div class="flex items-center gap-2">
 			<Progress value={data.progress.value} class="h-1" aria-label="진행" />
-			<span class="shrink-0 font-mono text-xs font-medium text-muted-foreground">{data.progress.text}</span>
+			<span class="mono-meta shrink-0">{data.progress.text}</span>
 		</div>
 	{/if}
 	{#if data.alert}
-		<div class={cn("flex items-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium", data.alert.tone === "warning" ? "bg-warning-soft text-warning" : "bg-destructive-soft text-destructive")}>
+		<div class={cn("label-xs rounded-sm px-2 py-1", data.alert.tone === "warning" ? "bg-warning-soft text-warning" : "bg-destructive-soft text-destructive")}>
 			{#if data.alert.tone === "warning"}<MessageCircle class="size-3" />{:else}<TriangleAlert class="size-3" />{/if}
 			{data.alert.text}
 		</div>
 	{/if}
 	<div class="flex items-center justify-between gap-2">
 		{#if data.status}<StatusBadge status={data.status} />{:else if data.badge}<Badge variant="secondary">{data.badge}</Badge>{:else}<span></span>{/if}
-		{#if data.meta}<span class="truncate font-mono text-xs font-medium text-muted-foreground">{data.meta}</span>{/if}
+		{#if data.meta}<span class="mono-meta truncate">{data.meta}</span>{/if}
 	</div>
 </div>

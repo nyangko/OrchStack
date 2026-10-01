@@ -54,13 +54,13 @@
 
 <svelte:head><title>권한 · 보안 · Settings · OrchStack</title></svelte:head>
 
-<main class="flex flex-col gap-5 px-8 py-7">
+<main class="page-main">
 	<PageHeader title="권한 · 보안" desc="기본 Trust 레벨 · 승인 규칙 · 차단 명령 · 비밀 · 감사 로그" status={saved && '저장됨'}>
 		<Button variant="outline" onclick={exportLog}><ScrollText />감사 로그 내보내기</Button>
 	</PageHeader>
 
 	<div class="flex items-start gap-5">
-		<div class="flex min-w-0 flex-1 flex-col gap-5">
+		<div class="col-fill gap-5">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>기본 Trust 레벨</Card.Title>
@@ -85,7 +85,7 @@
 				</Card.Header>
 				<Card.Content class="gap-0">
 					{#each s.blocked as b, i (b.pattern)}
-						<div class="flex items-center gap-3 border-t py-2.5 text-xs">
+						<div class="block-row">
 							<ShieldX class="size-3.5 shrink-0 text-destructive" />
 							<span class="w-60 truncate font-medium"><span class="font-mono">{b.pattern}</span>{#if b.scope}{' '}({b.scope}){/if}</span>
 							<span class="flex-1 truncate text-muted-foreground">{b.desc}</span>
@@ -96,7 +96,7 @@
 						</div>
 					{/each}
 					{#if adding}
-						<form class="flex items-center gap-2 border-t pt-2.5" onsubmit={(e) => (e.preventDefault(), addPattern())}>
+						<form class="inline-form" onsubmit={(e) => (e.preventDefault(), addPattern())}>
 							<InputGroup.Root class="flex-1">
 								<InputGroup.Addon><ShieldX /></InputGroup.Addon>
 								<!-- 패턴 추가를 눌러 연 입력 줄이라 바로 입력하게 한다 -->
@@ -111,7 +111,7 @@
 			</Card.Root>
 		</div>
 
-		<div class="flex w-95 shrink-0 flex-col gap-5">
+		<div class="aside-col w-95 gap-5">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>가드 트리거</Card.Title>
@@ -142,10 +142,10 @@
 					<Card.Description>커밋 · PR 작성자</Card.Description>
 				</Card.Header>
 				<Card.Content>
-					<div class="flex items-center gap-3 rounded-md border px-3.5 py-3">
-						<span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"><GitFork class="size-4" /></span>
-						<span class="flex min-w-0 flex-1 flex-col gap-1">
-							<span class="flex items-center gap-2 text-body font-semibold">{s.github.name}<Pill dot="bg-status-done" class="bg-success-soft text-status-done">전용 계정</Pill></span>
+					<div class="option-card rounded-md">
+						<span class="icon-tile"><GitFork class="size-4" /></span>
+						<span class="col-fill gap-1">
+							<span class="row-title-strong">{s.github.name}<Pill dot="bg-status-done" class="bg-success-soft text-status-done">전용 계정</Pill></span>
 							<span class="text-caption text-muted-foreground">{s.github.note}</span>
 						</span>
 						<!-- 계정 변경 화면은 .pen에 아직 없음 -->

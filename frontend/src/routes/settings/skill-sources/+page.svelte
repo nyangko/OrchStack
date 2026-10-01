@@ -81,7 +81,7 @@
 
 <svelte:head><title>스킬 소스 · Settings · OrchStack</title></svelte:head>
 
-<main class="flex flex-col gap-5 px-8 py-7">
+<main class="page-main">
 	<PageHeader title="스킬 소스" desc="스킬을 찾고 설치할 곳 · 워크스페이스 전체에 적용" status={false}>
 		<Button variant="outline" disabled={syncing} onclick={syncAll}>
 			<RefreshCw class={cn(syncing && 'animate-spin')} />{syncing ? '동기화 중…' : '지금 동기화'}
@@ -90,7 +90,7 @@
 	</PageHeader>
 
 	<div class="flex items-start gap-5">
-		<div class="flex min-w-0 flex-1 flex-col gap-5">
+		<div class="col-fill gap-5">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>소스</Card.Title>
@@ -99,10 +99,10 @@
 				<Card.Content class="flex flex-col gap-2">
 					{#each store.sources.sources as src (src.name)}
 						{@const Icon = kindIcon[src.kind]}
-						<div class="flex items-center gap-3 rounded-md border px-3.5 py-3">
-							<span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"><Icon class="size-4" /></span>
-							<span class="flex min-w-0 flex-1 flex-col gap-1">
-								<span class="flex items-center gap-2 text-body font-semibold">
+						<div class="option-card rounded-md">
+							<span class="icon-tile"><Icon class="size-4" /></span>
+							<span class="col-fill gap-1">
+								<span class="row-title-strong">
 									{src.name}<Pill dot={src.state === '연결됨' ? 'bg-status-done' : 'bg-muted-foreground'} class={src.state === '연결됨' ? 'bg-success-soft text-status-done' : ''}>{src.state}</Pill>
 								</span>
 								<span class="truncate text-caption text-muted-foreground">{src.desc}</span>
@@ -130,7 +130,7 @@
 							<Button type="button" variant="ghost" size="sm" onclick={() => ((adding = false), (newSource = ''))}>취소</Button>
 						</form>
 					{:else}
-						<button type="button" onclick={() => (adding = true)} class="flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+						<button type="button" onclick={() => (adding = true)} class="strip pressable py-2 font-medium">
 							<Plus class="size-3.5" />소스 추가 · GitHub 저장소 / 폴더
 						</button>
 					{/if}
@@ -165,7 +165,7 @@
 			</Card.Root>
 		</div>
 
-		<div class="flex w-95 shrink-0 flex-col gap-5">
+		<div class="aside-col w-95 gap-5">
 			<Card.Root size="sm">
 				<Card.Header><Card.Title>설치 도구</Card.Title></Card.Header>
 				<Card.Content>

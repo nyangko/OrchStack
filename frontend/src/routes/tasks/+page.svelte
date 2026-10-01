@@ -137,7 +137,7 @@
 <svelte:head><title>Tasks · OrchStack</title></svelte:head>
 
 {#snippet kpi(label: string, value: number, sub: string, tone?: string)}
-	<div class="flex flex-1 flex-col gap-1 rounded-md border bg-card px-3.5 py-3">
+	<div class="stat-card">
 		<span class="text-xs text-muted-foreground">{label}</span>
 		<span class={cn('font-mono text-xl font-semibold', tone)}>{value}</span>
 		<span class="truncate text-caption text-subtle-foreground">{sub}</span>
@@ -150,7 +150,7 @@
 		aria-current={view === key ? 'page' : undefined}
 		onclick={() => pickView(key, x)}
 		class={cn(
-			'flex h-8.5 w-full items-center gap-2.5 rounded-md px-2.5 text-body text-muted-foreground outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50',
+			'side-nav-item h-8.5 w-full text-muted-foreground',
 			view === key && 'bg-accent font-semibold text-foreground'
 		)}
 	>
@@ -161,7 +161,7 @@
 {/snippet}
 
 <div class="flex h-full">
-	<nav aria-label="보기" class="flex w-65 shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-sidebar px-3 py-5">
+	<nav aria-label="보기" class="side-nav w-65 px-3 py-5">
 		<span class="list-label px-2 pt-3 pb-1.5">보기</span>
 		{#each views as v (v.key)}{@render navItem(v.key, v.label, v.icon, v.f)}{/each}
 		<span class="list-label px-2 pt-3 pb-1.5">프로젝트</span>
@@ -174,16 +174,16 @@
 					type="button"
 					aria-label="{v.label} 보기 삭제"
 					onclick={() => ((saved = saved.filter((x) => x.key !== v.key)), view === v.key && pickView('all', { priorities: [] }))}
-					class="absolute top-2.5 right-8 rounded-xs text-subtle-foreground opacity-0 outline-none group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
+					class="view-remove"
 				><X class="size-3.5" /></button>
 			</div>
 		{/each}
-		<button type="button" onclick={saveView} class="flex h-8.5 items-center gap-2.5 rounded-md px-2.5 text-body text-muted-foreground outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50">
+		<button type="button" onclick={saveView} class="side-nav-item h-8.5 text-muted-foreground">
 			<Plus class="size-3.75" />지금 필터로 보기 저장
 		</button>
 	</nav>
 
-	<main class="flex min-w-0 flex-1 flex-col gap-4.5 overflow-y-auto px-8 py-7 *:shrink-0">
+	<main class="page-scroll-pad gap-4.5">
 		<header class="flex flex-col gap-1">
 			<h1 class="text-2xl font-bold">{heading}</h1>
 			<p class="text-xs text-muted-foreground">
@@ -258,18 +258,18 @@
 
 		{#if groups.length}
 			<div class="overflow-hidden rounded-lg border bg-card">
-				<div class="flex h-9 items-center gap-3 bg-muted px-4 text-caption font-medium text-muted-foreground">
+				<div class="tasks-table-head">
 					<span class="w-3.5"></span><span class="w-12">ID</span><span class="flex-1">Title</span><span class="w-28">Status</span><span class="w-36">Progress</span><span class="w-60">담당</span><span class="w-16 text-right">Updated</span>
 				</div>
 				{#each groups as { p, team, list } (p.sn)}
 					{@const open = !folded.includes(p.sn)}
-					<div class="flex items-center gap-2 border-t bg-muted px-4 py-2.5 text-xs">
+					<div class="tasks-group-row">
 						<button
 							type="button"
 							aria-expanded={open}
 							aria-label="{p.name} {open ? '접기' : '펼치기'}"
 							onclick={() => (folded = open ? [...folded, p.sn] : folded.filter((x) => x !== p.sn))}
-							class="rounded-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+							class="focus-ring rounded-xs text-muted-foreground hover:text-foreground"
 						>
 							<ChevronDown class={cn('size-3.5 transition-transform', !open && '-rotate-90')} />
 						</button>
@@ -286,11 +286,11 @@
 							{@const a = memberOf(t.agent)}
 							<!-- 행 클릭은 마우스 편의, 키보드는 제목 링크로 연다 -->
 							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-							<div class="flex h-13 cursor-pointer items-center gap-3 border-t px-4 text-xs hover:bg-muted/50" onclick={() => goto(`/p/${t.project}?task=${t.num}`)}>
+							<div class="task-row" onclick={() => goto(`/p/${t.project}?task=${t.num}`)}>
 								<st.icon class={cn('size-3.5 shrink-0', st.text)} aria-hidden="true" />
 								<span class="w-12 font-mono text-muted-foreground">#{t.num}</span>
-								<span class="flex min-w-0 flex-1 items-center gap-2">
-									<a href="/p/{t.project}?task={t.num}" onclick={(e) => e.stopPropagation()} class="truncate text-body font-medium outline-none hover:underline focus-visible:underline">{t.title}</a>
+								<span class="row-fill">
+									<a href="/p/{t.project}?task={t.num}" onclick={(e) => e.stopPropagation()} class="row-link-title">{t.title}</a>
 									{#if t.over}<Pill class="shrink-0 bg-warning-soft text-status-waiting"><TriangleAlert />토큰 초과</Pill>{/if}
 									{#if pending.has(t.num)}<Pill class="shrink-0 bg-warning-soft text-status-waiting"><MessageCircleQuestion />판단 대기</Pill>{/if}
 								</span>
@@ -310,12 +310,12 @@
 										</RoleAvatar>
 										<span class="font-medium">{a.name}</span>
 										<span class="text-muted-foreground">{roles[a.role].label}</span>
-										{#if t.model}<span class="inline-flex items-center gap-0.75 truncate rounded-xs bg-muted px-1.25 py-px font-mono text-2xs text-muted-foreground"><Cpu class="size-2.25 shrink-0" />{t.model}</span>{/if}
+										{#if t.model}<span class="code-tag truncate"><Cpu class="size-2.25 shrink-0" />{t.model}</span>{/if}
 									{:else}
 										<span class="text-muted-foreground">미배정</span>
 									{/if}
 								</span>
-								<span class="w-16 text-right font-mono text-caption text-subtle-foreground">{t.updated}</span>
+								<span class="updated-cell">{t.updated}</span>
 							</div>
 						{/each}
 					{/if}

@@ -28,10 +28,10 @@
 			role="radio"
 			aria-checked={on}
 			onclick={() => (value = l.n)}
-			class={cn('flex flex-col gap-1 rounded-md border p-3 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50', on && 'option-on')}
+			class={cn('option-press rounded-md', on && 'option-on')}
 		>
-			<span class="flex items-center gap-2 text-body font-semibold">
-				<span class={cn('flex size-5 items-center justify-center rounded-full font-mono text-caption', on ? 'bg-primary text-on-solid' : 'bg-muted text-muted-foreground')}>{l.n}</span>
+			<span class="row-title-strong">
+				<span class={cn('level-num', on ? 'bg-primary text-on-solid' : 'bg-muted text-muted-foreground')}>{l.n}</span>
 				{l.t}
 			</span>
 			<span class="text-xs text-muted-foreground">{l.d}</span>

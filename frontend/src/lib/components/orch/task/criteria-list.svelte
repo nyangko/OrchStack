@@ -36,7 +36,7 @@
 <ul class="flex flex-col gap-0.5" aria-label="완료 조건">
 	{#each items as c, i (i)}
 		<li
-			class={cn('group flex h-8 items-center gap-2 rounded-sm px-1.5 hover:bg-muted/60', dragFrom === i && 'opacity-50')}
+			class={cn('criterion-row group', dragFrom === i && 'opacity-50')}
 			draggable={editing !== i}
 			ondragstart={() => (dragFrom = i)}
 			ondragover={(e) => e.preventDefault()}
@@ -57,7 +57,7 @@
 				</InputGroup.Root>
 			{:else}
 				<span class={cn('min-w-0 flex-1 text-body', c.done && 'text-muted-foreground')}>{c.text}</span>
-				<span class="flex items-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+				<span class="hover-actions">
 					<Button variant="ghost" size="icon-xs" aria-label="조건 고치기" onclick={() => (editing = i)}><Pencil /></Button>
 					<Button variant="ghost" size="icon-xs" aria-label="조건 지우기" onclick={() => (items = items.filter((_, k) => k !== i))}><Trash2 /></Button>
 				</span>

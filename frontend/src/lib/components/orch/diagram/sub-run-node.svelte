@@ -47,18 +47,18 @@
 
 <div
 	class={cn(
-		"flex h-41 w-55 flex-col gap-2 rounded-lg border bg-card px-3.5 py-3 text-left shadow-sm",
+		"subrun-node",
 		data.mode !== "runner" && "border-dashed border-input",
 		selected && "ring-2 ring-primary"
 	)}
 >
 	<div class="flex items-center gap-2">
-		<span class={cn("flex size-6 items-center justify-center rounded-sm text-on-solid", md.tile)}><md.icon class="size-3.5" /></span>
-		<span class="flex-1 truncate font-mono text-xs font-semibold tracking-wide text-muted-foreground">{data.mode.toUpperCase()} · {data.id}</span>
-		{#if data.tier}<span class={cn("flex items-center gap-0.5 rounded-xs px-1.5 py-px font-mono text-2xs font-bold", tierTone[data.tier])}><Cpu class="size-2.5" />{data.tier}</span>{/if}
+		<span class={cn("center-box size-6 rounded-sm text-on-solid", md.tile)}><md.icon class="size-3.5" /></span>
+		<span class="mono-ref flex-1 truncate">{data.mode.toUpperCase()} · {data.id}</span>
+		{#if data.tier}<span class={cn("tier-chip", tierTone[data.tier])}><Cpu class="size-2.5" />{data.tier}</span>{/if}
 	</div>
 	<p class="text-body leading-tight font-semibold">{data.goal}</p>
-	<div class="flex items-center gap-3 text-caption text-muted-foreground">
+	<div class="meta-line gap-3">
 		<span class="flex items-center gap-1"><FolderTree class="size-3" />paths {data.paths.length - outside}</span>
 		{#if asked}<span class="font-medium text-primary">+{asked} via @ASK</span>{/if}
 		{#if outside}<span class="font-medium text-destructive">paths 밖 {outside}</span>{/if}
@@ -66,7 +66,7 @@
 	</div>
 	<span class="flex-1"></span>
 	<div class="flex items-center justify-between gap-2">
-		<span class={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-medium", st.tone)}>
+		<span class={cn("chip-round gap-1 text-caption font-medium", st.tone)}>
 			<st.icon class={cn("size-3", data.status === "running" && "animate-spin motion-reduce:animate-none")} />{st.label}
 		</span>
 		<span class="flex items-center gap-1.5">

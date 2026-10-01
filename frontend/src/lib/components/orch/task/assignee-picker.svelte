@@ -69,7 +69,7 @@
 							{@const l = load(a.sn)}
 							<Command.Item value="{a.name} {roles[a.role].label}" data-checked={value === a.sn} onSelect={() => pick(a.sn)} class="gap-2 py-1.5">
 								<RoleAvatar role={a.role} size="sm" />
-								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+								<span class="row-text">
 									<span class="flex items-center gap-1.5"><span class="font-medium">{a.name}</span><span class="text-xs text-muted-foreground">{roles[a.role].label}</span></span>
 									<span class="flex items-center gap-1.5 text-xs">
 										<Progress value={l.pct} class="h-1 w-10" aria-label="{a.name} 부하" />
@@ -82,7 +82,7 @@
 				{/each}
 				<Command.Group>
 					<Command.Item value="Unassigned 미배정" data-checked={value === undefined} onSelect={() => pick(undefined)} class="gap-2">
-						<span class="flex size-5 items-center justify-center rounded-xs bg-muted"><UserRoundX class="size-3 text-muted-foreground" /></span>
+						<span class="center-box size-5 rounded-xs bg-muted"><UserRoundX class="size-3 text-muted-foreground" /></span>
 						<span class="font-medium">Unassigned</span>
 					</Command.Item>
 				</Command.Group>

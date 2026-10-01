@@ -109,7 +109,7 @@
 
 <svelte:head><title>실행기 (CLI) · Settings · OrchStack</title></svelte:head>
 
-<main class="flex flex-col gap-5 px-8 py-7">
+<main class="page-main">
 	<PageHeader title="실행기 (CLI)" desc="에이전트가 도는 CLI · 설치 · 로그인 · 버전 · 공통 실행 설정" status={false}>
 		<Button variant="outline" disabled={detecting} onclick={detect}>
 			{#if detecting}<LoaderCircle class="animate-spin" />감지 중…{:else}<ScanSearch />다시 감지{/if}
@@ -127,13 +127,13 @@
 			{#each clis as c (c.key)}
 				{@const m = stateMeta[c.state]}
 				{@const L = logo[c.key]}
-				<div class="flex items-center gap-3 rounded-md border px-3.5 py-3">
-					<span class="flex size-9.5 shrink-0 items-center justify-center rounded-md bg-muted">
+				<div class="option-card rounded-md">
+					<span class="icon-tile-lg">
 						{#if typeof L === 'string'}<RuntimeLogo runtime={L} class="size-5 ring-0" />{:else}<L class="size-4.5" />{/if}
 					</span>
-					<span class="flex min-w-0 flex-1 flex-col gap-1">
-						<span class="flex items-center gap-2 text-xs font-semibold">{c.name}<Pill class="font-mono text-2xs">{c.version}</Pill></span>
-						<span class={cn('flex items-center gap-1.25 truncate text-caption', c.busy ? 'text-status-in-progress' : m.tone)}>
+					<span class="col-fill gap-1">
+						<span class="row-title-xs">{c.name}<Pill class="font-mono text-2xs">{c.version}</Pill></span>
+						<span class={cn('meta-truncate gap-1.25', c.busy ? 'text-status-in-progress' : m.tone)}>
 							{#if c.busy}<LoaderCircle class="size-3 shrink-0 animate-spin" />{c.state === 'update' ? '업데이트 중…' : '설치 중…'}
 							{:else}<m.icon class="size-3 shrink-0" />{c.note}{/if}
 						</span>
@@ -155,7 +155,7 @@
 					<Field.Row label={r.label} hint={r.hint}>
 						<Select.Root type="single" bind:value={run[r.key]}>
 							<Select.Trigger class="w-full" aria-label={r.label}>
-								<span class="flex min-w-0 flex-1 items-center gap-2">
+								<span class="row-fill">
 									<r.icon class="size-4 text-muted-foreground" />{run[r.key]}
 									<span class="truncate text-caption font-normal text-muted-foreground">{r.note}</span>
 								</span>
@@ -172,7 +172,7 @@
 			</Card.Content>
 		</Card.Root>
 
-		<div class="flex w-95 shrink-0 flex-col gap-5">
+		<div class="aside-col w-95 gap-5">
 			<Card.Root size="sm">
 				<Card.Header>
 					<Card.Title>감지</Card.Title>

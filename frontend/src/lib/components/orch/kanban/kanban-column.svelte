@@ -15,7 +15,7 @@
 
 <section
 	{@attach ref}
-	class="flex w-85 shrink-0 flex-col gap-2 rounded-xl p-1.5 transition-colors {isDropTarget.current ? 'bg-primary-soft' : ''}"
+	class="kanban-column {isDropTarget.current ? 'bg-primary-soft' : ''}"
 >
 	{@render children()}
 </section>

@@ -202,11 +202,11 @@
 	<span class="flex items-baseline gap-2 text-xs"><span class="font-semibold">{label}</span><span class="text-muted-foreground">{hint}</span></span>
 {/snippet}
 
-<main class="flex h-full flex-col items-center overflow-y-auto bg-muted px-6 py-10">
+<main class="setup-shell">
 	{#if step < 0}
 		<!-- 스플래시 (.pen 인트로 0 · LogoLoader) — 회전 링은 로딩 표시만, 키프레임 연출은 애니메이션 작업 때 -->
-		<div class="m-auto flex flex-col items-center gap-4" role="status" aria-live="polite">
-			<span class="relative flex size-30 items-center justify-center">
+		<div class="splash" role="status" aria-live="polite">
+			<span class="center-box relative size-30">
 				<svg viewBox="0 0 120 120" class="absolute inset-0 size-full" aria-hidden="true">
 					<circle cx="60" cy="60" r="56" fill="none" stroke="var(--border)" stroke-width="4" />
 					<circle cx="60" cy="60" r="56" fill="none" stroke="var(--primary)" stroke-width="4" stroke-linecap="round" stroke-dasharray="88 264" class="origin-center animate-spin motion-reduce:animate-none" />
@@ -221,26 +221,26 @@
 		</div>
 	{:else}
 		<img src={logo} alt="OrchStack" class="mb-6 h-7 w-auto" />
-		<div class="flex w-full max-w-230 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
-			<header class="flex flex-col gap-3 border-b px-8 pt-7 pb-6">
+		<div class="setup-card">
+			<header class="setup-head">
 				<Steps steps={['에이전트 연결', '프로젝트', '기본 팀']} current={step} />
 				<h1 class="mt-2 text-2xl font-bold">{stepInfo[step].title}</h1>
 				<p class="text-body text-muted-foreground">{stepInfo[step].desc}</p>
 			</header>
 
-			<div class="flex flex-col gap-4 px-8 py-6">
+			<div class="setup-body">
 				{#if step === 0}
 					<span class="text-xs font-semibold text-muted-foreground">실행기 · 이 기기에서 {detected} / {clis.length} 감지</span>
 					<div class="grid grid-cols-2 gap-2.5">
 						{#each clis as c (c.key)}
 							{@const m = cliMeta[c.state]}
-							<div class="flex items-center gap-3 rounded-lg border px-3.5 py-3">
-								<span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
+							<div class="option-card rounded-lg">
+								<span class="icon-tile">
 									{#if c.logo}<RuntimeLogo runtime={c.logo} class="size-5 ring-0" />{:else if c.icon}<c.icon class="size-4.5" />{/if}
 								</span>
-								<span class="flex min-w-0 flex-1 flex-col gap-1">
-									<span class="flex items-center gap-2 text-body font-semibold">{c.name}<Pill class="font-mono text-2xs">{c.version}</Pill></span>
-									<span class={cn('flex items-center gap-1 truncate text-caption', m.tone)}>
+								<span class="col-fill gap-1">
+									<span class="row-title-strong">{c.name}<Pill class="font-mono text-2xs">{c.version}</Pill></span>
+									<span class={cn('meta-truncate gap-1', m.tone)}>
 										<m.icon class={cn('size-3 shrink-0', (c.state === 'updating' || c.state === 'installing') && 'animate-spin')} />
 										{c.state === 'updating' ? '업데이트 중…' : c.state === 'installing' ? '설치 중…' : c.note}
 									</span>
@@ -253,10 +253,10 @@
 					</div>
 					<span class="mt-2 text-xs font-semibold text-muted-foreground">모델 연결 · 실행기가 쓸 계정</span>
 					{#each conns as c (c.runtime)}
-						<div class="flex items-center gap-3 rounded-lg border px-3.5 py-3">
-							<span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"><RuntimeLogo runtime={c.runtime} class="size-5 ring-0" /></span>
-							<span class="flex min-w-0 flex-1 flex-col gap-1">
-								<span class="flex items-center gap-2 text-body font-semibold">{c.plan}<Pill class="bg-primary-soft text-primary">구독</Pill></span>
+						<div class="option-card rounded-lg">
+							<span class="icon-tile"><RuntimeLogo runtime={c.runtime} class="size-5 ring-0" /></span>
+							<span class="col-fill gap-1">
+								<span class="row-title-strong">{c.plan}<Pill class="bg-primary-soft text-primary">구독</Pill></span>
 								<span class={cn('flex items-center gap-1 text-caption', c.state === 'ok' ? 'text-status-done' : 'text-muted-foreground')}>
 									{#if c.state === 'ok'}<CircleCheck class="size-3" />연결됨 · {runtimeName(c.runtime)} {clis.find((x) => x.key === c.runtime)?.version}
 									{:else if c.state === 'checking'}<LoaderCircle class="size-3 animate-spin" />연결 확인 중… {runtimeName(c.runtime)} 로그인 토큰 확인
@@ -265,7 +265,7 @@
 							</span>
 							{#if c.state === 'ok'}
 								{#each [['5H', c.h5], ['주간', c.week]] as const as [l, v] (l)}
-									<span class="flex items-center gap-1.5 rounded-sm border px-2 py-1 text-caption text-muted-foreground">
+									<span class="menu-line rounded-sm border text-caption">
 										{l}<Progress value={v} class="h-1 w-10 bg-muted" indicator={low(v) ? 'bg-destructive' : 'bg-success'} aria-label="{c.plan} {l} 잔량" />
 										<span class={cn('font-mono', low(v) ? 'text-destructive' : 'text-status-done')}>{v}%</span>
 									</span>
@@ -277,19 +277,19 @@
 					{/each}
 					{#each added as a, i (i)}
 						{@const M = providerMark[a.provider.key]}
-						<div class="flex items-center gap-3 rounded-lg border px-3.5 py-3">
-							<span class="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">{#if typeof M === 'string'}<RuntimeLogo runtime={M} class="size-5 ring-0" />{:else}<M class="size-4.5" />{/if}</span>
-							<span class="flex min-w-0 flex-1 flex-col gap-1">
-								<span class="flex items-center gap-2 text-body font-semibold">{a.title}<Pill class={a.provider.kind === 'API 키' ? 'bg-review-soft text-status-review' : a.provider.kind === '로컬' ? '' : 'bg-primary-soft text-primary'}>{a.provider.kind}</Pill></span>
-								<span class="flex items-center gap-1 text-caption text-status-done"><CircleCheck class="size-3" />{a.note}</span>
+						<div class="option-card rounded-lg">
+							<span class="icon-tile">{#if typeof M === 'string'}<RuntimeLogo runtime={M} class="size-5 ring-0" />{:else}<M class="size-4.5" />{/if}</span>
+							<span class="col-fill gap-1">
+								<span class="row-title-strong">{a.title}<Pill class={a.provider.kind === 'API 키' ? 'bg-review-soft text-status-review' : a.provider.kind === '로컬' ? '' : 'bg-primary-soft text-primary'}>{a.provider.kind}</Pill></span>
+								<span class="saved-note"><CircleCheck class="size-3" />{a.note}</span>
 							</span>
 						</div>
 					{/each}
-					<button type="button" onclick={() => openAdd()} class="flex items-center gap-2 rounded-lg px-3.5 py-2 text-body font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+					<button type="button" onclick={() => openAdd()} class="setup-more">
 						<Plus class="size-4" />다른 연결 추가 <span class="font-normal text-muted-foreground">(API 키 · 게이트웨이 · 로컬)</span>
 					</button>
 					{#if connOkAll}
-						<div class="flex items-center gap-2 rounded-md border border-success/40 bg-success-soft px-3.5 py-2.5 text-xs">
+						<div class="strip-success py-2.5">
 							<CircleCheck class="size-4 text-status-done" />
 							<span class="font-semibold">{connOkAll}개 연결 확인됨</span>
 							<span class="text-muted-foreground">다음 단계의 기본 팀 멤버에게 역할에 맞게 자동 배정돼요</span>
@@ -303,7 +303,7 @@
 							<InputGroup.Input bind:value={projectName} placeholder="프로젝트 이름" />
 						</InputGroup.Root>
 					</label>
-					<div class="flex flex-col gap-2 border-t pt-4">
+					<div class="form-block">
 						{@render field('저장소', 'GitHub App이 설치된 저장소만 보여요')}
 						<Select.Root type="single" bind:value={repo}>
 							<Select.Trigger class="h-10 w-full" aria-label="저장소">
@@ -312,7 +312,7 @@
 							<Select.Content>{#each repos as r (r.value)}<Select.Item value={r.value} label={r.value}>{r.value} <span class="text-muted-foreground">{r.meta}</span></Select.Item>{/each}</Select.Content>
 						</Select.Root>
 					</div>
-					<div class="flex flex-col gap-2 border-t pt-4">
+					<div class="form-block">
 						{@render field('기본 브랜치', '에이전트는 여기서 feat/<이슈>-<slug> 브랜치를 만들어요')}
 						<Select.Root type="single" bind:value={branch}>
 							<Select.Trigger class="h-10 w-full" aria-label="기본 브랜치">
@@ -321,14 +321,14 @@
 							<Select.Content>{#each branches as b (b.value)}<Select.Item value={b.value} label={b.value}>{b.value} <span class="text-muted-foreground">{b.meta}</span></Select.Item>{/each}</Select.Content>
 						</Select.Root>
 					</div>
-					<label class="flex items-center gap-3 border-t pt-4">
+					<label class="setup-toggle">
 						<span class="flex flex-1 flex-col gap-0.5">
 							<span class="text-body font-semibold">GitHub 이슈 가져오기</span>
 							<span class="text-xs text-muted-foreground">열린 이슈 {repoInfo.issues}개 → Backlog · 라벨 bug · feature만</span>
 						</span>
 						<Switch bind:checked={importIssues} />
 					</label>
-					<label class="flex items-center gap-3 border-t pt-4">
+					<label class="setup-toggle">
 						<span class="flex flex-1 flex-col gap-0.5">
 							<span class="text-body font-semibold">Orch가 첫 계획 세우기</span>
 							<span class="text-xs text-muted-foreground">가져온 이슈를 태스크로 나누고 배정안을 제안해요 (승인 후 실행)</span>
@@ -343,7 +343,7 @@
 							<InputGroup.Input bind:value={teamName} placeholder="팀 이름" />
 						</InputGroup.Root>
 					</label>
-					<div class="flex items-center gap-2 rounded-md bg-primary-soft px-3.5 py-2.5 text-xs">
+					<div class="strip bg-primary-soft py-2.5">
 						<Sparkles class="size-3.5 text-primary" />
 						<span class="font-semibold">Orch · PM</span>
 						<span class="text-muted-foreground">팀을 이끌고 태스크를 배정해요 · Claude Code · claude-opus-5.5 · Anthropic Max</span>
@@ -358,36 +358,36 @@
 								aria-checked={on}
 								onclick={() => (picked = on ? picked.filter((x) => x !== m.sn) : [...picked, m.sn])}
 								class={cn(
-									'flex items-start gap-3 rounded-lg border px-3.5 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+									'team-option',
 									on ? 'option-on' : 'bg-muted/50 opacity-60 hover:bg-muted hover:opacity-100'
 								)}
 							>
 								<RoleAvatar role={m.role} />
-								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+								<span class="row-text">
 									<span class="text-body font-semibold">{m.name} · {m.title}</span>
 									<span class="text-caption text-muted-foreground">템플릿 {m.title}</span>
-									<span class="flex items-center gap-1 text-caption text-muted-foreground"><RuntimeLogo runtime={m.runtime} class="size-3 ring-0" />{m.model} · {planLabel(conns.find((c) => c.runtime === m.runtime)?.plan)}</span>
+									<span class="meta-line gap-1"><RuntimeLogo runtime={m.runtime} class="size-3 ring-0" />{m.model} · {planLabel(conns.find((c) => c.runtime === m.runtime)?.plan)}</span>
 								</span>
 								{#if on}<CircleCheck class="size-4 shrink-0 text-primary" />{:else}<Circle class="size-4 shrink-0 text-subtle-foreground" />{/if}
 							</button>
 						{/each}
 						{#if extra}
-							<button type="button" role="checkbox" aria-checked="true" onclick={() => (extra = false)} class="flex items-start gap-3 rounded-lg border option-on px-3.5 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+							<button type="button" role="checkbox" aria-checked="true" onclick={() => (extra = false)} class="team-option option-on">
 								<RoleAvatar role={security.role} />
-								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+								<span class="row-text">
 									<span class="text-body font-semibold">하준 · {security.name}</span>
 									<span class="text-caption text-muted-foreground">템플릿 {security.name} v{security.version}</span>
-									<span class="flex items-center gap-1 text-caption text-muted-foreground"><RuntimeLogo runtime={security.runtime} class="size-3 ring-0" />{runtimeName(security.runtime)} · {security.model}</span>
+									<span class="meta-line gap-1"><RuntimeLogo runtime={security.runtime} class="size-3 ring-0" />{runtimeName(security.runtime)} · {security.model}</span>
 								</span>
 								<CircleCheck class="size-4 shrink-0 text-primary" />
 							</button>
 						{:else}
-							<button type="button" onclick={() => (extra = true)} class="flex items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/50 px-3.5 py-3 text-xs text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+							<button type="button" onclick={() => (extra = true)} class="dashed-add">
 								<Plus class="size-3.5" />역할 추가 (Security Reviewer 등)
 							</button>
 						{/if}
 					</div>
-					<div class="flex flex-col gap-2 border-t pt-4">
+					<div class="form-block">
 						{@render field('Orch 진행 방식', mode === 'timer' ? 'Auto = 판단이 필요 없는 일은 5초 타이머 후 자동 진행' : mode === 'manual' ? 'Manual = 매번 확인 후 진행' : 'Full auto = 대기 없이 진행 (루프 가드는 항상 적용)')}
 						<Segmented
 							aria-label="Orch 진행 방식"
@@ -398,19 +398,19 @@
 				{/if}
 			</div>
 
-			<footer class="flex items-center gap-2.5 border-t bg-muted/50 px-8 py-4">
+			<footer class="setup-foot">
 				{#if step === 0}
-					<span class="flex flex-1 items-center gap-1.5 text-xs text-muted-foreground">
+					<span class="meta-xs flex-1 gap-1.5">
 						{#if connOkAll}<CircleCheck class="size-3.5 text-status-done" />준비 완료 · 실행기 {detected} · 연결 {connOkAll}{:else}<LoaderCircle class="size-3.5 animate-spin" />연결 확인 중 · 1개 이상 확인되면 다음 버튼이 켜져요{/if}
 					</span>
 					<Button variant="ghost" size="sm" onclick={() => (step = 1)}>나중에 설정</Button>
 					<Button size="sm" disabled={!connOkAll} onclick={() => (step = 1)}><ArrowRight />다음 · 프로젝트</Button>
 				{:else if step === 1}
-					<span class="flex flex-1 items-center gap-1.5 text-xs text-muted-foreground"><Info class="size-3.5" />프로젝트는 나중에 상단 탭 + 에서 더 추가할 수 있어요</span>
+					<span class="meta-xs flex-1 gap-1.5"><Info class="size-3.5" />프로젝트는 나중에 상단 탭 + 에서 더 추가할 수 있어요</span>
 					<Button variant="ghost" size="sm" onclick={() => (step = 0)}><ArrowLeft />이전</Button>
 					<Button size="sm" disabled={!projectName.trim()} onclick={() => (step = 2)}><ArrowRight />다음 · 기본 팀</Button>
 				{:else}
-					<span class="flex flex-1 items-center gap-1.5 text-xs text-muted-foreground">
+					<span class="meta-xs flex-1 gap-1.5">
 						<Info class="size-3.5" />{importIssues && firstPlan ? `시작하면 Orch가 가져온 이슈 ${repoInfo.issues}개로 첫 계획을 제안해요` : '시작하면 빈 Workbench에서 Orch에게 목표를 알려주세요'}
 					</span>
 					<Button variant="ghost" size="sm" onclick={() => (step = 1)}><ArrowLeft />이전</Button>

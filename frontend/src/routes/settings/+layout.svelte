@@ -26,15 +26,15 @@
 </script>
 
 <div class="flex h-full">
-	<nav class="flex w-60 shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-sidebar px-3 py-5" aria-label="워크스페이스 설정">
-		<h2 class="px-2.5 pb-1.5 text-caption font-semibold text-muted-foreground">워크스페이스 설정</h2>
+	<nav class="side-nav w-60 px-3 py-5" aria-label="워크스페이스 설정">
+		<h2 class="section-label px-2.5 pb-1.5">워크스페이스 설정</h2>
 		{#each menus as m (m.href)}
 			{@const on = page.url.pathname.startsWith(m.href)}
 			<a
 				href={m.href}
 				aria-current={on ? 'page' : undefined}
 				class={cn(
-					'flex h-8.5 items-center gap-2.5 rounded-md px-2.5 text-body text-muted-foreground outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50',
+					'side-nav-item h-8.5 text-muted-foreground',
 					on && 'bg-accent font-semibold text-foreground'
 				)}
 			>
