@@ -26,11 +26,11 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
-	import { PageHeader } from '$lib/components/ui/page-header';
+	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Toggle } from '$lib/components/ui/toggle';
-	import { Pill } from '$lib/components/ui/pill';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Progress } from '$lib/components/ui/progress';
-	import { RuntimeLogo, type Runtime } from '$lib/components/ui/runtime-logo';
+	import { RuntimeLogo, type Runtime } from '$lib/components/orch/runtime-logo';
 	import { AddConnectionDialog, providerMark, type AddedConnection } from '$lib/components/orch/connection';
 	import { connections, fallbackChains, monthCost, type Connection, type ProviderKind, type SubRunTier } from '$lib/mock';
 	

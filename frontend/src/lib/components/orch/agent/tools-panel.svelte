@@ -14,8 +14,8 @@
 	import ShieldX from '@lucide/svelte/icons/shield-x';
 	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
-	import { Pill } from '$lib/components/ui/pill';
-	import { Segmented } from '$lib/components/ui/segmented';
+	import { Pill } from '$lib/components/orch/pill';
+	import { Segmented } from '$lib/components/orch/segmented';
 	import { mcpServers, type AgentConfig } from '$lib/mock';
 	import { scopeText, toggleIn } from '$lib/teams.svelte';
 	

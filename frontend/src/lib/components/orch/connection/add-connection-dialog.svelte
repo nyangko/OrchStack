@@ -12,7 +12,7 @@
 	import Plug from '@lucide/svelte/icons/plug';
 	import Zap from '@lucide/svelte/icons/zap';
 	import Cloud from '@lucide/svelte/icons/cloud';
-	import type { Runtime } from '$lib/components/ui/runtime-logo';
+	import type { Runtime } from '$lib/components/orch/runtime-logo';
 	import type { Provider } from '$lib/mock';
 
 	/// 제공자 표시 — 실행기 로고가 있으면 로고, 없으면 아이콘.
@@ -63,15 +63,15 @@
 	import * as Select from '$lib/components/ui/select';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
-	import { Steps } from '$lib/components/ui/steps';
-	import { Pill } from '$lib/components/ui/pill';
+	import { Steps } from '$lib/components/orch/steps';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Progress } from '$lib/components/ui/progress';
-	import { Segmented } from '$lib/components/ui/segmented';
-	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
+	import { Segmented } from '$lib/components/orch/segmented';
+	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import * as Field from '$lib/components/ui/field';
 	import { providers, type ProviderKind } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
-		import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 
 	let {
 		open = $bindable(false),
@@ -316,11 +316,11 @@
 					{#if list.length}
 						<section class="flex flex-col gap-2">
 							<span class="flex items-baseline gap-2 text-xs"><span class="font-semibold">{k}</span><span class="text-muted-foreground">{kindMeta[k].desc}</span></span>
-							<ChoiceCards.Root aria-label={k} class="grid-cols-3" value={sel?.key ?? null} onValueChange={(v) => pick(list.find((x) => x.key === v)!)}>
+							<ChoiceCards aria-label={k} class="grid-cols-3" value={sel?.key ?? null} onValueChange={(v) => pick(list.find((x) => x.key === v)!)}>
 								{#each list as p (p.key)}
 									{@const on = sel?.key === p.key}
 									{@const s = stateMeta[p.state]}
-									<ChoiceCards.Item value={p.key} ondblclick={() => (pick(p), (step = 1))} class="gap-2 rounded-lg px-3.5 py-3 hover:bg-muted/50">
+									<ChoiceCard value={p.key} ondblclick={() => (pick(p), (step = 1))} class="gap-2 rounded-lg px-3.5 py-3 hover:bg-muted/50">
 										<span class="row-title-strong">
 											{@render logoOf(p.key, 'sm')}<span class="flex-1 truncate">{p.name}</span>
 											{#if on}<CircleDot class="size-4 text-primary" />{:else}<Circle class="size-4 text-subtle-foreground" />{/if}
@@ -329,9 +329,9 @@
 											<Pill class={kindMeta[p.kind].pill}>{p.kind}</Pill>
 											<span class={['flex min-w-0 items-center gap-1', s.tone]}><s.icon class="size-3 shrink-0" /><span class="truncate">{p.note}</span></span>
 										</span>
-									</ChoiceCards.Item>
+									</ChoiceCard>
 								{/each}
-							</ChoiceCards.Root>
+							</ChoiceCards>
 						</section>
 					{/if}
 				{/each}

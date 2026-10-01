@@ -18,7 +18,7 @@
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import { Segmented } from '$lib/components/ui/segmented';
+	import { Segmented } from '$lib/components/orch/segmented';
 	import * as Field from '$lib/components/ui/field';
 	import { repos, type OrchPolicy, type ProjectTab } from '$lib/mock';
 	import { onMount } from 'svelte';

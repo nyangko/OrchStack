@@ -29,15 +29,15 @@
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
-	import { Pill } from '$lib/components/ui/pill';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Switch } from '$lib/components/ui/switch';
 	import { Input } from '$lib/components/ui/input';
 	import { Progress } from '$lib/components/ui/progress';
-	import { LimitRow } from '$lib/components/ui/limit-row';
-	import { RuntimeLogo, type Runtime } from '$lib/components/ui/runtime-logo';
+	import { LimitRow } from '$lib/components/orch/limit-row';
+	import { RuntimeLogo, type Runtime } from '$lib/components/orch/runtime-logo';
 	import { fallbackSteps, meters, modelCatalog, type AgentConfig, type ModelInfo } from '$lib/mock';
 	import { accountOf, low, runtimeName } from '$lib/teams.svelte';
-		import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 
 	let {
 		config: c,
@@ -260,10 +260,10 @@
 								{/if}
 							</div>
 							<!-- 배치는 섹션 그대로 두려고 contents -->
-							<ChoiceCards.Root aria-label="{p.label} 모델" class="contents" value={runtime === p.runtime ? model : null} onValueChange={(v) => (onchange(p.runtime, String(v)), (picker = false))}>
+							<ChoiceCards aria-label="{p.label} 모델" class="contents" value={runtime === p.runtime ? model : null} onValueChange={(v) => (onchange(p.runtime, String(v)), (picker = false))}>
 							{#each p.models as md (md.name)}
 								{@const on = model === md.name && runtime === p.runtime}
-								<ChoiceCards.Item value={md.name} layout="row">
+								<ChoiceCard value={md.name} layout="row">
 									{#if on}<CircleDot class="size-4 text-primary" />{:else}<Circle class="size-4 text-subtle-foreground" />{/if}
 									<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 										<span class="row-title">
@@ -275,9 +275,9 @@
 									<span class="num-cell w-24">{md.price}</span>
 									<span class="w-12 text-right font-mono text-caption">{md.ctx}</span>
 									<span class="w-12 text-right text-caption text-muted-foreground">● {md.speed}</span>
-								</ChoiceCards.Item>
+								</ChoiceCard>
 							{/each}
-							</ChoiceCards.Root>
+							</ChoiceCards>
 						</section>
 					{:else}
 						<p class="py-10 text-center text-xs text-muted-foreground">조건에 맞는 모델이 없어요.</p>

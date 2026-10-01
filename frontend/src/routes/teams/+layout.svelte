@@ -11,8 +11,8 @@
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
-	import { Segmented } from '$lib/components/ui/segmented';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
+	import { Segmented } from '$lib/components/orch/segmented';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
 	import { store, defaultTeam, glyphOf, membersOf } from '$lib/teams.svelte';
 	
 	let { children } = $props();

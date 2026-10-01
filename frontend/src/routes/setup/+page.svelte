@@ -32,18 +32,18 @@
 	import * as Select from '$lib/components/ui/select';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
-	import { Steps } from '$lib/components/ui/steps';
+	import { Steps } from '$lib/components/orch/steps';
 	import { Switch } from '$lib/components/ui/switch';
-	import { Pill } from '$lib/components/ui/pill';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Progress } from '$lib/components/ui/progress';
-	import { Segmented } from '$lib/components/ui/segmented';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
-	import { RuntimeLogo, type Runtime } from '$lib/components/ui/runtime-logo';
+	import { Segmented } from '$lib/components/orch/segmented';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
+	import { RuntimeLogo, type Runtime } from '$lib/components/orch/runtime-logo';
 	import { accounts, templates, type OrchPolicy } from '$lib/mock';
 	import { store, defaultTeam, runtimeName, low } from '$lib/teams.svelte';
 	import { SETUP_KEY } from '$lib/setup';
 	import { AddConnectionDialog, providerMark, type AddedConnection } from '$lib/components/orch/connection';
-		import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 
 	// -1 = 스플래시, 0 · 1 · 2 = 단계.
 	let step = $state(-1);
@@ -350,7 +350,7 @@
 					</div>
 					<span class="text-xs font-semibold text-muted-foreground">멤버 {picked.length + (extra ? 1 : 0)} · 체크 해제하면 빼고 시작해요</span>
 					<!-- 여러 명 고르기 — 추천 멤버 + 추가한 역할(extra) -->
-					<ChoiceCards.Root
+					<ChoiceCards
 						type="multiple"
 						aria-label="기본 팀 멤버"
 						class="grid-cols-2"
@@ -358,7 +358,7 @@
 					>
 						{#each recommended.members as m (m.sn)}
 							{@const on = picked.includes(m.sn)}
-							<ChoiceCards.Item value={m.sn} layout="row" tone="dim" class="items-start rounded-lg px-3.5 py-3">
+							<ChoiceCard value={m.sn} layout="row" tone="dim" class="items-start rounded-lg px-3.5 py-3">
 								<RoleAvatar role={m.role} />
 								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<span class="text-body font-semibold">{m.name} · {m.title}</span>
@@ -366,10 +366,10 @@
 									<span class="meta-line gap-1"><RuntimeLogo runtime={m.runtime} class="size-3 ring-0" />{m.model} · {planLabel(conns.find((c) => c.runtime === m.runtime)?.plan)}</span>
 								</span>
 								{#if on}<CircleCheck class="size-4 shrink-0 text-primary" />{:else}<Circle class="size-4 shrink-0 text-subtle-foreground" />{/if}
-							</ChoiceCards.Item>
+							</ChoiceCard>
 						{/each}
 						{#if extra}
-							<ChoiceCards.Item value="extra" layout="row" tone="dim" class="items-start rounded-lg px-3.5 py-3">
+							<ChoiceCard value="extra" layout="row" tone="dim" class="items-start rounded-lg px-3.5 py-3">
 								<RoleAvatar role={security.role} />
 								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<span class="text-body font-semibold">하준 · {security.name}</span>
@@ -377,13 +377,13 @@
 									<span class="meta-line gap-1"><RuntimeLogo runtime={security.runtime} class="size-3 ring-0" />{runtimeName(security.runtime)} · {security.model}</span>
 								</span>
 								<CircleCheck class="size-4 shrink-0 text-primary" />
-							</ChoiceCards.Item>
+							</ChoiceCard>
 						{:else}
 							<button type="button" onclick={() => (extra = true)} class="flex items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/50 px-3.5 py-3 text-xs text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
 								<Plus class="size-3.5" />역할 추가 (Security Reviewer 등)
 							</button>
 						{/if}
-					</ChoiceCards.Root>
+					</ChoiceCards>
 					<div class="form-block">
 						{@render field('Orch 진행 방식', mode === 'timer' ? 'Auto = 판단이 필요 없는 일은 5초 타이머 후 자동 진행' : mode === 'manual' ? 'Manual = 매번 확인 후 진행' : 'Full auto = 대기 없이 진행 (루프 가드는 항상 적용)')}
 						<Segmented

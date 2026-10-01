@@ -30,7 +30,7 @@
 	import FolderTree from "@lucide/svelte/icons/folder-tree";
 	import ListChecks from "@lucide/svelte/icons/list-checks";
 	import TokenMeter from "./token-meter.svelte";
-	import * as NodeCard from "$lib/components/ui/node-card";
+	import { NodeCard, NodeCardHeader, NodeCardKind, NodeCardRef, NodeCardTitle, NodeCardFooter } from "$lib/components/orch/node-card";
 	
 	let { data, selected }: NodeProps<Node<SubRun>> = $props();
 
@@ -45,14 +45,14 @@
 <Handle type="source" position={Position.Top} id="t" class="opacity-0" />
 <Handle type="target" position={Position.Bottom} id="b" class="opacity-0" />
 
-<NodeCard.Root {selected} dashed={data.mode !== "runner"} class="h-41 px-3.5 py-3">
-	<NodeCard.Header>
-		<NodeCard.Kind class={md.tile}><md.icon /></NodeCard.Kind>
-		<NodeCard.Ref>{data.mode.toUpperCase()} · {data.id}</NodeCard.Ref>
+<NodeCard {selected} dashed={data.mode !== "runner"} class="h-41 px-3.5 py-3">
+	<NodeCardHeader>
+		<NodeCardKind class={md.tile}><md.icon /></NodeCardKind>
+		<NodeCardRef>{data.mode.toUpperCase()} · {data.id}</NodeCardRef>
 		{#if data.tier}<span class={["flex items-center gap-0.5 rounded-xs px-1.5 py-px font-mono text-2xs font-bold", tierTone[data.tier]]}><Cpu class="size-2.5" />{data.tier}</span>{/if}
-	</NodeCard.Header>
+	</NodeCardHeader>
 	<!-- 글자 크기를 바꾸면 cn이 leading도 지워서 같이 넘긴다 -->
-	<NodeCard.Title class="text-body leading-tight">{data.goal}</NodeCard.Title>
+	<NodeCardTitle class="text-body leading-tight">{data.goal}</NodeCardTitle>
 	<div class="meta-line gap-3">
 		<span class="flex items-center gap-1"><FolderTree class="size-3" />paths {data.paths.length - outside}</span>
 		{#if asked}<span class="font-medium text-primary">+{asked} via @ASK</span>{/if}
@@ -60,7 +60,7 @@
 		<span class="flex items-center gap-1"><ListChecks class="size-3" />ac {done}/{data.ac.length}</span>
 	</div>
 	<span class="flex-1"></span>
-	<NodeCard.Footer>
+	<NodeCardFooter>
 		<span class={["chip-round gap-1 text-caption font-medium", st.tone]}>
 			<st.icon class={["size-3", data.status === "running" && "animate-spin motion-reduce:animate-none"]} />{st.label}
 		</span>
@@ -73,5 +73,5 @@
 			{/if}
 			<span class={["text-caption text-muted-foreground", data.status !== "queued" && "font-mono"]}>{data.status === "queued" ? "대기" : `${data.minutes}m`}</span>
 		</span>
-	</NodeCard.Footer>
-</NodeCard.Root>
+	</NodeCardFooter>
+</NodeCard>

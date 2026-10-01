@@ -13,8 +13,8 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Select from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
-	import { PageHeader } from '$lib/components/ui/page-header';
-	import { Pill } from '$lib/components/ui/pill';
+	import { PageHeader } from '$lib/components/orch/page-header';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Switch } from '$lib/components/ui/switch';
 	import * as Field from '$lib/components/ui/field';
 	import { notifyEvents, notifyChannels, notifyQuiet, type NotifyChannel } from '$lib/mock';

@@ -26,8 +26,8 @@ import PenTool from "@lucide/svelte/icons/pen-tool";
 import Shapes from "@lucide/svelte/icons/shapes";
 import type { Role } from "$lib/roles";
 import { useMock } from "$lib/api/env";
-import type { Runtime } from "$lib/components/ui/runtime-logo";
-import type { MdFile } from "$lib/components/ui/md-editor";
+import type { Runtime } from "$lib/components/orch/runtime-logo";
+import type { MdFile } from "$lib/components/orch/md-editor";
 import { projects, teams, templates, orchPolicy, skillLibrary, skillSources, skillLog, accounts, mcpServers, teamPolicy, type AgentConfig, type OrchPolicy, type TeamMember, type Template, type Skill, type SkillHit } from "$lib/mock";
 
 export const store = $state({

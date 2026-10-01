@@ -4,8 +4,8 @@
 	import type { Snippet } from 'svelte';
 	import UserRoundX from '@lucide/svelte/icons/user-round-x';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
-	import * as Combobox from '$lib/components/ui/combobox';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
+	import { Combobox, ComboboxTrigger, ComboboxContent, ComboboxSearch, ComboboxList, ComboboxEmpty, ComboboxGroup, ComboboxItem, ComboboxSeparator } from '$lib/components/orch/combobox';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
 	import { Progress } from '$lib/components/ui/progress';
 	import { roles } from '$lib/roles';
 	import type { Agent, Task } from '$lib/mock';
@@ -49,19 +49,19 @@
 
 </script>
 
-<Combobox.Root bind:open>
-	<Combobox.Trigger>
+<Combobox bind:open>
+	<ComboboxTrigger>
 		{#snippet child({ props })}{@render trigger(props)}{/snippet}
-	</Combobox.Trigger>
-	<Combobox.Content class="w-70">
-		<Combobox.Search placeholder="에이전트 검색…" />
-		<Combobox.List>
-			<Combobox.Empty>찾는 에이전트가 없어요</Combobox.Empty>
+	</ComboboxTrigger>
+	<ComboboxContent class="w-70">
+		<ComboboxSearch placeholder="에이전트 검색…" />
+		<ComboboxList>
+			<ComboboxEmpty>찾는 에이전트가 없어요</ComboboxEmpty>
 			{#each groups as g (g.heading)}
-				<Combobox.Group heading={g.heading}>
+				<ComboboxGroup heading={g.heading}>
 					{#each g.list as a (a.sn)}
 						{@const l = load(a.sn)}
-						<Combobox.Item value="{a.name} {roles[a.role].label}" selected={value === a.sn} onSelect={() => (value = a.sn)} class="gap-2 py-1.5">
+						<ComboboxItem value="{a.name} {roles[a.role].label}" selected={value === a.sn} onSelect={() => (value = a.sn)} class="gap-2 py-1.5">
 							<RoleAvatar role={a.role} size="sm" />
 							<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="flex items-center gap-1.5"><span class="font-medium">{a.name}</span><span class="text-xs text-muted-foreground">{roles[a.role].label}</span></span>
@@ -70,25 +70,25 @@
 									<span class={l.tone}>{l.note}</span>
 								</span>
 							</span>
-						</Combobox.Item>
+						</ComboboxItem>
 					{/each}
-				</Combobox.Group>
+				</ComboboxGroup>
 			{/each}
-			<Combobox.Group>
-				<Combobox.Item value="Unassigned 미배정" selected={value === undefined} onSelect={() => (value = undefined)} class="gap-2">
+			<ComboboxGroup>
+				<ComboboxItem value="Unassigned 미배정" selected={value === undefined} onSelect={() => (value = undefined)} class="gap-2">
 					<span class="flex items-center justify-center size-5 rounded-xs bg-muted"><UserRoundX class="size-3 text-muted-foreground" /></span>
 					<span class="font-medium">Unassigned</span>
-				</Combobox.Item>
-			</Combobox.Group>
+				</ComboboxItem>
+			</ComboboxGroup>
 			{#if onorch}
-				<Combobox.Separator />
-				<Combobox.Group>
-					<Combobox.Item value="Orch에게 배정 맡기기" onSelect={() => onorch()} class="gap-2">
+				<ComboboxSeparator />
+				<ComboboxGroup>
+					<ComboboxItem value="Orch에게 배정 맡기기" onSelect={() => onorch()} class="gap-2">
 						<span class="flex size-5 items-center justify-center"><Sparkles class="size-3.5 text-primary" /></span>
 						<span class="flex flex-col gap-0.5"><span class="font-medium">Orch에게 배정 맡기기</span><span class="text-xs text-muted-foreground">역할 · 부하 · 컨텍스트 기준</span></span>
-					</Combobox.Item>
-				</Combobox.Group>
+					</ComboboxItem>
+				</ComboboxGroup>
 			{/if}
-		</Combobox.List>
-	</Combobox.Content>
-</Combobox.Root>
+		</ComboboxList>
+	</ComboboxContent>
+</Combobox>

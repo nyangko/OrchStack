@@ -20,12 +20,12 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
-	import { PageHeader } from '$lib/components/ui/page-header';
-	import { Pill } from '$lib/components/ui/pill';
+	import { PageHeader } from '$lib/components/orch/page-header';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Progress } from '$lib/components/ui/progress';
-	import { MdEditor } from '$lib/components/ui/md-editor';
-	import { KeyValueRow } from '$lib/components/ui/key-value-row';
-	import { HistoryRow } from '$lib/components/ui/history-row';
+	import { MdEditor } from '$lib/components/orch/md-editor';
+	import { KeyValueRow } from '$lib/components/orch/key-value-row';
+	import { HistoryRow } from '$lib/components/orch/history-row';
 	import { presets, type Preset, type PresetKind } from '$lib/mock';
 	import { store, membersOf } from '$lib/teams.svelte';
 	

@@ -28,11 +28,11 @@
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
-	import { Pill } from '$lib/components/ui/pill';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Progress } from '$lib/components/ui/progress';
-	import { StatusBadge } from '$lib/components/ui/status-badge';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
-	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
+	import { StatusBadge } from '$lib/components/orch/status-badge';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
+	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import { statuses, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
 	import { tasks, projectTasks, decisions, type Task } from '$lib/mock';

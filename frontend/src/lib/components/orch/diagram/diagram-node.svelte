@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	import type { TaskStatus } from "$lib/status";
 	import type { Role } from "$lib/roles";
-	import type { Runtime } from "$lib/components/ui/runtime-logo";
+	import type { Runtime } from "$lib/components/orch/runtime-logo";
 
 	import type { MenuEntry } from "$lib/components/ui/dropdown-menu/index.js";
 	export type { MenuEntry };
@@ -39,13 +39,13 @@
 	import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
 	import Ellipsis from "@lucide/svelte/icons/ellipsis";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-	import * as NodeCard from "$lib/components/ui/node-card";
+	import { NodeCard, NodeCardHeader, NodeCardKind, NodeCardRef, NodeCardTitle, NodeCardFooter } from "$lib/components/orch/node-card";
 	import { Button } from "$lib/components/ui/button";
 	import { Badge } from "$lib/components/ui/badge";
 	import { Progress } from "$lib/components/ui/progress";
-	import { StatusBadge } from "$lib/components/ui/status-badge";
-	import { RoleAvatar } from "$lib/components/ui/role-avatar";
-	import { RuntimeLogo } from "$lib/components/ui/runtime-logo";
+	import { StatusBadge } from "$lib/components/orch/status-badge";
+	import { RoleAvatar } from "$lib/components/orch/role-avatar";
+	import { RuntimeLogo } from "$lib/components/orch/runtime-logo";
 	import TokenMeter from "./token-meter.svelte";
 	
 	let { data, selected }: NodeProps<Node<DiagramNodeData>> = $props();
@@ -67,10 +67,10 @@
 <Handle type="target" position={Position.Top} id="t" class="opacity-0" />
 <Handle type="source" position={Position.Bottom} id="b" class="opacity-0" />
 
-<NodeCard.Root {selected}>
-	<NodeCard.Header>
-		<NodeCard.Kind class={kind.bg}><kind.icon /></NodeCard.Kind>
-		<NodeCard.Ref>{data.ref}</NodeCard.Ref>
+<NodeCard {selected}>
+	<NodeCardHeader>
+		<NodeCardKind class={kind.bg}><kind.icon /></NodeCardKind>
+		<NodeCardRef>{data.ref}</NodeCardRef>
 		{#if data.menu?.length}
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
@@ -85,8 +85,8 @@
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 		{/if}
-	</NodeCard.Header>
-	<NodeCard.Title>{data.title}</NodeCard.Title>
+	</NodeCardHeader>
+	<NodeCardTitle>{data.title}</NodeCardTitle>
 	{#if data.tokens}<TokenMeter self={data.tokens.self} runner={data.tokens.runner} />{/if}
 	{#if data.who}
 		<div class="flex items-center gap-1.5 text-xs">
@@ -108,8 +108,8 @@
 			{data.alert.text}
 		</div>
 	{/if}
-	<NodeCard.Footer>
+	<NodeCardFooter>
 		{#if data.status}<StatusBadge status={data.status} />{:else if data.badge}<Badge variant="secondary">{data.badge}</Badge>{:else}<span></span>{/if}
 		{#if data.meta}<span class="mono-meta truncate">{data.meta}</span>{/if}
-	</NodeCard.Footer>
-</NodeCard.Root>
+	</NodeCardFooter>
+</NodeCard>

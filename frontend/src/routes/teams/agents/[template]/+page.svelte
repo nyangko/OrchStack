@@ -27,12 +27,12 @@
 	import * as Empty from '$lib/components/ui/empty';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Pill } from '$lib/components/ui/pill';
-	import { Segmented } from '$lib/components/ui/segmented';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
-	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
-	import { MdEditor, estimateTokens, type MdFile } from '$lib/components/ui/md-editor';
-	import { KeyValueRow } from '$lib/components/ui/key-value-row';
+	import { Pill } from '$lib/components/orch/pill';
+	import { Segmented } from '$lib/components/orch/segmented';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
+	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
+	import { MdEditor, estimateTokens, type MdFile } from '$lib/components/orch/md-editor';
+	import { KeyValueRow } from '$lib/components/orch/key-value-row';
 	import SkillsPanel from '$lib/components/orch/agent/skills-panel.svelte';
 	import ToolsPanel from '$lib/components/orch/agent/tools-panel.svelte';
 	import PermPanel from '$lib/components/orch/agent/perm-panel.svelte';

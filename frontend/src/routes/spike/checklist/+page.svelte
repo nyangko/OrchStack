@@ -1,6 +1,6 @@
 <script lang="ts">
 	/// ui/checklist 스파이크 — 태스크와 무관한 데이터 · 읽기 전용 목록.
-	import { Checklist, type ChecklistItem } from "$lib/components/ui/checklist/index.js";
+	import { Checklist, type ChecklistItem } from "$lib/components/orch/checklist/index.js";
 
 	let groceries = $state<ChecklistItem[]>([{ text: "우유", done: true }, { text: "달걀", done: false }]);
 	const steps: ChecklistItem[] = [{ text: "설치", done: true }, { text: "로그인", done: false }];

@@ -13,9 +13,9 @@
 	import Lock from '@lucide/svelte/icons/lock';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { Button } from '$lib/components/ui/button';
-	import { PageHeader } from '$lib/components/ui/page-header';
-	import { Pill } from '$lib/components/ui/pill';
-	import { MdEditor } from '$lib/components/ui/md-editor';
+	import { PageHeader } from '$lib/components/orch/page-header';
+	import { Pill } from '$lib/components/orch/pill';
+	import { MdEditor } from '$lib/components/orch/md-editor';
 	import { reportForms, reportSample, type ReportForm } from '$lib/mock';
 	
 	/// base — 복제본이면 원본 양식 key (잠긴 칸 · 아이콘을 원본에서 가져온다). name은 편집기 파일 이름.

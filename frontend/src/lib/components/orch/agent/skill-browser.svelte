@@ -19,9 +19,9 @@
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
-	import { Pill } from '$lib/components/ui/pill';
-	import { MdEditor } from '$lib/components/ui/md-editor';
-	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
+	import { Pill } from '$lib/components/orch/pill';
+	import { MdEditor } from '$lib/components/orch/md-editor';
+	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import { skillsSh, type SkillHit } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
 

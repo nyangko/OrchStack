@@ -32,7 +32,7 @@
 	import GitBranch from '@lucide/svelte/icons/git-branch';
 	import CornerDownRight from '@lucide/svelte/icons/corner-down-right';
 	import * as Table from '$lib/components/ui/table';
-	import { StatusSelect } from '$lib/components/ui/status-select';
+	import { StatusSelect } from '$lib/components/orch/status-select';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import * as Alert from '$lib/components/ui/alert';
 	import Link2 from '@lucide/svelte/icons/link-2';
@@ -41,8 +41,8 @@
 	import MessageCircleQuestion from '@lucide/svelte/icons/message-circle-question';
 	import Check from '@lucide/svelte/icons/check';
 	import Hourglass from '@lucide/svelte/icons/hourglass';
-	import * as Message from '$lib/components/ui/message';
-	import * as Bubble from '$lib/components/ui/bubble';
+	import { Message, MessageContent, MessageFooter, MessageHeader } from '$lib/components/orch/message';
+	import { Bubble, BubbleContent } from '$lib/components/orch/bubble';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { untrack, onDestroy, type Component } from 'svelte';
@@ -83,16 +83,16 @@
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
-	import { StatusBadge } from '$lib/components/ui/status-badge';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
-	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
+	import { StatusBadge } from '$lib/components/orch/status-badge';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
+	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import { statuses, statusOrder, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
 	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, type Issue, type Chat, type SubRun, type SpawnMode } from '$lib/mock';
 	import { store, defaultTeam } from '$lib/teams.svelte';
-	import { Segmented } from '$lib/components/ui/segmented';
-	import { Pill } from '$lib/components/ui/pill';
-	import * as Inspector from '$lib/components/ui/inspector';
+	import { Segmented } from '$lib/components/orch/segmented';
+	import { Pill } from '$lib/components/orch/pill';
+	import { Inspector, InspectorHeader, InspectorBody, InspectorSection, InspectorValueRow } from '$lib/components/orch/inspector';
 	import Bot from '@lucide/svelte/icons/bot';
 	import Users from '@lucide/svelte/icons/users';
 	import GitFork from '@lucide/svelte/icons/git-fork';
@@ -121,17 +121,17 @@
 	import UserRoundX from '@lucide/svelte/icons/user-round-x';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Kbd } from '$lib/components/ui/kbd';
-	import * as ChoiceCards from '$lib/components/ui/choice-cards';
+	import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 	import { mergeProps } from 'bits-ui';
 	import { Input } from '$lib/components/ui/input';
-	import * as Attachment from '$lib/components/ui/attachment';
+	import { AttachmentGroup, Attachment, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription, AttachmentActions, AttachmentAction } from '$lib/components/orch/attachment';
 	import * as HoverCard from '$lib/components/ui/hover-card';
 	import { Switch } from '$lib/components/ui/switch';
-	import { applyMd, type MdFormat } from '$lib/components/ui/md-editor';
+	import { applyMd, type MdFormat } from '$lib/components/orch/md-editor';
 	import AssigneePicker from '$lib/components/orch/task/assignee-picker.svelte';
 	import DependsPicker from '$lib/components/orch/task/depends-picker.svelte';
 	import PriorityPicker from '$lib/components/orch/task/priority-picker.svelte';
-	import { Checklist } from '$lib/components/ui/checklist';
+	import { Checklist } from '$lib/components/orch/checklist';
 	import { priorities, priorityOrder, type Priority } from '$lib/priority';
 	import type { Role } from '$lib/roles';
 	import type { TaskDetail } from '$lib/mock';
@@ -1222,8 +1222,8 @@
 				{@const iss = issueOf(cur.issue)}
 				<!-- 태스크 상세: 뷰 위 scrim + 패널. Esc · 닫기 버튼으로 닫는다 -->
 				<div class="scrim">
-					<Inspector.Root label="Task #{cur.num} 상세">
-						<Inspector.Header onclose={() => (detail = false)} closeLabel="상세 닫기">
+					<Inspector label="Task #{cur.num} 상세">
+						<InspectorHeader onclose={() => (detail = false)} closeLabel="상세 닫기">
 								<span class="kind-tile size-8 bg-node-task"><SquareCheck class="size-4" /></span>
 								<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<p class="truncate text-xs text-muted-foreground">{project.name} / Issue #{cur.issue} {iss?.title} / <span class="font-mono">TASK #{cur.num}</span></p>
@@ -1262,8 +1262,8 @@
 								</Alert.Root>
 							{/if}
 							{/snippet}
-						</Inspector.Header>
-						<Inspector.Body class="flex-row">
+						</InspectorHeader>
+						<InspectorBody class="flex-row">
 							<div class="detail-main">
 								<section class="flex flex-col gap-2">
 									<h3 class="text-body font-semibold">Description</h3>
@@ -1403,8 +1403,8 @@
 									</section>
 								{/if}
 							</aside>
-						</Inspector.Body>
-					</Inspector.Root>
+						</InspectorBody>
+					</Inspector>
 				</div>
 			{/if}
 			{#if curIssue}
@@ -1416,8 +1416,8 @@
 				{@const icon = statuses[issueIcon[iss.status]]}
 				<!-- 이슈 상세: Task Detail과 같은 틀 (scrim + 패널). 하위 이슈 · 태스크를 눌러 이어서 연다 -->
 				<div class="scrim">
-					<Inspector.Root label="Issue #{iss.num} 상세">
-						<Inspector.Header onclose={() => (issueSel = undefined)} closeLabel="상세 닫기">
+					<Inspector label="Issue #{iss.num} 상세">
+						<InspectorHeader onclose={() => (issueSel = undefined)} closeLabel="상세 닫기">
 								<span class="kind-tile size-8 bg-node-issue"><CircleDot class="size-4" /></span>
 								<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<p class="truncate text-xs text-muted-foreground">
@@ -1445,8 +1445,8 @@
 								<Button variant="ghost" size="sm" onclick={() => askPm(`Issue #${iss.num}`)}><MessageCircleQuestion />Ask PM about this</Button>
 							</div>
 							{/snippet}
-						</Inspector.Header>
-						<Inspector.Body class="flex-row">
+						</InspectorHeader>
+						<InspectorBody class="flex-row">
 							<div class="detail-main">
 								<section class="flex flex-col gap-2">
 									<h3 class="text-body font-semibold">Description</h3>
@@ -1496,8 +1496,8 @@
 									{/each}
 								</section>
 							</aside>
-						</Inspector.Body>
-					</Inspector.Root>
+						</InspectorBody>
+					</Inspector>
 				</div>
 			{/if}
 			{#if subCur}
@@ -1509,8 +1509,8 @@
 				{@const cur = s.runs.at(-1)}
 				{@const pathsTitle = `PATHS · ${s.paths.length - bad.length}` + (bad.length ? ' · 범위 위반' : s.paths.some((p) => p.from === 'ask') ? ` · 처음 ${s.paths.filter((p) => p.from === 'orig').length} + @ASK ${s.paths.filter((p) => p.from === 'ask').length}` : '')}
 				<!-- 하위 작업 카드: 뷰 오른쪽 (.pen SubRun Inspector Card, 340px) -->
-				<Inspector.Root label="하위 작업 {s.id}" floating>
-					<Inspector.Header onclose={() => (subSel = undefined)} closeLabel="하위 작업 카드 닫기">
+				<Inspector label="하위 작업 {s.id}" floating>
+					<InspectorHeader onclose={() => (subSel = undefined)} closeLabel="하위 작업 카드 닫기">
 							<span class={['flex size-7 shrink-0 items-center justify-center rounded-sm text-on-solid', md.tile]}><md.icon class="size-4" /></span>
 							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="meta-line gap-1.5 font-mono font-semibold">
@@ -1526,23 +1526,23 @@
 							<Button variant="ghost" size="icon-sm" class="bg-destructive-soft text-destructive" aria-label="하위 작업 중지" disabled={s.status !== 'running'}><Square /></Button>
 						</div>
 						{/snippet}
-					</Inspector.Header>
-					<Inspector.Body>
-						<Inspector.Section title="SUB-RUN">
-							<Inspector.ValueRow icon={Split} label="mode" value={{ runner: 'runner · 별도 Run', sub: 'sub · 리드 Run 안', fork: 'fork · 부모 컨텍스트 상속' }[s.mode]} />
-							<Inspector.ValueRow icon={Play} label="시작" value={`리드 Run #${s.leadRun}`} />
+					</InspectorHeader>
+					<InspectorBody>
+						<InspectorSection title="SUB-RUN">
+							<InspectorValueRow icon={Split} label="mode" value={{ runner: 'runner · 별도 Run', sub: 'sub · 리드 Run 안', fork: 'fork · 부모 컨텍스트 상속' }[s.mode]} />
+							<InspectorValueRow icon={Play} label="시작" value={`리드 Run #${s.leadRun}`} />
 							{#if s.retry}
-								<Inspector.ValueRow icon={RotateCcw} label="재시도">
+								<InspectorValueRow icon={RotateCcw} label="재시도">
 									<span class="flex items-center gap-1 font-medium">Run #{s.runs[0].num}<ArrowRight class="size-3" /><span class="text-muted-foreground">등급</span>
 										<span class={['mono-tag', tierTone[s.retry.from]]}>{s.retry.from}</span><ArrowRight class="size-3" /><span class={['mono-tag', tierTone[s.retry.to]]}>{s.retry.to}</span>
 									</span>
-								</Inspector.ValueRow>
+								</InspectorValueRow>
 							{/if}
-							{#if s.tier}<Inspector.ValueRow icon={Gauge} label="tier" value={`${s.tier} · ${s.retry ? `재시도로 ${s.retry.from}에서 올림` : `kind ${s.kind} → 규칙 엔진`}`} />{/if}
-							{#if s.model}<Inspector.ValueRow icon={Cpu} label="model" value={s.model} />{/if}
-							<Inspector.ValueRow icon={Timer} label="소요" value={s.status === 'queued' ? '대기 중' : `${s.minutes}m`} />
-						</Inspector.Section>
-						<Inspector.Section title={pathsTitle}>
+							{#if s.tier}<InspectorValueRow icon={Gauge} label="tier" value={`${s.tier} · ${s.retry ? `재시도로 ${s.retry.from}에서 올림` : `kind ${s.kind} → 규칙 엔진`}`} />{/if}
+							{#if s.model}<InspectorValueRow icon={Cpu} label="model" value={s.model} />{/if}
+							<InspectorValueRow icon={Timer} label="소요" value={s.status === 'queued' ? '대기 중' : `${s.minutes}m`} />
+						</InspectorSection>
+						<InspectorSection title={pathsTitle}>
 							{#if bad.length}
 								<Alert.Root variant="destructive" class="mb-1">
 									<OctagonX />
@@ -1565,37 +1565,37 @@
 								{:else if bad.length}재시도하면 등급이 한 단계 올라가요. 경로가 더 필요하면 @ASK로 요청해요.
 								{:else}paths 밖 파일을 고치면 실패로 처리돼요. 겹치는 경로의 하위 작업은 순서대로 실행돼요.{/if}
 							</p>
-						</Inspector.Section>
-						<Inspector.Section title={`@REPORT · ac ${s.ac.filter((a) => a.ok).length}/${s.ac.length}`}>
+						</InspectorSection>
+						<InspectorSection title={`@REPORT · ac ${s.ac.filter((a) => a.ok).length}/${s.ac.length}`}>
 							{#each s.ac as a (a.text)}
 								<span class="flex items-center gap-2 py-0.5"><Checkbox checked={a.ok} disabled aria-label={a.text} />{a.text}</span>
 							{/each}
 							{#if s.report}<p class="mt-1 rounded-md bg-muted px-2.5 py-2 text-caption text-muted-foreground">{s.report}</p>{/if}
-						</Inspector.Section>
-						<Inspector.Section title="TOKENS">
-							<Inspector.ValueRow icon={Coins} label="이 Run">
+						</InspectorSection>
+						<InspectorSection title="TOKENS">
+							<InspectorValueRow icon={Coins} label="이 Run">
 								{#if s.mode !== 'runner'}<TokenMeter included />{:else if cur}<TokenMeter self={cur.tokens} class="text-foreground" />{:else}<span class="text-muted-foreground">시작 전</span>{/if}
-							</Inspector.ValueRow>
+							</InspectorValueRow>
 							{#if s.runs.length > 1}
-								<Inspector.ValueRow icon={RotateCcw} label="재시도 전 Run #{s.runs[0].num}"><TokenMeter self={s.runs[0].tokens} /></Inspector.ValueRow>
+								<InspectorValueRow icon={RotateCcw} label="재시도 전 Run #{s.runs[0].num}"><TokenMeter self={s.runs[0].tokens} /></InspectorValueRow>
 							{/if}
 							<p class="pt-1 text-caption text-muted-foreground">{s.mode === 'runner' ? '리드와 따로 쌓이고 리드 합계에만 더해져요.' : '리드 Run 안에서 돌아 리드 사용량에 이미 들어 있어요.'}</p>
-						</Inspector.Section>
-						<Inspector.Section title="WORKTREE · {s.workdir.mode === 'repo' ? 'repo 모드' : 'worktree'}">
-							<Inspector.ValueRow icon={GitBranch} label="모드" value={s.workdir.mode === 'repo' ? 'repo 모드 · worktree 없음' : 'worktree'} />
-							<Inspector.ValueRow icon={FolderGit2} label="경로" value={s.workdir.path ?? '저장소 그대로 · orchstack/app'} />
-							<Inspector.ValueRow icon={GitBranch} label="브랜치" value={s.workdir.branch} />
-							{#if s.workdir.mode === 'worktree'}<Inspector.ValueRow icon={Trash2} label="정리" value={s.status === 'failed' ? '실패 · 24시간 보관 후 삭제' : '완료 후 병합 · 삭제'} />{/if}
-						</Inspector.Section>
-					</Inspector.Body>
-				</Inspector.Root>
+						</InspectorSection>
+						<InspectorSection title="WORKTREE · {s.workdir.mode === 'repo' ? 'repo 모드' : 'worktree'}">
+							<InspectorValueRow icon={GitBranch} label="모드" value={s.workdir.mode === 'repo' ? 'repo 모드 · worktree 없음' : 'worktree'} />
+							<InspectorValueRow icon={FolderGit2} label="경로" value={s.workdir.path ?? '저장소 그대로 · orchstack/app'} />
+							<InspectorValueRow icon={GitBranch} label="브랜치" value={s.workdir.branch} />
+							{#if s.workdir.mode === 'worktree'}<InspectorValueRow icon={Trash2} label="정리" value={s.status === 'failed' ? '실패 · 24시간 보관 후 삭제' : '완료 후 병합 · 삭제'} />{/if}
+						</InspectorSection>
+					</InspectorBody>
+				</Inspector>
 			{/if}
 			{#if agentSel}
 				{@const a = agentSel}
 				{@const mine = list.filter((t) => t.agent === a.sn)}
 				<!-- 에이전트 카드: 뷰 오른쪽에 뜬다 (.pen Agent Inspector Card, 340px) -->
-				<Inspector.Root label="{a.name} 에이전트" floating>
-					<Inspector.Header onclose={() => (inspect = undefined)} closeLabel="에이전트 카드 닫기">
+				<Inspector label="{a.name} 에이전트" floating>
+					<InspectorHeader onclose={() => (inspect = undefined)} closeLabel="에이전트 카드 닫기">
 							<RoleAvatar role={a.role} />
 							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="title-sm gap-1.5">{a.name}<RuntimeLogo runtime={a.runtime} class="size-3.5 ring-0" /></span>
@@ -1610,7 +1610,7 @@
 							<Button variant="ghost" size="icon-sm" class="bg-destructive-soft text-destructive" aria-label="중지"><Square /></Button>
 						</div>
 						{/snippet}
-					</Inspector.Header>
+					</InspectorHeader>
 					<Tabs.Root bind:value={inspectTab} class="flex min-h-0 flex-1 flex-col gap-0">
 						<Tabs.List variant="line" class="w-full justify-start px-4">
 							{#each [['overview', 'Overview'], ['activity', 'Activity'], ['runs', 'Runs'], ['config', 'Config']] as [v, l] (v)}<Tabs.Trigger value={v}>{l}</Tabs.Trigger>{/each}
@@ -1673,7 +1673,7 @@
 							<Button type="submit" size="icon-sm" aria-label="지시 보내기" disabled={!instruction.trim()}><ArrowUp /></Button>
 						</div>
 					</form>
-				</Inspector.Root>
+				</Inspector>
 			{/if}
 			</div>
 
@@ -1742,20 +1742,20 @@
 					{/if}
 					{#each chat as c, i (i)}
 						{#if c.kind === 'user'}
-							<Message.Root align="end">
-								<Message.Content>
-									<Bubble.Root align="end"><Bubble.Content class="text-body whitespace-pre-wrap">{c.text}</Bubble.Content></Bubble.Root>
-									<Message.Footer>You · {c.time}</Message.Footer>
-								</Message.Content>
-							</Message.Root>
+							<Message align="end">
+								<MessageContent>
+									<Bubble align="end"><BubbleContent class="text-body whitespace-pre-wrap">{c.text}</BubbleContent></Bubble>
+									<MessageFooter>You · {c.time}</MessageFooter>
+								</MessageContent>
+							</Message>
 						{:else if c.kind === 'orch'}
-							<Message.Root>
+							<Message>
 								<RoleAvatar role="orch" size="sm" />
-								<Message.Content>
-									<Message.Header>Orch · {c.time}</Message.Header>
-									<Bubble.Root variant="muted"><Bubble.Content class="text-body">{c.text}</Bubble.Content></Bubble.Root>
-								</Message.Content>
-							</Message.Root>
+								<MessageContent>
+									<MessageHeader>Orch · {c.time}</MessageHeader>
+									<Bubble variant="muted"><BubbleContent class="text-body">{c.text}</BubbleContent></Bubble>
+								</MessageContent>
+							</Message>
 						{:else if c.kind === 'proposal'}
 							<!-- 작업 제안 (.pen WorkProposalCard) -->
 							<div class="card rounded-lg flex flex-col gap-3 p-3 shadow-xs">
@@ -1865,14 +1865,14 @@
 										{#if q.context}<p class="text-body leading-relaxed text-muted-foreground">{q.context}</p>{/if}
 										{#if q.options}
 											<!-- .pen OptionCard on/off -->
-											<ChoiceCards.Root aria-label="Q{n + 1} 선택지" class="grid-cols-3 gap-2" bind:value={() => pick ?? null, (v) => (pick = (v ?? undefined) as typeof pick)}>
+											<ChoiceCards aria-label="Q{n + 1} 선택지" class="grid-cols-3 gap-2" bind:value={() => pick ?? null, (v) => (pick = (v ?? undefined) as typeof pick)}>
 												{#each q.options as o (o.key)}
-													<ChoiceCards.Item value={o.key} class="rounded-lg">
+													<ChoiceCard value={o.key} class="rounded-lg">
 														<span class="title-sm gap-1.5"><span class="font-mono text-xs text-muted-foreground">{o.key}</span>{o.title}{#if o.rec}<Badge variant="secondary" class="text-2xs">추천</Badge>{/if}</span>
 														{#if o.desc}<span class="text-xs text-muted-foreground">{o.desc}</span>{/if}
-													</ChoiceCards.Item>
+													</ChoiceCard>
 												{/each}
-											</ChoiceCards.Root>
+											</ChoiceCards>
 										{/if}
 									{/if}
 								</li>
@@ -1965,19 +1965,19 @@
 							<InputGroup.Textarea bind:ref={bodyArea} bind:value={d.body} placeholder="무엇을 · 왜 · 참고할 것" aria-label="설명" class="field-sizing-content min-h-16" />
 							{#if d.files.length}
 								<InputGroup.Addon align="block-end">
-									<Attachment.Group>
+									<AttachmentGroup>
 										{#each d.files as f, i (i)}
-											<Attachment.Root size="sm">
+											<Attachment size="sm">
 												{#if f.url}
-													<Attachment.Media variant="image"><img src={f.url} alt={f.name} /></Attachment.Media>
+													<AttachmentMedia variant="image"><img src={f.url} alt={f.name} /></AttachmentMedia>
 												{:else}
-													<Attachment.Media><FileText /></Attachment.Media>
-													<Attachment.Content><Attachment.Title>{f.name}</Attachment.Title><Attachment.Description>{fileMeta(f)}</Attachment.Description></Attachment.Content>
+													<AttachmentMedia><FileText /></AttachmentMedia>
+													<AttachmentContent><AttachmentTitle>{f.name}</AttachmentTitle><AttachmentDescription>{fileMeta(f)}</AttachmentDescription></AttachmentContent>
 												{/if}
-												<Attachment.Actions><Attachment.Action aria-label="{f.name} 빼기" onclick={() => d.files.splice(i, 1)}><X /></Attachment.Action></Attachment.Actions>
-											</Attachment.Root>
+												<AttachmentActions><AttachmentAction aria-label="{f.name} 빼기" onclick={() => d.files.splice(i, 1)}><X /></AttachmentAction></AttachmentActions>
+											</Attachment>
 										{/each}
-									</Attachment.Group>
+									</AttachmentGroup>
 								</InputGroup.Addon>
 							{/if}
 						</InputGroup.Root>

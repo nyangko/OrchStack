@@ -22,8 +22,8 @@
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
-	import { PageHeader } from '$lib/components/ui/page-header';
-	import { Segmented } from '$lib/components/ui/segmented';
+	import { PageHeader } from '$lib/components/orch/page-header';
+	import { Segmented } from '$lib/components/orch/segmented';
 	import * as Field from '$lib/components/ui/field';
 
 	type Key = keyof typeof s;

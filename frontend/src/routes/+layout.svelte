@@ -34,7 +34,7 @@
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { Kbd } from '$lib/components/ui/kbd';
 	import { Toggle } from '$lib/components/ui/toggle';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
 	import { tasks, projectTasks, issues, agents, connections, notices, type Notice } from '$lib/mock';
 	import { statuses } from '$lib/status';
 	import { roles } from '$lib/roles';

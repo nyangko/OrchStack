@@ -1,7 +1,7 @@
 <script lang="ts">
 	/// Trust 레벨 선택 (.pen 기본 Trust 레벨) — 1 읽기 전용 ~ 4 자율. 에이전트 권한 탭과 설정 › 권한 · 보안에서 쓴다.
 	import type { AgentConfig } from '$lib/mock';
-		import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 
 	let {
 		value = $bindable(),
@@ -20,16 +20,16 @@
 	] as const;
 </script>
 
-<ChoiceCards.Root aria-label="Trust 레벨" class="grid-cols-4" bind:value={() => value, (v) => (value = v as AgentConfig['trust'])}>
+<ChoiceCards aria-label="Trust 레벨" class="grid-cols-4" bind:value={() => value, (v) => (value = v as AgentConfig['trust'])}>
 	{#each levels as l (l.n)}
 		{@const on = value === l.n}
-		<ChoiceCards.Item value={l.n} class="rounded-md">
+		<ChoiceCard value={l.n} class="rounded-md">
 			<span class="row-title-strong">
 				<span class={['flex size-5 items-center justify-center rounded-full font-mono text-caption', on ? 'bg-primary text-on-solid' : 'bg-muted text-muted-foreground']}>{l.n}</span>
 				{l.t}
 			</span>
 			<span class="text-xs text-muted-foreground">{l.d}</span>
 			{#if base === l.n && !on}<span class="text-caption text-primary">템플릿 기본값</span>{/if}
-		</ChoiceCards.Item>
+		</ChoiceCard>
 	{/each}
-</ChoiceCards.Root>
+</ChoiceCards>

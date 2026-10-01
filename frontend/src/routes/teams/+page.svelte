@@ -61,9 +61,9 @@
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { goto } from '$app/navigation';
-	import { MdEditor, estimateTokens, type MdFile } from '$lib/components/ui/md-editor';
+	import { MdEditor, estimateTokens, type MdFile } from '$lib/components/orch/md-editor';
 	import Upload from '@lucide/svelte/icons/upload';
-	import { Segmented } from '$lib/components/ui/segmented';
+	import { Segmented } from '$lib/components/orch/segmented';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import CircleAlert from '@lucide/svelte/icons/circle-alert';
 	import GitFork from '@lucide/svelte/icons/git-fork';
@@ -76,11 +76,11 @@
 	import type { Component } from 'svelte';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Select from '$lib/components/ui/select';
-	import { Steps } from '$lib/components/ui/steps';
+	import { Steps } from '$lib/components/orch/steps';
 	import { Input } from '$lib/components/ui/input';
 	import { Badge } from '$lib/components/ui/badge';
 	import type { Role } from '$lib/roles';
-	import type { Runtime } from '$lib/components/ui/runtime-logo';
+	import type { Runtime } from '$lib/components/orch/runtime-logo';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as Card from '$lib/components/ui/card';
 	import * as Table from '$lib/components/ui/table';
@@ -88,19 +88,19 @@
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
 	import { Toggle } from '$lib/components/ui/toggle';
-	import { Pill } from '$lib/components/ui/pill';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Progress } from '$lib/components/ui/progress';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
-	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
+	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import { accounts, meters, teamPolicy, recommend, tasks, issues, memberDetails, type TeamMember, type OrchPolicy, type LevelAction, type SpawnMode } from '$lib/mock';
 	import { store, defaultTeam, glyphs, glyphOf, runtimeName, accountOf, low, scopeText, liveMap, k, putDraft } from '$lib/teams.svelte';
-	import { LimitRow } from '$lib/components/ui/limit-row';
-	import { KeyValueRow } from '$lib/components/ui/key-value-row';
+	import { LimitRow } from '$lib/components/orch/limit-row';
+	import { KeyValueRow } from '$lib/components/orch/key-value-row';
 	import SkillsPanel from '$lib/components/orch/agent/skills-panel.svelte';
 	import ToolsPanel from '$lib/components/orch/agent/tools-panel.svelte';
 	import PermPanel from '$lib/components/orch/agent/perm-panel.svelte';
 	import HarnessPanel from '$lib/components/orch/agent/harness-panel.svelte';
-		import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 
 	// 선택 팀은 ?team= 으로 둔다. 없으면 첫 프로젝트 팀. 팀 · 템플릿 데이터는 $lib/teams.svelte (서버 연결은 #45).
 	const team = $derived(store.crew.find((t) => t.sn === Number(page.url.searchParams.get('team'))) ?? defaultTeam());
@@ -710,10 +710,10 @@
 						<Sparkles class="size-3.5 shrink-0 text-primary" />
 						<span><span class="font-semibold">Orch 추천</span> · {recommend.reason} → {rec.name}</span>
 					</button>
-					<ChoiceCards.Root aria-label="템플릿" class="grid-cols-2" bind:value={() => pick, (v) => (pick = v as typeof pick)}>
+					<ChoiceCards aria-label="템플릿" class="grid-cols-2" bind:value={() => pick, (v) => (pick = v as typeof pick)}>
 						{#each tplShown as t (t.sn)}
 							{@const on = pick === t.sn}
-							<ChoiceCards.Item value={t.sn} layout="row" ondblclick={toCharacter} class="gap-2.5 bg-card px-2 py-1.75">
+							<ChoiceCard value={t.sn} layout="row" ondblclick={toCharacter} class="gap-2.5 bg-card px-2 py-1.75">
 								<RoleAvatar role={t.role} />
 								<span class="flex min-w-0 flex-1 flex-col gap-0.75">
 									<span class="text-xs font-semibold">{t.name}</span>
@@ -724,22 +724,22 @@
 									</span>
 								</span>
 								{#if on}<CircleCheck class="size-4 shrink-0 text-primary" />{/if}
-							</ChoiceCards.Item>
+							</ChoiceCard>
 						{:else}
 							<p class="col-span-2 py-6 text-center text-xs text-muted-foreground">검색 결과가 없어요.</p>
 						{/each}
-					</ChoiceCards.Root>
+					</ChoiceCards>
 					<!-- 같은 선택(pick)의 한 칸 — 배치는 그대로 두려고 contents -->
-					<ChoiceCards.Root aria-label="빈 캐릭터" class="contents" bind:value={() => pick, (v) => (pick = v as typeof pick)}>
-					<ChoiceCards.Item value={null} layout="row" class="gap-2.5 p-3.5">
+					<ChoiceCards aria-label="빈 캐릭터" class="contents" bind:value={() => pick, (v) => (pick = v as typeof pick)}>
+					<ChoiceCard value={null} layout="row" class="gap-2.5 p-3.5">
 						<span class="flex size-7 items-center justify-center rounded-md border border-dashed text-muted-foreground"><Plus class="size-3.5" /></span>
 						<span class="flex flex-1 flex-col gap-0.5">
 							<span class="text-xs font-semibold">빈 캐릭터로 시작</span>
 							<span class="text-caption text-muted-foreground">템플릿 없이 Instructions를 직접 작성</span>
 						</span>
 						{#if pick === null}<CircleCheck class="size-4 text-primary" />{/if}
-					</ChoiceCards.Item>
-					</ChoiceCards.Root>
+					</ChoiceCard>
+					</ChoiceCards>
 				{:else}
 					<!-- 고른 템플릿 (2 · 3단계 공통) -->
 					<div class="flex rounded-md bg-muted items-center gap-3 p-3">
@@ -881,19 +881,19 @@
 					{/if}
 					<section class="flex flex-col gap-2.5">
 						{@render heading('첫 작업', '추가 직후 무엇을 할지')}
-						<ChoiceCards.Root aria-label="첫 작업" class="grid-cols-3" bind:value={() => first, (v) => (first = v as typeof first)}>
+						<ChoiceCards aria-label="첫 작업" class="grid-cols-3" bind:value={() => first, (v) => (first = v as typeof first)}>
 							{#each [{ v: 'orch', icon: Sparkles, t: 'Orch에게 맡기기', d: `팀 진행 정책(${modeLabel(policy)})에 따라 대기열에서 배정` }, { v: 'task', icon: ListChecks, t: '지금 태스크 지정', d: firstLabel.task }, { v: 'wait', icon: Pause, t: '대기', d: '추가만 하고 배정하지 않음' }] as const as o (o.v)}
 								{@const on = first === o.v}
-								<ChoiceCards.Item value={o.v} class="rounded-md">
+								<ChoiceCard value={o.v} class="rounded-md">
 									<span class="label-xs-strong">
 										<o.icon class={['size-3.5', on ? 'text-primary' : 'text-muted-foreground']} />
 										<span class="flex-1">{o.t}</span>
 										{#if on}<CircleCheck class="size-3.5 text-primary" />{:else}<Circle class="size-3.5 text-subtle-foreground" />{/if}
 									</span>
 									<span class="truncate text-caption text-muted-foreground">{o.d}</span>
-								</ChoiceCards.Item>
+								</ChoiceCard>
 							{/each}
-						</ChoiceCards.Root>
+						</ChoiceCards>
 					</section>
 				{/if}
 			</div>

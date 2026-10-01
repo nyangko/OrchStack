@@ -22,11 +22,11 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Select from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
-	import { PageHeader } from '$lib/components/ui/page-header';
-	import { Pill } from '$lib/components/ui/pill';
-	import { RuntimeLogo, type Runtime } from '$lib/components/ui/runtime-logo';
+	import { PageHeader } from '$lib/components/orch/page-header';
+	import { Pill } from '$lib/components/orch/pill';
+	import { RuntimeLogo, type Runtime } from '$lib/components/orch/runtime-logo';
 	import * as Field from '$lib/components/ui/field';
-	import { KeyValueRow } from '$lib/components/ui/key-value-row';
+	import { KeyValueRow } from '$lib/components/orch/key-value-row';
 	import { AddConnectionDialog, type AddedConnection } from '$lib/components/orch/connection';
 	import { runtimeClis, runSettings, type RuntimeCli } from '$lib/mock';
 	

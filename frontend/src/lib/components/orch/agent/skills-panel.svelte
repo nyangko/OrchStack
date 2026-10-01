@@ -12,10 +12,10 @@
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
-	import { Pill } from '$lib/components/ui/pill';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Switch } from '$lib/components/ui/switch';
-	import { LimitRow } from '$lib/components/ui/limit-row';
-	import { RuntimeLogo, type Runtime } from '$lib/components/ui/runtime-logo';
+	import { LimitRow } from '$lib/components/orch/limit-row';
+	import { RuntimeLogo, type Runtime } from '$lib/components/orch/runtime-logo';
 	import { mcpServers, type AgentConfig } from '$lib/mock';
 	import { store, cfgTok, toggleIn, installSkill, sourceMeta } from '$lib/teams.svelte';
 	import SkillBrowser from './skill-browser.svelte';

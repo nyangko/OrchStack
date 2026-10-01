@@ -13,11 +13,11 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
-	import { PageHeader } from '$lib/components/ui/page-header';
-	import { Pill } from '$lib/components/ui/pill';
+	import { PageHeader } from '$lib/components/orch/page-header';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Switch } from '$lib/components/ui/switch';
-	import { KeyValueRow } from '$lib/components/ui/key-value-row';
-	import { HistoryRow } from '$lib/components/ui/history-row';
+	import { KeyValueRow } from '$lib/components/orch/key-value-row';
+	import { HistoryRow } from '$lib/components/orch/history-row';
 	import TrustPicker from '$lib/components/orch/agent/trust-picker.svelte';
 	import ApprovalTable from '$lib/components/orch/agent/approval-table.svelte';
 	import { security, auditLog, type AuditLog } from '$lib/mock';

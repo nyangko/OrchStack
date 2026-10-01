@@ -2,7 +2,7 @@
 	/// 범용 컴포넌트 검증용 갤러리 (#33). 각 Task가 아래에 섹션을 추가한다.
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Pill } from '$lib/components/ui/pill';
+	import { Pill } from '$lib/components/orch/pill';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { Kbd } from '$lib/components/ui/kbd';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -10,11 +10,11 @@
 	import { Input } from '$lib/components/ui/input';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Switch } from '$lib/components/ui/switch';
-	import { Segmented } from '$lib/components/ui/segmented';
-	import { Steps } from '$lib/components/ui/steps';
+	import { Segmented } from '$lib/components/orch/segmented';
+	import { Steps } from '$lib/components/orch/steps';
 	import * as Select from '$lib/components/ui/select';
 	import * as Field from '$lib/components/ui/field';
-	import { StatusSelect } from '$lib/components/ui/status-select';
+	import { StatusSelect } from '$lib/components/orch/status-select';
 	import type { TaskStatus } from '$lib/status';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -29,9 +29,9 @@
 	import * as Empty from '$lib/components/ui/empty';
 	import { UserPlus, Play, Trash2, TriangleAlert, ShieldCheck, Inbox, Info, FileCode, Cpu } from '@lucide/svelte';
 	import * as Avatar from '$lib/components/ui/avatar';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
-	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
-	import { StatusBadge } from '$lib/components/ui/status-badge';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
+	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
+	import { StatusBadge } from '$lib/components/orch/status-badge';
 	import { statusOrder } from '$lib/status';
 	import * as Item from '$lib/components/ui/item';
 	import * as Table from '$lib/components/ui/table';

@@ -18,12 +18,12 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
-	import { PageHeader } from '$lib/components/ui/page-header';
+	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Switch } from '$lib/components/ui/switch';
-	import { Pill } from '$lib/components/ui/pill';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
-	import { KeyValueRow } from '$lib/components/ui/key-value-row';
-	import { HistoryRow } from '$lib/components/ui/history-row';
+	import { Pill } from '$lib/components/orch/pill';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
+	import { KeyValueRow } from '$lib/components/orch/key-value-row';
+	import { HistoryRow } from '$lib/components/orch/history-row';
 	import SkillBrowser from '$lib/components/orch/agent/skill-browser.svelte';
 	import SkillSourcesDialog from '$lib/components/orch/agent/skill-sources-dialog.svelte';
 	import { mcpServers, type Skill, type SkillLog, type TeamMember } from '$lib/mock';

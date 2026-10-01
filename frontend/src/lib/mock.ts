@@ -20,7 +20,7 @@ export const repos = [
 
 import type { TaskStatus } from "$lib/status";
 import type { Role } from "$lib/roles";
-import type { Runtime } from "$lib/components/ui/runtime-logo";
+import type { Runtime } from "$lib/components/orch/runtime-logo";
 
 /// 에이전트(멤버). 스키마 tbl_member · tbl_agent_profile 요약. OpenAPI(#45) 전 임시 타입.
 export type Agent = {

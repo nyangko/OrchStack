@@ -9,7 +9,7 @@
 	import Check from '@lucide/svelte/icons/check';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
-	import { Pill } from '$lib/components/ui/pill';
+	import { Pill } from '$lib/components/orch/pill';
 	import * as Field from '$lib/components/ui/field';
 	import { skillSources } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';

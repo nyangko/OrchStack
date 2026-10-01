@@ -19,11 +19,11 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Button } from '$lib/components/ui/button';
-	import { PageHeader } from '$lib/components/ui/page-header';
-	import { Pill } from '$lib/components/ui/pill';
+	import { PageHeader } from '$lib/components/orch/page-header';
+	import { Pill } from '$lib/components/orch/pill';
 	import * as Field from '$lib/components/ui/field';
-	import { KeyValueRow } from '$lib/components/ui/key-value-row';
-	import { HistoryRow } from '$lib/components/ui/history-row';
+	import { KeyValueRow } from '$lib/components/orch/key-value-row';
+	import { HistoryRow } from '$lib/components/orch/history-row';
 	import SkillSourcesDialog from '$lib/components/orch/agent/skill-sources-dialog.svelte';
 	import type { Skill, SkillLog } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';

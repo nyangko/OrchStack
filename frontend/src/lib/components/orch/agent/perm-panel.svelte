@@ -4,8 +4,8 @@
 	import X from '@lucide/svelte/icons/x';
 	import * as Card from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
-	import { Pill } from '$lib/components/ui/pill';
-	import { RoleAvatar } from '$lib/components/ui/role-avatar';
+	import { Pill } from '$lib/components/orch/pill';
+	import { RoleAvatar } from '$lib/components/orch/role-avatar';
 	import TrustPicker from './trust-picker.svelte';
 	import ApprovalTable from './approval-table.svelte';
 	import type { AgentConfig, TeamMember } from '$lib/mock';
