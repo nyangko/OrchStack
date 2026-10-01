@@ -7,6 +7,8 @@ export type MenuEntry =
 	| {
 			label: string;
 			icon?: Component;
+			/** 글자 · 아이콘 색 (예: text-destructive · text-primary). 없으면 기본 · 아이콘은 회색 */
+			tone?: string;
 			shortcut?: string;
 			disabled?: boolean;
 			onSelect?: () => void;

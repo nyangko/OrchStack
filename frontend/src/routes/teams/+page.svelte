@@ -73,7 +73,7 @@
 	import Repeat from '@lucide/svelte/icons/repeat';
 	import ListPlus from '@lucide/svelte/icons/list-plus';
 	import Moon from '@lucide/svelte/icons/moon';
-	import type { Component } from 'svelte';
+	import { untrack, type Component } from 'svelte';
 	import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetBody, SheetFooter } from '$lib/components/ui/sheet';
 	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
 	import { Steps } from '$lib/components/orch/steps';
@@ -237,13 +237,20 @@
 		pick = from;
 		copied = undefined;
 	}
-	// 템플릿 화면의 "팀에 추가"는 ?add=템플릿 으로 온다 — 시트를 열고 주소에서 뗀다.
+	// 다른 화면에서 여는 주소 — 쓰고 나면 주소에서 뗀다.
+	// ?add=템플릿 → 멤버 추가 시트 (템플릿 화면 "팀에 추가" · 값이 비면 추천 템플릿, Workbench Menu / Add)
+	// ?member=멤버 → 멤버 상세 (Workbench 에이전트 메뉴 "멤버 상세 열기")
 	$effect(() => {
-		const from = Number(page.url.searchParams.get('add'));
-		if (!from) return;
-		startAdd(from);
+		const add = page.url.searchParams.get('add');
+		const member = Number(page.url.searchParams.get('member'));
+		if (add === null && !member) return;
+		untrack(() => {
+			if (add !== null) startAdd(Number(add) || undefined);
+			else openMember(member);
+		});
 		const url = new URL(page.url);
 		url.searchParams.delete('add');
+		url.searchParams.delete('member');
 		goto(url, { replaceState: true, noScroll: true, keepFocus: true });
 	});
 	/// 2단계로 — 템플릿이 바뀌었으면 Instructions · 런타임을 다시 복사한다.

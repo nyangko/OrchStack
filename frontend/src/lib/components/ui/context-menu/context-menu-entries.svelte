@@ -25,8 +25,8 @@
 			</SubContent>
 		</Sub>
 	{:else}
-		<Item disabled={m.disabled} onSelect={m.onSelect}>
-			{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}
+		<Item disabled={m.disabled} onSelect={m.onSelect} class={m.tone}>
+			{#if m.icon}<m.icon class={m.tone ?? "text-muted-foreground"} />{/if}{m.label}
 			{#if m.shortcut}<Shortcut>{m.shortcut}</Shortcut>{/if}
 		</Item>
 	{/if}

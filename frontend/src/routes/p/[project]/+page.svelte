@@ -11,6 +11,10 @@
 	import PanelLeftOpen from '@lucide/svelte/icons/panel-left-open';
 	import PanelRightClose from '@lucide/svelte/icons/panel-right-close';
 	import PanelRightOpen from '@lucide/svelte/icons/panel-right-open';
+	import ListPlus from '@lucide/svelte/icons/list-plus';
+	import RotateCw from '@lucide/svelte/icons/rotate-cw';
+	import MessageSquareShare from '@lucide/svelte/icons/message-square-share';
+	import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 	import Pause from '@lucide/svelte/icons/pause';
 	import Play from '@lucide/svelte/icons/play';
 	import Download from '@lucide/svelte/icons/download';
@@ -45,7 +49,7 @@
 	import { Bubble, BubbleContent } from '$lib/components/orch/bubble';
 	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from '$lib/components/ui/dialog';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { untrack, onDestroy, type Component } from 'svelte';
+	import { untrack, onDestroy, tick, type Component } from 'svelte';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { toast } from 'svelte-sonner';
 	import { useMock } from '$lib/api/env';
@@ -106,7 +110,7 @@
 	import Tag from '@lucide/svelte/icons/tag';
 	import Flag from '@lucide/svelte/icons/flag';
 	import UserRoundX from '@lucide/svelte/icons/user-round-x';
-	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '$lib/components/ui/dropdown-menu';
+	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuEntries } from '$lib/components/ui/dropdown-menu';
 	import { Kbd } from '$lib/components/ui/kbd';
 	import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 	import { mergeProps } from 'bits-ui';
@@ -128,6 +132,8 @@
 	let local = $state(tasks.map((t) => ({ ...t })));
 	// 일시정지한 태스크 (태스크 메뉴 Pause · Resume). Diagram 노드가 스크립트 초기화 중 메뉴를 만들어 위에 둔다.
 	let paused = $state<number[]>([]);
+	// 일시정지 · 중지한 에이전트 (에이전트 메뉴 · 카드). Diagram 에이전트 노드도 초기화 중 메뉴를 만들어 위에 둔다.
+	let agentHold = $state<Record<number, 'paused' | 'stopped'>>({});
 	const list = $derived(useMock ? local : viewTasks());
 	const issueList = $derived(useMock ? issues : viewIssues());
 	const agentList = $derived(useMock ? agents : viewAgents());
@@ -300,7 +306,9 @@
 			ref: roles[a.role].label.toUpperCase(),
 			title: a.name,
 			who: { role: a.role, name: a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI', runtime: a.runtime },
-			badge: a.activity.split(' · ')[0],
+			badge: agentState(a),
+			menuLabel: `${a.name} · ${roles[a.role].label}`,
+			menu: agentMenu(sn),
 			meta: lead.length ? `sub-run ${lead.length} · ctx ${ctx}` : `ctx ${ctx}`
 		};
 	}
@@ -439,6 +447,56 @@
 			{ label: 'Open Details', icon: PanelRight, shortcut: '↵', onSelect: () => open(num) }
 		];
 	}
+
+	// ── 에이전트 메뉴 (.pen Menu / Agent) — Quick Panel Agents 행 우클릭 · ⋯ · Diagram 에이전트 노드가 같은 목록 ─────────
+	// Pause · Resume · Restart · Stop은 대화를 거치지 않는 즉시 운영 제어. 목데이터: 화면 상태만 바꾼다(실행기 #13 · API 단계).
+	/// 지금 상태 한 낱말 (카드 · 노드 배지). 일시정지 · 중지가 우선.
+	function agentState(a: { sn: number; activity: string }) {
+		return agentHold[a.sn] === 'paused' ? 'Paused' : agentHold[a.sn] === 'stopped' ? 'Stopped' : a.activity.split(' · ')[0];
+	}
+	function pauseAgent(sn: number) {
+		agentHold[sn] = 'paused';
+		toast(`${agentName(sn)} 일시정지 · 현재 단계가 끝나면 멈춰요`);
+	}
+	function stopAgent(sn: number) {
+		agentHold[sn] = 'stopped';
+		toast(`${agentName(sn)} 실행을 멈췄어요`);
+	}
+	/// 실행 중 지시 입력으로 (.pen: Agent Card 하단 Runtime instruction 입력에 포커스).
+	async function instructAgent(sn: number) {
+		openAgent(sn);
+		await tick();
+		document.getElementById('runtime-instruction')?.focus();
+	}
+	function agentMenu(sn: number): MenuEntry[] {
+		const a = agentOf(sn)!;
+		const hold = agentHold[sn];
+		const running = !hold && a.activity.startsWith('Running');
+		const free = list.filter((t) => t.agent === undefined && !['done', 'cancelled'].includes(t.status));
+		const mine = list.find((t) => t.agent === sn && t.status === 'in_progress');
+		return [
+			{ label: 'Assign Task', icon: ListPlus, disabled: !free.length, sub: free.map((t) => ({ label: `#${t.num} ${t.title}`, onSelect: () => ((task(t.num).agent = sn), toast(`#${t.num}을 ${a.name}에게 맡겼어요`)) })) },
+			{ label: 'Send Runtime Instruction', icon: CornerDownRight, onSelect: () => void instructAgent(sn) },
+			'sep',
+			{ label: 'Pause', icon: Pause, disabled: !running, onSelect: () => pauseAgent(sn) },
+			{ label: 'Resume', icon: Play, disabled: hold !== 'paused', onSelect: () => (delete agentHold[sn], toast(`${a.name} 다시 진행`)) },
+			{ label: 'Restart', icon: RotateCw, onSelect: () => (delete agentHold[sn], toast(`${a.name} 세션을 다시 시작했어요`)) },
+			{ label: 'Stop', icon: Square, tone: 'text-destructive', disabled: hold === 'stopped', onSelect: () => stopAgent(sn) },
+			'sep',
+			{ label: 'Ask PM about this', icon: MessageSquareShare, tone: 'text-primary', onSelect: () => {
+					const run = mine && liveRunOf(mine.num);
+					askPm(`Agent ${a.name}${mine ? ` @Task #${mine.num}` : ''}${run ? ` @Run #${run.num}` : ''}`);
+				} },
+			{ label: '멤버 상세 열기', icon: PanelRightOpen, onSelect: () => goto(`/teams?member=${sn}`) }
+		];
+	}
+	// 추가 메뉴 (.pen Menu / Add) — Agents 탭 머리 +. 템플릿 · 팀 만들기 흐름은 아직 디자인에 없어 막아 둔다(#60).
+	const addMenu: MenuEntry[] = [
+		{ label: '멤버 추가 · 템플릿에서', icon: UserPlus, onSelect: () => goto('/teams?add=') },
+		{ label: '새 에이전트 템플릿', icon: LayoutTemplate, disabled: true },
+		'sep',
+		{ label: '새 팀', icon: Users, disabled: true }
+	];
 
 	// Kanban 카드 hover 미리보기 (.pen KanbanCard/HoverPreview) — 커서 +18px, 화면 끝에선 반대쪽. 끌 때 · 메뉴 열 때는 숨긴다.
 	let hover = $state<{ num: number; x: number; y: number }>();
@@ -793,7 +851,18 @@
 								<TabsTrigger value="agents">Agents</TabsTrigger>
 							</TabsList>
 							<span class="flex-1"></span>
-							<Button variant="ghost" size="icon-sm" aria-label="새 태스크" aria-expanded={quick !== undefined} onclick={() => (quick ? (quick = undefined) : openQuick())}><Plus /></Button>
+							{#if panelTab === 'agents'}
+								<!-- Menu / Add (.pen yFujN) -->
+								<DropdownMenu>
+									<DropdownMenuTrigger>{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-sm" aria-label="추가"><Plus /></Button>{/snippet}</DropdownMenuTrigger>
+									<DropdownMenuContent align="end" class="w-56">
+										<DropdownMenuLabel>추가</DropdownMenuLabel>
+										<DropdownMenuEntries entries={addMenu} />
+									</DropdownMenuContent>
+								</DropdownMenu>
+							{:else}
+								<Button variant="ghost" size="icon-sm" aria-label="새 태스크" aria-expanded={quick !== undefined} onclick={() => (quick ? (quick = undefined) : openQuick())}><Plus /></Button>
+							{/if}
 							<Button variant="ghost" size="icon-sm" aria-label="Quick panel 접기" onclick={() => (leftOpen = false)}><PanelLeftClose /></Button>
 						</div>
 						{#if panelTab === 'tasks'}
@@ -871,19 +940,43 @@
 
 					<TabsContent value="agents" class="min-h-0 flex-1 overflow-y-auto">
 						{#each agentList as a (a.sn)}
-							<button type="button" aria-pressed={inspect === a.sn} onclick={() => openAgent(a.sn)} class={['flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left outline-none focus-visible:bg-muted', inspect === a.sn ? 'bg-primary-soft hover:bg-primary-soft' : 'hover:bg-muted']}>
-								<RoleAvatar role={a.role}>
-									<AvatarBadge class={a.online ? 'bg-success' : 'bg-subtle-foreground'} aria-label={a.online ? '온라인' : '오프라인'} />
-								</RoleAvatar>
-								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
-									<span class="flex items-center gap-1.5">
-										<span class="text-sm font-medium">{a.name}</span>
-										<span class="font-mono text-xs text-muted-foreground">{a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'}</span>
-									</span>
-									<span class="truncate text-xs text-muted-foreground">{a.activity}</span>
-								</span>
-								<span class="font-mono text-xs font-medium text-muted-foreground">{a.tokens}</span>
-							</button>
+							<!-- 우클릭 · ⋯ → Menu / Agent (.pen znwIq, Diagram 에이전트 노드와 같은 목록) -->
+							<ContextMenu>
+								<ContextMenuTrigger>
+									{#snippet child({ props })}
+										<div {...props} class="group relative">
+											<button type="button" aria-pressed={inspect === a.sn} onclick={() => openAgent(a.sn)} class={['flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left outline-none focus-visible:bg-muted', inspect === a.sn ? 'bg-primary-soft hover:bg-primary-soft' : 'hover:bg-muted']}>
+												<RoleAvatar role={a.role}>
+													<AvatarBadge class={a.online ? 'bg-success' : 'bg-subtle-foreground'} aria-label={a.online ? '온라인' : '오프라인'} />
+												</RoleAvatar>
+												<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+													<span class="flex items-center gap-1.5">
+														<span class="text-sm font-medium">{a.name}</span>
+														<span class="font-mono text-xs text-muted-foreground">{a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'}</span>
+													</span>
+													<span class="truncate text-xs text-muted-foreground">{a.activity}</span>
+												</span>
+												<span class="font-mono text-xs font-medium text-muted-foreground">{a.tokens}</span>
+											</button>
+											<DropdownMenu>
+												<DropdownMenuTrigger>
+													{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-xs" class="absolute top-1/2 right-2 -translate-y-1/2 bg-card opacity-0 group-hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100" aria-label="{a.name} 메뉴"><Ellipsis /></Button>{/snippet}
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end" class="w-56">
+													<DropdownMenuLabel class="truncate">{a.name} · {roles[a.role].label}</DropdownMenuLabel>
+													<DropdownMenuSeparator />
+													<DropdownMenuEntries entries={agentMenu(a.sn)} />
+												</DropdownMenuContent>
+											</DropdownMenu>
+										</div>
+									{/snippet}
+								</ContextMenuTrigger>
+								<ContextMenuContent class="w-56">
+									<ContextMenuLabel class="truncate">{a.name} · {roles[a.role].label}</ContextMenuLabel>
+									<ContextMenuSeparator />
+									<ContextMenuEntries entries={agentMenu(a.sn)} />
+								</ContextMenuContent>
+							</ContextMenu>
 						{/each}
 					</TabsContent>
 				</Tabs>
@@ -1499,10 +1592,10 @@
 							</div>
 						{#snippet sub()}
 						<div class="flex items-center gap-2">
-							<Badge variant="secondary">{a.activity.split(' · ')[0]}</Badge>
+							<Badge variant="secondary">{agentState(a)}</Badge>
 							<span class="flex-1"></span>
-							<Button variant="ghost" size="icon-sm" class="bg-warning-soft text-warning" aria-label="일시정지 · 현재 단계 끝나면 멈춤" title="일시정지 · 현재 단계 끝나면 멈춤"><Pause /></Button>
-							<Button variant="ghost" size="icon-sm" class="bg-destructive-soft text-destructive" aria-label="중지"><Square /></Button>
+							<Button variant="ghost" size="icon-sm" class="bg-warning-soft text-warning" aria-label="일시정지 · 현재 단계 끝나면 멈춤" title="일시정지 · 현재 단계 끝나면 멈춤" disabled={agentHold[a.sn] !== undefined} onclick={() => pauseAgent(a.sn)}><Pause /></Button>
+							<Button variant="ghost" size="icon-sm" class="bg-destructive-soft text-destructive" aria-label="중지" disabled={agentHold[a.sn] === 'stopped'} onclick={() => stopAgent(a.sn)}><Square /></Button>
 						</div>
 						{/snippet}
 					</InspectorHeader>
@@ -1564,7 +1657,7 @@
 					</Tabs>
 					<form class="border-t p-3" onsubmit={instruct}>
 						<div class="flex items-center gap-1.5 rounded-md border border-input bg-background py-1.5 pr-1.5 pl-3 focus-within:ring-3 focus-within:ring-ring/50">
-							<input bind:value={instruction} placeholder="{a.name}에게 실행 중 지시…" aria-label="{a.name}에게 실행 중 지시" class="bare-input" />
+							<input id="runtime-instruction" bind:value={instruction} placeholder="{a.name}에게 실행 중 지시…" aria-label="{a.name}에게 실행 중 지시" class="bare-input" />
 							<Button type="submit" size="icon-sm" aria-label="지시 보내기" disabled={!instruction.trim()}><ArrowUp /></Button>
 						</div>
 					</form>
