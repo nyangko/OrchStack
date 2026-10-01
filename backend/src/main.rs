@@ -10,6 +10,7 @@ mod issue; // /issues CRUD
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
 mod rule; // 하위 작업 규칙 엔진 (#67 · LLM 0)
+mod runner; // runner 하위 Run 실행 · @REPORT 회수 (#67)
 mod stream; // /projects/{sn}/snapshot · events · stream (SSE)
 mod task; // /tasks CRUD + MoveTask + 배정
 mod team; // /teams · /members CRUD
