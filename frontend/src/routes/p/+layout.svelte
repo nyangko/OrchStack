@@ -26,7 +26,7 @@
 	import { api } from '$lib/api/client';
 	import type { ApiProject } from '$lib/api/types';
 	import { roles } from '$lib/roles';
-	import { store } from '$lib/teams.svelte';
+	import { store, teamsLoad, loadTeams } from '$lib/teams.svelte';
 	
 	let { children } = $props();
 
@@ -73,7 +73,9 @@
 		const byRole = [...count].map(([r, n]) => `${roles[r].label} ${n}`);
 		return [`멤버 ${t.members.length}`, ...byRole].join(' · ');
 	}
-	function openNew() {
+	async function openNew() {
+		// 서버 모드: 팀 목록을 서버에서 (Teams 화면을 아직 안 열었으면 여기서 읽는다)
+		if (!useMock && teamsLoad.state !== 'ready') await loadTeams();
 		name = '';
 		repo = repos[0].name;
 		teamSn = squads[0]?.sn ?? 0;
@@ -90,7 +92,7 @@
 	});
 
 	let submitting = $state(false);
-	/// 만들면 탭을 열고 그 Workbench로 간다. 서버 모드는 POST /projects — 실패하면 입력을 그대로 둔다(토스트는 클라이언트가). 팀 · 진행 방식 · 이슈 가져오기는 A-3 · #89 뒤에 보낸다.
+	/// 만들면 탭을 열고 그 Workbench로 간다. 서버 모드는 POST /projects — 실패하면 입력을 그대로 둔다(토스트는 클라이언트가). 팀도 함께 보낸다. 진행 방식 · 이슈 가져오기는 서버 필드가 없어 아직 화면 상태(#60 · #22).
 	async function create(e: SubmitEvent) {
 		e.preventDefault();
 		if (!name.trim() || nameTaken || submitting) return;
@@ -100,7 +102,7 @@
 			store.projects.push({ sn, name: name.trim(), status: 'active', dot: firstPlan ? 'bg-status-waiting' : 'bg-subtle-foreground' });
 		} else {
 			submitting = true;
-			const { data } = await api.POST('/projects', { body: { name: name.trim(), repo_name: repo } });
+			const { data } = await api.POST('/projects', { body: { name: name.trim(), repo_name: repo, team_sn: team?.sn } }).catch(() => ({ data: undefined }));
 			submitting = false;
 			if (!data) return;
 			store.projects.push(toTab(data));

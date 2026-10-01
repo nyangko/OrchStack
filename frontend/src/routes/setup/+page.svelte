@@ -40,7 +40,9 @@
 	import { RoleAvatar } from '$lib/components/orch/role-avatar';
 	import { RuntimeLogo, type Runtime } from '$lib/components/orch/runtime-logo';
 	import { accounts, templates, type OrchPolicy } from '$lib/mock';
-	import { store, defaultTeam, runtimeName, low } from '$lib/teams.svelte';
+	import { store, defaultTeam, runtimeName, low, teamsLoad } from '$lib/teams.svelte';
+	import { api } from '$lib/api/client';
+	import { useMock } from '$lib/api/env';
 	import { SETUP_KEY } from '$lib/setup';
 	import { AddConnectionDialog, providerMark, type AddedConnection } from '$lib/components/orch/connection';
 		import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
@@ -170,8 +172,31 @@
 	const security = templates.find((t) => t.name === 'Security Reviewer')!;
 	let mode = $state<OrchPolicy['mode']>('timer');
 
-	/// 시작 — 고른 구성을 팀에 반영하고 첫 실행을 끝낸다 (서버 저장은 #45 · #47).
+	/// 서버 모드 시작 — 팀 → 고른 멤버 → 프로젝트(그 팀)를 서버에 만든다 (A-7 #98). 실패하면 그 자리에 머문다(토스트는 클라이언트).
+	/// 연결 · 진행 방식 · 이슈 가져오기는 서버 필드가 없어 화면 상태(#47 · #60). 첫 실행 완료 표시는 localStorage(tbl_workspace setup_done 대기).
+	let finishing = $state(false);
+	async function finishOnServer() {
+		finishing = true;
+		try {
+			const team = (await api.POST('/teams', { body: { name: teamName.trim() || recommended.name } })).data;
+			if (!team) return;
+			const members = recommended.members.filter((m) => picked.includes(m.sn)).map((m) => ({ name: m.name, role_name: m.title }));
+			if (extra) members.push({ name: '하준', role_name: security.name });
+			for (const body of members) await api.POST('/teams/{sn}/members', { params: { path: { sn: team.sn } }, body: { ...body, first_task_mode: 'orch' } });
+			const proj = (await api.POST('/projects', { body: { name: projectName.trim() || 'OrchStack', repo_name: repo, default_branch: branch, team_sn: team.sn } })).data;
+			if (!proj) return;
+			teamsLoad.state = 'idle';
+			localStorage.setItem(SETUP_KEY, '1');
+			goto(`/p/${proj.sn}`, { replaceState: true });
+		} catch {
+			// 연결 실패는 클라이언트가 알린다
+		} finally {
+			finishing = false;
+		}
+	}
+	/// 시작 — 고른 구성을 팀에 반영하고 첫 실행을 끝낸다.
 	function finish() {
+		if (!useMock) return void finishOnServer();
 		const team = defaultTeam();
 		team.name = teamName.trim() || team.name;
 		team.members = team.members.filter((m) => picked.includes(m.sn));
@@ -411,7 +436,7 @@
 						<Info class="size-3.5" />{importIssues && firstPlan ? `시작하면 Orch가 가져온 이슈 ${repoInfo.issues}개로 첫 계획을 제안해요` : '시작하면 빈 Workbench에서 Orch에게 목표를 알려주세요'}
 					</span>
 					<Button variant="ghost" size="sm" onclick={() => (step = 1)}><ArrowLeft />이전</Button>
-					<Button size="sm" disabled={!picked.length && !extra} onclick={finish}><Play />그대로 시작 → Workbench</Button>
+					<Button size="sm" disabled={(!picked.length && !extra) || finishing} onclick={finish}>{#if finishing}<LoaderCircle class="animate-spin" />{:else}<Play />{/if}그대로 시작 → Workbench</Button>
 				{/if}
 			</footer>
 		</div>
