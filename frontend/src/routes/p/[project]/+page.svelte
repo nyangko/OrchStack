@@ -79,8 +79,13 @@
 	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
 	import { statuses, statusOrder, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
-	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, type Issue, type Chat, type SubRun } from '$lib/mock';
-	import { store } from '$lib/teams.svelte';
+	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, type Issue, type Chat, type SubRun, type SpawnMode } from '$lib/mock';
+	import { store, defaultTeam } from '$lib/teams.svelte';
+	import { Segmented } from '$lib/components/ui/segmented';
+	import { Pill } from '$lib/components/ui/pill';
+	import Bot from '@lucide/svelte/icons/bot';
+	import Users from '@lucide/svelte/icons/users';
+	import GitFork from '@lucide/svelte/icons/git-fork';
 	import { cn } from '$lib/utils';
 
 	const project = $derived(store.projects.find((p) => p.sn === Number(page.params.project)));
@@ -187,6 +192,14 @@
 
 	// Diagram (.pen #26 Workbench / Diagram) — 3열: Project → Orch → Issue / Task / Agent. 사용자 배치 저장은 #59.
 	// 1열은 관계 순서대로 둔다 (프로젝트의 PM이 이슈를 위임). .pen은 Project · Issue · Orch 순이라 흐름이 거꾸로 읽혔다.
+	// 하위 작업 방식 (.pen Task 상세 · 하위 작업 방식) — 태스크 값이 없으면 팀 기본값. 팀이 허용하지 않은 방식은 고를 수 없다 (#67).
+	const team = $derived(store.crew.find((t) => t.project === project?.name) ?? defaultTeam());
+	const spawnPolicy = $derived(store.policies[team.sn].spawn);
+	const spawnModes: { value: SpawnMode; icon: typeof Cpu }[] = [{ value: 'sub', icon: GitBranch }, { value: 'fork', icon: GitFork }, { value: 'runner', icon: Cpu }];
+	const spawnOptions = $derived([
+		{ value: 'team', label: `팀 기본: ${spawnPolicy.mode}`, icon: Users },
+		...spawnModes.map((m) => ({ ...m, label: m.value, disabled: !spawnPolicy.allow.includes(m.value), hint: `${team.name}에서 허용하지 않은 방식이에요 · Teams › Orch 진행 정책` }))
+	]);
 	// 4 · 5열은 리드의 하위 작업 (#67)
 	const col = [0, 260, 520, 780, 1020];
 	const nodeTypes = { diagram: DiagramNode, subrun: SubRunNode };
@@ -838,6 +851,39 @@
 										{/each}
 									</section>
 								{/if}
+								{#if leadRuns[cur.num]}
+									{@const subs = subRuns.filter((s) => s.task === cur.num)}
+									<!-- Run 토큰 (.pen Run 상세 · 토큰) — Run마다 따로 쌓고 여기서만 합친다. runner는 리드와 따로, sub · fork는 리드 사용량에 포함 -->
+									<section class="flex flex-col">
+										<h3 class="mb-1 text-body font-semibold">Run 토큰</h3>
+										<Item.Root variant="row" size="xs">
+											<Item.Content><Item.Title><Bot class="size-3.5 text-muted-foreground" />리드 Run #{leadRuns[cur.num].run} · {agentName(a?.sn)}</Item.Title></Item.Content>
+											<Item.Actions><TokenMeter self={leadRuns[cur.num].self} runner={runnerTotal(cur.num)} /></Item.Actions>
+										</Item.Root>
+										{#each subs as s (s.id)}
+											{#if s.mode === 'runner'}
+												{#each s.runs as r, i (r.num)}
+													<Item.Root variant="row" size="xs">
+														<Item.Content><Item.Title><Cpu class="size-3.5 text-muted-foreground" />Run #{r.num} · {s.id} runner{i < s.runs.length - 1 ? ' · 실패(재시도 전)' : ''}</Item.Title></Item.Content>
+														<Item.Actions><TokenMeter self={r.tokens} /></Item.Actions>
+													</Item.Root>
+												{:else}
+													<Item.Root variant="row" size="xs">
+														<Item.Content><Item.Title><Cpu class="size-3.5 text-muted-foreground" />{s.id} runner · 대기</Item.Title></Item.Content>
+														<Item.Actions><TokenMeter self={0} /></Item.Actions>
+													</Item.Root>
+												{/each}
+											{:else}
+												{@const M = subRunMode[s.mode].icon}
+												<Item.Root variant="row" size="xs">
+													<Item.Content><Item.Title><M class="size-3.5 text-muted-foreground" />{s.id} {s.mode}</Item.Title></Item.Content>
+													<Item.Actions><TokenMeter included /></Item.Actions>
+												</Item.Root>
+											{/if}
+										{/each}
+										<p class="pt-1.5 text-caption text-muted-foreground">runner는 리드와 따로 보이고 합계에만 더해요. sub · fork는 리드 Run 안에서 돌아 리드 사용량에 이미 들어 있어요.</p>
+									</section>
+								{/if}
 								{#if info?.activity.length}
 									<section class="flex flex-col">
 										<h3 class="mb-1 text-body font-semibold">Activity</h3>
@@ -862,6 +908,21 @@
 											<Item.Actions class="min-w-0 truncate text-xs font-medium">{v}</Item.Actions>
 										</Item.Root>
 									{/each}
+								</section>
+								<section class="flex flex-col gap-2">
+									<div class="flex items-center gap-2">
+										<h3 class="text-body font-semibold">하위 작업 방식</h3>
+										<Pill class="ml-auto">{cur.spawnMode ? '이 태스크만' : '팀 기본값 사용'}</Pill>
+									</div>
+									<Segmented aria-label="하위 작업 방식" options={spawnOptions} bind:value={() => cur.spawnMode ?? 'team', (v) => (task(cur.num).spawnMode = v === 'team' ? undefined : (v as SpawnMode))} />
+									{#if (cur.spawnMode ?? spawnPolicy.mode) === 'fork'}
+										<Alert.Root variant="warning">
+											<GitFork />
+											<Alert.Title>fork는 부모 컨텍스트를 상속해요</Alert.Title>
+											<Alert.Description>부모 컨텍스트를 그대로 복사해 비용이 커요.</Alert.Description>
+										</Alert.Root>
+									{/if}
+									<p class="text-caption text-muted-foreground">바꾸면 이 태스크에만 저장돼요. 비워 두면 팀 기본값을 써요 (Teams › Orch 진행 정책).</p>
 								</section>
 								{#if info?.context}
 									<section class="flex flex-col gap-2">

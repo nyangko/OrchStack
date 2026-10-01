@@ -44,6 +44,8 @@ export type Task = {
 	title: string;
 	status: TaskStatus;
 	priority: "P0" | "P1" | "P2" | "P3";
+	/** 하위 작업 방식 (tbl_task.spawn_mode). 없으면 팀 기본값 (#67). */
+	spawnMode?: SpawnMode;
 	agent?: number;
 	effort?: "High" | "Medium" | "Low";
 	/** 상위 이슈 번호. */
@@ -836,6 +838,7 @@ export const meters = [
 ] as const;
 
 /// Orch 진행 정책 (.pen Orch 진행 정책 · 자동 진행 / 사용자 판단 / 루프 가드). 레벨 L0–L4별 처리 방식.
+export type SpawnMode = "sub" | "fork" | "runner";
 export type LevelAction = "auto" | "timer" | "wait" | "block";
 export type OrchPolicy = {
 	mode: "manual" | "timer" | "full";
@@ -846,6 +849,8 @@ export type OrchPolicy = {
 	levels: { name: string; example: string; action: LevelAction; timeout: string; locked?: boolean }[];
 	guards: { key: "streak" | "reject" | "repeat" | "budget" | "spawn" | "away"; name: string; value: string; on: boolean }[];
 	lastStop: string;
+	/** 하위 작업 정책 (tbl_team.spawn_mode · spawn_allow · max_child_run · #67). 기본 방식은 허용 안에 있어야 하고 동시 수는 1 이상. */
+	spawn: { mode: SpawnMode; allow: SpawnMode[]; maxChild: number };
 };
 
 export const orchPolicy: OrchPolicy = {
@@ -868,6 +873,7 @@ export const orchPolicy: OrchPolicy = {
 		{ key: "away", name: "사용자 부재 감지", value: "30분 무응답 → Manual로 전환", on: true },
 	],
 	lastStop: "어제 #121 반려 3회",
+	spawn: { mode: "runner", allow: ["sub", "runner"], maxChild: 3 },
 };
 
 /// 팀 정책 (.pen 팀 정책 카드). 사용량은 멤버 목록에서 계산한다.
