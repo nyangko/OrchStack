@@ -45,12 +45,6 @@
 	const tok = $derived(cfgTok(c));
 </script>
 
-{#snippet sameAs(changed: boolean, base?: AgentConfig)}
-	{#if base}
-		<Pill class={changed ? 'bg-primary-soft text-primary' : ''}>{changed ? '템플릿과 다름' : '템플릿과 동일'}</Pill>
-	{/if}
-{/snippet}
-
 <!-- .pen SkillRow — 글자 타일 · 이름 · 설명 · 출처 · 토큰 · 켜기 -->
 {#snippet skillRow(name: string, desc: string, source: string, SourceIcon: Component, tok: number, on: boolean, toggle: () => void, changed = false)}
 	<div class="list-row">
@@ -69,7 +63,9 @@
 
 <div class="flex items-center gap-2.5">
 	<h2 class="text-lg font-semibold">{skillAdd ? '스킬 추가' : 'Skills'}</h2>
-	{@render sameAs(!!base && (c.skills.join() !== base.skills.join() || c.mcp.join() !== base.mcp.join()), base)}
+	{#if base}
+		<Pill class={(!!base && (c.skills.join() !== base.skills.join() || c.mcp.join() !== base.mcp.join())) ? 'bg-primary-soft text-primary' : ''}>{(!!base && (c.skills.join() !== base.skills.join() || c.mcp.join() !== base.mcp.join())) ? '템플릿과 다름' : '템플릿과 동일'}</Pill>
+	{/if}
 	<span class="text-xs text-muted-foreground">{c.skills.length + c.mcp.length} / {store.library.length + c.mcp.length} 활성</span>
 	<Pill>다음 Run부터 적용</Pill>
 	<span class="saved-note"><CircleCheck class="size-3" />저장됨</span>

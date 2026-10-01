@@ -92,15 +92,11 @@
 	}
 </script>
 
-{#snippet sameAs(changed: boolean, base?: AgentConfig)}
+<div class="flex items-center gap-2.5">
+	<h2 class="text-lg font-semibold">{base ? 'Harness' : 'Harness 기본값'}</h2>
 	{#if base}
 		<Pill class={changed ? 'bg-primary-soft text-primary' : ''}>{changed ? '템플릿과 다름' : '템플릿과 동일'}</Pill>
 	{/if}
-{/snippet}
-
-<div class="flex items-center gap-2.5">
-	<h2 class="text-lg font-semibold">{base ? 'Harness' : 'Harness 기본값'}</h2>
-	{@render sameAs(changed, base)}
 	<Pill>다음 Run부터 적용</Pill>
 	<span class="flex-1"></span>
 	<span class="saved-note"><CircleCheck class="size-3" />저장됨</span>

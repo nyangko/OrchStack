@@ -385,14 +385,6 @@
 
 <svelte:head><title>{team.name} · Teams · OrchStack</title></svelte:head>
 
-{#snippet bars(values: number[])}
-	<span class="flex h-6 w-18 items-end gap-0.75" aria-hidden="true">
-		{#each values as h, i (i)}
-			<span class={['flex-1 rounded-t-xs bg-primary', i < values.length - 1 && 'opacity-35']} style="height: {h}px"></span>
-		{/each}
-	</span>
-{/snippet}
-
 {#snippet kpi(label: string, value: string, sub: string, delta?: string, trend?: number[])}
 	<div class="flex flex-1 flex-col gap-1 border-r px-4.5 py-3.5 last:border-r-0">
 		<span class="text-xs text-muted-foreground">{label}</span>
@@ -400,7 +392,13 @@
 			<span class="font-mono text-xl font-semibold whitespace-nowrap">{value}</span>
 			{#if delta}<span class="pb-0.5 font-mono text-xs font-medium text-status-done">{delta}</span>{/if}
 			<span class="flex-1"></span>
-			{#if trend}{@render bars(trend)}{/if}
+			{#if trend}
+				<span class="flex h-6 w-18 items-end gap-0.75" aria-hidden="true">
+					{#each trend as h, i (i)}
+						<span class={['flex-1 rounded-t-xs bg-primary', i < trend.length - 1 && 'opacity-35']} style="height: {h}px"></span>
+					{/each}
+				</span>
+			{/if}
 		</span>
 		<span class="text-caption text-subtle-foreground">{sub}</span>
 	</div>

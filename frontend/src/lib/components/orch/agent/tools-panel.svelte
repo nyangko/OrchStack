@@ -36,15 +36,11 @@
 	});
 </script>
 
-{#snippet sameAs(changed: boolean, base?: AgentConfig)}
-	{#if base}
-		<Pill class={changed ? 'bg-primary-soft text-primary' : ''}>{changed ? '템플릿과 다름' : '템플릿과 동일'}</Pill>
-	{/if}
-{/snippet}
-
 <div class="flex items-center gap-2.5">
 	<h2 class="text-lg font-semibold">Tools & MCP</h2>
-	{@render sameAs(!!base && (c.mcp.join() !== base.mcp.join() || c.github !== base.github), base)}
+	{#if base}
+		<Pill class={(!!base && (c.mcp.join() !== base.mcp.join() || c.github !== base.github)) ? 'bg-primary-soft text-primary' : ''}>{(!!base && (c.mcp.join() !== base.mcp.join() || c.github !== base.github)) ? '템플릿과 다름' : '템플릿과 동일'}</Pill>
+	{/if}
 	<span class="flex items-center gap-1 text-xs text-status-done"><CircleCheck class="size-3.5" />MCP {c.mcp.length}/{c.mcp.length} 정상 · {mcpChecked} 점검</span>
 	<span class="flex-1"></span>
 	<Button variant="outline" size="sm" onclick={() => (mcpChecked = '방금')}><RefreshCw />다시 점검</Button>

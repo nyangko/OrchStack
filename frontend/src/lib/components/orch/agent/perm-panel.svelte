@@ -26,12 +26,6 @@
 	let excludeDraft = $state('');
 </script>
 
-{#snippet sameAs(changed: boolean, base?: AgentConfig)}
-	{#if base}
-		<Pill class={changed ? 'bg-primary-soft text-primary' : ''}>{changed ? '템플릿과 다름' : '템플릿과 동일'}</Pill>
-	{/if}
-{/snippet}
-
 {#snippet globs(list: string[], draft: string, set: (v: string) => void, label: string)}
 	<div class="flex flex-col gap-1.5">
 		<span class="text-caption font-semibold text-muted-foreground">{label}</span>
@@ -51,7 +45,10 @@
 
 <div class="flex items-center gap-2.5">
 	<h2 class="text-lg font-semibold">{base ? '권한' : '권한 기본값'}</h2>
-	{@render sameAs(cfgDiff(c, base) > 0, base)}
+	{#if base}
+		{@const changed = cfgDiff(c, base) > 0}
+		<Pill class={changed ? 'bg-primary-soft text-primary' : ''}>{changed ? '템플릿과 다름' : '템플릿과 동일'}</Pill>
+	{/if}
 	<span class="flex-1"></span>
 	<span class="saved-note"><CircleCheck class="size-3" />저장됨</span>
 </div>

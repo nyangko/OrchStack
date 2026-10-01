@@ -259,29 +259,6 @@
 	{#if typeof M === 'string'}<RuntimeLogo runtime={M} class={['ring-0', size === 'lg' ? 'size-5' : 'size-4']} />{:else}<M class={size === 'lg' ? 'size-5' : 'size-4'} />{/if}
 {/snippet}
 
-<!-- 추가되면 이렇게 보여요 — 인증 · 확인 단계 오른쪽 -->
-{#snippet preview()}
-	{#if sel}
-		<span class="list-label px-0 pt-0">추가되면 이렇게 보여요</span>
-		<div class="card flex items-center gap-3 px-4 py-3.5 rounded-lg">
-			<span class="icon-tile">{@render logoOf(sel.key, 'lg')}</span>
-			<span class="flex min-w-0 flex-1 flex-col gap-1">
-				<span class="row-title-strong">{isSub ? sel.name : title}<Pill class={kindMeta[sel.kind].pill}>{sel.kind}</Pill></span>
-				{#if authed}
-					<span class="saved-note"><CircleCheck class="size-3" />{isSub ? `${sel.plan} · ${sel.cli}` : `${name} · ${sel.models} 모델`}</span>
-				{:else}
-					<span class="text-caption text-muted-foreground">{isSub ? '로그인 전' : '연결 테스트 전'}</span>
-				{/if}
-			</span>
-			<span class="menu-line rounded-sm border text-caption">
-				{#if isSub}일<Progress value={authed ? 100 : 0} class="h-1 w-10 bg-muted" indicator="bg-success" aria-label="일 한도" /><span class="font-mono text-status-done">{authed ? '100%' : '—'}</span>
-				{:else if needsKey}월<Progress value={0} class="h-1 w-10 bg-muted" aria-label="월 예산" /><span class="font-mono text-primary">$0/${budget}</span>
-				{:else}한도 없음{/if}
-			</span>
-		</div>
-	{/if}
-{/snippet}
-
 <Dialog.Root bind:open={() => open, (v) => (open = v)}>
 	<Dialog.Content size="xl" tall>
 		<Dialog.Header icon={PlugZap}>
@@ -475,7 +452,26 @@
 					</div>
 
 					<aside class="flex flex-col gap-2">
-						{@render preview()}
+						<!-- 추가되면 이렇게 보여요 — 인증 · 확인 단계 오른쪽 -->
+						{#if sel}
+							<span class="list-label px-0 pt-0">추가되면 이렇게 보여요</span>
+							<div class="card flex items-center gap-3 px-4 py-3.5 rounded-lg">
+								<span class="icon-tile">{@render logoOf(sel.key, 'lg')}</span>
+								<span class="flex min-w-0 flex-1 flex-col gap-1">
+									<span class="row-title-strong">{isSub ? sel.name : title}<Pill class={kindMeta[sel.kind].pill}>{sel.kind}</Pill></span>
+									{#if authed}
+										<span class="saved-note"><CircleCheck class="size-3" />{isSub ? `${sel.plan} · ${sel.cli}` : `${name} · ${sel.models} 모델`}</span>
+									{:else}
+										<span class="text-caption text-muted-foreground">{isSub ? '로그인 전' : '연결 테스트 전'}</span>
+									{/if}
+								</span>
+								<span class="menu-line rounded-sm border text-caption">
+									{#if isSub}일<Progress value={authed ? 100 : 0} class="h-1 w-10 bg-muted" indicator="bg-success" aria-label="일 한도" /><span class="font-mono text-status-done">{authed ? '100%' : '—'}</span>
+									{:else if needsKey}월<Progress value={0} class="h-1 w-10 bg-muted" aria-label="월 예산" /><span class="font-mono text-primary">$0/${budget}</span>
+									{:else}한도 없음{/if}
+								</span>
+							</div>
+						{/if}
 						{#if step === 1}
 							<span class="list-label px-0 pt-4">이 연결을 쓸 수 있는 실행기</span>
 							{#each compat as [cli, why, ok] (cli)}
