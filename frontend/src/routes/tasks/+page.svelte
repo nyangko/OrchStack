@@ -37,8 +37,7 @@
 	import { roles } from '$lib/roles';
 	import { tasks, projectTasks, decisions, type Task } from '$lib/mock';
 	import { store, glyphOf } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	// 모든 프로젝트의 태스크. OrchStack 목데이터는 project가 없어 1로 채운다 (서버 연결은 #44).
 	const all: (Task & { project: number })[] = [...tasks, ...projectTasks].map((t) => ({ ...t, project: t.project ?? 1 }));
 	const pending = new Set(decisions.filter((d) => !d.decided).map((d) => d.task));
@@ -139,7 +138,7 @@
 {#snippet kpi(label: string, value: number, sub: string, tone?: string)}
 	<div class="stat-card">
 		<span class="text-xs text-muted-foreground">{label}</span>
-		<span class={cn('font-mono text-xl font-semibold', tone)}>{value}</span>
+		<span class={['font-mono text-xl font-semibold', tone]}>{value}</span>
 		<span class="truncate text-caption text-subtle-foreground">{sub}</span>
 	</div>
 {/snippet}
@@ -149,10 +148,7 @@
 		type="button"
 		aria-current={view === key ? 'page' : undefined}
 		onclick={() => pickView(key, x)}
-		class={cn(
-			'side-nav-item h-8.5 w-full text-muted-foreground',
-			view === key && 'bg-accent font-semibold text-foreground'
-		)}
+		class={['side-nav-item h-8.5 w-full', view === key ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 	>
 		<Icon class="size-3.75 shrink-0" />
 		<span class="flex-1 truncate text-left">{label}</span>
@@ -257,7 +253,7 @@
 		</div>
 
 		{#if groups.length}
-			<div class="overflow-hidden rounded-lg border bg-card">
+			<div class="card overflow-hidden rounded-lg">
 				<div class="flex h-9 items-center gap-3 bg-muted px-4 text-caption font-medium text-muted-foreground">
 					<span class="w-3.5"></span><span class="w-12">ID</span><span class="flex-1">Title</span><span class="w-28">Status</span><span class="w-36">Progress</span><span class="w-60">담당</span><span class="w-16 text-right">Updated</span>
 				</div>
@@ -271,7 +267,7 @@
 							onclick={() => (folded = open ? [...folded, p.sn] : folded.filter((x) => x !== p.sn))}
 							class="focus-ring rounded-xs text-muted-foreground hover:text-foreground"
 						>
-							<ChevronDown class={cn('size-3.5 transition-transform', !open && '-rotate-90')} />
+							<ChevronDown class={['size-3.5 transition-transform', !open && '-rotate-90']} />
 						</button>
 						<Folder class="size-3.5 text-muted-foreground" />
 						<span class="font-semibold">{p.name}</span>
@@ -287,7 +283,7 @@
 							<!-- 행 클릭은 마우스 편의, 키보드는 제목 링크로 연다 -->
 							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 							<div class="flex h-13 cursor-pointer items-center gap-3 border-t px-4 text-xs hover:bg-muted/50" onclick={() => goto(`/p/${t.project}?task=${t.num}`)}>
-								<st.icon class={cn('size-3.5 shrink-0', st.text)} aria-hidden="true" />
+								<st.icon class={['size-3.5 shrink-0', st.text]} aria-hidden="true" />
 								<span class="w-12 font-mono text-muted-foreground">#{t.num}</span>
 								<span class="flex min-w-0 flex-1 items-center gap-2">
 									<a href="/p/{t.project}?task={t.num}" onclick={(e) => e.stopPropagation()} class="truncate text-body font-medium outline-none hover:underline focus-visible:underline">{t.title}</a>
@@ -324,7 +320,7 @@
 		{:else}
 			<!-- 빈 상태 (.pen 빈 상태 · 새 프로젝트에 태스크 없음) -->
 			{@const noTasks = f.project !== undefined && !all.some((t) => t.project === f.project)}
-			<Empty.Root class="rounded-lg border bg-card py-16">
+			<Empty.Root class="card py-16 rounded-lg">
 				<Empty.Header>
 					<Empty.Media variant="icon"><ListTodo /></Empty.Media>
 					<Empty.Title>{noTasks ? '아직 태스크가 없어요' : '조건에 맞는 태스크가 없어요'}</Empty.Title>

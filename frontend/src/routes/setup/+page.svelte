@@ -43,8 +43,7 @@
 	import { store, defaultTeam, runtimeName, low } from '$lib/teams.svelte';
 	import { SETUP_KEY } from '$lib/setup';
 	import { AddConnectionDialog, providerMark, type AddedConnection } from '$lib/components/orch/connection';
-	import { cn } from '$lib/utils';
-	import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import * as ChoiceCards from '$lib/components/ui/choice-cards';
 
 	// -1 = 스플래시, 0 · 1 · 2 = 단계.
 	let step = $state(-1);
@@ -222,7 +221,7 @@
 		</div>
 	{:else}
 		<img src={logo} alt="OrchStack" class="mb-6 h-7 w-auto" />
-		<div class="flex w-full max-w-230 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+		<div class="card flex w-full max-w-230 flex-col overflow-hidden shadow-sm">
 			<header class="flex flex-col gap-3 border-b px-8 pt-7 pb-6">
 				<Steps steps={['에이전트 연결', '프로젝트', '기본 팀']} current={step} />
 				<h1 class="mt-2 text-2xl font-bold">{stepInfo[step].title}</h1>
@@ -241,8 +240,8 @@
 								</span>
 								<span class="flex min-w-0 flex-1 flex-col gap-1">
 									<span class="row-title-strong">{c.name}<Pill class="font-mono text-2xs">{c.version}</Pill></span>
-									<span class={cn('meta-truncate gap-1', m.tone)}>
-										<m.icon class={cn('size-3 shrink-0', (c.state === 'updating' || c.state === 'installing') && 'animate-spin')} />
+									<span class={['meta-truncate gap-1', m.tone]}>
+										<m.icon class={['size-3 shrink-0', (c.state === 'updating' || c.state === 'installing') && 'animate-spin']} />
 										{c.state === 'updating' ? '업데이트 중…' : c.state === 'installing' ? '설치 중…' : c.note}
 									</span>
 								</span>
@@ -258,7 +257,7 @@
 							<span class="icon-tile"><RuntimeLogo runtime={c.runtime} class="size-5 ring-0" /></span>
 							<span class="flex min-w-0 flex-1 flex-col gap-1">
 								<span class="row-title-strong">{c.plan}<Pill class="bg-primary-soft text-primary">구독</Pill></span>
-								<span class={cn('flex items-center gap-1 text-caption', c.state === 'ok' ? 'text-status-done' : 'text-muted-foreground')}>
+								<span class={['flex items-center gap-1 text-caption', c.state === 'ok' ? 'text-status-done' : 'text-muted-foreground']}>
 									{#if c.state === 'ok'}<CircleCheck class="size-3" />연결됨 · {runtimeName(c.runtime)} {clis.find((x) => x.key === c.runtime)?.version}
 									{:else if c.state === 'checking'}<LoaderCircle class="size-3 animate-spin" />연결 확인 중… {runtimeName(c.runtime)} 로그인 토큰 확인
 									{:else}<Timer class="size-3" />대기 중 · {runtimeName(c.runtime)} {clis.find((x) => x.key === c.runtime)?.state === 'ok' ? '로그인 확인 필요' : '업데이트 후 확인'}{/if}
@@ -268,7 +267,7 @@
 								{#each [['5H', c.h5], ['주간', c.week]] as const as [l, v] (l)}
 									<span class="menu-line rounded-sm border text-caption">
 										{l}<Progress value={v} class="h-1 w-10 bg-muted" indicator={low(v) ? 'bg-destructive' : 'bg-success'} aria-label="{c.plan} {l} 잔량" />
-										<span class={cn('font-mono', low(v) ? 'text-destructive' : 'text-status-done')}>{v}%</span>
+										<span class={['font-mono', low(v) ? 'text-destructive' : 'text-status-done']}>{v}%</span>
 									</span>
 								{/each}
 							{:else}

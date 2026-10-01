@@ -27,8 +27,7 @@
 	import SkillSourcesDialog from '$lib/components/orch/agent/skill-sources-dialog.svelte';
 	import type { Skill, SkillLog } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	type Source = (typeof store.sources.sources)[number];
 
 	let syncing = $state(false);
@@ -84,7 +83,7 @@
 <main class="page-main">
 	<PageHeader title="스킬 소스" desc="스킬을 찾고 설치할 곳 · 워크스페이스 전체에 적용" status={false}>
 		<Button variant="outline" disabled={syncing} onclick={syncAll}>
-			<RefreshCw class={cn(syncing && 'animate-spin')} />{syncing ? '동기화 중…' : '지금 동기화'}
+			<RefreshCw class={[syncing && 'animate-spin']} />{syncing ? '동기화 중…' : '지금 동기화'}
 		</Button>
 		<Button onclick={() => (adding = true)}><Plus />소스 추가</Button>
 	</PageHeader>

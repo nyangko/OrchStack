@@ -71,8 +71,7 @@
 	import * as Field from '$lib/components/ui/field';
 	import { providers, type ProviderKind } from '$lib/mock';
 	import { store } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-	import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import * as ChoiceCards from '$lib/components/ui/choice-cards';
 
 	let {
 		open = $bindable(false),
@@ -257,14 +256,14 @@
 
 {#snippet logoOf(key: string, size: 'sm' | 'lg')}
 	{@const M = providerMark[key]}
-	{#if typeof M === 'string'}<RuntimeLogo runtime={M} class={cn('ring-0', size === 'lg' ? 'size-5' : 'size-4')} />{:else}<M class={size === 'lg' ? 'size-5' : 'size-4'} />{/if}
+	{#if typeof M === 'string'}<RuntimeLogo runtime={M} class={['ring-0', size === 'lg' ? 'size-5' : 'size-4']} />{:else}<M class={size === 'lg' ? 'size-5' : 'size-4'} />{/if}
 {/snippet}
 
 <!-- 추가되면 이렇게 보여요 — 인증 · 확인 단계 오른쪽 -->
 {#snippet preview()}
 	{#if sel}
 		<span class="list-label px-0 pt-0">추가되면 이렇게 보여요</span>
-		<div class="flex items-center gap-3 rounded-lg border bg-card px-4 py-3.5">
+		<div class="card flex items-center gap-3 px-4 py-3.5 rounded-lg">
 			<span class="icon-tile">{@render logoOf(sel.key, 'lg')}</span>
 			<span class="flex min-w-0 flex-1 flex-col gap-1">
 				<span class="row-title-strong">{isSub ? sel.name : title}<Pill class={kindMeta[sel.kind].pill}>{sel.kind}</Pill></span>
@@ -305,7 +304,7 @@
 								role="radio"
 								aria-checked={filter === k}
 								onclick={() => (filter = k)}
-								class={cn('flex items-center gap-1 rounded-full px-2.5 py-1 text-caption font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', filter === k ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground')}
+								class={['flex items-center gap-1 rounded-full px-2.5 py-1 text-caption font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', filter === k ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground']}
 							>
 								{k}<span class="opacity-70">{k === '전체' ? providers.length : providers.filter((p) => p.kind === k).length}</span>
 							</button>
@@ -328,7 +327,7 @@
 										</span>
 										<span class="flex items-center gap-2 text-caption">
 											<Pill class={kindMeta[p.kind].pill}>{p.kind}</Pill>
-											<span class={cn('flex min-w-0 items-center gap-1', s.tone)}><s.icon class="size-3 shrink-0" /><span class="truncate">{p.note}</span></span>
+											<span class={['flex min-w-0 items-center gap-1', s.tone]}><s.icon class="size-3 shrink-0" /><span class="truncate">{p.note}</span></span>
 										</span>
 									</ChoiceCards.Item>
 								{/each}
@@ -480,9 +479,9 @@
 						{#if step === 1}
 							<span class="list-label px-0 pt-4">이 연결을 쓸 수 있는 실행기</span>
 							{#each compat as [cli, why, ok] (cli)}
-								<span class={cn('flex items-center gap-2 text-body', !ok && 'text-muted-foreground')}>
+								<span class={['flex items-center gap-2 text-body', !ok && 'text-muted-foreground']}>
 									{#if ok}<CircleCheck class="size-4 text-status-done" />{:else}<CircleMinus class="size-4" />{/if}
-									<span class={cn('flex-1', ok && 'font-medium')}>{cli}</span><span class="text-caption text-muted-foreground">{why}</span>
+									<span class={['flex-1', ok && 'font-medium']}>{cli}</span><span class="text-caption text-muted-foreground">{why}</span>
 								</span>
 							{/each}
 						{:else}

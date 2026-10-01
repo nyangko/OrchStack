@@ -14,8 +14,7 @@
 	import { Segmented } from '$lib/components/ui/segmented';
 	import { RoleAvatar } from '$lib/components/ui/role-avatar';
 	import { store, defaultTeam, glyphOf, membersOf } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	let { children } = $props();
 
 	const scope = $derived(page.route.id?.startsWith('/teams/agents') ? 'agents' : 'teams');
@@ -56,7 +55,7 @@
 						<a
 							href="/teams/agents/{t.sn}"
 							aria-current={on ? 'page' : undefined}
-							class={cn('flex items-center gap-2.5 rounded-md px-2 py-1.75 outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50', on && 'bg-accent')}
+							class={['flex items-center gap-2.5 rounded-md px-2 py-1.75 outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50', on && 'bg-accent']}
 						>
 							<RoleAvatar role={t.role} />
 							<span class="flex min-w-0 flex-1 flex-col gap-0.75">
@@ -81,13 +80,13 @@
 					<a
 						href="/teams?team={t.sn}"
 						aria-current={on ? 'page' : undefined}
-						class={cn('flex items-center gap-2.5 rounded-md p-2 outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50', on && 'bg-accent')}
+						class={['flex items-center gap-2.5 rounded-md p-2 outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50', on && 'bg-accent']}
 					>
 						<Avatar.Group class={on ? '*:data-[slot=avatar]:ring-accent' : '*:data-[slot=avatar]:ring-sidebar'}>
 							{#each t.members.slice(0, 3) as m (m.sn)}<RoleAvatar role={m.role} icon={glyphOf(m)} size="sm" />{/each}
 						</Avatar.Group>
 						<span class="flex min-w-0 flex-1 flex-col gap-px">
-							<span class={cn('truncate text-body', on ? 'font-semibold' : 'font-medium')}>{t.name}</span>
+							<span class={['truncate text-body', on ? 'font-semibold' : 'font-medium']}>{t.name}</span>
 							<span class="truncate text-caption text-muted-foreground">{t.orch ? '모든 프로젝트 · PM' : t.project}</span>
 						</span>
 						<span class="flex flex-col items-end gap-0.5 text-muted-foreground">

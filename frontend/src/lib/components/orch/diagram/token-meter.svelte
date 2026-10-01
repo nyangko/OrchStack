@@ -8,7 +8,7 @@
 	/// runner 합계를 주면 lead(자기 + runner = 합계), included면 sub · fork(리드 합계에 포함), 아니면 자기 사용량만.
 	import Coins from "@lucide/svelte/icons/coins";
 	import { cn } from "$lib/utils";
-
+	
 	let {
 		self = 0,
 		runner,

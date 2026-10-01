@@ -29,8 +29,7 @@
 	import { KeyValueRow } from '$lib/components/ui/key-value-row';
 	import { AddConnectionDialog, type AddedConnection } from '$lib/components/orch/connection';
 	import { runtimeClis, runSettings, type RuntimeCli } from '$lib/mock';
-	import { cn } from '$lib/utils';
-
+	
 	/// busy — 설치 · 업데이트 중 (목데이터 동안만).
 	type Cli = RuntimeCli & { busy?: boolean };
 
@@ -133,7 +132,7 @@
 					</span>
 					<span class="flex min-w-0 flex-1 flex-col gap-1">
 						<span class="flex items-center gap-2 text-xs font-semibold">{c.name}<Pill class="font-mono text-2xs">{c.version}</Pill></span>
-						<span class={cn('meta-truncate gap-1.25', c.busy ? 'text-status-in-progress' : m.tone)}>
+						<span class={['meta-truncate gap-1.25', c.busy ? 'text-status-in-progress' : m.tone]}>
 							{#if c.busy}<LoaderCircle class="size-3 shrink-0 animate-spin" />{c.state === 'update' ? '업데이트 중…' : '설치 중…'}
 							{:else}<m.icon class="size-3 shrink-0" />{c.note}{/if}
 						</span>

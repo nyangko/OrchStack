@@ -21,8 +21,7 @@
 	import TrustPicker from '$lib/components/orch/agent/trust-picker.svelte';
 	import ApprovalTable from '$lib/components/orch/agent/approval-table.svelte';
 	import { security, auditLog, type AuditLog } from '$lib/mock';
-	import { cn } from '$lib/utils';
-
+	
 	let s = $state(structuredClone(security));
 	let log = $state(structuredClone(auditLog));
 	/// 처음 값과 달라지면 저장됨 표시 (자동 저장 가정).

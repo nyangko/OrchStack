@@ -21,6 +21,7 @@
 </script>
 
 <script lang="ts">
+	import type { ClassValue } from "svelte/elements";
 	/// 실행기 로고 (.pen RuntimeLogo/codex · claude). 브랜드색 원 + 흰 마크, 카드색 테두리로 겹쳐 놓아도 구분된다.
 	import { cn } from "$lib/utils.js";
 
@@ -30,7 +31,7 @@
 	}: {
 		runtime: Runtime;
 		/** 크기는 size-* 로 조절 (기본 18px). */
-		class?: string;
+		class?: ClassValue;
 	} = $props();
 
 	const m = $derived(marks[runtime]);

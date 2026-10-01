@@ -20,8 +20,7 @@
 	import { store, cfgTok, toggleIn, installSkill, sourceMeta } from '$lib/teams.svelte';
 	import SkillBrowser from './skill-browser.svelte';
 	import SkillSourcesDialog from './skill-sources-dialog.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	let {
 		config: c,
 		base,
@@ -100,7 +99,7 @@
 			<SkillBrowser added={(n) => c.skills.includes(n)} onadd={(h) => (installSkill(h), c.skills.includes(h.name) || c.skills.push(h.name))} {target} />
 		</Tabs.Content>
 		{#each ['installed', 'team'] as v (v)}
-			<Tabs.Content value={v} class="rounded-lg border bg-card px-4 py-1">
+			<Tabs.Content value={v} class="card px-4 py-1 rounded-lg">
 				{#each store.library.filter((k) => v === 'installed' || k.source === 'Team') as k (k.name)}
 					{@render skillRow(k.name, k.desc, k.version ? `${sourceMeta[k.source].label} · ${k.version}` : sourceMeta[k.source].label, sourceMeta[k.source].icon, k.tok, c.skills.includes(k.name), () => toggleIn(c.skills, k.name))}
 				{/each}
@@ -149,7 +148,7 @@
 				<Card.Header><Card.Title>CLI별 적용 방식</Card.Title></Card.Header>
 				<Card.Content class="gap-2 text-xs">
 					{#each [['codex', 'Codex CLI', 'AGENTS.md에 스킬 요약을 포함'], ['claude', 'Claude Code', '~/.claude/skills 로 동기화']] as const as [r, n, d] (r)}
-						<div class={cn('flex items-start gap-2 rounded-sm p-2', r === runtime && 'bg-primary-soft')}>
+						<div class={['flex items-start gap-2 rounded-sm p-2', r === runtime && 'bg-primary-soft']}>
 							<RuntimeLogo runtime={r} class="size-4 ring-0" />
 							<span class="flex flex-col gap-0.5"><span class="font-medium">{n}{r === runtime ? ' · 현재' : ''}</span><span class="text-muted-foreground">{d}</span></span>
 						</div>

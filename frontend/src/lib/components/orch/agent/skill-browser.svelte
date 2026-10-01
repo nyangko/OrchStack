@@ -56,7 +56,7 @@
 		<span class="flex-1"></span>
 		<span class="text-caption text-muted-foreground">결과 {shHits.length} · 설치 많은 순</span>
 	</div>
-	<div class="card-surface px-4 py-1">
+	<div class="card rounded-lg px-4 py-1">
 		{#each shHits as h (h.name)}
 			{@const isAdded = added(h.name)}
 			{@const warn = h.audit[0] < h.audit[1]}

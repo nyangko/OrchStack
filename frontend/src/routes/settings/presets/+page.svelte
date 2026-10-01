@@ -28,8 +28,7 @@
 	import { HistoryRow } from '$lib/components/ui/history-row';
 	import { presets, type Preset, type PresetKind } from '$lib/mock';
 	import { store, membersOf } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	type Version = { v: number; who: string; when: string; note: string; body: string };
 	/// builtIn — OrchStack 기본 제공 (잠김, 복제해서 수정). name은 편집기 파일 이름 — 편집기가 이 항목의 body를 바로 고친다.
 	type Item = Preset & { name: string; builtIn: boolean; versions: Version[] };
@@ -159,7 +158,7 @@
 							type="button"
 							aria-current={p.key === sel.key ? 'true' : undefined}
 							onclick={() => (selKey = p.key)}
-							class={cn('list-panel-item px-2 py-1.75 text-muted-foreground', p.key === sel.key && 'bg-accent font-semibold text-foreground')}
+							class={['list-panel-item px-2 py-1.75', p.key === sel.key ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 						>
 							<k.icon class="size-3.5 shrink-0" />
 							<span class="truncate">{p.key} · {p.tok} tok{p.kind === 'style' && p.default ? ' (기본)' : ''}</span>

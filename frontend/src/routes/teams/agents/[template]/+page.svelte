@@ -38,8 +38,7 @@
 	import PermPanel from '$lib/components/orch/agent/perm-panel.svelte';
 	import HarnessPanel from '$lib/components/orch/agent/harness-panel.svelte';
 	import { store, defaultTeam, glyphOf, membersOf, runtimeName, accountOf, scopeText, liveMap, putDraft } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	const t = $derived(store.templates.find((x) => x.sn === Number(page.params.template)) ?? store.templates[0]);
 	/// 템플릿의 팀 관련 문구(추가 대상 · team.md)는 기본 팀 기준.
 	const team = $derived(defaultTeam());
@@ -126,16 +125,13 @@
 	<div class="flex min-h-0 flex-1">
 		<nav aria-label="템플릿 메뉴" class="flex w-52.5 shrink-0 flex-col gap-0.5 border-r bg-sidebar px-2.5 py-3.5">
 			{#each tplNav as g, gi (g.group)}
-				<span class={cn('list-label px-2 pt-0.5 pb-1.5', gi > 0 && 'mt-1.5 border-t pt-3.5')}>{g.group}</span>
+				<span class={['list-label px-2 pb-1.5', gi > 0 ? 'mt-1.5 border-t pt-3.5' : 'pt-0.5']}>{g.group}</span>
 				{#each g.items as it (it.v)}
 					<button
 						type="button"
 						aria-current={tplTab === it.v ? 'page' : undefined}
 						onclick={() => (tplTab = it.v)}
-						class={cn(
-							'side-nav-item h-8.5 text-muted-foreground',
-							tplTab === it.v && 'bg-accent font-semibold text-foreground'
-						)}
+						class={['side-nav-item h-8.5', tplTab === it.v ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 					>
 						<it.icon class="size-3.75" />
 						<span class="flex-1 text-left">{it.label}</span>
@@ -249,7 +245,7 @@
 								<Card.Content class="gap-2">
 									{#each t.revisions.slice(0, 3) as r (r.v)}
 										<div class="flex items-center gap-2 text-xs">
-											<Pill class={cn('font-mono', r.state === 'draft' && 'bg-warning-soft text-status-waiting')}>v{r.v}</Pill>
+											<Pill class={['font-mono', r.state === 'draft' && 'bg-warning-soft text-status-waiting']}>v{r.v}</Pill>
 											<span class="flex-1 truncate">{r.note}</span>
 											<span class="font-mono text-caption text-subtle-foreground">{r.when}</span>
 										</div>
@@ -270,7 +266,7 @@
 						<Button size="sm" disabled={!dirty} onclick={saveDraft}>v{t.draft ? t.revisions.find((r) => r.state === 'draft')?.v : t.version + 1} 초안에 저장</Button>
 					</div>
 					<div class="flex h-160 gap-3.5">
-						<nav aria-label="지침 파일" class="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto rounded-md border bg-card p-2 text-xs">
+						<nav aria-label="지침 파일" class="card flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto p-2 text-xs rounded-md">
 							<span class="list-label px-2 pt-1 pb-1.5">파일</span>
 							{#each tplWork as f (f.name)}
 								{@const depth = f.name.includes('/') ? 1 : 0}
@@ -283,7 +279,7 @@
 									type="button"
 									aria-current={tplOpened[tplActive]?.name === f.name ? 'true' : undefined}
 									onclick={() => openTplFile(f.name)}
-									class={cn('flex items-center gap-1.5 rounded-sm py-1.25 pr-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50', depth ? 'pl-7' : 'pl-2', tplOpened[tplActive]?.name === f.name && 'bg-accent font-medium')}
+									class={['flex items-center gap-1.5 rounded-sm py-1.25 pr-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50', depth ? 'pl-7' : 'pl-2', tplOpened[tplActive]?.name === f.name && 'bg-accent font-medium']}
 								>
 									{#if f.name === 'SOUL.md'}<Heart class="size-3.5 text-muted-foreground" />{:else}<FileText class="size-3.5 text-muted-foreground" />{/if}
 									<span class="flex-1 truncate">{f.name.split('/').pop()}</span>
@@ -349,7 +345,7 @@
 									{#each t.revisions as r (r.v)}
 										{@const Icon = r.state === 'draft' ? PencilLine : r.state === 'live' ? BadgeCheck : History}
 										<div class="row-divided gap-2.5 py-2.5">
-											<Icon class={cn('mt-0.5 size-4 shrink-0', r.state === 'draft' ? 'text-status-waiting' : r.state === 'live' ? 'text-status-done' : 'text-muted-foreground')} />
+											<Icon class={['mt-0.5 size-4 shrink-0', r.state === 'draft' ? 'text-status-waiting' : r.state === 'live' ? 'text-status-done' : 'text-muted-foreground']} />
 											<span class="flex flex-col gap-0.5">
 												<span class="flex items-center gap-2 text-xs"><span class="font-semibold">v{r.v}{r.state === 'draft' ? ' · 초안' : r.state === 'live' ? ' · 배포 중' : ''}</span><span class="text-muted-foreground">{r.who}</span><span class="font-mono text-caption text-subtle-foreground">{r.when}</span></span>
 												<span class="text-xs text-muted-foreground">{r.note}</span>

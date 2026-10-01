@@ -39,8 +39,7 @@
 	import { statuses } from '$lib/status';
 	import { roles } from '$lib/roles';
 	import { store, glyphOf } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	let { children } = $props();
 
 	// 검색 (⌘K) — 태스크 · 이슈 · 멤버 · 설정 · 명령 (.pen Workbench · 검색 (⌘K) 결과). 목데이터에서 찾는다.
@@ -182,10 +181,10 @@
 				<a
 					href={l.href}
 					aria-current={on ? 'page' : undefined}
-					class={cn(
+					class={[
 						'flex h-8 shrink-0 items-center gap-2 rounded-md px-2 text-sm whitespace-nowrap outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-ring/50',
 						on && 'bg-sidebar-accent font-medium'
-					)}
+					]}
 				>
 					<l.icon class="size-4" />
 					{l.label}
@@ -222,9 +221,9 @@
 						{#each items as n (n.id)}
 							{@const m = noticeMeta[n.kind]}
 							{@const mem = memberOf(n.member)}
-							<div class={cn('flex flex-col gap-2 border-t px-4 py-3', n.unread && 'bg-primary-soft/60')}>
+							<div class={['flex flex-col gap-2 border-t px-4 py-3', n.unread && 'bg-primary-soft/60']}>
 								<div class="flex gap-3">
-									{#if mem}<RoleAvatar role={mem.role} icon={glyphOf(mem)} />{:else}<span class={cn('flex items-center justify-center size-7 shrink-0 rounded-md', m.tile)}><m.icon class="size-3.5" /></span>{/if}
+									{#if mem}<RoleAvatar role={mem.role} icon={glyphOf(mem)} />{:else}<span class={['flex items-center justify-center size-7 shrink-0 rounded-md', m.tile]}><m.icon class="size-3.5" /></span>{/if}
 									<div class="flex min-w-0 flex-1 flex-col gap-1 text-xs">
 										<span class="flex items-center gap-1.5">
 											<span class="font-semibold">{n.who}</span>
@@ -294,7 +293,7 @@
 								<RoleAvatar role={h.member.role} icon={glyphOf(h.member)} size="sm" />
 								<span class="font-medium">{h.label}</span><span class="text-caption text-muted-foreground">{h.meta}</span>
 							{:else}
-								{#if h.icon}<h.icon class={cn('size-4', h.tone ?? 'text-muted-foreground')} />{/if}
+								{#if h.icon}<h.icon class={['size-4', h.tone ?? 'text-muted-foreground']} />{/if}
 								<span class="truncate">{h.label}{h.meta ? ` · ${h.meta}` : ''}</span>
 							{/if}
 							{#if h.shortcut}<Command.Shortcut>{h.shortcut}</Command.Shortcut>{/if}

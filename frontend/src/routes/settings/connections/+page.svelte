@@ -33,8 +33,7 @@
 	import { RuntimeLogo, type Runtime } from '$lib/components/ui/runtime-logo';
 	import { AddConnectionDialog, providerMark, type AddedConnection } from '$lib/components/orch/connection';
 	import { connections, fallbackChains, monthCost, type Connection, type ProviderKind, type SubRunTier } from '$lib/mock';
-	import { cn } from '$lib/utils';
-
+	
 	type Filter = '전체' | '구독 · 플랜' | 'API 키' | '게이트웨이' | '로컬';
 	/// 한도 문제 알림 — 점검 결과로 생긴다.
 	type Notice = { key: string; title: string; desc: string };
@@ -131,7 +130,7 @@
 <!-- 제공자 로고 · 아이콘 -->
 {#snippet mark(key: string, size: string)}
 	{@const M = providerMark[key]}
-	{#if typeof M === 'string'}<RuntimeLogo runtime={M} class={cn(size, 'ring-0')} />{:else if M}<M class={size} />{/if}
+	{#if typeof M === 'string'}<RuntimeLogo runtime={M} class={[size, 'ring-0']} />{:else if M}<M class={size} />{/if}
 {/snippet}
 
 <main class="page-main">
@@ -168,11 +167,11 @@
 				<div class="grid grid-cols-2 gap-2.5">
 					{#each g.items as c (c.key)}
 						{@const st = stateMeta[c.state]}
-						<div class={cn('flex items-center rounded-md border gap-3 px-4 py-3.5', isOn(c) ? 'bg-card' : 'bg-muted')}>
+						<div class={['flex items-center rounded-md border gap-3 px-4 py-3.5', isOn(c) ? 'bg-card' : 'bg-muted']}>
 							<span class="icon-tile size-9.5">{@render mark(c.key, 'size-5')}</span>
 							<span class="flex min-w-0 flex-1 flex-col gap-1.25">
 								<span class="label-xs-strong">{c.name}<Pill class={kindPill[c.kind]}>{c.kind}</Pill></span>
-								<span class={cn('meta-truncate gap-1.25', st.tone)}><st.icon class="size-3 shrink-0" />{c.note}</span>
+								<span class={['meta-truncate gap-1.25', st.tone]}><st.icon class="size-3 shrink-0" />{c.note}</span>
 							</span>
 							{#each c.quotas as q (q.label)}
 								{@const money = q.limit !== undefined}
@@ -181,7 +180,7 @@
 								<span class="flex shrink-0 items-center gap-1.5 rounded-sm border bg-card px-2 py-0.75">
 									<span class="text-2xs font-semibold text-muted-foreground">{q.label}</span>
 									<Progress value={v} class="h-1 w-8 bg-muted" indicator={money ? 'bg-primary' : v < 20 ? 'bg-status-blocked' : 'bg-status-done'} aria-label="{c.name} {q.label}" />
-									<span class={cn('font-mono text-caption font-semibold', tone)}>{money ? `$${q.used}/$${q.limit}` : `${q.pct}%`}</span>
+									<span class={['font-mono text-caption font-semibold', tone]}>{money ? `$${q.used}/$${q.limit}` : `${q.pct}%`}</span>
 								</span>
 							{/each}
 							{#if c.state === 'expired'}
@@ -224,7 +223,7 @@
 							ondragstart={() => (dragFrom = i)}
 							ondragover={(e) => e.preventDefault()}
 							ondrop={() => move(dragFrom, i)}
-							class={cn('flex items-center gap-2.5 rounded-md border bg-card px-3 py-2.5', off && 'opacity-60')}
+							class={['card flex items-center gap-2.5 px-3 py-2.5 rounded-md', off && 'opacity-60']}
 						>
 							<button
 								type="button"
@@ -248,7 +247,7 @@
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger>
 									{#snippet child({ props })}
-										<button {...props} type="button" aria-label="{s.name} 등급" class={cn('flex shrink-0 items-center gap-1 rounded-xs px-1.5 py-px text-2xs font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50', s.tier ? `font-mono ${tierTone[s.tier]}` : 'bg-muted text-muted-foreground')}>
+										<button {...props} type="button" aria-label="{s.name} 등급" class={['flex shrink-0 items-center gap-1 rounded-xs px-1.5 py-px text-2xs font-bold outline-none focus-visible:ring-3 focus-visible:ring-ring/50', s.tier ? `font-mono ${tierTone[s.tier]}` : 'bg-muted text-muted-foreground']}>
 											{#if s.tier}<Cpu class="size-2.5" />{s.tier}{:else}<Layers class="size-2.5" />모든 등급{/if}
 										</button>
 									{/snippet}

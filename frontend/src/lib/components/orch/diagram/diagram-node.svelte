@@ -47,8 +47,7 @@
 	import { RoleAvatar } from "$lib/components/ui/role-avatar";
 	import { RuntimeLogo } from "$lib/components/ui/runtime-logo";
 	import TokenMeter from "./token-meter.svelte";
-	import { cn } from "$lib/utils";
-
+	
 	let { data, selected }: NodeProps<Node<DiagramNodeData>> = $props();
 
 	// 종류별 아이콘 · 색 (.pen KindIcon)
@@ -104,7 +103,7 @@
 		</div>
 	{/if}
 	{#if data.alert}
-		<div class={cn("label-xs rounded-sm px-2 py-1", data.alert.tone === "warning" ? "bg-warning-soft text-warning" : "bg-destructive-soft text-destructive")}>
+		<div class={["label-xs rounded-sm px-2 py-1", data.alert.tone === "warning" ? "bg-warning-soft text-warning" : "bg-destructive-soft text-destructive"]}>
 			{#if data.alert.tone === "warning"}<MessageCircle class="size-3" />{:else}<TriangleAlert class="size-3" />{/if}
 			{data.alert.text}
 		</div>

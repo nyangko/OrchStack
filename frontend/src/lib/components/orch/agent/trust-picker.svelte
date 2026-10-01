@@ -1,8 +1,7 @@
 <script lang="ts">
 	/// Trust 레벨 선택 (.pen 기본 Trust 레벨) — 1 읽기 전용 ~ 4 자율. 에이전트 권한 탭과 설정 › 권한 · 보안에서 쓴다.
 	import type { AgentConfig } from '$lib/mock';
-	import { cn } from '$lib/utils';
-	import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import * as ChoiceCards from '$lib/components/ui/choice-cards';
 
 	let {
 		value = $bindable(),
@@ -26,7 +25,7 @@
 		{@const on = value === l.n}
 		<ChoiceCards.Item value={l.n} class="rounded-md">
 			<span class="row-title-strong">
-				<span class={cn('flex size-5 items-center justify-center rounded-full font-mono text-caption', on ? 'bg-primary text-on-solid' : 'bg-muted text-muted-foreground')}>{l.n}</span>
+				<span class={['flex size-5 items-center justify-center rounded-full font-mono text-caption', on ? 'bg-primary text-on-solid' : 'bg-muted text-muted-foreground']}>{l.n}</span>
 				{l.t}
 			</span>
 			<span class="text-xs text-muted-foreground">{l.d}</span>

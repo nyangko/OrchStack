@@ -4,8 +4,7 @@
 	import Check from '@lucide/svelte/icons/check';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { priorities, priorityOrder, type Priority } from '$lib/priority';
-	import { cn } from '$lib/utils';
-
+	
 	let { value = $bindable(), trigger }: { value: Priority; trigger: Snippet<[Record<string, unknown>]> } = $props();
 
 	let open = $state(false);
@@ -26,7 +25,7 @@
 		{#each priorityOrder as p (p)}
 			{@const m = priorities[p]}
 			<DropdownMenu.Item onSelect={() => (value = p)} class="gap-2">
-				<m.icon class={cn('size-3.5', m.text)} />
+				<m.icon class={['size-3.5', m.text]} />
 				<span class="font-medium">{p}</span><span class="flex-1 text-xs text-muted-foreground">{m.label}</span>
 				{#if value === p}<Check class="size-3.5" />{:else}<DropdownMenu.Shortcut>{p.slice(1)}</DropdownMenu.Shortcut>{/if}
 			</DropdownMenu.Item>

@@ -27,8 +27,7 @@
 	import type { ApiProject } from '$lib/api/types';
 	import { roles } from '$lib/roles';
 	import { store } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	let { children } = $props();
 
 	// 열린 탭은 화면 상태(서버에 저장하지 않음). 닫아도 프로젝트는 그대로다.
@@ -118,10 +117,10 @@
 		<a
 			href="/p"
 			aria-current={page.url.pathname === '/p' ? 'page' : undefined}
-			class={cn(
-				'flex h-8 shrink-0 items-center gap-1.5 rounded-t-lg px-3 text-body font-medium hover:text-foreground text-muted-foreground',
-				page.url.pathname === '/p' && 'relative -mb-px border border-b-0 bg-background text-foreground'
-			)}
+			class={[
+				'flex h-8 shrink-0 items-center gap-1.5 rounded-t-lg px-3 text-body font-medium hover:text-foreground',
+				page.url.pathname === '/p' ? 'relative -mb-px border border-b-0 bg-background text-foreground' : 'text-muted-foreground'
+			]}
 		>
 			<LayoutGrid class="size-3.5" />
 			All Projects
@@ -130,13 +129,13 @@
 		{#each tabs as p (p.sn)}
 			{@const on = p.sn === current}
 			<div
-				class={cn(
+				class={[
 					'flex h-8 shrink-0 items-center gap-2 rounded-t-lg pr-2 pl-3',
 					on ? 'relative -mb-px border border-b-0 bg-background' : 'text-muted-foreground hover:text-foreground'
-				)}
+				]}
 			>
 				<a href="/p/{p.sn}" aria-current={on ? 'page' : undefined} class="flex items-center gap-2 text-body font-medium outline-none focus-visible:underline">
-					<span class={cn('size-1.5 rounded-full', p.dot)}></span>
+					<span class={['size-1.5 rounded-full', p.dot]}></span>
 					{p.name}
 				</a>
 				<button

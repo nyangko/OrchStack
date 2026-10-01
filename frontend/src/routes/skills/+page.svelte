@@ -28,8 +28,7 @@
 	import SkillSourcesDialog from '$lib/components/orch/agent/skill-sources-dialog.svelte';
 	import { mcpServers, type Skill, type SkillLog, type TeamMember } from '$lib/mock';
 	import { store, sourceMeta, installSkill, glyphOf } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	/// 멤버의 실제 설정 — 아직 복사 전이면 원본 템플릿 설정.
 	const cfgOf = (m: TeamMember) => m.config ?? store.templates.find((t) => t.name === m.title)?.config;
 	const members = $derived(store.crew.flatMap((t) => t.members));
@@ -141,10 +140,7 @@
 					type="button"
 					aria-current={filterKey === it.key ? 'page' : undefined}
 					onclick={() => ((filterKey = it.key), (filter = it.f))}
-					class={cn(
-						'side-nav-item h-8 text-muted-foreground',
-						filterKey === it.key && 'bg-accent font-semibold text-foreground'
-					)}
+					class={['side-nav-item h-8', filterKey === it.key ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 				>
 					<it.icon class="size-3.75 shrink-0" />
 					<span class="flex-1 truncate text-left">{it.label}</span>
@@ -179,9 +175,9 @@
 							{#each skills as s (s.name)}
 								{@const on = sel.kind === 'skill' && sel.name === s.name}
 								{@const src = sourceMeta[s.source]}
-								<div class={cn('list-row -mx-2 rounded-md px-2', on && 'bg-primary-soft', (s.on === false || s.blocked) && 'opacity-60')}>
+								<div class={['list-row -mx-2 rounded-md px-2', on && 'bg-primary-soft', (s.on === false || s.blocked) && 'opacity-60']}>
 									<button type="button" onclick={() => (sel = { kind: 'skill', name: s.name })} class="row-link">
-										<span class={cn('flex size-8 shrink-0 items-center justify-center rounded-md font-mono text-xs font-semibold text-on-solid uppercase', tileOf(s.name))}>{s.name[0]}</span>
+										<span class={['flex size-8 shrink-0 items-center justify-center rounded-md font-mono text-xs font-semibold text-on-solid uppercase', tileOf(s.name)]}>{s.name[0]}</span>
 										<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 											<span class="font-mono text-body font-medium">{s.name}</span>
 											<span class="truncate text-xs text-muted-foreground">{s.blocked ? s.blocked + ' → 차단됨' : s.desc}</span>
@@ -211,9 +207,9 @@
 								{@const st = store.mcp[m.name]}
 								{@const n = usersOf(m.name, 'mcp').members.length}
 								{@const on = sel.kind === 'mcp' && sel.name === m.name}
-								<div class={cn('list-row -mx-2 rounded-md px-2', on && 'bg-primary-soft')}>
+								<div class={['list-row -mx-2 rounded-md px-2', on && 'bg-primary-soft']}>
 									<button type="button" onclick={() => (sel = { kind: 'mcp', name: m.name })} class="row-link">
-										<Plug class={cn('size-4 shrink-0', st.installed ? 'text-primary' : 'text-muted-foreground')} />
+										<Plug class={['size-4 shrink-0', st.installed ? 'text-primary' : 'text-muted-foreground']} />
 										<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 											<span class="row-title font-mono">
 												{m.name}
@@ -223,8 +219,8 @@
 											<span class="text-xs text-muted-foreground">{m.desc} · {m.tools} tools{st.installed ? ` · +${m.tok} tok` : ' · 필요 시 설치'} · 멤버 {n}</span>
 										</span>
 									</button>
-									<span class={cn('flex items-center gap-1.5 text-caption', st.auth ? 'text-status-waiting' : st.installed ? 'text-status-done' : 'text-muted-foreground')}>
-										<span class={cn('size-1.5 rounded-full', st.auth ? 'bg-status-waiting' : st.installed ? 'bg-success' : 'bg-subtle-foreground')}></span>
+									<span class={['flex items-center gap-1.5 text-caption', st.auth ? 'text-status-waiting' : st.installed ? 'text-status-done' : 'text-muted-foreground']}>
+										<span class={['size-1.5 rounded-full', st.auth ? 'bg-status-waiting' : st.installed ? 'bg-success' : 'bg-subtle-foreground']}></span>
 										{st.auth ? '인증 필요' : st.installed ? '정상' : '미설치'}
 									</span>
 									{#if st.auth || !st.installed}
@@ -246,10 +242,10 @@
 							<Card.Description>선택한 스킬 · {sourceMeta[s.source].label}</Card.Description>
 						</Card.Header>
 						<Card.Content class="gap-0">
-							<KeyValueRow label="버전"><span class={cn('text-body font-medium', s.update ? 'text-status-waiting' : undefined)}>{s.update ? `${s.version} → ${s.update} 업데이트 가능` : (s.version ?? '—')}</span></KeyValueRow>
+							<KeyValueRow label="버전"><span class={['text-body font-medium', s.update ? 'text-status-waiting' : undefined]}>{s.update ? `${s.version} → ${s.update} 업데이트 가능` : (s.version ?? '—')}</span></KeyValueRow>
 							<KeyValueRow label="소스" value={sourceMeta[s.source].label} />
 							<KeyValueRow label="컨텍스트" value={s.blocked ? '—' : `+${s.tok} tok / Run`} />
-							<KeyValueRow label="보안 검사"><span class={cn('text-body font-medium', s.blocked ? 'text-destructive' : undefined)}>{s.blocked ? `실패 · ${s.blocked}` : '통과 · sha256 고정'}</span></KeyValueRow>
+							<KeyValueRow label="보안 검사"><span class={['text-body font-medium', s.blocked ? 'text-destructive' : undefined]}>{s.blocked ? `실패 · ${s.blocked}` : '통과 · sha256 고정'}</span></KeyValueRow>
 							<KeyValueRow label="Codex CLI" value="AGENTS.md에 요약 포함" />
 							<KeyValueRow label="Claude Code" value="~/.claude/skills 동기화" />
 							{@render usage(selUsers)}
@@ -264,7 +260,7 @@
 							<Card.Description>선택한 MCP 서버</Card.Description>
 						</Card.Header>
 						<Card.Content class="gap-0">
-							<KeyValueRow label="상태"><span class={cn('text-body font-medium', st.auth ? 'text-status-waiting' : undefined)}>{st.auth ? '인증 필요' : st.installed ? '설치됨 · 정상' : '접근 가능 · 미설치'}</span></KeyValueRow>
+							<KeyValueRow label="상태"><span class={['text-body font-medium', st.auth ? 'text-status-waiting' : undefined]}>{st.auth ? '인증 필요' : st.installed ? '설치됨 · 정상' : '접근 가능 · 미설치'}</span></KeyValueRow>
 							<KeyValueRow label="도구" value={`${selMcp.tools} tools`} />
 							<KeyValueRow label="컨텍스트" value={st.installed ? `+${selMcp.tok} tok / Run` : '미설치 · 비용 없음'} />
 							<KeyValueRow label="설명" value={selMcp.desc} />

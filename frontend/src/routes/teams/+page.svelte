@@ -100,8 +100,7 @@
 	import ToolsPanel from '$lib/components/orch/agent/tools-panel.svelte';
 	import PermPanel from '$lib/components/orch/agent/perm-panel.svelte';
 	import HarnessPanel from '$lib/components/orch/agent/harness-panel.svelte';
-	import { cn } from '$lib/utils';
-	import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import * as ChoiceCards from '$lib/components/ui/choice-cards';
 
 	// 선택 팀은 ?team= 으로 둔다. 없으면 첫 프로젝트 팀. 팀 · 템플릿 데이터는 $lib/teams.svelte (서버 연결은 #45).
 	const team = $derived(store.crew.find((t) => t.sn === Number(page.url.searchParams.get('team'))) ?? defaultTeam());
@@ -389,7 +388,7 @@
 {#snippet bars(values: number[])}
 	<span class="flex h-6 w-18 items-end gap-0.75" aria-hidden="true">
 		{#each values as h, i (i)}
-			<span class={cn('flex-1 rounded-t-xs bg-primary', i < values.length - 1 && 'opacity-35')} style="height: {h}px"></span>
+			<span class={['flex-1 rounded-t-xs bg-primary', i < values.length - 1 && 'opacity-35']} style="height: {h}px"></span>
 		{/each}
 	</span>
 {/snippet}
@@ -410,7 +409,7 @@
 <!-- 역할 아바타 + 오른쪽 아래 실행기 로고 -->
 {#snippet who(m: TeamMember, small = false)}
 	<RoleAvatar role={m.role} icon={glyphOf(m)} size={small ? 'sm' : 'default'} class="overflow-visible">
-		<RuntimeLogo runtime={m.runtime} class={cn('absolute -right-1 -bottom-1 ring-[1.5px]', small ? 'size-2.5' : 'size-3')} />
+		<RuntimeLogo runtime={m.runtime} class={['absolute -right-1 -bottom-1 ring-[1.5px]', small ? 'size-2.5' : 'size-3']} />
 	</RoleAvatar>
 {/snippet}
 
@@ -433,7 +432,7 @@
 				<Button variant="outline" size="sm" class="text-body"><Pencil class="size-3.5" />팀 편집</Button>
 				<Button size="sm" class="text-body" onclick={() => startAdd()}><UserPlus class="size-3.5" />멤버 추가</Button>
 			</div>
-			<div class="flex rounded-lg border bg-card">
+			<div class="card flex rounded-lg">
 				{@render kpi('멤버', String(team.members.length), `${running} running · ${count('waiting')} waiting · ${count('idle')} idle`)}
 				{@render kpi('열린 태스크', String(team.stats.open), team.stats.openNote)}
 				{@render kpi('이번 주 완료', String(team.stats.done), team.stats.doneNote, team.stats.doneDelta, team.stats.doneTrend)}
@@ -466,7 +465,7 @@
 					</Alert.Root>
 				{/each}
 
-				<div class="overflow-hidden rounded-lg border bg-card">
+				<div class="card overflow-hidden rounded-lg">
 					<Table.Root class="table-fixed">
 						<Table.Header class="bg-muted">
 							<Table.Row class="hover:bg-muted">
@@ -495,10 +494,10 @@
 										</span>
 									</Table.Cell>
 									<Table.Cell>
-										<span class={cn('label-xs', st.text)}><st.icon class="size-3.5" />{st.label}</span>
+										<span class={['label-xs', st.text]}><st.icon class="size-3.5" />{st.label}</span>
 									</Table.Cell>
 									<Table.Cell>
-										<span class={cn('flex items-center gap-1.5 text-xs', m.status === 'idle' && 'text-muted-foreground')}>
+										<span class={['flex items-center gap-1.5 text-xs', m.status === 'idle' && 'text-muted-foreground']}>
 											{#if m.next}<CircleDashed class="size-3.25 shrink-0 text-node-task" />{:else}<SquareCheck class="size-3.25 shrink-0 text-node-task" />{/if}
 											<span class="truncate">{m.work}</span>
 										</span>
@@ -511,14 +510,14 @@
 									<Table.Cell>
 										<span class="flex items-center gap-2">
 											<Progress value={m.context} class="h-1.25 bg-muted" indicator={full ? 'bg-status-blocked' : undefined} aria-label="{m.name} 컨텍스트" />
-											<span class={cn('font-mono text-caption', full ? 'font-semibold text-status-blocked' : 'text-muted-foreground')}>{m.context}%</span>
+											<span class={['font-mono text-caption', full ? 'font-semibold text-status-blocked' : 'text-muted-foreground']}>{m.context}%</span>
 										</span>
 									</Table.Cell>
 									<Table.Cell>
 										<span class="flex items-center gap-1.5 text-caption">
 											<span class="font-medium text-muted-foreground">주</span>
 											<Progress value={week} class="h-1 w-16 bg-muted" indicator={low(week) ? 'bg-destructive' : 'bg-success'} aria-label="{m.name} 주간 잔량" />
-											<span class={cn('font-mono font-medium', low(week) && 'font-semibold text-destructive')}>{week}%</span>
+											<span class={['font-mono', low(week) ? 'font-semibold text-destructive' : 'font-medium']}>{week}%</span>
 										</span>
 									</Table.Cell>
 									<Table.Cell class="pr-4 text-right font-mono text-xs">{k(m.tokens)}</Table.Cell>
@@ -537,7 +536,7 @@
 					<Card.Content>
 						<div class="flex items-center gap-3">
 							{#each Object.values(loads) as l (l.label)}
-								<span class="meta-line gap-1.25"><span class={cn('size-2 rounded-xs', l.bg)}></span>{l.label}</span>
+								<span class="meta-line gap-1.25"><span class={['size-2 rounded-xs', l.bg]}></span>{l.label}</span>
 							{/each}
 						</div>
 						{#each team.members as m (m.sn)}
@@ -547,14 +546,14 @@
 									<span class="text-xs font-medium">{m.name}</span>
 								</span>
 								<span class="flex h-3.5 w-60 gap-0.5 rounded-xs bg-muted" aria-hidden="true">
-									{#each m.load as s, i (i)}<span class={cn('w-9.5 rounded-xs', loads[s].bg)}></span>{/each}
+									{#each m.load as s, i (i)}<span class={['w-9.5 rounded-xs', loads[s].bg]}></span>{/each}
 								</span>
 								<span class="w-14 text-xs whitespace-nowrap text-muted-foreground tabular-nums">작업 {m.load.length}개</span>
 								<span
-									class={cn(
+									class={[
 										'flex-1 truncate text-xs font-medium',
 										m.load.includes('blocked') ? 'text-status-blocked' : m.status === 'waiting' ? 'text-status-waiting' : 'text-muted-foreground'
-									)}>{m.loadNote}</span
+									]}>{m.loadNote}</span
 								>
 							</div>
 						{/each}
@@ -572,7 +571,7 @@
 						{#each accounts as a (a.runtime)}
 							{@const users = team.members.filter((m) => m.runtime === a.runtime)}
 							{@const warn = low(a.week)}
-							<div class={cn('flex flex-col border gap-2.5 rounded-md p-3', warn && 'border-destructive bg-destructive-soft')}>
+							<div class={['flex flex-col border gap-2.5 rounded-md p-3', warn && 'border-destructive bg-destructive-soft']}>
 								<div class="flex items-center gap-2">
 									<RuntimeLogo runtime={a.runtime} class="size-5 ring-0" />
 									<span class="flex min-w-0 flex-1 flex-col">
@@ -587,7 +586,7 @@
 									<div class="flex flex-col gap-1">
 										<span class="flex gap-1.5 text-caption">
 											<span class="flex-1 text-muted-foreground">{q.label}</span>
-											<span class={cn('font-semibold', low(q.pct) && 'text-destructive')}><span class="font-mono">{q.pct}%</span> 남음</span>
+											<span class={['font-semibold', low(q.pct) && 'text-destructive']}><span class="font-mono">{q.pct}%</span> 남음</span>
 											<span class="text-subtle-foreground">· {q.reset} 리셋</span>
 										</span>
 										<Progress value={q.pct} class="h-1.25 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" />
@@ -618,9 +617,9 @@
 						<div class="flex flex-col">
 							{#each policy.levels as l, i (i)}
 								<div class="flex h-7 items-center gap-2.5 text-xs">
-									<span class={cn('mono-tag py-px text-on-solid', levelTone[i].bg)}>L{i}</span>
+									<span class={['mono-tag py-px text-on-solid', levelTone[i].bg]}>L{i}</span>
 									<span class="flex-1">{l.name}</span>
-									<span class={cn('font-medium', levelTone[i].text)}>{actionLabel(policy, l.action, l.timeout)}</span>
+									<span class={['font-medium', levelTone[i].text]}>{actionLabel(policy, l.action, l.timeout)}</span>
 								</div>
 							{/each}
 						</div>
@@ -772,7 +771,7 @@
 										aria-checked={glyph === i}
 										aria-label="아이콘 {i + 1}"
 										onclick={() => (glyph = i)}
-										class={cn('rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50', glyph === i ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'opacity-50 hover:opacity-100')}
+										class={['rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50', glyph === i ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'opacity-50 hover:opacity-100']}
 									>
 										<RoleAvatar {role} icon={g} />
 									</button>
@@ -812,7 +811,7 @@
 									<RuntimeLogo runtime={runtime} class="size-4 ring-0" />
 									{accountOf(runtime).plan}
 									<Pill class="text-2xs">구독</Pill>
-									<span class={cn('ml-auto text-caption font-normal', low(accountOf(runtime).week) ? 'text-destructive' : 'text-muted-foreground')}>주간 {accountOf(runtime).week}% 남음</span>
+									<span class={['ml-auto text-caption font-normal', low(accountOf(runtime).week) ? 'text-destructive' : 'text-muted-foreground']}>주간 {accountOf(runtime).week}% 남음</span>
 								</div>
 							</div>
 							<label class="flex flex-col gap-1.5">
@@ -849,7 +848,7 @@
 								<span class="pill-soft gap-1.25">
 									<span class="font-mono text-2xs text-muted-foreground">{i + 1}</span>
 									{a.plan}
-									<span class={cn('font-mono text-2xs', low(a.week) ? 'text-status-blocked' : 'text-muted-foreground')}>{a.week}%</span>
+									<span class={['font-mono text-2xs', low(a.week) ? 'text-status-blocked' : 'text-muted-foreground']}>{a.week}%</span>
 								</span>
 								<ChevronRight class="size-3 text-subtle-foreground" />
 							{/each}
@@ -887,7 +886,7 @@
 								{@const on = first === o.v}
 								<ChoiceCards.Item value={o.v} class="rounded-md">
 									<span class="label-xs-strong">
-										<o.icon class={cn('size-3.5', on ? 'text-primary' : 'text-muted-foreground')} />
+										<o.icon class={['size-3.5', on ? 'text-primary' : 'text-muted-foreground']} />
 										<span class="flex-1">{o.t}</span>
 										{#if on}<CircleCheck class="size-3.5 text-primary" />{:else}<Circle class="size-3.5 text-subtle-foreground" />{/if}
 									</span>
@@ -904,7 +903,7 @@
 				{#if step === 0}
 					{#if tpl}
 						{@const soul = tpl.files.find((f) => f.name === 'SOUL.md')}
-						<div class="card-surface flex flex-col gap-2.5 p-4">
+						<div class="card rounded-lg flex flex-col gap-2.5 p-4">
 							<div class="flex flex-col gap-0.5">
 								<span class="text-sm font-semibold">{tpl.name} v{tpl.version}</span>
 								<span class="text-xs text-muted-foreground">{tpl.desc}</span>
@@ -922,7 +921,7 @@
 						<div class="empty-note text-muted-foreground">빈 캐릭터는 AGENT.md 한 파일로 시작해요. 런타임은 다음 단계에서 정해요.</div>
 					{/if}
 				{:else}
-					<div class="card-surface flex flex-col gap-2.5 p-4">
+					<div class="card rounded-lg flex flex-col gap-2.5 p-4">
 						<span class="text-caption font-semibold text-muted-foreground">미리보기</span>
 						<div class="flex items-center gap-3 pb-1">
 							<RoleAvatar {role} icon={glyphs[role][glyph]} size="lg" />
@@ -980,7 +979,7 @@
 			{#each cols as [a, b], i (i)}
 				<div class="flex flex-1 flex-col items-center justify-end gap-0.5">
 					{#if b}<span class="w-4 rounded-t-sm bg-status-blocked" style="height: {(b / max) * 88}px"></span>{/if}
-					{#if a}<span class={cn('w-4 bg-primary', !b && 'rounded-t-sm')} style="height: {(a / max) * 88}px"></span>{/if}
+					{#if a}<span class={['w-4 bg-primary', !b && 'rounded-t-sm']} style="height: {(a / max) * 88}px"></span>{/if}
 				</div>
 			{/each}
 		</div>
@@ -994,7 +993,7 @@
 	<div class="stat-card">
 		<span class="text-xs text-muted-foreground">{label}</span>
 		<span class="font-mono text-xl font-semibold">{value}</span>
-		<span class={cn('text-caption text-subtle-foreground', tone)}>{sub}</span>
+		<span class={['text-caption', tone ?? 'text-subtle-foreground']}>{sub}</span>
 	</div>
 {/snippet}
 
@@ -1006,7 +1005,7 @@
 		<span class="font-mono text-xs text-muted-foreground">#{num}</span>
 		<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 			<span class="truncate text-body font-medium">{title}</span>
-			{#if note}<span class={cn('truncate text-caption', noteTone ?? 'text-muted-foreground')}>{note}</span>{/if}
+			{#if note}<span class={['truncate text-caption', noteTone ?? 'text-muted-foreground']}>{note}</span>{/if}
 		</span>
 		<span class="font-mono text-caption text-subtle-foreground">{issue}</span>
 		<span class="num-cell w-28 whitespace-nowrap">{meta}</span>
@@ -1027,7 +1026,7 @@
 						{#if isPaused}
 							<Pill class="rounded-sm bg-warning-soft px-2 text-warning"><Pause />Paused</Pill>
 						{:else}
-							<Pill class={cn('rounded-sm px-2', m.status === 'running' ? 'bg-primary-soft text-status-in-progress' : m.status === 'waiting' ? 'bg-warning-soft text-status-waiting' : '')}>
+							<Pill class={['rounded-sm px-2', m.status === 'running' ? 'bg-primary-soft text-status-in-progress' : m.status === 'waiting' ? 'bg-warning-soft text-status-waiting' : '']}>
 								<st.icon />{st.label}{#if m.status === 'running' && det?.now}{` · #${det.now.task}`}{/if}
 							</Pill>
 						{/if}
@@ -1051,16 +1050,13 @@
 			<Sheet.Body padded={false} class="flex-row">
 				<nav aria-label="멤버 메뉴" class="side-nav w-52.5 px-2.5 py-3.5">
 					{#each nav as g, gi (g.group)}
-						<span class={cn('list-label px-2 pt-0.5 pb-1.5', gi > 0 && 'mt-1.5 border-t pt-3.5')}>{g.group}</span>
+						<span class={['list-label px-2 pb-1.5', gi > 0 ? 'mt-1.5 border-t pt-3.5' : 'pt-0.5']}>{g.group}</span>
 						{#each g.items as it (it.v)}
 							<button
 								type="button"
 								aria-current={tab === it.v ? 'page' : undefined}
 								onclick={() => (tab = it.v)}
-								class={cn(
-									'side-nav-item h-8.5 text-muted-foreground',
-									tab === it.v && 'bg-accent font-semibold text-foreground'
-								)}
+								class={['side-nav-item h-8.5', tab === it.v ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 							>
 								<it.icon class="size-3.75" />
 								<span class="flex-1 text-left">{it.label}</span>
@@ -1120,8 +1116,8 @@
 							<Card.Content class="gap-0">
 								{#each det.attention as at, i (i)}
 									{@const Icon = at.kind === 'quota' ? TriangleAlert : at.kind === 'wait' ? Link2 : Undo2}
-									<div class={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
-										<Icon class={cn('size-4 shrink-0', at.kind === 'quota' ? 'text-destructive' : at.kind === 'wait' ? 'text-status-waiting' : 'text-status-review')} />
+									<div class={['flex items-center gap-3 py-2.5', i > 0 && 'border-t']}>
+										<Icon class={['size-4 shrink-0', at.kind === 'quota' ? 'text-destructive' : at.kind === 'wait' ? 'text-status-waiting' : 'text-status-review']} />
 										<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 											<span class="text-body font-medium">{at.title}</span>
 											<span class="text-xs text-muted-foreground">{at.sub}</span>
@@ -1260,7 +1256,7 @@
 							<Card.Header><Card.Title>최근 7일 Run</Card.Title></Card.Header>
 							<Card.Content>{@render chart(det.runDays, ['성공', '실패'], `7일 · ${det.runs.length} runs · 성공 ${ok} · 실패 ${fail}`)}</Card.Content>
 						</Card.Root>
-						<div class="overflow-hidden rounded-lg border bg-card">
+						<div class="card overflow-hidden rounded-lg">
 							<Table.Root class="table-fixed">
 								<Table.Header>
 									<Table.Row class="hover:bg-transparent">
@@ -1277,16 +1273,16 @@
 									{#each det.runs as r (r.num)}
 										{@const ri = runIcon[r.status]}
 										<Table.Row
-											class={cn('h-11 text-xs', det.failure?.run === r.num && 'cursor-pointer', runSel === r.num && 'bg-primary-soft hover:bg-primary-soft')}
+											class={['h-11 text-xs', det.failure?.run === r.num && 'cursor-pointer', runSel === r.num && 'bg-primary-soft hover:bg-primary-soft']}
 											onclick={() => det.failure?.run === r.num && (runSel = runSel === r.num ? undefined : r.num)}
 										>
-											<Table.Cell class="pl-3.5"><ri.icon class={cn('size-3.5', ri.text)} aria-label={r.status} /></Table.Cell>
+											<Table.Cell class="pl-3.5"><ri.icon class={['size-3.5', ri.text]} aria-label={r.status} /></Table.Cell>
 											<Table.Cell class="font-mono font-semibold text-muted-foreground">#{r.num}</Table.Cell>
 											<Table.Cell class="truncate">{r.task}</Table.Cell>
 											<Table.Cell class="font-mono text-muted-foreground">{r.start}</Table.Cell>
 											<Table.Cell class="font-mono text-muted-foreground">{r.dur}</Table.Cell>
 											<Table.Cell class="font-mono text-muted-foreground">{r.tokens.toFixed(1)}K</Table.Cell>
-											<Table.Cell class={cn('truncate pr-3.5', r.status === 'failed' ? 'text-status-blocked' : 'text-muted-foreground')}>{r.result}</Table.Cell>
+											<Table.Cell class={['truncate pr-3.5', r.status === 'failed' ? 'text-status-blocked' : 'text-muted-foreground']}>{r.result}</Table.Cell>
 										</Table.Row>
 									{/each}
 								</Table.Body>
@@ -1306,7 +1302,7 @@
 											{#each sel.steps as step (step.name)}
 												<div class="flex items-center gap-2 text-xs">
 													{#if step.state === 'done'}<CircleCheck class="size-3.5 text-status-done" />{:else if step.state === 'failed'}<CircleX class="size-3.5 text-status-blocked" />{:else}<CircleDashed class="size-3.5 text-subtle-foreground" />{/if}
-													<span class={cn('flex-1', step.state === 'failed' && 'font-medium text-status-blocked', step.state === 'skipped' && 'text-muted-foreground')}>{step.name}</span>
+													<span class={['flex-1', step.state === 'failed' && 'font-medium text-status-blocked', step.state === 'skipped' && 'text-muted-foreground']}>{step.name}</span>
 													<span class="font-mono text-caption text-muted-foreground">{step.time}</span>
 												</div>
 											{/each}
@@ -1325,7 +1321,7 @@
 									<Card.Content class="gap-1.5">
 										{#each sel.files as f (f.path)}
 											<div class="flex items-center gap-2.5 font-mono text-xs">
-												<span class={cn('w-3 font-semibold', f.kind === 'A' ? 'text-status-done' : 'text-status-waiting')}>{f.kind}</span>
+												<span class={['w-3 font-semibold', f.kind === 'A' ? 'text-status-done' : 'text-status-waiting']}>{f.kind}</span>
 												<span class="flex-1 truncate">{f.path}</span>
 												<span class="text-muted-foreground">{f.diff}</span>
 											</div>
@@ -1341,7 +1337,7 @@
 								<Toggle variant="chip" count={n} pressed={actFilter === k} onPressedChange={() => (actFilter = k)}>{k}</Toggle>
 							{/each}
 						</div>
-						<div class="card-surface flex flex-col gap-2 px-4 py-3">
+						<div class="card rounded-lg flex flex-col gap-2 px-4 py-3">
 							{#each det.activity as d (d.day)}
 								{@const items = d.items.filter((a) => actFilter === 'all' || actKind(a) === actFilter)}
 								{#if items.length}
@@ -1349,7 +1345,7 @@
 									{#each items as a, i (i)}
 										{#if a.type === 'decision'}
 											<div class="flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-xs">
-												<BookMarked class={cn('size-3.5', a.orch ? 'text-status-review' : 'text-primary')} />
+												<BookMarked class={['size-3.5', a.orch ? 'text-status-review' : 'text-primary']} />
 												<span class="font-semibold">{a.who}</span>
 												<span class="rounded-xs bg-muted px-1.5 py-px text-caption text-muted-foreground font-medium">{a.kind}</span>
 												<span class="flex-1">{a.text}</span>
@@ -1409,7 +1405,7 @@
 						<div class="grid grid-cols-2 gap-3.5">
 							{#each [acc, ...accounts.filter((a) => a !== acc)] as a (a.runtime)}
 								{@const warn = low(a.week)}
-								<div class={cn('flex flex-col gap-2.5 rounded-md border p-3 bg-card', warn && 'border-destructive bg-destructive-soft')}>
+								<div class={['card flex flex-col gap-2.5 p-3 rounded-md', warn && 'border-destructive bg-destructive-soft']}>
 									<div class="flex items-center gap-2">
 										<RuntimeLogo runtime={a.runtime} class="size-5 ring-0" />
 										<span class="flex flex-1 flex-col"><span class="text-body font-semibold">{a.name}</span><span class="font-mono text-caption text-muted-foreground">{a.login}</span></span>
@@ -1419,7 +1415,7 @@
 										<div class="flex flex-col gap-1">
 											<span class="flex gap-1.5 text-caption">
 												<span class="flex-1 text-muted-foreground">{q.label}</span>
-												<span class={cn('font-semibold', low(q.pct) && 'text-destructive')}><span class="font-mono">{q.pct}%</span> 남음</span>
+												<span class={['font-semibold', low(q.pct) && 'text-destructive']}><span class="font-mono">{q.pct}%</span> 남음</span>
 												<span class="text-subtle-foreground">· {q.reset} 리셋</span>
 											</span>
 											<Progress value={q.pct} class="h-1.25 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" />
@@ -1466,7 +1462,7 @@
 						>
 							{#snippet status()}→ AGENTS.md / CLAUDE.md로 변환{/snippet}
 						</MdEditor>
-						<div class="flex items-center gap-2 rounded-md border bg-card px-3.5 py-2.5">
+						<div class="card flex items-center gap-2 px-3.5 py-2.5 rounded-md">
 							<span class="flex-1 text-xs text-muted-foreground">
 								{#if proposed}<span class="text-primary">{proposed}을 템플릿 초안에 제안했어요 · </span>{/if}
 								{memberChanged.length ? `템플릿과 다른 파일 ${memberChanged.length}개 · 이 멤버에게만 적용 중` : '템플릿과 같아요'}
@@ -1508,10 +1504,10 @@
 					<div role="radiogroup" aria-label="진행 모드" class="grid grid-cols-3 gap-3">
 						{#each [{ v: 'manual', icon: Hand, t: 'Manual', d: '매번 사용자가 확인해야 진행' }, { v: 'timer', icon: Timer, t: 'Auto · 타이머', d: '제안 후 카운트다운 · 개입 없으면 진행' }, { v: 'full', icon: Zap, t: 'Full auto', d: '대기 없이 바로 진행 (가드는 항상 적용)' }] as const as o (o.v)}
 							{@const on = d.mode === o.v}
-							<div class={cn('flex flex-col border gap-2 rounded-md p-3.5', on && 'option-on')}>
+							<div class={['flex flex-col border gap-2 rounded-md p-3.5', on && 'option-on']}>
 								<button type="button" role="radio" aria-checked={on} onclick={() => (d.mode = o.v)} class="flex flex-col gap-2 text-left outline-none focus-visible:underline">
 									<span class="row-title-strong">
-										<o.icon class={cn('size-4', on ? 'text-primary' : 'text-muted-foreground')} />
+										<o.icon class={['size-4', on ? 'text-primary' : 'text-muted-foreground']} />
 										<span class="flex-1">{o.t}</span>
 										{#if on}<CircleCheck class="size-4 text-primary" />{:else}<Circle class="size-4 text-subtle-foreground" />{/if}
 									</span>
@@ -1526,7 +1522,7 @@
 												type="button"
 												aria-pressed={sel}
 												onclick={() => ((d.mode = 'timer'), (d.timer = sec), (customTimer = false))}
-												class={cn('rounded-xs border px-2 py-0.75 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', sel ? 'border-primary bg-primary text-on-solid' : 'bg-card')}
+												class={['rounded-xs border px-2 py-0.75 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', sel ? 'border-primary bg-primary text-on-solid' : 'bg-card']}
 											>{sec}초</button>
 										{/each}
 										{#if customTimer}
@@ -1550,7 +1546,7 @@
 						{#each d.levels as l, i (i)}
 							<div class="flex items-center border-t px-4 gap-4 py-3">
 								<span class="flex w-57.5 items-center gap-2.5">
-									<span class={cn('mono-tag py-px text-on-solid', levelTone[i].bg)}>L{i}</span>
+									<span class={['mono-tag py-px text-on-solid', levelTone[i].bg]}>L{i}</span>
 									<span class="text-body font-semibold">{l.name}</span>
 								</span>
 								<span class="flex-1 text-xs text-muted-foreground">{l.example}</span>
@@ -1603,7 +1599,7 @@
 							<span class="text-caption font-semibold text-muted-foreground">기본 방식</span>
 							<Segmented
 								aria-label="기본 방식"
-								class={cn(spawnError && 'ring-1 ring-destructive')}
+								class={spawnError ? 'ring-1 ring-destructive' : undefined}
 								options={spawnModes.map((m) => ({ value: m.value, label: m.value, icon: m.icon, disabled: !d.spawn.allow.includes(m.value), hint: '허용 방식에서 꺼져 있어요' }))}
 								bind:value={() => d.spawn.mode, (v) => (d.spawn.mode = v as SpawnMode)}
 							/>
@@ -1621,7 +1617,7 @@
 						</div>
 						<div class="flex flex-col border gap-2.5 rounded-md p-3.5">
 							<span class="text-caption font-semibold text-muted-foreground">리드당 동시 하위 작업</span>
-							<InputGroup.Root class={cn('w-28', childError && 'border-destructive')}>
+							<InputGroup.Root class={['w-28', childError && 'border-destructive']}>
 								<InputGroup.Addon><Layers /></InputGroup.Addon>
 								<InputGroup.Input type="number" min="1" bind:value={d.spawn.maxChild} aria-label="리드당 동시 하위 작업" class="font-mono" />
 							</InputGroup.Root>

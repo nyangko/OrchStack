@@ -9,8 +9,7 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Bell from '@lucide/svelte/icons/bell';
 	import Shield from '@lucide/svelte/icons/shield';
-	import { cn } from '$lib/utils';
-
+	
 	let { children } = $props();
 
 	const menus = [
@@ -33,10 +32,7 @@
 			<a
 				href={m.href}
 				aria-current={on ? 'page' : undefined}
-				class={cn(
-					'side-nav-item h-8.5 text-muted-foreground',
-					on && 'bg-accent font-semibold text-foreground'
-				)}
+				class={['side-nav-item h-8.5', on ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 			>
 				<m.icon class="size-3.75" />{m.label}
 			</a>

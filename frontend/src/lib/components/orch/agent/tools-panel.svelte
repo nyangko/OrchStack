@@ -18,8 +18,7 @@
 	import { Segmented } from '$lib/components/ui/segmented';
 	import { mcpServers, type AgentConfig } from '$lib/mock';
 	import { scopeText, toggleIn } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-
+	
 	let { config: c, base, teamName }: { config: AgentConfig; base?: AgentConfig; teamName: string } = $props();
 
 	let mcpChecked = $state('2분 전');
@@ -51,7 +50,7 @@
 	<Button variant="outline" size="sm" onclick={() => (mcpChecked = '방금')}><RefreshCw />다시 점검</Button>
 </div>
 <p class="info-line"><ShieldCheck class="size-3.5 shrink-0 text-primary" /><span><span class="font-medium text-foreground">적용 권한</span> · 목록에 없는 도구는 차단 · Instructions는 목록을 줄일 수만 있어요 (늘릴 수 없음)</span></p>
-<div class="flex items-center rounded-md border gap-3 bg-card p-3.5">
+<div class="card flex items-center gap-3 p-3.5 rounded-md">
 	<Github class="size-4.5 shrink-0" />
 	<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 		<span class="text-body font-medium">GitHub 계정 · {c.github === 'bot' ? '전용 계정 (orch-bot) 사용 중' : '내 GitHub 사용 중'}</span>
@@ -70,7 +69,7 @@
 				{#each mcpServers as srv (srv.name)}
 					{@const on = c.mcp.includes(srv.name)}
 					<div class="list-row">
-						<Plug class={cn('size-4 shrink-0', on ? 'text-primary' : 'text-muted-foreground')} />
+						<Plug class={['size-4 shrink-0', on ? 'text-primary' : 'text-muted-foreground']} />
 						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 							<span class="row-title">
 								{srv.name}

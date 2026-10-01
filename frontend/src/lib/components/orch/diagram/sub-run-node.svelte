@@ -31,8 +31,7 @@
 	import ListChecks from "@lucide/svelte/icons/list-checks";
 	import TokenMeter from "./token-meter.svelte";
 	import * as NodeCard from "$lib/components/ui/node-card";
-	import { cn } from "$lib/utils";
-
+	
 	let { data, selected }: NodeProps<Node<SubRun>> = $props();
 
 	const st = $derived(subRunStatus[data.status]);
@@ -50,7 +49,7 @@
 	<NodeCard.Header>
 		<NodeCard.Kind class={md.tile}><md.icon /></NodeCard.Kind>
 		<NodeCard.Ref>{data.mode.toUpperCase()} · {data.id}</NodeCard.Ref>
-		{#if data.tier}<span class={cn("flex items-center gap-0.5 rounded-xs px-1.5 py-px font-mono text-2xs font-bold", tierTone[data.tier])}><Cpu class="size-2.5" />{data.tier}</span>{/if}
+		{#if data.tier}<span class={["flex items-center gap-0.5 rounded-xs px-1.5 py-px font-mono text-2xs font-bold", tierTone[data.tier]]}><Cpu class="size-2.5" />{data.tier}</span>{/if}
 	</NodeCard.Header>
 	<!-- 글자 크기를 바꾸면 cn이 leading도 지워서 같이 넘긴다 -->
 	<NodeCard.Title class="text-body leading-tight">{data.goal}</NodeCard.Title>
@@ -62,8 +61,8 @@
 	</div>
 	<span class="flex-1"></span>
 	<NodeCard.Footer>
-		<span class={cn("chip-round gap-1 text-caption font-medium", st.tone)}>
-			<st.icon class={cn("size-3", data.status === "running" && "animate-spin motion-reduce:animate-none")} />{st.label}
+		<span class={["chip-round gap-1 text-caption font-medium", st.tone]}>
+			<st.icon class={["size-3", data.status === "running" && "animate-spin motion-reduce:animate-none"]} />{st.label}
 		</span>
 		<span class="flex items-center gap-1.5">
 			{#if data.mode === "runner"}
@@ -72,7 +71,7 @@
 			{:else}
 				<TokenMeter included />
 			{/if}
-			<span class={cn("text-caption text-muted-foreground", data.status !== "queued" && "font-mono")}>{data.status === "queued" ? "대기" : `${data.minutes}m`}</span>
+			<span class={["text-caption text-muted-foreground", data.status !== "queued" && "font-mono"]}>{data.status === "queued" ? "대기" : `${data.minutes}m`}</span>
 		</span>
 	</NodeCard.Footer>
 </NodeCard.Root>

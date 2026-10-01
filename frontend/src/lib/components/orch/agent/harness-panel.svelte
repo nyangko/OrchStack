@@ -37,8 +37,7 @@
 	import { RuntimeLogo, type Runtime } from '$lib/components/ui/runtime-logo';
 	import { fallbackSteps, meters, modelCatalog, type AgentConfig, type ModelInfo } from '$lib/mock';
 	import { accountOf, low, runtimeName } from '$lib/teams.svelte';
-	import { cn } from '$lib/utils';
-	import * as ChoiceCards from '$lib/components/ui/choice-cards';
+		import * as ChoiceCards from '$lib/components/ui/choice-cards';
 
 	let {
 		config: c,
@@ -123,7 +122,7 @@
 						<span class="text-caption font-semibold text-muted-foreground">연결</span>
 						<div class="field-box h-9">
 							<RuntimeLogo runtime={runtime} class="size-4 ring-0" /><span class="truncate">{acc.plan}</span><Pill class="text-2xs">구독</Pill>
-							<span class={cn('ml-auto text-caption font-normal whitespace-nowrap', low(acc.week) ? 'text-destructive' : 'text-muted-foreground')}>주간 {acc.week}%</span>
+							<span class={['ml-auto text-caption font-normal whitespace-nowrap', low(acc.week) ? 'text-destructive' : 'text-muted-foreground']}>주간 {acc.week}%</span>
 						</div>
 					</div>
 					<div class="flex flex-col gap-1.5">
@@ -169,9 +168,9 @@
 				{/each}
 			</Card.Content>
 		</Card.Root>
-		<div class="flex flex-col border rounded-md bg-card">
+		<div class="card flex flex-col rounded-md">
 			<button type="button" aria-expanded={showCmd} onclick={() => (showCmd = !showCmd)} class="flex items-center gap-2 px-4 py-3 text-left text-body font-medium outline-none focus-visible:underline">
-				<Terminal class="size-3.5 text-muted-foreground" /><span class="flex-1">실행 명령 미리보기</span><ChevronDown class={cn('size-4 text-muted-foreground transition-transform', showCmd && 'rotate-180')} />
+				<Terminal class="size-3.5 text-muted-foreground" /><span class="flex-1">실행 명령 미리보기</span><ChevronDown class={['size-4 text-muted-foreground transition-transform', showCmd && 'rotate-180']} />
 			</button>
 			{#if showCmd}<pre class="mx-4 mb-4 overflow-x-auto rounded-sm bg-foreground p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-background">{command}</pre>{/if}
 		</div>
@@ -235,13 +234,13 @@
 			<Dialog.Body padded={false} class="flex-row">
 				<nav aria-label="제공자" class="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-2 text-xs">
 					<span class="list-label px-2 pt-1 pb-1.5">제공자 · 연결됨 {modelCatalog.length}</span>
-					<button type="button" aria-pressed={pickProvider === 'all'} onclick={() => (pickProvider = 'all')} class={cn('model-provider-item', pickProvider === 'all' && 'bg-accent font-medium')}><Layers class="size-3.5" /><span class="flex-1">전체</span></button>
+					<button type="button" aria-pressed={pickProvider === 'all'} onclick={() => (pickProvider = 'all')} class={['model-provider-item', pickProvider === 'all' && 'bg-accent font-medium']}><Layers class="size-3.5" /><span class="flex-1">전체</span></button>
 					{#each modelCatalog as p (p.key)}
 						{@const a = p.kind === '구독' ? accountOf(p.runtime) : undefined}
-						<button type="button" aria-pressed={pickProvider === p.key} onclick={() => (pickProvider = p.key)} class={cn('model-provider-item', pickProvider === p.key && 'bg-accent font-medium')}>
+						<button type="button" aria-pressed={pickProvider === p.key} onclick={() => (pickProvider = p.key)} class={['model-provider-item', pickProvider === p.key && 'bg-accent font-medium']}>
 							{#if a}<RuntimeLogo runtime={p.runtime} class="size-3.5 ring-0" />{:else}<Route class="size-3.5" />{/if}
 							<span class="flex-1 truncate">{p.label}</span>
-							<span class={cn('font-mono text-caption', a && low(a.week) ? 'text-destructive' : 'text-muted-foreground')}>{a ? `${a.week}%` : `$${Math.round(gateway.used)}`}</span>
+							<span class={['font-mono text-caption', a && low(a.week) ? 'text-destructive' : 'text-muted-foreground']}>{a ? `${a.week}%` : `$${Math.round(gateway.used)}`}</span>
 						</button>
 					{/each}
 				</nav>
@@ -254,7 +253,7 @@
 								<span class="flex-1"></span>
 								{#if a}
 									{#each [['5H', a.h5], ['주간', a.week]] as const as [l, v] (l)}
-										<span class="meta-line gap-1.5">{l}<Progress value={v} class="h-1 w-12 bg-muted" indicator={low(v) ? 'bg-destructive' : 'bg-success'} aria-label="{p.label} {l}" /><span class={cn('font-mono', low(v) && 'text-destructive')}>{v}%</span></span>
+										<span class="meta-line gap-1.5">{l}<Progress value={v} class="h-1 w-12 bg-muted" indicator={low(v) ? 'bg-destructive' : 'bg-success'} aria-label="{p.label} {l}" /><span class={['font-mono', low(v) && 'text-destructive']}>{v}%</span></span>
 									{/each}
 								{:else}
 									<span class="font-mono text-caption text-muted-foreground">월 ${gateway.used}/${gateway.limit}</span>
@@ -269,7 +268,7 @@
 									<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 										<span class="row-title">
 											{md.name}
-											{#each md.tags as tg (tg)}<Pill class={cn('text-2xs', tg === 'NEW' ? 'bg-primary-soft text-primary' : tg === '추천' ? 'bg-success-soft text-status-done' : '')}>{#if tg === '추천'}<ThumbsUp />{:else if tg === 'Tested'}<CircleCheck />{/if}{tg}</Pill>{/each}
+											{#each md.tags as tg (tg)}<Pill class={['text-2xs', tg === 'NEW' ? 'bg-primary-soft text-primary' : tg === '추천' ? 'bg-success-soft text-status-done' : '']}>{#if tg === '추천'}<ThumbsUp />{:else if tg === 'Tested'}<CircleCheck />{/if}{tg}</Pill>{/each}
 										</span>
 										<span class="text-xs text-muted-foreground">{md.vendor}</span>
 									</span>

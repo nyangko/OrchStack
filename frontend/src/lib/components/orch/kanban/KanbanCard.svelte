@@ -34,7 +34,7 @@
 	type="button"
 	data-dragging={isDragSource.current || undefined}
 	class={cn(
-		"w-full rounded-lg border border-border bg-card text-left text-sm text-card-foreground shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50 data-dragging:opacity-40 aria-pressed:ring-2 aria-pressed:ring-primary",
+		"card w-full text-left text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50 data-dragging:opacity-40 aria-pressed:ring-2 aria-pressed:ring-primary rounded-lg",
 		className
 	)}
 	{...restProps}

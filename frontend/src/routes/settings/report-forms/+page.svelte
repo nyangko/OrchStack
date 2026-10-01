@@ -17,8 +17,7 @@
 	import { Pill } from '$lib/components/ui/pill';
 	import { MdEditor } from '$lib/components/ui/md-editor';
 	import { reportForms, reportSample, type ReportForm } from '$lib/mock';
-	import { cn } from '$lib/utils';
-
+	
 	/// base — 복제본이면 원본 양식 key (잠긴 칸 · 아이콘을 원본에서 가져온다). name은 편집기 파일 이름.
 	type Form = ReportForm & { name: string; label: string; base?: string };
 
@@ -92,7 +91,7 @@
 					type="button"
 					aria-current={f.key === sel.key ? 'true' : undefined}
 					onclick={() => (selKey = f.key)}
-					class={cn('list-panel-item px-2.5 py-2 text-muted-foreground', f.key === sel.key && 'bg-accent font-semibold text-foreground')}
+					class={['list-panel-item px-2.5 py-2', f.key === sel.key ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 				>
 					<Icon class="size-3.5 shrink-0" /><span class="truncate">{f.label}</span>
 				</button>
@@ -107,8 +106,8 @@
 				{#if sel.base}<Button variant="ghost" size="sm" onclick={remove}><Trash2 />삭제</Button>{/if}
 			</div>
 			{#key sel.key}<MdEditor files={[sel]} tabs={false} base={{ [sel.name]: original }} baseLabel="기본 양식" class="h-100" />{/key}
-			<div class={cn('strip border py-2.5', missing.length ? 'border-destructive/40 bg-destructive-soft' : 'bg-muted')}>
-				<Lock class={cn('size-3.5 shrink-0', missing.length && 'text-destructive')} />
+			<div class={['strip border py-2.5', missing.length ? 'border-destructive/40 bg-destructive-soft' : 'bg-muted']}>
+				<Lock class={['size-3.5 shrink-0', missing.length && 'text-destructive']} />
 				<span class="shrink-0 font-semibold">잠긴 칸</span>
 				{#if missing.length}
 					<span class="text-destructive">지운 잠긴 칸이 있어요: <span class="font-mono">{missing.join(' · ')}</span> · 되돌려야 저장돼요</span>
@@ -121,7 +120,7 @@
 		</section>
 
 		{#if preview}
-			<aside class="flex w-100 shrink-0 flex-col gap-2 rounded-xl border bg-card p-5 text-xs" aria-label="미리보기">
+			<aside class="card flex w-100 shrink-0 flex-col gap-2 p-5 text-xs" aria-label="미리보기">
 				<span class="text-caption text-muted-foreground">미리보기 · #{reportSample.task.num} 데이터</span>
 				{#each lines as l, i (i)}
 					{#if i === 0}<h3 class="text-base font-semibold">{l.replace(/^#+\s+/, '')}</h3>
