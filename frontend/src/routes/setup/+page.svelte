@@ -44,6 +44,7 @@
 	import { SETUP_KEY } from '$lib/setup';
 	import { AddConnectionDialog, providerMark, type AddedConnection } from '$lib/components/orch/connection';
 	import { cn } from '$lib/utils';
+	import * as ChoiceCards from '$lib/components/ui/choice-cards';
 
 	// -1 = 스플래시, 0 · 1 · 2 = 단계.
 	let step = $state(-1);
@@ -349,19 +350,16 @@
 						<span class="text-muted-foreground">팀을 이끌고 태스크를 배정해요 · Claude Code · claude-opus-5.5 · Anthropic Max</span>
 					</div>
 					<span class="text-xs font-semibold text-muted-foreground">멤버 {picked.length + (extra ? 1 : 0)} · 체크 해제하면 빼고 시작해요</span>
-					<div class="grid grid-cols-2 gap-2.5">
+					<!-- 여러 명 고르기 — 추천 멤버 + 추가한 역할(extra) -->
+					<ChoiceCards.Root
+						type="multiple"
+						aria-label="기본 팀 멤버"
+						class="grid-cols-2"
+						bind:value={() => [...picked, ...(extra ? ['extra'] : [])], (v) => ((picked = (v as (number | string)[]).filter((x): x is number => typeof x === 'number')), (extra = (v as unknown[]).includes('extra')))}
+					>
 						{#each recommended.members as m (m.sn)}
 							{@const on = picked.includes(m.sn)}
-							<button
-								type="button"
-								role="checkbox"
-								aria-checked={on}
-								onclick={() => (picked = on ? picked.filter((x) => x !== m.sn) : [...picked, m.sn])}
-								class={cn(
-									'team-option',
-									on ? 'option-on' : 'bg-muted/50 opacity-60 hover:bg-muted hover:opacity-100'
-								)}
-							>
+							<ChoiceCards.Item value={m.sn} layout="row" tone="dim" class="items-start rounded-lg px-3.5 py-3">
 								<RoleAvatar role={m.role} />
 								<span class="row-text">
 									<span class="text-body font-semibold">{m.name} · {m.title}</span>
@@ -369,10 +367,10 @@
 									<span class="meta-line gap-1"><RuntimeLogo runtime={m.runtime} class="size-3 ring-0" />{m.model} · {planLabel(conns.find((c) => c.runtime === m.runtime)?.plan)}</span>
 								</span>
 								{#if on}<CircleCheck class="size-4 shrink-0 text-primary" />{:else}<Circle class="size-4 shrink-0 text-subtle-foreground" />{/if}
-							</button>
+							</ChoiceCards.Item>
 						{/each}
 						{#if extra}
-							<button type="button" role="checkbox" aria-checked="true" onclick={() => (extra = false)} class="team-option option-on">
+							<ChoiceCards.Item value="extra" layout="row" tone="dim" class="items-start rounded-lg px-3.5 py-3">
 								<RoleAvatar role={security.role} />
 								<span class="row-text">
 									<span class="text-body font-semibold">하준 · {security.name}</span>
@@ -380,13 +378,13 @@
 									<span class="meta-line gap-1"><RuntimeLogo runtime={security.runtime} class="size-3 ring-0" />{runtimeName(security.runtime)} · {security.model}</span>
 								</span>
 								<CircleCheck class="size-4 shrink-0 text-primary" />
-							</button>
+							</ChoiceCards.Item>
 						{:else}
 							<button type="button" onclick={() => (extra = true)} class="dashed-add">
 								<Plus class="size-3.5" />역할 추가 (Security Reviewer 등)
 							</button>
 						{/if}
-					</div>
+					</ChoiceCards.Root>
 					<div class="form-block">
 						{@render field('Orch 진행 방식', mode === 'timer' ? 'Auto = 판단이 필요 없는 일은 5초 타이머 후 자동 진행' : mode === 'manual' ? 'Manual = 매번 확인 후 진행' : 'Full auto = 대기 없이 진행 (루프 가드는 항상 적용)')}
 						<Segmented

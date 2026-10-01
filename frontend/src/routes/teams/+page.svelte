@@ -101,6 +101,7 @@
 	import PermPanel from '$lib/components/orch/agent/perm-panel.svelte';
 	import HarnessPanel from '$lib/components/orch/agent/harness-panel.svelte';
 	import { cn } from '$lib/utils';
+	import * as ChoiceCards from '$lib/components/ui/choice-cards';
 
 	// 선택 팀은 ?team= 으로 둔다. 없으면 첫 프로젝트 팀. 팀 · 템플릿 데이터는 $lib/teams.svelte (서버 연결은 #45).
 	const team = $derived(store.crew.find((t) => t.sn === Number(page.url.searchParams.get('team'))) ?? defaultTeam());
@@ -710,20 +711,10 @@
 						<Sparkles class="size-3.5 shrink-0 text-primary" />
 						<span><span class="font-semibold">Orch 추천</span> · {recommend.reason} → {rec.name}</span>
 					</button>
-					<div role="radiogroup" aria-label="템플릿" class="grid grid-cols-2 gap-2.5">
+					<ChoiceCards.Root aria-label="템플릿" class="grid-cols-2" bind:value={() => pick, (v) => (pick = v as typeof pick)}>
 						{#each tplShown as t (t.sn)}
 							{@const on = pick === t.sn}
-							<button
-								type="button"
-								role="radio"
-								aria-checked={on}
-								onclick={() => (pick = t.sn)}
-								ondblclick={toCharacter}
-								class={cn(
-									'mini-option',
-									on && 'option-on'
-								)}
-							>
+							<ChoiceCards.Item value={t.sn} layout="row" ondblclick={toCharacter} class="gap-2.5 bg-card px-2 py-1.75">
 								<RoleAvatar role={t.role} />
 								<span class="col-fill gap-0.75">
 									<span class="text-xs font-semibold">{t.name}</span>
@@ -734,28 +725,22 @@
 									</span>
 								</span>
 								{#if on}<CircleCheck class="size-4 shrink-0 text-primary" />{/if}
-							</button>
+							</ChoiceCards.Item>
 						{:else}
 							<p class="grid-empty">검색 결과가 없어요.</p>
 						{/each}
-					</div>
-					<button
-						type="button"
-						role="radio"
-						aria-checked={pick === null}
-						onclick={() => (pick = null)}
-						class={cn(
-							'card-press gap-2.5 p-3.5',
-							pick === null && 'option-on'
-						)}
-					>
+					</ChoiceCards.Root>
+					<!-- 같은 선택(pick)의 한 칸 — 배치는 그대로 두려고 contents -->
+					<ChoiceCards.Root aria-label="빈 캐릭터" class="contents" bind:value={() => pick, (v) => (pick = v as typeof pick)}>
+					<ChoiceCards.Item value={null} layout="row" class="gap-2.5 p-3.5">
 						<span class="add-tile"><Plus class="size-3.5" /></span>
 						<span class="flex flex-1 flex-col gap-0.5">
 							<span class="text-xs font-semibold">빈 캐릭터로 시작</span>
 							<span class="text-caption text-muted-foreground">템플릿 없이 Instructions를 직접 작성</span>
 						</span>
 						{#if pick === null}<CircleCheck class="size-4 text-primary" />{/if}
-					</button>
+					</ChoiceCards.Item>
+					</ChoiceCards.Root>
 				{:else}
 					<!-- 고른 템플릿 (2 · 3단계 공통) -->
 					<div class="soft-box items-center gap-3 p-3">
@@ -897,28 +882,19 @@
 					{/if}
 					<section class="flex flex-col gap-2.5">
 						{@render heading('첫 작업', '추가 직후 무엇을 할지')}
-						<div role="radiogroup" aria-label="첫 작업" class="grid grid-cols-3 gap-2.5">
+						<ChoiceCards.Root aria-label="첫 작업" class="grid-cols-3" bind:value={() => first, (v) => (first = v as typeof first)}>
 							{#each [{ v: 'orch', icon: Sparkles, t: 'Orch에게 맡기기', d: `팀 진행 정책(${modeLabel(policy)})에 따라 대기열에서 배정` }, { v: 'task', icon: ListChecks, t: '지금 태스크 지정', d: firstLabel.task }, { v: 'wait', icon: Pause, t: '대기', d: '추가만 하고 배정하지 않음' }] as const as o (o.v)}
 								{@const on = first === o.v}
-								<button
-									type="button"
-									role="radio"
-									aria-checked={on}
-									onclick={() => (first = o.v)}
-									class={cn(
-										'option-press rounded-md',
-										on && 'option-on'
-									)}
-								>
+								<ChoiceCards.Item value={o.v} class="rounded-md">
 									<span class="label-xs-strong">
 										<o.icon class={cn('size-3.5', on ? 'text-primary' : 'text-muted-foreground')} />
 										<span class="flex-1">{o.t}</span>
 										{#if on}<CircleCheck class="size-3.5 text-primary" />{:else}<Circle class="size-3.5 text-subtle-foreground" />{/if}
 									</span>
 									<span class="truncate text-caption text-muted-foreground">{o.d}</span>
-								</button>
+								</ChoiceCards.Item>
 							{/each}
-						</div>
+						</ChoiceCards.Root>
 					</section>
 				{/if}
 			</div>

@@ -38,6 +38,7 @@
 	import { fallbackSteps, meters, modelCatalog, type AgentConfig, type ModelInfo } from '$lib/mock';
 	import { accountOf, low, runtimeName } from '$lib/teams.svelte';
 	import { cn } from '$lib/utils';
+	import * as ChoiceCards from '$lib/components/ui/choice-cards';
 
 	let {
 		config: c,
@@ -259,14 +260,11 @@
 									<span class="font-mono text-caption text-muted-foreground">월 ${gateway.used}/${gateway.limit}</span>
 								{/if}
 							</div>
+							<!-- 배치는 섹션 그대로 두려고 contents -->
+							<ChoiceCards.Root aria-label="{p.label} 모델" class="contents" value={runtime === p.runtime ? model : null} onValueChange={(v) => (onchange(p.runtime, String(v)), (picker = false))}>
 							{#each p.models as md (md.name)}
 								{@const on = model === md.name && runtime === p.runtime}
-								<button
-									type="button"
-									aria-pressed={on}
-									onclick={() => (onchange(p.runtime, md.name), (picker = false))}
-									class={cn('card-press gap-3 px-3 py-2.5', on && 'option-on')}
-								>
+								<ChoiceCards.Item value={md.name} layout="row">
 									{#if on}<CircleDot class="size-4 text-primary" />{:else}<Circle class="size-4 text-subtle-foreground" />{/if}
 									<span class="row-text">
 										<span class="row-title">
@@ -278,8 +276,9 @@
 									<span class="num-cell w-24">{md.price}</span>
 									<span class="w-12 text-right font-mono text-caption">{md.ctx}</span>
 									<span class="w-12 text-right text-caption text-muted-foreground">● {md.speed}</span>
-								</button>
+								</ChoiceCards.Item>
 							{/each}
+							</ChoiceCards.Root>
 						</section>
 					{:else}
 						<p class="py-10 text-center text-xs text-muted-foreground">조건에 맞는 모델이 없어요.</p>

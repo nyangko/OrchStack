@@ -301,15 +301,7 @@
 	@apply flex size-9.5 shrink-0 items-center justify-center rounded-md bg-muted;
 }
 
-/* 누르는 선택 카드 (세로) · 3곳 */
-@utility option-press {
-	@apply flex flex-col gap-1 border p-3 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50;
-}
 
-/* 누르는 카드 한 줄 · 2곳 */
-@utility card-press {
-	@apply flex items-center rounded-md border text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50;
-}
 
 /* 줄 전체가 링크인 영역 · 2곳 */
 @utility row-link {

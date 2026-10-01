@@ -121,6 +121,7 @@
 	import UserRoundX from '@lucide/svelte/icons/user-round-x';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Kbd } from '$lib/components/ui/kbd';
+	import * as ChoiceCards from '$lib/components/ui/choice-cards';
 	import { mergeProps } from 'bits-ui';
 	import { Input } from '$lib/components/ui/input';
 	import * as Attachment from '$lib/components/ui/attachment';
@@ -1881,21 +1882,15 @@
 									{#if n === qi}
 										{#if q.context}<p class="text-body leading-relaxed text-muted-foreground">{q.context}</p>{/if}
 										{#if q.options}
-											<div class="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Q{n + 1} 선택지">
+											<!-- .pen OptionCard on/off -->
+											<ChoiceCards.Root aria-label="Q{n + 1} 선택지" class="grid-cols-3 gap-2" bind:value={() => pick ?? null, (v) => (pick = (v ?? undefined) as typeof pick)}>
 												{#each q.options as o (o.key)}
-													<!-- .pen OptionCard on/off -->
-													<button
-														type="button"
-														role="radio"
-														aria-checked={pick === o.key}
-														onclick={() => (pick = o.key)}
-														class={cn('option-press rounded-lg', pick === o.key && 'option-on')}
-													>
+													<ChoiceCards.Item value={o.key} class="rounded-lg">
 														<span class="title-sm gap-1.5"><span class="font-mono text-xs text-muted-foreground">{o.key}</span>{o.title}{#if o.rec}<Badge variant="secondary" class="text-2xs">추천</Badge>{/if}</span>
 														{#if o.desc}<span class="text-xs text-muted-foreground">{o.desc}</span>{/if}
-													</button>
+													</ChoiceCards.Item>
 												{/each}
-											</div>
+											</ChoiceCards.Root>
 										{/if}
 									{/if}
 								</li>

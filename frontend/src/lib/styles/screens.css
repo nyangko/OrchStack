@@ -297,10 +297,6 @@
 @utility filter-pill {
 	@apply flex items-center gap-1 rounded-full px-2.5 py-1 text-caption font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50;
 }
-/* 제공자 선택 카드 */
-@utility provider-option {
-	@apply flex flex-col gap-2 rounded-lg border px-3.5 py-3 text-left outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50;
-}
 
 /* ── connections/+page.svelte ── */
 /* 한도 칩 (.pen QuotaChip) */
@@ -490,10 +486,6 @@
 /* 스위치 줄 */
 @utility setup-toggle {
 	@apply flex items-center gap-3 border-t pt-4;
-}
-/* 기본 팀 선택 카드 */
-@utility team-option {
-	@apply flex items-start gap-3 rounded-lg border px-3.5 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50;
 }
 /* 점선 추가 버튼 */
 @utility dashed-add {
@@ -697,10 +689,6 @@
 /* 켜고 끄는 꼬리표 (켬) */
 @utility toggle-tag-on {
 	@apply rounded-xs border bg-card px-2 py-0.75 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50;
-}
-/* 작은 선택 카드 */
-@utility mini-option {
-	@apply flex items-center gap-2.5 rounded-md border bg-card px-2 py-1.75 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50;
 }
 /* 카드 (오류면 빨강) */
 @utility fallback-card {
