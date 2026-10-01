@@ -1,10 +1,8 @@
 /// 서버 API(#59 W-8) 연결 전 목데이터. 타입은 OpenAPI 스키마에서 가져와 교체 시 호출부가 바뀌지 않게 한다.
-import type { components } from "$lib/api/schema";
-
-type Project = components["schemas"]["Project"];
+import type { ApiProject, ApiIssue, ApiTask, ApiTeam, ApiMember, ApiTemplate } from "$lib/api/types";
 
 /// 프로젝트 탭 표시용. dot은 진행 상태(실행 중 · 대기 · 쉼)를 나타내는 계산값이라 스키마에 없다.
-export type ProjectTab = Pick<Project, "sn" | "name" | "status"> & { dot: string };
+export type ProjectTab = Pick<ApiProject, "sn" | "name" | "status"> & { dot: string };
 
 export const projects: ProjectTab[] = [
 	{ sn: 1, name: "OrchStack", status: "active", dot: "bg-success" },
@@ -36,12 +34,10 @@ export type Agent = {
 	tokens: string;
 };
 
-/// 태스크. 스키마 tbl_task 요약. OpenAPI(#44) 전 임시 타입.
-export type Task = {
-	num: number;
+/// 태스크. 서버 Task와 겹치는 필드(num · title)는 스키마에서, 나머지는 화면 계산값. 페이지별 교체(A-1~)에서 sn · member_sn 등으로 맞춘다.
+export type Task = Pick<ApiTask, "num" | "title"> & {
 	/** 프로젝트 sn. 없으면 1 (OrchStack). */
 	project?: number;
-	title: string;
 	status: TaskStatus;
 	priority: "P0" | "P1" | "P2" | "P3";
 	/** 하위 작업 방식 (tbl_task.spawn_mode). 없으면 팀 기본값 (#67). */
@@ -64,9 +60,7 @@ export type Task = {
 };
 
 /// 이슈. 스키마 tbl_issue 요약 (상태: open · in_progress · done · closed). parent가 있으면 하위 이슈.
-export type Issue = {
-	num: number;
-	title: string;
+export type Issue = Pick<ApiIssue, "num" | "title"> & {
 	status: "open" | "in_progress" | "done" | "closed";
 	parent?: number;
 	updated: string;
@@ -251,9 +245,7 @@ export const thread: Chat[] = [
 ];
 
 /// 팀 멤버 한 줄 (.pen Teams / MemberRow · WorkloadRow). 스키마 tbl_member · tbl_team_member · tbl_run 요약. OpenAPI(#45) 전 임시 타입.
-export type TeamMember = {
-	sn: number;
-	name: string;
+export type TeamMember = Pick<ApiMember, "sn" | "name"> & {
 	role: Role;
 	/** 역할 표시 이름 (예: Backend Developer). */
 	title: string;
@@ -279,9 +271,7 @@ export type TeamMember = {
 };
 
 /// 팀 (.pen Teams / TeamListItem · Team Header). 스키마 tbl_team 요약. orch 팀은 모든 프로젝트를 조정한다.
-export type Team = {
-	sn: number;
-	name: string;
+export type Team = Pick<ApiTeam, "sn" | "name"> & {
 	orch?: boolean;
 	/** 연결 프로젝트 이름. orch 팀은 없음. */
 	project?: string;
@@ -1034,9 +1024,7 @@ export const skillSources = {
 };
 
 /// 에이전트 템플릿 (.pen TemplateListItem · 멤버 추가 1단계). 스키마 tbl_agent_profile 요약. 멤버는 템플릿을 복사해 만든다.
-export type Template = {
-	sn: number;
-	name: string;
+export type Template = Pick<ApiTemplate, "sn" | "name"> & {
 	role: Role;
 	version: number;
 	/** 한 줄 요약 (역할 · 전문). */

@@ -4,6 +4,12 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	// 개발 중엔 /api 를 백엔드로 넘겨 CORS 없이 같은 출처로 부른다 ($lib/api/env.ts 기본 '/api'). SSE도 그대로 흐른다.
+	server: {
+		proxy: {
+			'/api': { target: process.env.VITE_API_PROXY ?? 'http://127.0.0.1:8080', rewrite: (p) => p.replace(/^\/api/, '') }
+		}
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit({

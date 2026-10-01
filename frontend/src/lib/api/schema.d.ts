@@ -12,7 +12,7 @@ export interface paths {
             cookie?: never;
         };
         /** 서버와 DB가 살아 있는지 확인한다 (DB 연결이 끊기면 503) */
-        get: operations["health"];
+        get: operations["main_health"];
         put?: never;
         post?: never;
         delete?: never;
@@ -29,15 +29,15 @@ export interface paths {
             cookie?: never;
         };
         /** 1건 조회. 없으면 404 */
-        get: operations["read"];
+        get: operations["issue_read"];
         put?: never;
         post?: never;
         /** 삭제 (IssueDeleted). 성공 204, 없으면 404. 속한 태스크는 남고 issue_sn만 비워진다 */
-        delete: operations["remove"];
+        delete: operations["issue_remove"];
         options?: never;
         head?: never;
         /** 부분 수정 (UpdateIssue → IssueUpdated). 없으면 404, 모르는 status면 422 */
-        patch: operations["update"];
+        patch: operations["issue_update"];
         trace?: never;
     };
     "/issues/{sn}/tasks": {
@@ -48,10 +48,10 @@ export interface paths {
             cookie?: never;
         };
         /** 이슈의 태스크 목록 (번호순) */
-        get: operations["list"];
+        get: operations["task_list"];
         put?: never;
         /** 태스크 생성 (CreateTask → TaskCreated). 이슈가 없으면 404 */
-        post: operations["create"];
+        post: operations["task_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -66,15 +66,15 @@ export interface paths {
             cookie?: never;
         };
         /** 멤버 1건 조회. 없으면 404 */
-        get: operations["member"];
+        get: operations["team_member"];
         put?: never;
         post?: never;
         /** 멤버 삭제 (MemberDeleted). 멤버 프로필도 지운다. Run · 리뷰 등 기록이 있으면 409 (보관 = status archived) */
-        delete: operations["delete"];
+        delete: operations["team_delete"];
         options?: never;
         head?: never;
         /** 멤버 부분 수정 (MemberUpdated). 모르는 상태는 422, 없으면 404 */
-        patch: operations["edit"];
+        patch: operations["team_edit"];
         trace?: never;
     };
     "/profiles": {
@@ -85,10 +85,10 @@ export interface paths {
             cookie?: never;
         };
         /** 프로필 목록 (번호순). `kind`로 거른다 */
-        get: operations["list"];
+        get: operations["agent_list"];
         put?: never;
         /** 프로필 생성 (ProfileCreated) */
-        post: operations["create"];
+        post: operations["agent_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -103,15 +103,15 @@ export interface paths {
             cookie?: never;
         };
         /** 1건 조회. 없으면 404 */
-        get: operations["read"];
+        get: operations["agent_read"];
         put?: never;
         post?: never;
         /** 삭제 (ProfileDeleted). 성공 204, 없으면 404, 멤버가 쓰는 중이면 409 (하위 설정은 CASCADE) */
-        delete: operations["remove"];
+        delete: operations["agent_remove"];
         options?: never;
         head?: never;
         /** 부분 수정 (ProfileUpdated). 없으면 404 */
-        patch: operations["update"];
+        patch: operations["agent_update"];
         trace?: never;
     };
     "/profiles/{sn}/caps": {
@@ -122,7 +122,7 @@ export interface paths {
             cookie?: never;
         };
         /** 하위 매핑 조회: 스킬 · MCP · 도구 정책 (편집은 별도 Task). 프로필이 없으면 404 */
-        get: operations["caps"];
+        get: operations["agent_caps"];
         put?: never;
         post?: never;
         delete?: never;
@@ -139,9 +139,9 @@ export interface paths {
             cookie?: never;
         };
         /** 폴백 체인 조회 (sort 순). 프로필이 없으면 404 */
-        get: operations["fallbacks"];
+        get: operations["agent_fallbacks"];
         /** 폴백 체인 전체 교체 (ProfileUpdated). 배열 순서 = sort. 모르는 tier · 없는 실행기 · 연결 · 모델은 422, 프로필이 없으면 404 */
-        put: operations["chain"];
+        put: operations["agent_chain"];
         post?: never;
         delete?: never;
         options?: never;
@@ -157,10 +157,10 @@ export interface paths {
             cookie?: never;
         };
         /** 목록 (탭 순서 sort, 같으면 번호순) */
-        get: operations["list"];
+        get: operations["project_list"];
         put?: never;
         /** 생성 후 DB 기본값까지 채운 행을 201로 돌려준다 */
-        post: operations["create"];
+        post: operations["project_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -175,15 +175,15 @@ export interface paths {
             cookie?: never;
         };
         /** 1건 조회. 없으면 404 */
-        get: operations["read"];
+        get: operations["project_read"];
         put?: never;
         post?: never;
         /** 삭제. 성공 204, 없으면 404 (하위 데이터는 스키마의 ON DELETE 규칙을 따른다) */
-        delete: operations["remove"];
+        delete: operations["project_remove"];
         options?: never;
         head?: never;
         /** 부분 수정 후 최신 행을 돌려준다. 없으면 404 */
-        patch: operations["update"];
+        patch: operations["project_update"];
         trace?: never;
     };
     "/projects/{sn}/issues": {
@@ -194,10 +194,10 @@ export interface paths {
             cookie?: never;
         };
         /** 프로젝트의 이슈 목록 (번호순) */
-        get: operations["list"];
+        get: operations["issue_list"];
         put?: never;
         /** 이슈 생성 (CreateIssue → IssueCreated). 프로젝트가 없으면 404 */
-        post: operations["create"];
+        post: operations["issue_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -212,7 +212,7 @@ export interface paths {
             cookie?: never;
         };
         /** 프로젝트 태스크 목록 (Kanban용). `status`로 거르고 queue_sort → 번호순 */
-        get: operations["board"];
+        get: operations["task_board"];
         put?: never;
         post?: never;
         delete?: never;
@@ -229,7 +229,7 @@ export interface paths {
             cookie?: never;
         };
         /** 1건 조회. 없으면 404 */
-        get: operations["read"];
+        get: operations["run_read"];
         put?: never;
         post?: never;
         delete?: never;
@@ -248,7 +248,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** 승인 (ApproveRun → RunApproved). Run은 completed, 태스크는 done */
-        post: operations["approve"];
+        post: operations["run_approve"];
         delete?: never;
         options?: never;
         head?: never;
@@ -265,7 +265,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** 반려 (RejectRun → RunRejected). Run은 failed(rejected), 태스크는 in_progress로 돌아가고 tbl_review에 반려가 쌓인다 (round = 반려 횟수). 재실행은 retry */
-        post: operations["reject"];
+        post: operations["run_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -282,7 +282,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** 재시도 (RetryRun → RunStarted). failed · cancelled Run에서만, 기존 Run은 그대로 두고 새 Run을 만든다 */
-        post: operations["retry"];
+        post: operations["run_retry"];
         delete?: never;
         options?: never;
         head?: never;
@@ -299,7 +299,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** 리뷰 요청 (RequestReview → ReviewRequested). running Run과 in_progress 태스크가 함께 review로 간다 */
-        post: operations["review"];
+        post: operations["run_review"];
         delete?: never;
         options?: never;
         head?: never;
@@ -314,7 +314,7 @@ export interface paths {
             cookie?: never;
         };
         /** Run의 Session 목록 (번호순) */
-        get: operations["sessions"];
+        get: operations["run_sessions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -333,7 +333,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Run 중지 (StopRun → RunCancelled). 끝난 Run이면 409. 태스크 상태는 그대로 둔다 */
-        post: operations["stop"];
+        post: operations["run_stop"];
         delete?: never;
         options?: never;
         head?: never;
@@ -348,15 +348,15 @@ export interface paths {
             cookie?: never;
         };
         /** 1건 조회. 없으면 404 */
-        get: operations["read"];
+        get: operations["task_read"];
         put?: never;
         post?: never;
         /** 삭제 (TaskDeleted). 성공 204, 없으면 404 */
-        delete: operations["remove"];
+        delete: operations["task_remove"];
         options?: never;
         head?: never;
         /** 부분 수정 (TaskUpdated). 상태는 못 바꾼다. 없으면 404 */
-        patch: operations["update"];
+        patch: operations["task_update"];
         trace?: never;
     };
     "/tasks/{sn}/assign": {
@@ -369,9 +369,9 @@ export interface paths {
         get?: never;
         put?: never;
         /** 멤버 배정 (AssignAgent → AgentAssigned · assign_by = user). 없는 멤버 422, 보관된 멤버 409. Run은 만들지 않는다 */
-        post: operations["assign"];
+        post: operations["task_assign"];
         /** 배정 해제 (AgentUnassigned · member_sn = NULL) */
-        delete: operations["unassign"];
+        delete: operations["task_unassign"];
         options?: never;
         head?: never;
         patch?: never;
@@ -387,7 +387,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** 상태 이동 (MoveTask → TaskMoved). 표에 없는 전이는 409, 없는 태스크는 404 */
-        post: operations["mv"];
+        post: operations["task_mv"];
         delete?: never;
         options?: never;
         head?: never;
@@ -402,10 +402,10 @@ export interface paths {
             cookie?: never;
         };
         /** 태스크의 Run 목록 (번호순) */
-        get: operations["list"];
+        get: operations["run_list"];
         put?: never;
         /** Run 시작 (StartRun → RunStarted). Run은 queued로 만들고 태스크는 in_progress. 담당 멤버가 없거나 진행 중 Run(하위 Run 제외 · #67)이 있으면 409 */
-        post: operations["start"];
+        post: operations["run_start"];
         delete?: never;
         options?: never;
         head?: never;
@@ -420,10 +420,10 @@ export interface paths {
             cookie?: never;
         };
         /** 팀 목록 (sort → 번호순) */
-        get: operations["list"];
+        get: operations["team_list"];
         put?: never;
         /** 팀 생성 (TeamCreated) */
-        post: operations["create"];
+        post: operations["team_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -438,15 +438,15 @@ export interface paths {
             cookie?: never;
         };
         /** 팀 1건 조회. 없으면 404 */
-        get: operations["read"];
+        get: operations["team_read"];
         put?: never;
         post?: never;
         /** 팀 삭제 (TeamDeleted). 멤버와 멤버 프로필도 지운다. Run 기록이 있는 멤버가 있으면 409 */
-        delete: operations["remove"];
+        delete: operations["team_remove"];
         options?: never;
         head?: never;
         /** 팀 부분 수정 (TeamUpdated). 없으면 404, 모르는 하위 작업 방식 · 허용 밖 기본 방식은 422 */
-        patch: operations["update"];
+        patch: operations["team_update"];
         trace?: never;
     };
     "/teams/{sn}/members": {
@@ -457,10 +457,10 @@ export interface paths {
             cookie?: never;
         };
         /** 팀 멤버 목록 (sort → 번호순). 팀이 없으면 404 */
-        get: operations["members"];
+        get: operations["team_members"];
         put?: never;
         /** 멤버 추가 (MemberCreated). 템플릿이 없으면 422, draft · 보관 · live 버전 없음은 409, 템플릿 없이 role_name도 없으면 422 */
-        post: operations["add"];
+        post: operations["team_add"];
         delete?: never;
         options?: never;
         head?: never;
@@ -475,7 +475,7 @@ export interface paths {
             cookie?: never;
         };
         /** 템플릿 목록 (보관 제외 · sort → 번호순) */
-        get: operations["templates"];
+        get: operations["agent_templates"];
         put?: never;
         post?: never;
         delete?: never;
@@ -492,7 +492,7 @@ export interface paths {
             cookie?: never;
         };
         /** 템플릿 1건 조회. 없으면 404 */
-        get: operations["template"];
+        get: operations["agent_template"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1008,7 +1008,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health: {
+    main_health: {
         parameters: {
             query?: never;
             header?: never;
@@ -1035,7 +1035,7 @@ export interface operations {
             };
         };
     };
-    read: {
+    issue_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -1065,7 +1065,7 @@ export interface operations {
             };
         };
     };
-    remove: {
+    issue_remove: {
         parameters: {
             query?: never;
             header?: never;
@@ -1094,7 +1094,7 @@ export interface operations {
             };
         };
     };
-    update: {
+    issue_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -1128,7 +1128,7 @@ export interface operations {
             };
         };
     };
-    list: {
+    task_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -1158,7 +1158,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    task_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -1192,7 +1192,7 @@ export interface operations {
             };
         };
     };
-    member: {
+    team_member: {
         parameters: {
             query?: never;
             header?: never;
@@ -1222,7 +1222,7 @@ export interface operations {
             };
         };
     };
-    delete: {
+    team_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -1251,7 +1251,7 @@ export interface operations {
             };
         };
     };
-    edit: {
+    team_edit: {
         parameters: {
             query?: never;
             header?: never;
@@ -1285,7 +1285,7 @@ export interface operations {
             };
         };
     };
-    list: {
+    agent_list: {
         parameters: {
             query?: {
                 /** @description 이 종류만 */
@@ -1315,7 +1315,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    agent_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -1346,7 +1346,7 @@ export interface operations {
             };
         };
     };
-    read: {
+    agent_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -1376,7 +1376,7 @@ export interface operations {
             };
         };
     };
-    remove: {
+    agent_remove: {
         parameters: {
             query?: never;
             header?: never;
@@ -1405,7 +1405,7 @@ export interface operations {
             };
         };
     };
-    update: {
+    agent_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -1439,7 +1439,7 @@ export interface operations {
             };
         };
     };
-    caps: {
+    agent_caps: {
         parameters: {
             query?: never;
             header?: never;
@@ -1469,7 +1469,7 @@ export interface operations {
             };
         };
     };
-    fallbacks: {
+    agent_fallbacks: {
         parameters: {
             query?: never;
             header?: never;
@@ -1499,7 +1499,7 @@ export interface operations {
             };
         };
     };
-    chain: {
+    agent_chain: {
         parameters: {
             query?: never;
             header?: never;
@@ -1533,7 +1533,7 @@ export interface operations {
             };
         };
     };
-    list: {
+    project_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -1560,7 +1560,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    project_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -1591,7 +1591,7 @@ export interface operations {
             };
         };
     };
-    read: {
+    project_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -1621,7 +1621,7 @@ export interface operations {
             };
         };
     };
-    remove: {
+    project_remove: {
         parameters: {
             query?: never;
             header?: never;
@@ -1650,7 +1650,7 @@ export interface operations {
             };
         };
     };
-    update: {
+    project_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -1684,7 +1684,7 @@ export interface operations {
             };
         };
     };
-    list: {
+    issue_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -1714,7 +1714,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    issue_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -1748,7 +1748,7 @@ export interface operations {
             };
         };
     };
-    board: {
+    task_board: {
         parameters: {
             query?: {
                 /** @description 이 상태만 */
@@ -1781,7 +1781,7 @@ export interface operations {
             };
         };
     };
-    read: {
+    run_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -1811,7 +1811,7 @@ export interface operations {
             };
         };
     };
-    approve: {
+    run_approve: {
         parameters: {
             query?: never;
             header?: never;
@@ -1841,7 +1841,7 @@ export interface operations {
             };
         };
     };
-    reject: {
+    run_reject: {
         parameters: {
             query?: never;
             header?: never;
@@ -1875,7 +1875,7 @@ export interface operations {
             };
         };
     };
-    retry: {
+    run_retry: {
         parameters: {
             query?: never;
             header?: never;
@@ -1905,7 +1905,7 @@ export interface operations {
             };
         };
     };
-    review: {
+    run_review: {
         parameters: {
             query?: never;
             header?: never;
@@ -1935,7 +1935,7 @@ export interface operations {
             };
         };
     };
-    sessions: {
+    run_sessions: {
         parameters: {
             query?: never;
             header?: never;
@@ -1965,7 +1965,7 @@ export interface operations {
             };
         };
     };
-    stop: {
+    run_stop: {
         parameters: {
             query?: never;
             header?: never;
@@ -1995,7 +1995,7 @@ export interface operations {
             };
         };
     };
-    read: {
+    task_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -2025,7 +2025,7 @@ export interface operations {
             };
         };
     };
-    remove: {
+    task_remove: {
         parameters: {
             query?: never;
             header?: never;
@@ -2054,7 +2054,7 @@ export interface operations {
             };
         };
     };
-    update: {
+    task_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -2088,7 +2088,7 @@ export interface operations {
             };
         };
     };
-    assign: {
+    task_assign: {
         parameters: {
             query?: never;
             header?: never;
@@ -2122,7 +2122,7 @@ export interface operations {
             };
         };
     };
-    unassign: {
+    task_unassign: {
         parameters: {
             query?: never;
             header?: never;
@@ -2152,7 +2152,7 @@ export interface operations {
             };
         };
     };
-    mv: {
+    task_mv: {
         parameters: {
             query?: never;
             header?: never;
@@ -2186,7 +2186,7 @@ export interface operations {
             };
         };
     };
-    list: {
+    run_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -2216,7 +2216,7 @@ export interface operations {
             };
         };
     };
-    start: {
+    run_start: {
         parameters: {
             query?: never;
             header?: never;
@@ -2246,7 +2246,7 @@ export interface operations {
             };
         };
     };
-    list: {
+    team_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -2273,7 +2273,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    team_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -2304,7 +2304,7 @@ export interface operations {
             };
         };
     };
-    read: {
+    team_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -2334,7 +2334,7 @@ export interface operations {
             };
         };
     };
-    remove: {
+    team_remove: {
         parameters: {
             query?: never;
             header?: never;
@@ -2363,7 +2363,7 @@ export interface operations {
             };
         };
     };
-    update: {
+    team_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -2397,7 +2397,7 @@ export interface operations {
             };
         };
     };
-    members: {
+    team_members: {
         parameters: {
             query?: never;
             header?: never;
@@ -2427,7 +2427,7 @@ export interface operations {
             };
         };
     };
-    add: {
+    team_add: {
         parameters: {
             query?: never;
             header?: never;
@@ -2461,7 +2461,7 @@ export interface operations {
             };
         };
     };
-    templates: {
+    agent_templates: {
         parameters: {
             query?: never;
             header?: never;
@@ -2488,7 +2488,7 @@ export interface operations {
             };
         };
     };
-    template: {
+    agent_template: {
         parameters: {
             query?: never;
             header?: never;

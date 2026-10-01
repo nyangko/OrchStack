@@ -31,6 +31,7 @@
 	import GitMerge from '@lucide/svelte/icons/git-merge';
 	import Settings2 from '@lucide/svelte/icons/settings-2';
 	import { Button } from '$lib/components/ui/button';
+	import { Toaster } from '$lib/components/ui/sonner';
 	import { Kbd } from '$lib/components/ui/kbd';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import { RoleAvatar } from '$lib/components/ui/role-avatar';
@@ -262,6 +263,8 @@
 </div>
 
 <svelte:window onkeydown={onkey} />
+<!-- API 실패 토스트 ($lib/api/client.ts) -->
+<Toaster position="bottom-right" />
 
 <Command.Dialog bind:open={searching} bind:value={selected} shouldFilter={false} title="검색" description="태스크 · 이슈 · 멤버 · 설정 · 명령" class="sm:max-w-180">
 	<!-- ⌘↵ 새 탭 · ↵ 열기 · ↑↓ 이동은 Command가 처리 -->
