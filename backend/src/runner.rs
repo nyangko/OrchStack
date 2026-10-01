@@ -3,7 +3,7 @@
 #![allow(dead_code)] // 리드 Run 디스패처가 호출한다
 
 use crate::{
-    entity::{tbl_context_manifest as cm, tbl_context_source as cs, tbl_log_token as lt, tbl_map_fallback as fb, tbl_member, tbl_model, tbl_project, tbl_run as r, tbl_runtime, tbl_session as s, tbl_task, tbl_team, tbl_workspace},
+    entity::{tbl_profile_rule as pr, tbl_profile_tool as pt, tbl_context_manifest as cm, tbl_context_source as cs, tbl_log_token as lt, tbl_map_fallback as fb, tbl_member, tbl_model, tbl_project, tbl_run as r, tbl_runtime, tbl_session as s, tbl_task, tbl_team, tbl_workspace},
     error::{Error, Res},
     event::{self, Ev},
     exec::{self, Job, Status},
@@ -22,7 +22,7 @@ const RULES: &str = "\
 You are a sub-task worker. Rules:
 - Do only the @TASK below. Edit only files in `paths`. Read nothing else.
 - Follow the existing code style of the given files. Smallest change that meets every `ac`.
-- No git commands (commit, stash, checkout, reset). No new dependencies.
+- Never git stash, checkout or reset (other workers share this tree). No new dependencies.
 - Before reporting, run format, lint and type check on your `paths` files only. Fix what they flag.
 - If you cannot finish without another file or a decision, stop and reply with one `@ASK v1` block (`need: [path, ...]` or `q: ...`).
 - When done, reply with only this block (English, no prose, no diff):
@@ -41,14 +41,30 @@ pub fn block(code: &str) -> Vec<String> {
         "claude_code" => &[
             "--setting-sources", "",
             "--settings", r#"{"claudeMdExcludes":["**/CLAUDE.md","**/CLAUDE.local.md","**/.claude/**"],"autoMemoryEnabled":false}"#,
-            // Bash는 열고 git만 막는다 (커밋 · 되돌리기는 리드 · OrchStack만). 범위 밖 변경은 실행 후 paths 검사가 잡는다
-            "--strict-mcp-config", "--disable-slash-commands", "--allowedTools", "Bash", "--disallowedTools", "mcp__*", "Bash(git:*)",
+            "--strict-mcp-config", "--disable-slash-commands",
             "--permission-mode", "acceptEdits", "--permission-prompts", "none",
         ],
         "codex" => &["--ignore-user-config", "--ignore-rules", "--ephemeral", "--disable", "plugins", "-c", "project_doc_max_bytes=0", "--sandbox", "workspace-write"],
         _ => &[],
     };
     a.iter().map(|s| s.to_string()).collect()
+}
+
+/// 리드 프로필의 도구 정책 · 명령 규칙 → Claude 허용 · 차단 인자. 행이 없으면 허용 (스키마 기본 allow).
+/// 하위 Run은 승인을 물을 수 없어(`--permission-prompts none`) approval · allowlist도 차단으로 본다
+// ponytail: Codex는 명령별 차단이 없어 무시 (workspace-write 샌드박스만). 필요하면 shell 차단 → --sandbox read-only
+pub fn perms(code: &str, tools: &[pt::Model], rules: &[pr::Model]) -> Vec<String> {
+    if code != "claude_code" { return vec![] }
+    let off = |t: &str| tools.iter().any(|x| x.tool_code == t && x.policy != "allow");
+    let mut deny = vec!["mcp__*".to_owned()];
+    if off("git_push") { deny.extend(["Bash(git push:*)".into(), "Bash(gh pr:*)".into()]); }
+    if off("git_destructive") { deny.extend(["Bash(git push --force:*)".into(), "Bash(git push -f:*)".into(), "Bash(git reset --hard:*)".into()]); }
+    deny.extend(rules.iter().filter(|r| r.action_code == "command" && r.policy != "auto").filter_map(|r| r.pattern.as_ref()).map(|p| format!("Bash({p})")));
+    let mut a = vec![];
+    if !off("shell") { a.extend(["--allowedTools".into(), "Bash".into()]); }
+    a.push("--disallowedTools".into());
+    a.extend(deny);
+    a
 }
 
 /// 최소 입력: 고정 규칙 → @TASK 원문 → paths 파일 (경로, 내용 · None = 아직 없는 파일 · glob)
@@ -275,6 +291,11 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
         return finish(db, &m, &b, None, "no_runtime", None).await;
     };
     let Some(ex) = exec::pick(&rt.code) else { return finish(db, &m, &b, None, "no_runtime", None).await };
+    // 도구 정책은 리드 프로필을 따른다 (하위 Run의 member_sn = 리드 멤버)
+    let profile = tbl_member::Entity::find_by_id(m.member_sn).one(db).await?.ok_or_else(Error::not_found)?.profile_sn;
+    let tools = pt::Entity::find().filter(pt::Column::ProfileSn.eq(profile)).all(db).await?;
+    let rules = pr::Entity::find().filter(pr::Column::ProfileSn.eq(profile)).all(db).await?;
+    let args: Vec<String> = block(&rt.code).into_iter().chain(perms(&rt.code, &tools, &rules)).collect();
     let before = dirty(&cwd).await;
     run::run_to(db, sn, "running").await?;
     let (mut total, mut asked) = (exec::Usage::default(), 0u8);
@@ -304,7 +325,7 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
         run::session_to(db, session, "active").await?;
 
         let job = Job {
-            prompt: input, cwd: cwd.clone().into(), bin: rt.bin_path.clone().map(Into::into), model: m.model_code.clone(), args: block(&rt.code),
+            prompt: input, cwd: cwd.clone().into(), bin: rt.bin_path.clone().map(Into::into), model: m.model_code.clone(), args: args.clone(),
             timeout: Duration::from_secs(ws.run_timeout_min.max(1) as u64 * 60), ..Default::default()
         };
         let (tx, _rx) = mpsc::unbounded_channel(); // ponytail: 실시간 스트림은 B-5 구독이 붙을 때
@@ -434,7 +455,13 @@ mod tests {
         assert!(p.contains("--- src/* (not read"));
         assert!(RULES.len() / 4 < 300);
         assert!(block("claude_code").contains(&"--strict-mcp-config".to_owned()));
-        assert!(block("claude_code").contains(&"Bash(git:*)".to_owned()));
+        // 프로필 정책: 행 없음 = Bash 허용 · shell 차단 = Bash 없음 · push 차단 · 명령 규칙 차단
+        let tool = |c: &str, p: &str| pt::Model { sn: 0, profile_sn: 1, tool_code: c.into(), scope_text: None, policy: p.into(), sort: 0, create_at: String::new() };
+        assert_eq!(perms("claude_code", &[], &[]), ["--allowedTools", "Bash", "--disallowedTools", "mcp__*"]);
+        let rule = pr::Model { sn: 0, profile_sn: 1, action_code: "command".into(), title: "rm".into(), pattern: Some("rm -rf:*".into()), description: None, policy: "block".into(), approver: None, is_notify: 1, sort: 0, create_at: String::new() };
+        let a = perms("claude_code", &[tool("shell", "approval"), tool("git_push", "block")], &[rule]);
+        assert!(!a.contains(&"Bash".to_owned()) && a.contains(&"Bash(git push:*)".to_owned()) && a.contains(&"Bash(rm -rf:*)".to_owned()));
+        assert!(perms("codex", &[tool("shell", "block")], &[]).is_empty());
         assert!(block("codex").contains(&"project_doc_max_bytes=0".to_owned()));
     }
 
