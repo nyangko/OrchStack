@@ -5,6 +5,7 @@ mod agent; // /profiles CRUD · /templates 조회
 mod entity; // 테이블별 SeaORM entity (sea-orm-cli 생성물 · 직접 수정하지 않는다)
 mod error; // 공통 에러 응답
 mod event; // 명령 실행 틀 (상태 변경 + 이벤트 append + 발행)
+mod exec; // 실행기: Claude Code · Codex CLI 비대화형 실행 (#13)
 mod issue; // /issues CRUD
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
