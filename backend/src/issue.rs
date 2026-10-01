@@ -81,13 +81,13 @@ async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<Issue> {
 }
 
 /// 프로젝트의 이슈 목록 (번호순)
-#[utoipa::path(get, path = "/projects/{sn}/issues", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 200, body = Vec<Issue>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "issue_list", get, path = "/projects/{sn}/issues", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 200, body = Vec<Issue>), (status = "default", body = ErrorBody)))]
 async fn list(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Issue>>> {
     Ok(Json(Tbl::find().filter(i::Column::ProjectSn.eq(sn)).order_by_asc(i::Column::Num).all(&db).await?.into_iter().map(Issue::from).collect()))
 }
 
 /// 이슈 생성 (CreateIssue → IssueCreated). 프로젝트가 없으면 404
-#[utoipa::path(post, path = "/projects/{sn}/issues", params(("sn" = i64, Path, description = "프로젝트 번호")), request_body = IssueNew, responses((status = 201, body = Issue), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "issue_create", post, path = "/projects/{sn}/issues", params(("sn" = i64, Path, description = "프로젝트 번호")), request_body = IssueNew, responses((status = 201, body = Issue), (status = "default", body = ErrorBody)))]
 async fn create(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<IssueNew>) -> Res<(StatusCode, Json<Issue>)> {
     let out = event::run(&db, async |tx| {
         let num = next_num(tx, sn).await?;
@@ -103,13 +103,13 @@ async fn create(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
 }
 
 /// 1건 조회. 없으면 404
-#[utoipa::path(get, path = "/issues/{sn}", params(("sn" = i64, Path, description = "이슈 번호")), responses((status = 200, body = Issue), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "issue_read", get, path = "/issues/{sn}", params(("sn" = i64, Path, description = "이슈 번호")), responses((status = 200, body = Issue), (status = "default", body = ErrorBody)))]
 async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Issue>> {
     get(&db, sn).await.map(Json)
 }
 
 /// 부분 수정 (UpdateIssue → IssueUpdated). 없으면 404, 모르는 status면 422
-#[utoipa::path(patch, path = "/issues/{sn}", params(("sn" = i64, Path, description = "이슈 번호")), request_body = IssuePatch, responses((status = 200, body = Issue), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "issue_update", patch, path = "/issues/{sn}", params(("sn" = i64, Path, description = "이슈 번호")), request_body = IssuePatch, responses((status = 200, body = Issue), (status = "default", body = ErrorBody)))]
 async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<IssuePatch>) -> Res<Json<Issue>> {
     if b.status.as_deref().is_some_and(|s| !STATUS.contains(&s)) {
         return Err(Error::invalid(format!("status must be one of {STATUS:?}")));
@@ -134,7 +134,7 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
 }
 
 /// 삭제 (IssueDeleted). 성공 204, 없으면 404. 속한 태스크는 남고 issue_sn만 비워진다
-#[utoipa::path(delete, path = "/issues/{sn}", params(("sn" = i64, Path, description = "이슈 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "issue_remove", delete, path = "/issues/{sn}", params(("sn" = i64, Path, description = "이슈 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
 async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusCode> {
     event::run(&db, async |tx| {
         let m = get(tx, sn).await?;

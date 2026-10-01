@@ -177,13 +177,13 @@ async fn one(db: &impl ConnectionTrait, sn: i64) -> Res<Member> {
 }
 
 /// 팀 목록 (sort → 번호순)
-#[utoipa::path(get, path = "/teams", responses((status = 200, body = Vec<Team>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_list", get, path = "/teams", responses((status = 200, body = Vec<Team>), (status = "default", body = ErrorBody)))]
 async fn list(State(db): State<DatabaseConnection>) -> Res<Json<Vec<Team>>> {
     Ok(Json(Tbl::find().order_by_asc(tm::Column::Sort).order_by_asc(tm::Column::Sn).all(&db).await?.into_iter().map(Team::from).collect()))
 }
 
 /// 팀 생성 (TeamCreated)
-#[utoipa::path(post, path = "/teams", request_body = TeamNew, responses((status = 201, body = Team), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_create", post, path = "/teams", request_body = TeamNew, responses((status = 201, body = Team), (status = "default", body = ErrorBody)))]
 async fn create(State(db): State<DatabaseConnection>, Body(b): Body<TeamNew>) -> Res<(StatusCode, Json<Team>)> {
     if b.kind.as_deref().is_some_and(|k| !KINDS.contains(&k)) {
         return Err(Error::invalid(format!("kind must be one of {KINDS:?}")));
@@ -198,13 +198,13 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<TeamNew>) ->
 }
 
 /// 팀 1건 조회. 없으면 404
-#[utoipa::path(get, path = "/teams/{sn}", params(("sn" = i64, Path, description = "팀 번호")), responses((status = 200, body = Team), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_read", get, path = "/teams/{sn}", params(("sn" = i64, Path, description = "팀 번호")), responses((status = 200, body = Team), (status = "default", body = ErrorBody)))]
 async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Team>> {
     get(&db, sn).await.map(Json)
 }
 
 /// 팀 부분 수정 (TeamUpdated). 없으면 404, 모르는 하위 작업 방식 · 허용 밖 기본 방식은 422
-#[utoipa::path(patch, path = "/teams/{sn}", params(("sn" = i64, Path, description = "팀 번호")), request_body = TeamPatch, responses((status = 200, body = Team), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_update", patch, path = "/teams/{sn}", params(("sn" = i64, Path, description = "팀 번호")), request_body = TeamPatch, responses((status = 200, body = Team), (status = "default", body = ErrorBody)))]
 async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<TeamPatch>) -> Res<Json<Team>> {
     if b.spawn_mode.as_deref().is_some_and(|m| !SPAWN.contains(&m))
         || b.spawn_allow.as_deref().is_some_and(|a| a.split(',').any(|m| !SPAWN.contains(&m)))
@@ -242,7 +242,7 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
 }
 
 /// 팀 삭제 (TeamDeleted). 멤버와 멤버 프로필도 지운다. Run 기록이 있는 멤버가 있으면 409
-#[utoipa::path(delete, path = "/teams/{sn}", params(("sn" = i64, Path, description = "팀 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_remove", delete, path = "/teams/{sn}", params(("sn" = i64, Path, description = "팀 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
 async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusCode> {
     event::run(&db, async |tx| {
         let t = get(tx, sn).await?;
@@ -255,7 +255,7 @@ async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusC
 }
 
 /// 팀 멤버 목록 (sort → 번호순). 팀이 없으면 404
-#[utoipa::path(get, path = "/teams/{sn}/members", params(("sn" = i64, Path, description = "팀 번호")), responses((status = 200, body = Vec<Member>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_members", get, path = "/teams/{sn}/members", params(("sn" = i64, Path, description = "팀 번호")), responses((status = 200, body = Vec<Member>), (status = "default", body = ErrorBody)))]
 async fn members(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Member>>> {
     get(&db, sn).await?;
     Ok(Json(mb::Entity::find().filter(mb::Column::TeamSn.eq(sn)).order_by_asc(mb::Column::Sort).order_by_asc(mb::Column::Sn)
@@ -263,7 +263,7 @@ async fn members(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<V
 }
 
 /// 멤버 추가 (MemberCreated). 템플릿이 없으면 422, draft · 보관 · live 버전 없음은 409, 템플릿 없이 role_name도 없으면 422
-#[utoipa::path(post, path = "/teams/{sn}/members", params(("sn" = i64, Path, description = "팀 번호")), request_body = MemberNew, responses((status = 201, body = Member), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_add", post, path = "/teams/{sn}/members", params(("sn" = i64, Path, description = "팀 번호")), request_body = MemberNew, responses((status = 201, body = Member), (status = "default", body = ErrorBody)))]
 async fn add(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<MemberNew>) -> Res<(StatusCode, Json<Member>)> {
     let out = event::run(&db, async |tx| {
         get(tx, sn).await?;
@@ -302,13 +302,13 @@ async fn add(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Mem
 }
 
 /// 멤버 1건 조회. 없으면 404
-#[utoipa::path(get, path = "/members/{sn}", params(("sn" = i64, Path, description = "멤버 번호")), responses((status = 200, body = Member), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_member", get, path = "/members/{sn}", params(("sn" = i64, Path, description = "멤버 번호")), responses((status = 200, body = Member), (status = "default", body = ErrorBody)))]
 async fn member(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Member>> {
     one(&db, sn).await.map(Json)
 }
 
 /// 멤버 부분 수정 (MemberUpdated). 모르는 상태는 422, 없으면 404
-#[utoipa::path(patch, path = "/members/{sn}", params(("sn" = i64, Path, description = "멤버 번호")), request_body = MemberPatch, responses((status = 200, body = Member), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_edit", patch, path = "/members/{sn}", params(("sn" = i64, Path, description = "멤버 번호")), request_body = MemberPatch, responses((status = 200, body = Member), (status = "default", body = ErrorBody)))]
 async fn edit(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<MemberPatch>) -> Res<Json<Member>> {
     if b.status.as_deref().is_some_and(|s| !STATUS.contains(&s)) {
         return Err(Error::invalid(format!("status must be one of {STATUS:?}")));
@@ -333,7 +333,7 @@ async fn edit(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Me
 }
 
 /// 멤버 삭제 (MemberDeleted). 멤버 프로필도 지운다. Run · 리뷰 등 기록이 있으면 409 (보관 = status archived)
-#[utoipa::path(delete, path = "/members/{sn}", params(("sn" = i64, Path, description = "멤버 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "team_delete", delete, path = "/members/{sn}", params(("sn" = i64, Path, description = "멤버 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
 async fn delete(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusCode> {
     event::run(&db, async |tx| {
         let m = one(tx, sn).await?;

@@ -72,7 +72,7 @@ struct Health {
 }
 
 /// 서버와 DB가 살아 있는지 확인한다 (DB 연결이 끊기면 503)
-#[utoipa::path(get, path = "/health", responses((status = 200, body = Health), (status = 503, body = Health)))]
+#[utoipa::path(operation_id = "main_health", get, path = "/health", responses((status = 200, body = Health), (status = 503, body = Health)))]
 async fn health(State(db): State<DatabaseConnection>) -> (StatusCode, Json<Health>) {
     match db.ping().await {
         Ok(()) => (StatusCode::OK, Json(Health { status: "ok", db: "ok" })),

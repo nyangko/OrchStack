@@ -154,32 +154,32 @@ async fn begin(tx: &DatabaseTransaction, task_sn: i64, retry: Option<i64>) -> Re
 }
 
 /// 태스크의 Run 목록 (번호순)
-#[utoipa::path(get, path = "/tasks/{sn}/runs", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 200, body = Vec<Run>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "run_list", get, path = "/tasks/{sn}/runs", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 200, body = Vec<Run>), (status = "default", body = ErrorBody)))]
 async fn list(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Run>>> {
     Ok(Json(r::Entity::find().filter(r::Column::TaskSn.eq(sn)).order_by_asc(r::Column::Num).all(&db).await?.into_iter().map(Run::from).collect()))
 }
 
 /// Run 시작 (StartRun → RunStarted). Run은 queued로 만들고 태스크는 in_progress. 담당 멤버가 없거나 진행 중 Run(하위 Run 제외 · #67)이 있으면 409
-#[utoipa::path(post, path = "/tasks/{sn}/runs", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 201, body = Run), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "run_start", post, path = "/tasks/{sn}/runs", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 201, body = Run), (status = "default", body = ErrorBody)))]
 async fn start(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<(StatusCode, Json<Run>)> {
     let out = event::run(&db, async |tx| begin(tx, sn, None).await.map(|(out, ev)| (out, vec![ev]))).await?;
     Ok((StatusCode::CREATED, Json(out)))
 }
 
 /// 1건 조회. 없으면 404
-#[utoipa::path(get, path = "/runs/{sn}", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "run_read", get, path = "/runs/{sn}", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
 async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Run>> {
     get(&db, sn).await.map(|m| Json(m.into()))
 }
 
 /// Run의 Session 목록 (번호순)
-#[utoipa::path(get, path = "/runs/{sn}/sessions", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Vec<Session>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "run_sessions", get, path = "/runs/{sn}/sessions", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Vec<Session>), (status = "default", body = ErrorBody)))]
 async fn sessions(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Session>>> {
     Ok(Json(s::Entity::find().filter(s::Column::RunSn.eq(sn)).order_by_asc(s::Column::Sn).all(&db).await?.into_iter().map(Session::from).collect()))
 }
 
 /// Run 중지 (StopRun → RunCancelled). 끝난 Run이면 409. 태스크 상태는 그대로 둔다
-#[utoipa::path(post, path = "/runs/{sn}/stop", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "run_stop", post, path = "/runs/{sn}/stop", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
 async fn stop(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Run>> {
     let out = event::run(&db, async |tx| {
         let out = Run::from(step(tx, sn, "cancelled").await?);
@@ -190,7 +190,7 @@ async fn stop(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Run>
 }
 
 /// 재시도 (RetryRun → RunStarted). failed · cancelled Run에서만, 기존 Run은 그대로 두고 새 Run을 만든다
-#[utoipa::path(post, path = "/runs/{sn}/retry", params(("sn" = i64, Path, description = "재시도할 Run 번호")), responses((status = 201, body = Run), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "run_retry", post, path = "/runs/{sn}/retry", params(("sn" = i64, Path, description = "재시도할 Run 번호")), responses((status = 201, body = Run), (status = "default", body = ErrorBody)))]
 async fn retry(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<(StatusCode, Json<Run>)> {
     let out = event::run(&db, async |tx| {
         let old = get(tx, sn).await?;
@@ -203,7 +203,7 @@ async fn retry(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<(StatusC
 }
 
 /// 리뷰 요청 (RequestReview → ReviewRequested). running Run과 in_progress 태스크가 함께 review로 간다
-#[utoipa::path(post, path = "/runs/{sn}/review", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "run_review", post, path = "/runs/{sn}/review", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
 async fn review(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Run>> {
     let out = event::run(&db, async |tx| {
         let out = Run::from(step(tx, sn, "review").await?);
@@ -215,7 +215,7 @@ async fn review(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Ru
 }
 
 /// 승인 (ApproveRun → RunApproved). Run은 completed, 태스크는 done
-#[utoipa::path(post, path = "/runs/{sn}/approve", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "run_approve", post, path = "/runs/{sn}/approve", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
 async fn approve(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Run>> {
     let out = event::run(&db, async |tx| {
         in_review(tx, sn).await?;
@@ -228,7 +228,7 @@ async fn approve(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<R
 }
 
 /// 반려 (RejectRun → RunRejected). Run은 failed(rejected), 태스크는 in_progress로 돌아가고 tbl_review에 반려가 쌓인다 (round = 반려 횟수). 재실행은 retry
-#[utoipa::path(post, path = "/runs/{sn}/reject", params(("sn" = i64, Path, description = "Run 번호")), request_body = RejectBody, responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "run_reject", post, path = "/runs/{sn}/reject", params(("sn" = i64, Path, description = "Run 번호")), request_body = RejectBody, responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
 async fn reject(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<RejectBody>) -> Res<Json<Run>> {
     let out = event::run(&db, async |tx| {
         in_review(tx, sn).await?;

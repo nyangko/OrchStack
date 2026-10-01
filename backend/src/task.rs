@@ -120,7 +120,7 @@ async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<Task> {
 }
 
 /// 프로젝트 태스크 목록 (Kanban용). `status`로 거르고 queue_sort → 번호순
-#[utoipa::path(get, path = "/projects/{sn}/tasks", params(("sn" = i64, Path, description = "프로젝트 번호"), ("status" = Option<String>, Query, description = "이 상태만")), responses((status = 200, body = Vec<Task>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "task_board", get, path = "/projects/{sn}/tasks", params(("sn" = i64, Path, description = "프로젝트 번호"), ("status" = Option<String>, Query, description = "이 상태만")), responses((status = 200, body = Vec<Task>), (status = "default", body = ErrorBody)))]
 async fn board(State(db): State<DatabaseConnection>, Sn(sn): Sn, Query(q): Query<std::collections::HashMap<String, String>>) -> Res<Json<Vec<Task>>> {
     let mut f = Tbl::find().filter(t::Column::ProjectSn.eq(sn));
     if let Some(s) = q.get("status") { f = f.filter(t::Column::Status.eq(s.as_str())); }
@@ -128,13 +128,13 @@ async fn board(State(db): State<DatabaseConnection>, Sn(sn): Sn, Query(q): Query
 }
 
 /// 이슈의 태스크 목록 (번호순)
-#[utoipa::path(get, path = "/issues/{sn}/tasks", params(("sn" = i64, Path, description = "이슈 번호")), responses((status = 200, body = Vec<Task>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "task_list", get, path = "/issues/{sn}/tasks", params(("sn" = i64, Path, description = "이슈 번호")), responses((status = 200, body = Vec<Task>), (status = "default", body = ErrorBody)))]
 async fn list(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Task>>> {
     Ok(Json(Tbl::find().filter(t::Column::IssueSn.eq(sn)).order_by_asc(t::Column::Num).all(&db).await?.into_iter().map(Task::from).collect()))
 }
 
 /// 태스크 생성 (CreateTask → TaskCreated). 이슈가 없으면 404
-#[utoipa::path(post, path = "/issues/{sn}/tasks", params(("sn" = i64, Path, description = "이슈 번호")), request_body = TaskNew, responses((status = 201, body = Task), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "task_create", post, path = "/issues/{sn}/tasks", params(("sn" = i64, Path, description = "이슈 번호")), request_body = TaskNew, responses((status = 201, body = Task), (status = "default", body = ErrorBody)))]
 async fn create(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<TaskNew>) -> Res<(StatusCode, Json<Task>)> {
     let priority = b.priority.map(prio).transpose()?;
     let out = event::run(&db, async |tx| {
@@ -152,13 +152,13 @@ async fn create(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
 }
 
 /// 1건 조회. 없으면 404
-#[utoipa::path(get, path = "/tasks/{sn}", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "task_read", get, path = "/tasks/{sn}", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
 async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Task>> {
     get(&db, sn).await.map(Json)
 }
 
 /// 부분 수정 (TaskUpdated). 상태는 못 바꾼다. 없으면 404
-#[utoipa::path(patch, path = "/tasks/{sn}", params(("sn" = i64, Path, description = "태스크 번호")), request_body = TaskPatch, responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "task_update", patch, path = "/tasks/{sn}", params(("sn" = i64, Path, description = "태스크 번호")), request_body = TaskPatch, responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
 async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<TaskPatch>) -> Res<Json<Task>> {
     b.priority.map(prio).transpose()?;
     let out = event::run(&db, async |tx| {
@@ -193,7 +193,7 @@ pub async fn shift(tx: &DatabaseTransaction, sn: i64, to: &str) -> Res<(Task, St
 }
 
 /// 상태 이동 (MoveTask → TaskMoved). 표에 없는 전이는 409, 없는 태스크는 404
-#[utoipa::path(post, path = "/tasks/{sn}/move", params(("sn" = i64, Path, description = "태스크 번호")), request_body = MoveBody, responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "task_mv", post, path = "/tasks/{sn}/move", params(("sn" = i64, Path, description = "태스크 번호")), request_body = MoveBody, responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
 async fn mv(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<MoveBody>) -> Res<Json<Task>> {
     let out = event::run(&db, async |tx| {
         let (out, from) = shift(tx, sn, &b.status).await?;
@@ -204,7 +204,7 @@ async fn mv(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Move
 }
 
 /// 삭제 (TaskDeleted). 성공 204, 없으면 404
-#[utoipa::path(delete, path = "/tasks/{sn}", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "task_remove", delete, path = "/tasks/{sn}", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
 async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusCode> {
     event::run(&db, async |tx| {
         let m = get(tx, sn).await?;
@@ -239,13 +239,13 @@ async fn set_member(db: &DatabaseConnection, sn: i64, member: Option<i64>) -> Re
 }
 
 /// 멤버 배정 (AssignAgent → AgentAssigned · assign_by = user). 없는 멤버 422, 보관된 멤버 409. Run은 만들지 않는다
-#[utoipa::path(post, path = "/tasks/{sn}/assign", params(("sn" = i64, Path, description = "태스크 번호")), request_body = AssignBody, responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "task_assign", post, path = "/tasks/{sn}/assign", params(("sn" = i64, Path, description = "태스크 번호")), request_body = AssignBody, responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
 async fn assign(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<AssignBody>) -> Res<Json<Task>> {
     set_member(&db, sn, Some(b.member_sn)).await.map(Json)
 }
 
 /// 배정 해제 (AgentUnassigned · member_sn = NULL)
-#[utoipa::path(delete, path = "/tasks/{sn}/assign", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "task_unassign", delete, path = "/tasks/{sn}/assign", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
 async fn unassign(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Task>> {
     set_member(&db, sn, None).await.map(Json)
 }

@@ -215,7 +215,7 @@ fn check(kind: Option<&str>, trust: Option<i64>) -> Res<()> {
 }
 
 /// 프로필 목록 (번호순). `kind`로 거른다
-#[utoipa::path(get, path = "/profiles", params(("kind" = Option<String>, Query, description = "이 종류만")), responses((status = 200, body = Vec<Profile>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_list", get, path = "/profiles", params(("kind" = Option<String>, Query, description = "이 종류만")), responses((status = 200, body = Vec<Profile>), (status = "default", body = ErrorBody)))]
 async fn list(State(db): State<DatabaseConnection>, Query(q): Query<std::collections::HashMap<String, String>>) -> Res<Json<Vec<Profile>>> {
     let mut f = Tbl::find();
     if let Some(k) = q.get("kind") { f = f.filter(p::Column::Kind.eq(k.as_str())); }
@@ -223,7 +223,7 @@ async fn list(State(db): State<DatabaseConnection>, Query(q): Query<std::collect
 }
 
 /// 프로필 생성 (ProfileCreated)
-#[utoipa::path(post, path = "/profiles", request_body = ProfileNew, responses((status = 201, body = Profile), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_create", post, path = "/profiles", request_body = ProfileNew, responses((status = 201, body = Profile), (status = "default", body = ErrorBody)))]
 async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ProfileNew>) -> Res<(StatusCode, Json<Profile>)> {
     let kind = b.kind.unwrap_or_else(|| "workspace".into());
     check(Some(&kind), None)?;
@@ -236,13 +236,13 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ProfileNew>)
 }
 
 /// 1건 조회. 없으면 404
-#[utoipa::path(get, path = "/profiles/{sn}", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Profile), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_read", get, path = "/profiles/{sn}", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Profile), (status = "default", body = ErrorBody)))]
 async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Profile>> {
     get(&db, sn).await.map(Json)
 }
 
 /// 부분 수정 (ProfileUpdated). 없으면 404
-#[utoipa::path(patch, path = "/profiles/{sn}", params(("sn" = i64, Path, description = "프로필 번호")), request_body = ProfilePatch, responses((status = 200, body = Profile), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_update", patch, path = "/profiles/{sn}", params(("sn" = i64, Path, description = "프로필 번호")), request_body = ProfilePatch, responses((status = 200, body = Profile), (status = "default", body = ErrorBody)))]
 async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<ProfilePatch>) -> Res<Json<Profile>> {
     check(None, b.trust_level)?;
     let out = event::run(&db, async |tx| {
@@ -272,7 +272,7 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
 }
 
 /// 삭제 (ProfileDeleted). 성공 204, 없으면 404, 멤버가 쓰는 중이면 409 (하위 설정은 CASCADE)
-#[utoipa::path(delete, path = "/profiles/{sn}", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_remove", delete, path = "/profiles/{sn}", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
 async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusCode> {
     event::run(&db, async |tx| {
         let m = get(tx, sn).await?;
@@ -283,7 +283,7 @@ async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusC
 }
 
 /// 하위 매핑 조회: 스킬 · MCP · 도구 정책 (편집은 별도 Task). 프로필이 없으면 404
-#[utoipa::path(get, path = "/profiles/{sn}/caps", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Caps), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_caps", get, path = "/profiles/{sn}/caps", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Caps), (status = "default", body = ErrorBody)))]
 async fn caps(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Caps>> {
     get(&db, sn).await?;
     let skills = ps::Entity::find().filter(ps::Column::ProfileSn.eq(sn)).order_by_asc(ps::Column::Sn).all(&db).await?
@@ -310,7 +310,7 @@ struct Fallback {
 }
 
 /// 폴백 체인 조회 (sort 순). 프로필이 없으면 404
-#[utoipa::path(get, path = "/profiles/{sn}/fallbacks", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Vec<Fallback>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_fallbacks", get, path = "/profiles/{sn}/fallbacks", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Vec<Fallback>), (status = "default", body = ErrorBody)))]
 async fn fallbacks(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Fallback>>> {
     get(&db, sn).await?;
     Ok(Json(fb::Entity::find().filter(fb::Column::ProfileSn.eq(sn)).order_by_asc(fb::Column::Sort).all(&db).await?.into_iter()
@@ -319,7 +319,7 @@ async fn fallbacks(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json
 }
 
 /// 폴백 체인 전체 교체 (ProfileUpdated). 배열 순서 = sort. 모르는 tier · 없는 실행기 · 연결 · 모델은 422, 프로필이 없으면 404
-#[utoipa::path(put, path = "/profiles/{sn}/fallbacks", params(("sn" = i64, Path, description = "프로필 번호")), request_body = Vec<Fallback>, responses((status = 200, body = Vec<Fallback>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_chain", put, path = "/profiles/{sn}/fallbacks", params(("sn" = i64, Path, description = "프로필 번호")), request_body = Vec<Fallback>, responses((status = 200, body = Vec<Fallback>), (status = "default", body = ErrorBody)))]
 async fn chain(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Vec<Fallback>>) -> Res<Json<Vec<Fallback>>> {
     if b.iter().any(|f| f.tier.as_deref().is_some_and(|t| !TIERS.contains(&t))) {
         return Err(Error::invalid(format!("tier must be one of {TIERS:?} or null")));
@@ -339,14 +339,14 @@ async fn chain(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<V
 }
 
 /// 템플릿 목록 (보관 제외 · sort → 번호순)
-#[utoipa::path(get, path = "/templates", responses((status = 200, body = Vec<Template>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_templates", get, path = "/templates", responses((status = 200, body = Vec<Template>), (status = "default", body = ErrorBody)))]
 async fn templates(State(db): State<DatabaseConnection>) -> Res<Json<Vec<Template>>> {
     Ok(Json(tp::Entity::find().filter(tp::Column::Status.ne("archived")).order_by_asc(tp::Column::Sort).order_by_asc(tp::Column::Sn)
         .all(&db).await?.into_iter().map(Template::from).collect()))
 }
 
 /// 템플릿 1건 조회. 없으면 404
-#[utoipa::path(get, path = "/templates/{sn}", params(("sn" = i64, Path, description = "템플릿 번호")), responses((status = 200, body = Template), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "agent_template", get, path = "/templates/{sn}", params(("sn" = i64, Path, description = "템플릿 번호")), responses((status = 200, body = Template), (status = "default", body = ErrorBody)))]
 async fn template(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Template>> {
     tp::Entity::find_by_id(sn).one(&db).await?.map(|m| Json(m.into())).ok_or_else(Error::not_found)
 }

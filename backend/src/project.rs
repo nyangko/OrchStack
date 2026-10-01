@@ -65,19 +65,19 @@ struct ProjectPatch {
 }
 
 /// 목록 (탭 순서 sort, 같으면 번호순)
-#[utoipa::path(get, path = "/projects", responses((status = 200, body = Vec<Project>), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "project_list", get, path = "/projects", responses((status = 200, body = Vec<Project>), (status = "default", body = ErrorBody)))]
 async fn list(State(db): State<DatabaseConnection>) -> Res<Json<Vec<Project>>> {
     Ok(Json(Tbl::find().order_by_asc(p::Column::Sort).order_by_asc(p::Column::Sn).all(&db).await?.into_iter().map(Project::from).collect()))
 }
 
 /// 1건 조회. 없으면 404
-#[utoipa::path(get, path = "/projects/{sn}", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 200, body = Project), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "project_read", get, path = "/projects/{sn}", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 200, body = Project), (status = "default", body = ErrorBody)))]
 async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Project>> {
     Tbl::find_by_id(sn).one(&db).await?.map(|m| Json(m.into())).ok_or_else(Error::not_found)
 }
 
 /// 생성 후 DB 기본값까지 채운 행을 201로 돌려준다
-#[utoipa::path(post, path = "/projects", request_body = ProjectNew, responses((status = 201, body = Project), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "project_create", post, path = "/projects", request_body = ProjectNew, responses((status = 201, body = Project), (status = "default", body = ErrorBody)))]
 async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ProjectNew>) -> Res<(StatusCode, Json<Project>)> {
     let m = p::ActiveModel {
         wid: Set(crate::WID),
@@ -94,7 +94,7 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ProjectNew>)
 }
 
 /// 부분 수정 후 최신 행을 돌려준다. 없으면 404
-#[utoipa::path(patch, path = "/projects/{sn}", params(("sn" = i64, Path, description = "프로젝트 번호")), request_body = ProjectPatch, responses((status = 200, body = Project), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "project_update", patch, path = "/projects/{sn}", params(("sn" = i64, Path, description = "프로젝트 번호")), request_body = ProjectPatch, responses((status = 200, body = Project), (status = "default", body = ErrorBody)))]
 async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<ProjectPatch>) -> Res<Json<Project>> {
     // update_at은 항상 갱신하고, 나머지는 요청에 있는 필드만 SET에 추가한다
     let mut q = Tbl::update_many().filter(p::Column::Sn.eq(sn)).col_expr(p::Column::UpdateAt, Expr::cust("datetime('now')"));
@@ -112,7 +112,7 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
 }
 
 /// 삭제. 성공 204, 없으면 404 (하위 데이터는 스키마의 ON DELETE 규칙을 따른다)
-#[utoipa::path(delete, path = "/projects/{sn}", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
+#[utoipa::path(operation_id = "project_remove", delete, path = "/projects/{sn}", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
 async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusCode> {
     match Tbl::delete_by_id(sn).exec(&db).await?.rows_affected {
         0 => Err(Error::not_found()),
