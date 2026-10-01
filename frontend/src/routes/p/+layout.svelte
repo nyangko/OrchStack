@@ -20,28 +20,22 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { FieldRow, FieldSwitchRow } from '$lib/components/ui/field';
-	import { repos, type OrchPolicy, type ProjectTab } from '$lib/mock';
+	import { repos, type OrchPolicy } from '$lib/mock';
 	import { onMount } from 'svelte';
 	import { useMock } from '$lib/api/env';
 	import { api } from '$lib/api/client';
-	import type { ApiProject } from '$lib/api/types';
 	import { roles } from '$lib/roles';
-	import { store, teamsLoad, loadTeams } from '$lib/teams.svelte';
+	import { store, teamsLoad, loadTeams, loadProjects, projectTab } from '$lib/teams.svelte';
 	
 	let { children } = $props();
 
 	// 열린 탭은 화면 상태(서버에 저장하지 않음). 닫아도 프로젝트는 그대로다.
 	let open = $state(store.projects.map((p) => p.sn));
 	/// 서버 행 → 탭. dot은 상태색 (실행 중 여부는 #88 뒤에).
-	const toTab = (p: ApiProject): ProjectTab => ({ sn: p.sn, name: p.name, status: p.status, dot: p.status === 'active' ? 'bg-success' : 'bg-subtle-foreground' });
 	// 서버 모드면 프로젝트 목록을 API에서 — 탭 · All Projects · Workbench가 같은 목록(store.projects)을 본다
 	onMount(async () => {
 		if (useMock) return;
-		const { data } = await api.GET('/projects');
-		if (data) {
-			store.projects = data.map(toTab);
-			open = store.projects.map((p) => p.sn);
-		}
+		if (await loadProjects()) open = store.projects.map((p) => p.sn);
 	});
 	const tabs = $derived(store.projects.filter((p) => open.includes(p.sn)));
 	const current = $derived(Number(page.params.project));
@@ -105,7 +99,7 @@
 			const { data } = await api.POST('/projects', { body: { name: name.trim(), repo_name: repo, team_sn: team?.sn } }).catch(() => ({ data: undefined }));
 			submitting = false;
 			if (!data) return;
-			store.projects.push(toTab(data));
+			store.projects.push(projectTab(data));
 			sn = data.sn;
 		}
 		open.push(sn);

@@ -28,10 +28,12 @@ import type { Role } from "$lib/roles";
 import { useMock } from "$lib/api/env";
 import { api, failureOf } from "$lib/api/client";
 import { roleOf } from "$lib/project.svelte";
-import type { ApiMember } from "$lib/api/types";
+import type { ApiMember, ApiProject, ApiTask } from "$lib/api/types";
+import { ago } from "$lib/time";
+import { statuses, type TaskStatus } from "$lib/status";
 import type { Runtime } from "$lib/components/orch/runtime-logo";
 import type { MdFile } from "$lib/components/orch/md-editor";
-import { projects, teams, templates, orchPolicy, skillLibrary, skillSources, skillLog, accounts, mcpServers, teamPolicy, type AgentConfig, type OrchPolicy, type TeamMember, type Team, type SpawnMode, type Template, type Skill, type SkillHit } from "$lib/mock";
+import { projects, teams, templates, orchPolicy, skillLibrary, skillSources, skillLog, accounts, mcpServers, teamPolicy, type AgentConfig, type OrchPolicy, type TeamMember, type Team, type SpawnMode, type Task, type ProjectTab, type Template, type Skill, type SkillHit } from "$lib/mock";
 
 export const store = $state({
 	/// 프로젝트 탭 (새 프로젝트를 만들면 늘어난다).
@@ -175,4 +177,29 @@ export async function saveTeamSpawn(teamSn: number, spawn: OrchPolicy["spawn"]):
 	const res = await api.PATCH("/teams/{sn}", { params: { path: { sn: teamSn } }, body: { spawn_mode: spawn.mode, spawn_allow: spawn.allow.join(","), max_child_run: Number(spawn.maxChild) } }).catch(() => undefined);
 	if (!res) return "서버에 연결할 수 없어요";
 	return res.error ? failureOf(res.error).message : undefined;
+}
+
+/// 프로젝트 행 → 탭. 탭 · All Projects · Workbench · Tasks가 같은 목록(store.projects)을 본다.
+export const projectTab = (p: ApiProject): ProjectTab => ({ sn: p.sn, name: p.name, status: p.status, dot: p.status === "active" ? "bg-success" : "bg-subtle-foreground" });
+
+/// 서버 모드 프로젝트 목록. 실패하면 false (토스트는 클라이언트).
+export async function loadProjects(): Promise<boolean> {
+	if (useMock) return true;
+	const res = await api.GET("/projects").catch(() => undefined);
+	if (!res?.data) return false;
+	store.projects = res.data.map(projectTab);
+	return true;
+}
+
+/// 모든 프로젝트의 태스크 (A-3 #94) — 전체 목록 API(#89)가 없어 프로젝트별 목록을 합친다. 이슈 번호 · 진행 · 메시지 수는 아직 빈 값.
+export async function loadAllTasks(): Promise<(Task & { project: number })[] | undefined> {
+	const view = (t: ApiTask): Task & { project: number } => ({
+		sn: t.sn, num: t.num, project: t.project_sn, title: t.title, description: t.description,
+		status: (t.status in statuses ? t.status : "todo") as TaskStatus,
+		priority: `P${Math.min(3, Math.max(0, t.priority))}` as Task["priority"],
+		agent: t.member_sn ?? undefined, issue: 0, steps: [0, 0], messages: 0, updated: ago(t.update_at)
+	});
+	const lists = await Promise.all(store.projects.map((p) => api.GET("/projects/{sn}/tasks", { params: { path: { sn: p.sn } } }).then((r) => r.data).catch(() => undefined)));
+	if (lists.some((l) => !l)) return;
+	return lists.flatMap((l) => (l ?? []).map(view));
 }

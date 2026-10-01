@@ -36,11 +36,26 @@
 	import { statuses, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
 	import { tasks, projectTasks, decisions, type Task } from '$lib/mock';
-	import { store, glyphOf } from '$lib/teams.svelte';
+	import { store, glyphOf, teamsLoad, loadTeams, loadProjects, loadAllTasks } from '$lib/teams.svelte';
+	import { useMock } from '$lib/api/env';
+	import { onMount } from 'svelte';
 	
-	// 모든 프로젝트의 태스크. OrchStack 목데이터는 project가 없어 1로 채운다 (서버 연결은 #44).
-	const all: (Task & { project: number })[] = [...tasks, ...projectTasks].map((t) => ({ ...t, project: t.project ?? 1 }));
-	const pending = new Set(decisions.filter((d) => !d.decided).map((d) => d.task));
+	// 모든 프로젝트의 태스크. 목데이터는 OrchStack이 project가 없어 1로 채운다. 서버 모드는 프로젝트별 목록을 합친다(A-3 · 전체 API #89 대기).
+	let all = $state<(Task & { project: number })[]>(useMock ? [...tasks, ...projectTasks].map((t) => ({ ...t, project: t.project ?? 1 })) : []);
+	let loadState = $state<'loading' | 'ready' | 'error'>(useMock ? 'ready' : 'loading');
+	async function load() {
+		loadState = 'loading';
+		if (teamsLoad.state !== 'ready') await loadTeams();
+		const list = (await loadProjects()) ? await loadAllTasks() : undefined;
+		if (!list) return void (loadState = 'error');
+		all = list;
+		loadState = 'ready';
+	}
+	onMount(() => {
+		if (!useMock) void load();
+	});
+	// 판단 대기 태스크 — 서버 판단 API(#49) 전에는 서버 모드에서 비운다.
+	const pending = new Set(useMock ? decisions.filter((d) => !d.decided).map((d) => d.task) : []);
 	/// 담당 — 모든 팀 멤버에서 찾는다.
 	const memberOf = (sn?: number) => store.crew.flatMap((t) => t.members).find((m) => m.sn === sn);
 	const teamOf = (project: string) => store.crew.find((t) => t.project === project);
@@ -125,12 +140,12 @@
 	const heading = $derived(
 		f.project ? store.projects.find((p) => p.sn === f.project)!.name : `${[...views, ...saved].find((v) => v.key === view)?.label ?? '전체'}${view === 'all' ? ' 태스크' : ''}`
 	);
-	const assignees = [...new Set(all.map((t) => t.agent).filter((sn) => sn !== undefined))].map((sn) => memberOf(sn)!).filter(Boolean);
+	const assignees = $derived([...new Set(all.map((t) => t.agent).filter((sn) => sn !== undefined))].map((sn) => memberOf(sn)!).filter(Boolean));
 
-	const inProgress = all.filter((t) => t.status === 'in_progress');
-	const blockedList = all.filter((t) => t.status === 'blocked');
-	const reviewList = all.filter((t) => t.status === 'review');
-	const doneList = all.filter((t) => t.status === 'done');
+	const inProgress = $derived(all.filter((t) => t.status === 'in_progress'));
+	const blockedList = $derived(all.filter((t) => t.status === 'blocked'));
+	const reviewList = $derived(all.filter((t) => t.status === 'review'));
+	const doneList = $derived(all.filter((t) => t.status === 'done'));
 </script>
 
 <svelte:head><title>Tasks · OrchStack</title></svelte:head>
@@ -252,7 +267,21 @@
 			</DropdownMenu>
 		</div>
 
-		{#if groups.length}
+		{#if loadState !== 'ready'}
+			<!-- 서버 모드 불러오기 -->
+			<Empty class="card py-16 rounded-lg">
+				<EmptyHeader>
+					{#if loadState === 'error'}
+						<EmptyTitle>태스크를 불러오지 못했어요</EmptyTitle>
+						<EmptyDescription>서버 연결을 확인하고 다시 시도하세요.</EmptyDescription>
+					{:else}
+						<EmptyMedia variant="icon"><LoaderCircle class="animate-spin" /></EmptyMedia>
+						<EmptyTitle>태스크를 불러오는 중…</EmptyTitle>
+					{/if}
+				</EmptyHeader>
+				{#if loadState === 'error'}<EmptyContent><Button variant="outline" onclick={load}>다시 시도</Button></EmptyContent>{/if}
+			</Empty>
+		{:else if groups.length}
 			<div class="card overflow-hidden rounded-lg">
 				<div class="flex h-9 items-center gap-3 bg-muted px-4 text-caption font-medium text-muted-foreground">
 					<span class="w-3.5"></span><span class="w-12">ID</span><span class="flex-1">Title</span><span class="w-28">Status</span><span class="w-36">Progress</span><span class="w-60">담당</span><span class="w-16 text-right">Updated</span>
