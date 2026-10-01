@@ -10,7 +10,7 @@ use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 /// 허용되는 하위 작업 모델 등급 (#67)
-const TIERS: [&str; 3] = ["S", "M", "L"];
+pub(crate) const TIERS: [&str; 3] = ["S", "M", "L"];
 
 /// 허용되는 프로필 소유 종류
 const KINDS: [&str; 3] = ["workspace", "template", "member"];

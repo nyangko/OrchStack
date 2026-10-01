@@ -13,7 +13,7 @@ const KINDS: [&str; 2] = ["orch", "project"];
 /// 허용되는 멤버 상태
 const STATUS: [&str; 5] = ["running", "waiting", "idle", "paused", "archived"];
 /// 허용되는 하위 작업 방식 (#67)
-const SPAWN: [&str; 3] = ["sub", "fork", "runner"];
+pub(crate) const SPAWN: [&str; 3] = ["sub", "fork", "runner"];
 
 /// team · member 관련 경로 묶음
 pub fn routes() -> OpenApiRouter<DatabaseConnection> {

@@ -8,6 +8,7 @@ mod event; // 명령 실행 틀 (상태 변경 + 이벤트 append + 발행)
 mod issue; // /issues CRUD
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
+mod rule; // 하위 작업 규칙 엔진 (#67 · LLM 0)
 mod task; // /tasks CRUD + MoveTask + 배정
 mod team; // /teams · /members CRUD
 
