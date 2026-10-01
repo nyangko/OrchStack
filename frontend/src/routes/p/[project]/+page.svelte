@@ -45,7 +45,13 @@
 	import * as Bubble from '$lib/components/ui/bubble';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { untrack } from 'svelte';
+	import { untrack, onDestroy } from 'svelte';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import { toast } from 'svelte-sonner';
+	import { useMock } from '$lib/api/env';
+	import type { ApiRun } from '$lib/api/types';
+	import { ago } from '$lib/time';
+	import { project as wb, openProject, closeProject, viewTasks, viewIssues, viewAgents, moveTask, runsOf, stopRun } from '$lib/project.svelte';
 	import { SvelteFlow, Background, BackgroundVariant, Controls, Panel, MarkerType, type Node, type Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import DiagramNode, { type DiagramNodeData } from '$lib/components/orch/diagram/diagram-node.svelte';
@@ -90,8 +96,26 @@
 
 	const project = $derived(store.projects.find((p) => p.sn === Number(page.params.project)));
 
-	// 태스크 목록은 페이지가 소유한다 (Kanban 이동 · Quick Panel이 같은 목록을 본다). 서버 연결은 #59.
-	let list = $state(tasks.map((t) => ({ ...t })));
+	// 태스크 · 이슈 · 에이전트 — 목데이터 모드(VITE_MOCK=1)면 화면 안에서만 바꾸고, 아니면 프로젝트 스토어(snapshot + SSE)를 본다.
+	let local = $state(tasks.map((t) => ({ ...t })));
+	const list = $derived(useMock ? local : viewTasks());
+	const issueList = $derived(useMock ? issues : viewIssues());
+	const agentList = $derived(useMock ? agents : viewAgents());
+	// 프로젝트가 바뀌면 그 프로젝트의 snapshot · 스트림으로 갈아탄다
+	$effect(() => {
+		const sn = Number(page.params.project);
+		if (!useMock && sn) void openProject(sn);
+	});
+	onDestroy(closeProject);
+	/// 상태 변경 = 서버 command(POST /tasks/{sn}/move). 막힌 전이(409)는 문구로 알리고 화면은 서버 값으로 돌아간다.
+	async function setStatus(num: number, status: TaskStatus) {
+		if (useMock) {
+			local.find((t) => t.num === num)!.status = status;
+			return;
+		}
+		const err = await moveTask(num, status);
+		if (err) toast.warning(err);
+	}
 
 	// 뷰는 URL(?view=)에 둔다 — 새로고침 · 링크 공유 시 유지. 기본은 Kanban (#18).
 	const views = [
@@ -129,7 +153,7 @@
 		issueSel = undefined;
 	}
 	const count = (s: TaskStatus) => list.filter((t) => t.status === s).length;
-	const agentName = (sn?: number) => agents.find((a) => a.sn === sn)?.name;
+	const agentName = (sn?: number) => agentList.find((a) => a.sn === sn)?.name;
 	const shown = $derived(
 		list.filter(
 			(t) =>
@@ -139,7 +163,7 @@
 	);
 
 	// Kanban (.pen #26 Workbench / Kanban Board) — 상태별 열. Failed 열은 해당 태스크가 있을 때만.
-	const agentOf = (sn?: number) => agents.find((a) => a.sn === sn);
+	const agentOf = (sn?: number) => agentList.find((a) => a.sn === sn);
 	const task = (num: number) => list.find((t) => t.num === num)!;
 	const lanes = $derived(statusOrder.filter((s) => s !== 'failed' || count(s) > 0));
 	// 드래그 중 열 배치는 따로 두고, 놓을 때 태스크 상태에 반영한다.
@@ -147,14 +171,14 @@
 	$effect.pre(() => {
 		board = Object.fromEntries(statusOrder.map((s) => [s, list.filter((t) => t.status === s).map((t) => t.num)]));
 	});
-	/// 놓은 열을 태스크 상태로 반영한다. (서버 command 호출은 #59)
+	/// 놓은 열을 태스크 상태로 반영한다 — 바뀐 태스크만 command.
 	function drop() {
-		for (const [s, nums] of Object.entries(board)) for (const n of nums) task(n).status = s as TaskStatus;
+		for (const [s, nums] of Object.entries(board)) for (const n of nums) if (task(n).status !== s) void setStatus(n, s as TaskStatus);
 	}
 
 	// Issue Board (.pen #26 Workbench / Issue Board) — 이슈 → 하위 이슈 → 태스크 트리.
-	const issueOf = (num: number) => issues.find((i) => i.num === num);
-	const subIssues = (num: number) => issues.filter((i) => i.parent === num);
+	const issueOf = (num: number) => issueList.find((i) => i.num === num);
+	const subIssues = (num: number) => issueList.filter((i) => i.parent === num);
 	const tasksOf = (num: number) => list.filter((t) => t.issue === num);
 	/// 하위 이슈까지 포함한 태스크.
 	const allTasks = (num: number): typeof list => [...tasksOf(num), ...subIssues(num).flatMap((i) => allTasks(i.num))];
@@ -233,7 +257,7 @@
 			meta: t.run ? `Run ${t.run}` : t.priority,
 			menu: [
 				{ label: '상세 보기', onSelect: () => open(t.num) },
-				...statusOrder.filter((st) => st !== t.status && st !== 'waiting').map((st) => ({ label: `→ ${statuses[st].label}`, onSelect: () => (task(num).status = st) }))
+				...statusOrder.filter((st) => st !== t.status && st !== 'waiting').map((st) => ({ label: `→ ${statuses[st].label}`, onSelect: () => void setStatus(num, st) }))
 			]
 		};
 	}
@@ -252,10 +276,12 @@
 			meta: lead.length ? `sub-run ${lead.length} · ctx ${ctx}` : `ctx ${ctx}`
 		};
 	}
-	const diagramTasks = [128, 129, 130, 131];
+	const diagramTasks = $derived(useMock ? [128, 129, 130, 131] : list.map((t) => t.num));
 	// #131은 소라보다 조금 위 — 완료 보고 선(소라 아래 → Orch)의 라벨이 카드에 가리지 않게
 	const taskY = [0, 228, 457, 630];
-	let nodes = $state.raw<(Node<DiagramNodeData> | Node<SubRun>)[]>([
+	/// 목데이터 배치 (.pen Diagram 그대로).
+	function mockNodes(): (Node<DiagramNodeData> | Node<SubRun>)[] {
+		return [
 		{ id: 'project', type: 'diagram', position: { x: col[0], y: 0 }, data: { kind: 'project', ref: 'PROJECT', title: 'OrchStack', badge: 'Active', meta: 'Core Team' } },
 		{ id: 'issue-51', type: 'diagram', position: { x: col[0], y: 360 }, data: { kind: 'issue', ref: 'ISSUE #51', title: 'Authentication Flow 개선', progress: { value: 29, text: '86K / 300K tok' }, badge: 'In Progress' } },
 		{ id: 'orch', type: 'diagram', position: { x: col[0], y: 140 }, data: { kind: 'orch', ref: 'ORCH · PM', title: 'Orch', who: { role: 'orch', name: 'Project Manager', runtime: 'claude', model: 'claude-opus-5.5' }, alert: { text: '판단 대기 3 · 제안 4초 후 진행', tone: 'warning' }, badge: 'Auto · 5초', meta: '자동 3/10' } },
@@ -265,7 +291,20 @@
 		})),
 		// 진(#129)의 하위 작업 — 2열 · 행마다 리드 옆부터
 		...subRuns.map((s, i) => ({ id: `sub-${s.id}`, type: 'subrun', position: { x: col[3 + (i % 2)], y: 228 + Math.floor(i / 2) * 190 }, data: s }))
-	]);
+		];
+	}
+	/// 서버 데이터 배치: 1열 프로젝트 · Orch · 이슈, 2열 태스크, 3열 멤버. 사용자 배치 저장은 #89.
+	function liveNodes(): Node<DiagramNodeData>[] {
+		const top = issueList.filter((i) => !i.parent);
+		return [
+			{ id: 'project', type: 'diagram', position: { x: col[0], y: 0 }, data: { kind: 'project', ref: 'PROJECT', title: project?.name ?? '', badge: project?.status ?? '', meta: team.name } },
+			{ id: 'orch', type: 'diagram', position: { x: col[0], y: 140 }, data: { kind: 'orch', ref: 'ORCH · PM', title: 'Orch', who: { role: 'orch', name: 'Project Manager', runtime: 'claude' }, badge: 'Auto', meta: '' } },
+			...top.map((i, k) => ({ id: `issue-${i.num}`, type: 'diagram', position: { x: col[0], y: 360 + k * 170 }, data: { kind: 'issue', ref: `ISSUE #${i.num}`, title: i.title, badge: issueLabel[i.status], meta: `tasks ${allTasks(i.num).length}` } as DiagramNodeData })),
+			...diagramTasks.map((n, k) => ({ id: `task-${n}`, type: 'diagram', position: { x: col[1], y: k * 200 }, data: taskData(n) })),
+			...agentList.map((a, k) => ({ id: `agent-${a.sn}`, type: 'diagram', position: { x: col[2], y: k * 200 }, data: agentData(a.sn, '—') }))
+		];
+	}
+	let nodes = $state.raw<(Node<DiagramNodeData> | Node<SubRun>)[]>(useMock ? mockNodes() : []);
 	// 연결선 종류별 색 (.pen Workbench/EdgeLegend). 라벨은 .pen EdgeLabel 칩 모양.
 	const stroke = { contains: 'var(--input)', delegate: 'var(--primary)', assigned: 'var(--node-agent)', idle: 'var(--status-review)', live: 'var(--primary)', spawn: 'var(--node-agent)', waits: 'var(--subtle-foreground)' };
 	const chip = (live = false) =>
@@ -282,7 +321,9 @@
 			labelStyle: label ? chip(kind === 'live') : undefined
 		};
 	}
-	let edges = $state.raw<Edge[]>([
+	/// 목데이터 연결선.
+	function mockEdges(): Edge[] {
+		return [
 		link('e-p-o', 'project', 'orch', 'contains', 'PM', ['b', 't']),
 		link('e-o-i', 'orch', 'issue-51', 'delegate', '위임', ['b', 't']),
 		...diagramTasks.map((n) => link(`e-i-${n}`, 'issue-51', `task-${n}`, 'contains')),
@@ -295,7 +336,34 @@
 		link('e-report', 'agent-4', 'orch', 'idle', '완료 보고', ['b', 'l']),
 		...subRuns.map((s, i) => link(`e-spawn-${s.id}`, `agent-${s.lead}`, `sub-${s.id}`, 'spawn', i ? undefined : 'spawn', ['r', 'l'], s.mode !== 'runner')),
 		...subRuns.filter((s) => s.waits).map((s) => link(`e-waits-${s.id}`, `sub-${s.id}`, `sub-${s.waits!.id}`, 'waits', `queued · waits ${s.waits!.id} · ${s.waits!.glob}`, ['t', 'b'], true))
-	]);
+		];
+	}
+	/// 서버 데이터 연결선: 프로젝트→Orch, Orch→이슈(위임), 이슈→태스크(포함), 태스크→담당(배정).
+	function liveEdges(): Edge[] {
+		return [
+			link('e-p-o', 'project', 'orch', 'contains', 'PM', ['b', 't']),
+			...issueList.filter((i) => !i.parent).map((i) => link(`e-o-${i.num}`, 'orch', `issue-${i.num}`, 'delegate', undefined, ['b', 't'])),
+			...list.filter((t) => t.issue).map((t) => link(`e-i-${t.num}`, `issue-${topIssue(t.issue)}`, `task-${t.num}`, 'contains')),
+			...list.filter((t) => t.agent !== undefined && agentOf(t.agent)).map((t) => link(`e-${t.num}`, `task-${t.num}`, `agent-${t.agent}`, 'assigned'))
+		];
+	}
+	/// 하위 이슈의 태스크는 최상위 이슈 노드에 단다 (이슈 노드는 최상위만 그린다).
+	function topIssue(num: number): number {
+		const i = issueOf(num);
+		return i?.parent ? topIssue(i.parent) : num;
+	}
+	let edges = $state.raw<Edge[]>(useMock ? mockEdges() : []);
+	// 서버 모드: 태스크 · 이슈 · 멤버 구성이 바뀌면 다시 배치한다 (같은 id는 자리를 유지).
+	$effect(() => {
+		if (useMock) return;
+		const key = [list.map((t) => `${t.num}:${t.agent}:${t.issue}`).join(), issueList.map((i) => `${i.num}:${i.parent}`).join(), agentList.map((a) => a.sn).join()].join('|');
+		untrack(() => {
+			void key;
+			const pos = new Map(nodes.map((n) => [n.id, n.position]));
+			nodes = liveNodes().map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }));
+			edges = liveEdges();
+		});
+	});
 	// 태스크 상태 · 선택이 바뀌면 노드에 반영한다 (위치는 유지).
 	$effect(() => {
 		const sel = selected;
@@ -321,6 +389,18 @@
 	let details = $state(structuredClone(taskDetails));
 	const cur = $derived(detail && selected !== undefined ? list.find((t) => t.num === selected) : undefined);
 	const info = $derived(cur ? details[cur.num] : undefined);
+	// Run 목록 — 목데이터는 상세에 있고, 서버는 상세를 열 때 GET /tasks/{sn}/runs. 토큰은 #88 뒤에.
+	let apiRuns = $state<ApiRun[]>([]);
+	$effect(() => {
+		const n = cur?.num;
+		apiRuns = [];
+		if (!useMock && n !== undefined) runsOf(n).then((r) => (apiRuns = r));
+	});
+	const activeRun = ['queued', 'starting', 'running', 'waiting', 'review'];
+	const liveRun = $derived(apiRuns.find((r) => activeRun.includes(r.status)));
+	const runs = $derived(
+		info?.runs ?? apiRuns.map((r) => ({ num: r.num, note: r.result_summary ? `${r.status} · ${r.result_summary}` : r.status, time: ago(r.start_at ?? r.create_at), tokens: '—', live: activeRun.includes(r.status) }))
+	);
 	/// 이 태스크 · 이슈를 PM Dock 대화로 넘긴다 (.pen "Ask PM about this"). ref 예: "Task #129".
 	function askPm(ref: string) {
 		dockOpen = true;
@@ -582,7 +662,7 @@
 					</Tabs.Content>
 
 					<Tabs.Content value="agents" class="min-h-0 flex-1 overflow-y-auto">
-						{#each agents as a (a.sn)}
+						{#each agentList as a (a.sn)}
 							<button type="button" aria-pressed={inspect === a.sn} onclick={() => openAgent(a.sn)} class={cn('flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left outline-none hover:bg-muted focus-visible:bg-muted', inspect === a.sn && 'bg-primary-soft hover:bg-primary-soft')}>
 								<RoleAvatar role={a.role}>
 									<Avatar.Badge class={a.online ? 'bg-success' : 'bg-subtle-foreground'} aria-label={a.online ? '온라인' : '오프라인'} />
@@ -616,8 +696,16 @@
 					</Tabs.List>
 				</Tabs.Root>
 				<p class="min-w-0 flex-1 truncate text-body text-muted-foreground">
-					{project.name} · {list.length} tasks · {agents.length} agents
+					{project.name} · {list.length} tasks · {agentList.length} agents
 				</p>
+				{#if !useMock && wb.state !== 'live'}
+					<Badge variant={wb.state === 'error' ? 'destructive' : 'secondary'} class="gap-1" role="status" data-testid="stream-state">
+						{#if wb.state === 'error'}연결 실패{:else}<LoaderCircle class="size-3 animate-spin" />{wb.state === 'reconnecting' ? '재연결 중' : '불러오는 중'}{/if}
+					</Badge>
+					{#if wb.state === 'error'}
+						<Button variant="outline" size="xs" onclick={() => (closeProject(), void openProject(Number(page.params.project)))}>다시 시도</Button>
+					{/if}
+				{/if}
 				{#if !dockOpen}
 					<Button variant="ghost" size="icon-sm" aria-label="PM Dock 펼치기" onclick={() => (dockOpen = true)}><PanelRightOpen /></Button>
 				{/if}
@@ -747,7 +835,7 @@
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
-							{#each issues.filter((i) => !i.parent) as i (i.num)}
+							{#each issueList.filter((i) => !i.parent) as i (i.num)}
 								{@render issueRow(i, 0)}
 							{/each}
 						</Table.Body>
@@ -777,7 +865,7 @@
 								<Button variant="ghost" size="sm" onclick={() => navigator.clipboard?.writeText(`${page.url.origin}${page.url.pathname}?task=${cur.num}`)}><Link2 />Copy link</Button>
 							{#snippet sub()}
 							<div class="flex flex-wrap items-center gap-2 pl-11">
-								<StatusSelect bind:value={() => cur.status, (v) => (task(cur.num).status = v)} />
+								<StatusSelect bind:value={() => cur.status, (v) => void setStatus(cur.num, v)} />
 								<Badge variant="outline">{cur.priority}</Badge>
 								{#if a}
 									<span class="flex items-center gap-1.5 text-xs">
@@ -787,10 +875,11 @@
 										{#if cur.model}<Badge variant="mono" class="text-2xs">{a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'} · {cur.model}</Badge>{/if}
 									</span>
 								{/if}
-								{#if cur.run}<span class="text-xs text-muted-foreground">Run {cur.run}</span>{/if}
+								{#if cur.run}<span class="text-xs text-muted-foreground">Run {cur.run}</span>{:else if liveRun}<span class="text-xs text-muted-foreground">Run #{liveRun.num}</span>{/if}
 								<span class="flex-1"></span>
 								<Button variant="ghost" size="icon-sm" class="bg-warning-soft text-warning" aria-label="일시정지"><Pause /></Button>
-								<Button variant="ghost" size="icon-sm" class="bg-destructive-soft text-destructive" aria-label="중지"><Square /></Button>
+								<!-- 중지 = POST /runs/{sn}/stop · 진행 중 Run이 있을 때만 -->
+								<Button variant="ghost" size="icon-sm" class="bg-destructive-soft text-destructive" aria-label="중지" disabled={!useMock && !liveRun} onclick={() => liveRun && stopRun(liveRun.sn).then((e) => e && toast.warning(e))}><Square /></Button>
 								<Button variant="ghost" size="sm" onclick={() => askPm(`Task #${cur.num}`)}><MessageCircleQuestion />Ask PM about this</Button>
 							</div>
 							{#if info?.decision}
@@ -810,7 +899,7 @@
 							<div class="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-5">
 								<section class="flex flex-col gap-2">
 									<h3 class="text-body font-semibold">Description</h3>
-									<p class="text-body leading-relaxed">{info?.description ?? '설명이 없어요.'}</p>
+									<p class="text-body leading-relaxed">{info?.description ?? cur.description ?? '설명이 없어요.'}</p>
 								</section>
 								<section class="flex flex-col gap-1">
 									<h3 class="text-body font-semibold">Acceptance criteria</h3>
@@ -836,10 +925,10 @@
 										{/each}
 									</section>
 								{/if}
-								{#if info?.runs.length}
+								{#if runs.length}
 									<section class="flex flex-col">
 										<h3 class="mb-1 text-body font-semibold">Runs</h3>
-										{#each info.runs as r (r.num)}
+										{#each runs as r (r.num)}
 											<Item.Root variant="row" size="xs">
 												<Item.Content>
 													<Item.Title>Run #{r.num} {#if r.live}<span class="size-1.5 rounded-full bg-success" aria-label="진행 중"></span>{/if}</Item.Title>

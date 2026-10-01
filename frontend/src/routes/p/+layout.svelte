@@ -20,7 +20,11 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Segmented } from '$lib/components/ui/segmented';
 	import * as Field from '$lib/components/ui/field';
-	import { repos, type OrchPolicy } from '$lib/mock';
+	import { repos, type OrchPolicy, type ProjectTab } from '$lib/mock';
+	import { onMount } from 'svelte';
+	import { useMock } from '$lib/api/env';
+	import { api } from '$lib/api/client';
+	import type { ApiProject } from '$lib/api/types';
 	import { roles } from '$lib/roles';
 	import { store } from '$lib/teams.svelte';
 	import { cn } from '$lib/utils';
@@ -29,6 +33,17 @@
 
 	// 열린 탭은 화면 상태(서버에 저장하지 않음). 닫아도 프로젝트는 그대로다.
 	let open = $state(store.projects.map((p) => p.sn));
+	/// 서버 행 → 탭. dot은 상태색 (실행 중 여부는 #88 뒤에).
+	const toTab = (p: ApiProject): ProjectTab => ({ sn: p.sn, name: p.name, status: p.status, dot: p.status === 'active' ? 'bg-success' : 'bg-subtle-foreground' });
+	// 서버 모드면 프로젝트 목록을 API에서 — 탭 · All Projects · Workbench가 같은 목록(store.projects)을 본다
+	onMount(async () => {
+		if (useMock) return;
+		const { data } = await api.GET('/projects');
+		if (data) {
+			store.projects = data.map(toTab);
+			open = store.projects.map((p) => p.sn);
+		}
+	});
 	const tabs = $derived(store.projects.filter((p) => open.includes(p.sn)));
 	const current = $derived(Number(page.params.project));
 
@@ -75,12 +90,23 @@
 		goto(page.url.pathname, { replaceState: true });
 	});
 
-	/// 만들면 탭을 열고 그 Workbench로 간다 (목데이터 · 서버 연결은 #59).
-	function create(e: SubmitEvent) {
+	let submitting = $state(false);
+	/// 만들면 탭을 열고 그 Workbench로 간다. 서버 모드는 POST /projects — 실패하면 입력을 그대로 둔다(토스트는 클라이언트가). 팀 · 진행 방식 · 이슈 가져오기는 A-3 · #89 뒤에 보낸다.
+	async function create(e: SubmitEvent) {
 		e.preventDefault();
-		if (!name.trim() || nameTaken) return;
-		const sn = Math.max(0, ...store.projects.map((p) => p.sn)) + 1;
-		store.projects.push({ sn, name: name.trim(), status: 'active', dot: firstPlan ? 'bg-status-waiting' : 'bg-subtle-foreground' });
+		if (!name.trim() || nameTaken || submitting) return;
+		let sn: number;
+		if (useMock) {
+			sn = Math.max(0, ...store.projects.map((p) => p.sn)) + 1;
+			store.projects.push({ sn, name: name.trim(), status: 'active', dot: firstPlan ? 'bg-status-waiting' : 'bg-subtle-foreground' });
+		} else {
+			submitting = true;
+			const { data } = await api.POST('/projects', { body: { name: name.trim(), repo_name: repo } });
+			submitting = false;
+			if (!data) return;
+			store.projects.push(toTab(data));
+			sn = data.sn;
+		}
 		open.push(sn);
 		creating = false;
 		goto(`/p/${sn}`);

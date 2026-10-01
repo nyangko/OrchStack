@@ -35,7 +35,7 @@ export type Agent = {
 };
 
 /// 태스크. 서버 Task와 겹치는 필드(num · title)는 스키마에서, 나머지는 화면 계산값. 페이지별 교체(A-1~)에서 sn · member_sn 등으로 맞춘다.
-export type Task = Pick<ApiTask, "num" | "title"> & {
+export type Task = Pick<ApiTask, "num" | "title"> & Partial<Pick<ApiTask, "sn" | "description">> & {
 	/** 프로젝트 sn. 없으면 1 (OrchStack). */
 	project?: number;
 	status: TaskStatus;
