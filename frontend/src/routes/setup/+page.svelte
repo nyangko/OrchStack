@@ -3,7 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import symbol from '$lib/assets/logo/symbol.png';
+	import symbolDark from '$lib/assets/logo/symbol-dark.png';
 	import logo from '$lib/assets/logo/logo.png';
+	import logoDark from '$lib/assets/logo/logo-dark.png';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import Code from '@lucide/svelte/icons/code';
 	import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
@@ -236,7 +238,7 @@
 					<circle cx="60" cy="60" r="56" fill="none" stroke="var(--border)" stroke-width="4" />
 					<circle cx="60" cy="60" r="56" fill="none" stroke="var(--primary)" stroke-width="4" stroke-linecap="round" stroke-dasharray="88 264" class="origin-center animate-spin motion-reduce:animate-none" />
 				</svg>
-				<img src={symbol} alt="" class="size-14" />
+				<img src={symbol} alt="" class="size-14 dark:hidden" /><img src={symbolDark} alt="" class="hidden size-14 dark:block" />
 			</span>
 			<!-- 심볼이 로고의 O와 같아 여기선 글자만 둔다 -->
 			<span class="text-2xl font-semibold">OrchStack</span>
@@ -245,7 +247,7 @@
 			<span class="font-mono text-caption text-subtle-foreground">v0.1 Alpha</span>
 		</div>
 	{:else}
-		<img src={logo} alt="OrchStack" class="mb-6 h-7 w-auto" />
+		<img src={logo} alt="OrchStack" class="mb-6 h-7 w-auto dark:hidden" /><img src={logoDark} alt="OrchStack" class="mb-6 hidden h-7 w-auto dark:block" />
 		<div class="card flex w-full max-w-230 flex-col overflow-hidden shadow-sm">
 			<header class="flex flex-col gap-3 border-b px-8 pt-7 pb-6">
 				<Steps steps={['에이전트 연결', '프로젝트', '기본 팀']} current={step} />

@@ -4,6 +4,7 @@
 	import favicon from '$lib/assets/logo/favicon.png';
 	import faviconDark from '$lib/assets/logo/favicon-dark.png';
 	import logo from '$lib/assets/logo/logo.png';
+	import logoDark from '$lib/assets/logo/logo-dark.png';
 	import { page } from '$app/state';
 	import Users from '@lucide/svelte/icons/users';
 	import ListChecks from '@lucide/svelte/icons/list-checks';
@@ -174,7 +175,9 @@
 	{#if !page.url.pathname.startsWith('/setup')}
 	<header class="flex h-13 shrink-0 items-center gap-6 border-b bg-card px-4">
 		<a href="/" class="flex shrink-0 items-center">
-			<img src={logo} alt="OrchStack" class="h-5 w-auto" />
+			<!-- 로고는 테마별 이미지 (다크: 글자가 흰 로고) -->
+			<img src={logo} alt="OrchStack" class="h-5 w-auto dark:hidden" />
+			<img src={logoDark} alt="OrchStack" class="hidden h-5 w-auto dark:block" />
 		</a>
 		<nav class="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto" aria-label="주요 메뉴">
 			{#each links as l (l.href)}
