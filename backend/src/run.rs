@@ -20,7 +20,7 @@ const RUN_MOVES: &[(&str, &str)] = &[
 const SESSION_MOVES: &[(&str, &str)] = &[("starting", "active"), ("starting", "failed"), ("active", "stopped"), ("active", "failed")];
 
 /// 아직 끝나지 않은 Run 상태 (태스크당 1개만 허용)
-const ACTIVE: [&str; 5] = ["queued", "starting", "running", "waiting", "review"];
+pub(crate) const ACTIVE: [&str; 5] = ["queued", "starting", "running", "waiting", "review"];
 
 /// run 관련 경로 묶음
 pub fn routes() -> OpenApiRouter<DatabaseConnection> {
