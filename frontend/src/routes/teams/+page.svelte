@@ -65,6 +65,9 @@
 	import { MdEditor, estimateTokens, type MdFile } from '$lib/components/ui/md-editor';
 	import Upload from '@lucide/svelte/icons/upload';
 	import { Segmented } from '$lib/components/ui/segmented';
+	import { Checkbox } from '$lib/components/ui/checkbox';
+	import CircleAlert from '@lucide/svelte/icons/circle-alert';
+	import GitFork from '@lucide/svelte/icons/git-fork';
 	import { Switch } from '$lib/components/ui/switch';
 	import Hand from '@lucide/svelte/icons/hand';
 	import Zap from '@lucide/svelte/icons/zap';
@@ -90,7 +93,7 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { RoleAvatar } from '$lib/components/ui/role-avatar';
 	import { RuntimeLogo } from '$lib/components/ui/runtime-logo';
-	import { accounts, meters, teamPolicy, recommend, tasks, issues, memberDetails, type TeamMember, type OrchPolicy, type LevelAction } from '$lib/mock';
+	import { accounts, meters, teamPolicy, recommend, tasks, issues, memberDetails, type TeamMember, type OrchPolicy, type LevelAction, type SpawnMode } from '$lib/mock';
 	import { store, defaultTeam, glyphs, glyphOf, runtimeName, accountOf, low, scopeText, liveMap, k, putDraft } from '$lib/teams.svelte';
 	import { LimitRow } from '$lib/components/ui/limit-row';
 	import SkillsPanel from '$lib/components/orch/agent/skills-panel.svelte';
@@ -154,6 +157,14 @@
 	const waitOptions = ['', '10분', '30분', '1시간'];
 	const guardIcon: Record<OrchPolicy['guards'][number]['key'], Component> = { streak: Repeat, reject: Undo2, repeat: Copy, budget: Coins, spawn: ListPlus, away: Moon };
 	let customTimer = $state(false);
+	// 하위 작업 정책 (.pen 4 · 하위 작업) — 기본 방식은 허용 방식 안에 있어야 하고, 리드당 동시 수는 1 이상 (#67 · tbl_team).
+	const spawnModes: { value: SpawnMode; icon: typeof Cpu }[] = [{ value: 'sub', icon: GitBranch }, { value: 'fork', icon: GitFork }, { value: 'runner', icon: Cpu }];
+	const spawnDesc: [SpawnMode, string][] = [['sub', '리드 Run 안에서 · 토큰은 리드 합계에 포함'], ['runner', '별도 Run · 등급은 작업 종류로 자동'], ['fork', '부모 컨텍스트 상속']];
+	const spawnError = $derived(draft && !draft.spawn.allow.includes(draft.spawn.mode) ? '기본 방식은 허용 방식 안에 있어야 합니다' : '');
+	const childError = $derived(draft && !(Number(draft.spawn.maxChild) >= 1) ? '리드당 동시 하위 작업은 1 이상이어야 해요' : '');
+	function toggleAllow(d: OrchPolicy, m: SpawnMode, on: boolean) {
+		d.spawn.allow = on ? [...d.spawn.allow, m] : d.spawn.allow.filter((x) => x !== m);
+	}
 	/// 정책 편집 열기 — 현재 팀 정책의 사본으로 시작한다.
 	function editPolicy() {
 		draft = structuredClone($state.snapshot(policy));
@@ -614,6 +625,9 @@
 						</div>
 						<div class="flex items-center gap-1.5 border-t pt-2 text-xs text-muted-foreground">
 							<ShieldCheck class="size-3.25 shrink-0 text-status-done" />루프 가드 {policy.guards.filter((g) => g.on).length}개 켜짐 · 마지막 정지: {policy.lastStop}
+						</div>
+						<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+							<Layers class="size-3.25 shrink-0" />하위 작업 · 기본 {policy.spawn.mode} · 허용 {policy.spawn.allow.join(' · ')} · 리드당 {policy.spawn.maxChild}
 						</div>
 					</Card.Content>
 				</Card.Root>
@@ -1533,7 +1547,7 @@
 					<Dialog.Description class="text-xs">다음 작업 배정 · 분배 · 사용자 판단이 필요한 순간을 Orch가 어떻게 처리할지 정해요.</Dialog.Description>
 				</div>
 				<Button variant="ghost" size="sm" onclick={() => (draft = undefined)}>취소</Button>
-				<Button size="sm" onclick={savePolicy}>저장</Button>
+				<Button size="sm" disabled={!!spawnError || !!childError} onclick={savePolicy}>저장</Button>
 			</header>
 			<div class="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-7! pt-6! pb-7!">
 				<section class="flex flex-col gap-3">
@@ -1627,6 +1641,50 @@
 							</label>
 						{/each}
 					</div>
+				</section>
+
+				<section class="flex flex-col gap-3">
+					{@render heading('4 · 하위 작업', '리드 에이전트가 태스크 안에서 작업을 나눠 돌리는 방식이에요. 태스크마다 바꿀 수 있고, 비워 두면 이 기본값을 써요 (Task 상세 › 하위 작업 방식).')}
+					<div class="grid grid-cols-3 gap-2.5">
+						<div class="flex flex-col gap-2.5 rounded-md border p-3.5">
+							<span class="text-caption font-semibold text-muted-foreground">기본 방식</span>
+							<Segmented
+								aria-label="기본 방식"
+								class={cn(spawnError && 'ring-1 ring-destructive')}
+								options={spawnModes.map((m) => ({ value: m.value, label: m.value, icon: m.icon, disabled: !d.spawn.allow.includes(m.value), hint: '허용 방식에서 꺼져 있어요' }))}
+								bind:value={() => d.spawn.mode, (v) => (d.spawn.mode = v as SpawnMode)}
+							/>
+							{#if spawnError}
+								<span class="flex items-center gap-1 text-caption font-medium text-destructive"><CircleAlert class="size-3 shrink-0" />{spawnError}</span>
+							{:else}
+								<span class="text-caption text-muted-foreground">runner · 별도 Run으로 돌려요. 모델 등급(S/M/L)은 작업 종류로 정해지고, 토큰은 따로 집계돼요.</span>
+							{/if}
+						</div>
+						<div class="flex flex-col gap-2 rounded-md border p-3.5">
+							<span class="text-caption font-semibold text-muted-foreground">허용 방식</span>
+							{#each spawnDesc as [m, desc] (m)}
+								<label class="flex items-center gap-2 text-xs"><Checkbox checked={d.spawn.allow.includes(m)} onCheckedChange={(v) => toggleAllow(d, m, !!v)} aria-label="{m} 허용" />{m} · {desc}</label>
+							{/each}
+						</div>
+						<div class="flex flex-col gap-2.5 rounded-md border p-3.5">
+							<span class="text-caption font-semibold text-muted-foreground">리드당 동시 하위 작업</span>
+							<InputGroup.Root class={cn('w-28', childError && 'border-destructive')}>
+								<InputGroup.Addon><Layers /></InputGroup.Addon>
+								<InputGroup.Input type="number" min="1" bind:value={d.spawn.maxChild} aria-label="리드당 동시 하위 작업" class="font-mono" />
+							</InputGroup.Root>
+							{#if childError}
+								<span class="flex items-center gap-1 text-caption font-medium text-destructive"><CircleAlert class="size-3 shrink-0" />{childError}</span>
+							{/if}
+							<span class="text-caption text-muted-foreground">최소 1 · paths가 겹치는 하위 작업은 규칙 엔진이 순서대로 돌려요 (queued · waits).</span>
+						</div>
+					</div>
+					{#if d.spawn.allow.includes('fork')}
+						<Alert.Root variant="warning">
+							<GitFork />
+							<Alert.Title>fork는 부모 컨텍스트를 그대로 상속해요</Alert.Title>
+							<Alert.Description>켜면 부모 컨텍스트를 그대로 복사해 비용이 커요.</Alert.Description>
+						</Alert.Root>
+					{/if}
 				</section>
 			</div>
 		{/if}

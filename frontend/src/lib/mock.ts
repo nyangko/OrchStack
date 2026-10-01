@@ -430,13 +430,15 @@ export const connections: Connection[] = [
 ];
 
 /// 실행기별 폴백 체인 (.pen FallbackStep). 위에서부터 시도. key는 connections의 key.
-export type ChainStep = { key: string; name: string; kind: ProviderKind; cond: string; cost: string };
+/// tier — 이 단계가 맡는 하위 작업 등급 (tbl_map_fallback.tier). 없으면 모든 등급. 같은 연결을 등급만 다르게 여러 번 넣을 수 있다 (#67).
+export type ChainStep = { key: string; name: string; kind: ProviderKind; cond: string; cost: string; tier?: SubRunTier };
 export const fallbackChains: Record<Runtime, ChainStep[]> = {
 	claude: [
-		{ key: "anthropic", name: "Anthropic · Max", kind: "구독", cond: "기본 · 주간 잔량 20% 미만이면 다음으로", cost: "—" },
+		{ key: "anthropic", name: "Anthropic · Max · Haiku", kind: "구독", cond: "S 작업(조사 · 요약 · 린트 수정) · 주간 잔량 20% 미만이면 다음", cost: "—", tier: "S" },
+		{ key: "anthropic", name: "Anthropic · Max · Opus", kind: "구독", cond: "기본 · 주간 잔량 20% 미만이면 다음으로", cost: "—" },
 		{ key: "anthropic-api", name: "Anthropic API · prod", kind: "API 키", cond: "429 · 한도 초과 시 · 월 예산 $100 안에서", cost: "$100/월" },
 		{ key: "omniroute", name: "OmniRoute", kind: "게이트웨이", cond: "API 예산 소진 시 · 저렴한 제공자로 자동 라우팅", cost: "$30/월" },
-		{ key: "ollama", name: "Ollama · qwen3-coder", kind: "로컬", cond: "모두 실패 시 · L0 내부 작업만", cost: "무료" },
+		{ key: "ollama", name: "Ollama · qwen3-coder", kind: "로컬", cond: "모두 실패 시 · L0 내부 작업만", cost: "무료", tier: "S" },
 	],
 	codex: [
 		{ key: "chatgpt", name: "Codex · ChatGPT Pro", kind: "구독", cond: "기본 · 주간 잔량 20% 미만이면 다음으로", cost: "—" },
