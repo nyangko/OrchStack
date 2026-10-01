@@ -13,6 +13,26 @@
 @utility view-summary {
 	@apply min-w-0 flex-1 truncate text-body text-muted-foreground;
 }
+/* Kanban 카드 진행 수 */
+@utility kanban-card-steps {
+	@apply shrink-0 font-mono text-xs font-semibold whitespace-nowrap text-muted-foreground;
+}
+/* 호버 미리보기 머리 */
+@utility hover-preview-head {
+	@apply flex items-start gap-2 border-b px-3 py-2.5;
+}
+/* 호버 미리보기 본문 */
+@utility hover-preview-body {
+	@apply flex flex-col gap-2 px-3 py-2.5 text-caption;
+}
+/* 호버 미리보기 값 */
+@utility hover-preview-value {
+	@apply min-w-0 flex-1 truncate text-right font-medium;
+}
+/* 호버 미리보기 바닥 안내 */
+@utility hover-preview-foot {
+	@apply bg-muted px-3 py-2 text-caption text-muted-foreground;
+}
 /* Diagram 연결선 범례 */
 @utility diagram-legend {
 	@apply flex items-center gap-3 rounded-md border bg-card px-2.5 py-1.5 text-xs text-muted-foreground;
@@ -668,54 +688,4 @@
 /* 켜고 끄는 꼬리표 */
 @utility toggle-tag {
 	@apply rounded-xs border px-2 py-0.75 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50;
-}
-
-/* ── orch/board/TaskBoard · TaskBoardLane · TaskCard ── */
-/* 보드 (.pen Kanban Board) */
-@utility task-board {
-	@apply flex h-full items-start gap-3 p-4;
-}
-/* 상태 열 */
-@utility task-board-lane {
-	@apply flex w-85 shrink-0 flex-col gap-2 rounded-xl p-1.5 transition-colors;
-}
-/* 상태 열 머리 (.pen KanbanColumnHeader) */
-@utility task-board-lane-head {
-	@apply flex h-10 items-center gap-2 pr-1 pl-2 [&>svg]:size-3.5;
-}
-/* 태스크 카드 (.pen KanbanCard) */
-@utility task-card {
-	@apply w-full rounded-lg border border-border bg-card text-left text-sm text-card-foreground shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50 data-dragging:opacity-40 aria-pressed:ring-2 aria-pressed:ring-primary;
-}
-/* 카드 머리 (담당 · 우선순위) */
-@utility task-card-head {
-	@apply flex items-center gap-2 border-b px-4 py-3;
-}
-/* 카드 본문 (제목 · 이슈 · 진행) */
-@utility task-card-body {
-	@apply flex flex-col gap-2.5 px-4 py-3.5;
-}
-/* 카드 바닥 (토큰 · 메시지 · 모델 · Run) */
-@utility task-card-foot {
-	@apply flex items-center gap-3.5 border-t px-4 py-2.5 font-mono text-xs text-muted-foreground;
-}
-/* 카드 진행 수 */
-@utility task-card-steps {
-	@apply shrink-0 font-mono text-xs font-semibold whitespace-nowrap text-muted-foreground;
-}
-/* 호버 미리보기 머리 */
-@utility hover-preview-head {
-	@apply flex items-start gap-2 border-b px-3 py-2.5;
-}
-/* 호버 미리보기 본문 */
-@utility hover-preview-body {
-	@apply flex flex-col gap-2 px-3 py-2.5 text-caption;
-}
-/* 호버 미리보기 값 */
-@utility hover-preview-value {
-	@apply min-w-0 flex-1 truncate text-right font-medium;
-}
-/* 호버 미리보기 바닥 안내 */
-@utility hover-preview-foot {
-	@apply bg-muted px-3 py-2 text-caption text-muted-foreground;
 }
