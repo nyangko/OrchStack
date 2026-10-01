@@ -327,6 +327,26 @@
 	@apply border-primary! bg-primary-soft! ring-1 ring-primary;
 }
 
+/* xyflow(Diagram) — 라이브러리 CSS 변수를 앱 토큰에 연결한다. 이 영역 안에서만 · 라이트 · 다크 같은 토큰 (#115 H-3).
+   노드 · 간선 라벨은 우리 부품(NodeCard · EdgeLabel)이 그리므로 컨트롤 · 핸들 · 미니맵 · 선택 영역만. */
+.svelte-flow {
+	--xy-background-color: transparent;
+	--xy-controls-button-background-color: var(--card);
+	--xy-controls-button-background-color-hover: var(--muted);
+	--xy-controls-button-color: var(--foreground);
+	--xy-controls-button-color-hover: var(--foreground);
+	--xy-controls-button-border-color: var(--border);
+	--xy-handle-background-color: var(--muted-foreground);
+	--xy-handle-border-color: var(--card);
+	--xy-edge-label-background-color: var(--card);
+	--xy-edge-label-color: var(--foreground);
+	--xy-minimap-background-color: var(--card);
+	--xy-minimap-mask-background-color: var(--overlay);
+	--xy-minimap-node-background-color: var(--muted-strong);
+	--xy-selection-background-color: var(--primary-soft);
+	--xy-attribution-background-color: transparent;
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;
