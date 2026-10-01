@@ -2,6 +2,20 @@
 	import type { TaskStatus } from "$lib/status";
 	import type { Role } from "$lib/roles";
 	import type { Runtime } from "$lib/components/ui/runtime-logo";
+	import type { Component } from "svelte";
+
+	/// 노드 · 카드 메뉴 한 줄 (.pen ContextMenu / Task). "sep"는 구분선, sub가 있으면 하위 메뉴.
+	/// Diagram 노드 … 메뉴와 Kanban 카드 우클릭 메뉴가 같은 목록을 그린다.
+	export type MenuEntry =
+		| "sep"
+		| {
+				label: string;
+				icon?: Component;
+				shortcut?: string;
+				disabled?: boolean;
+				onSelect?: () => void;
+				sub?: { label: string; icon?: Component; tone?: string; checked?: boolean; onSelect: () => void }[];
+		  };
 
 	/// Diagram 노드 데이터 (.pen DiagramNode). 담당 · 진행 · 경고 줄은 있을 때만 그린다.
 	export type DiagramNodeData = {
@@ -18,8 +32,9 @@
 		meta?: string;
 		/** 리드 토큰 (K) — 자기 사용량 + 하위 runner 합계 (.pen TokenMeter lead). */
 		tokens?: { self: number; runner: number };
-		/** 머리 줄 … 메뉴 항목 (.pen Node Menu). */
-		menu?: { label: string; onSelect: () => void }[];
+		/** 머리 줄 … 메뉴 (.pen ContextMenu / Task). menuLabel은 메뉴 머리 (예: "Task #130 · QA"). */
+		menu?: MenuEntry[];
+		menuLabel?: string;
 	};
 </script>
 
@@ -34,6 +49,7 @@
 	import MessageCircle from "@lucide/svelte/icons/message-circle";
 	import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
 	import Ellipsis from "@lucide/svelte/icons/ellipsis";
+	import Check from "@lucide/svelte/icons/check";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { Button } from "$lib/components/ui/button";
 	import { Badge } from "$lib/components/ui/badge";
@@ -82,9 +98,26 @@
 						<Button {...props} variant="ghost" size="icon-xs" class="nodrag -my-1" aria-label="{data.ref} 메뉴"><Ellipsis /></Button>
 					{/snippet}
 				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="start" class="w-44">
-					{#each data.menu as m (m.label)}
-						<DropdownMenu.Item onSelect={m.onSelect}>{m.label}</DropdownMenu.Item>
+				<DropdownMenu.Content align="start" class="w-56">
+					{#if data.menuLabel}<DropdownMenu.Label class="truncate">{data.menuLabel}</DropdownMenu.Label><DropdownMenu.Separator />{/if}
+					{#each data.menu as m, i (i)}
+						{#if m === "sep"}
+							<DropdownMenu.Separator />
+						{:else if m.sub}
+							<DropdownMenu.Sub>
+								<DropdownMenu.SubTrigger disabled={m.disabled}>{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}</DropdownMenu.SubTrigger>
+								<DropdownMenu.SubContent class="w-48">
+									{#each m.sub as x (x.label)}
+										<DropdownMenu.Item onSelect={x.onSelect}>{#if x.icon}<x.icon class={x.tone} />{/if}<span class="flex-1">{x.label}</span>{#if x.checked}<Check />{/if}</DropdownMenu.Item>
+									{/each}
+								</DropdownMenu.SubContent>
+							</DropdownMenu.Sub>
+						{:else}
+							<DropdownMenu.Item disabled={m.disabled} onSelect={m.onSelect}>
+								{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}
+								{#if m.shortcut}<DropdownMenu.Shortcut>{m.shortcut}</DropdownMenu.Shortcut>{/if}
+							</DropdownMenu.Item>
+						{/if}
 					{/each}
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>

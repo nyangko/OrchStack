@@ -54,7 +54,13 @@
 	import { project as wb, openProject, closeProject, viewTasks, viewIssues, viewAgents, moveTask, runsOf, stopRun } from '$lib/project.svelte';
 	import { SvelteFlow, Background, BackgroundVariant, Controls, Panel, MarkerType, type Node, type Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
-	import DiagramNode, { type DiagramNodeData } from '$lib/components/orch/diagram/diagram-node.svelte';
+	import DiagramNode, { type DiagramNodeData, type MenuEntry } from '$lib/components/orch/diagram/diagram-node.svelte';
+	import * as ContextMenu from '$lib/components/ui/context-menu';
+	import UserPlus from '@lucide/svelte/icons/user-plus';
+	import StepForward from '@lucide/svelte/icons/step-forward';
+	import PanelRight from '@lucide/svelte/icons/panel-right';
+	import FilterIcon from '@lucide/svelte/icons/filter';
+	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import SubRunNode, { subRunStatus, subRunMode, tierTone } from '$lib/components/orch/diagram/sub-run-node.svelte';
 	import TokenMeter from '$lib/components/orch/diagram/token-meter.svelte';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
@@ -124,7 +130,7 @@
 	import DependsPicker from '$lib/components/orch/task/depends-picker.svelte';
 	import PriorityPicker from '$lib/components/orch/task/priority-picker.svelte';
 	import CriteriaList from '$lib/components/orch/task/criteria-list.svelte';
-	import { priorities, type Priority } from '$lib/priority';
+	import { priorities, priorityOrder, type Priority } from '$lib/priority';
 	import type { Role } from '$lib/roles';
 	import type { TaskDetail } from '$lib/mock';
 
@@ -132,6 +138,8 @@
 
 	// 태스크 · 이슈 · 에이전트 — 목데이터 모드(VITE_MOCK=1)면 화면 안에서만 바꾸고, 아니면 프로젝트 스토어(snapshot + SSE)를 본다.
 	let local = $state(tasks.map((t) => ({ ...t })));
+	// 일시정지한 태스크 (태스크 메뉴 Pause · Resume). Diagram 노드가 스크립트 초기화 중 메뉴를 만들어 위에 둔다.
+	let paused = $state<number[]>([]);
 	const list = $derived(useMock ? local : viewTasks());
 	const issueList = $derived(useMock ? issues : viewIssues());
 	const agentList = $derived(useMock ? agents : viewAgents());
@@ -289,10 +297,8 @@
 			alert: alerts[t.num],
 			status: t.status,
 			meta: t.run ? `Run ${t.run}` : t.priority,
-			menu: [
-				{ label: '상세 보기', onSelect: () => open(t.num) },
-				...statusOrder.filter((st) => st !== t.status && st !== 'waiting').map((st) => ({ label: `→ ${statuses[st].label}`, onSelect: () => void setStatus(num, st) }))
-			]
+			menuLabel: `Task #${t.num} · ${t.title}`,
+			menu: taskMenu(t.num)
 		};
 	}
 	/// 에이전트 노드 데이터.
@@ -421,6 +427,45 @@
 
 	// Task Detail View (.pen TaskDetailView) — 가운데 뷰 위에 겹쳐 연다. 상세 데이터가 없는 태스크는 빈 상태로.
 	let details = $state(structuredClone(taskDetails));
+
+	// ── 태스크 메뉴 (.pen ContextMenu / Task) — Kanban 카드 우클릭 · Diagram 노드 … 가 같은 목록 ─────────
+	// Run 제어(Start · Pause · Resume · Stop · Requeue)는 목데이터: 상태 · 일시정지 표시만 바꾼다. 실제 실행은 실행기(#13) · API 단계.
+	function taskMenu(num: number): MenuEntry[] {
+		const t = task(num);
+		const running = t.status === 'in_progress';
+		const isPaused = paused.includes(num);
+		return [
+			{
+				label: 'Assign Agent', icon: UserPlus,
+				sub: [...agentList.map((a) => ({ label: `${a.name} · ${roles[a.role].label}`, checked: t.agent === a.sn, onSelect: () => (task(num).agent = a.sn) })), { label: 'Unassigned', checked: t.agent === undefined, onSelect: () => (task(num).agent = undefined) }]
+			},
+			{ label: 'Start', icon: Play, disabled: running || ['done', 'review'].includes(t.status), onSelect: () => void setStatus(num, 'in_progress') },
+			{ label: 'Pause', icon: Pause, disabled: !running || isPaused, onSelect: () => ((paused = [...paused, num]), toast(`#${num} 일시정지 · 현재 단계가 끝나면 멈춰요`)) },
+			{ label: 'Resume', icon: StepForward, disabled: !isPaused, onSelect: () => ((paused = paused.filter((x) => x !== num)), toast(`#${num} 다시 진행`)) },
+			{ label: 'Stop', icon: Square, disabled: !running, onSelect: () => ((paused = paused.filter((x) => x !== num)), void setStatus(num, 'todo'), toast(`#${num} Run을 멈추고 Todo로 돌렸어요`)) },
+			{ label: 'Requeue', icon: RotateCcw, disabled: !['failed', 'cancelled', 'blocked'].includes(t.status), onSelect: () => void setStatus(num, 'todo') },
+			'sep',
+			{ label: 'Change Priority', icon: Flag, sub: priorityOrder.map((p) => ({ label: `${p} ${priorities[p].label}`, icon: priorities[p].icon, tone: priorities[p].text, checked: t.priority === p, onSelect: () => (task(num).priority = p) })) },
+			{ label: 'Add Dependency', icon: Link2Icon, onSelect: () => editTask(num) },
+			'sep',
+			{ label: 'Open Details', icon: PanelRight, shortcut: '↵', onSelect: () => open(num) }
+		];
+	}
+
+	// Kanban 카드 hover 미리보기 (.pen KanbanCard/HoverPreview) — 커서 +18px, 화면 끝에선 반대쪽. 끌 때 · 메뉴 열 때는 숨긴다.
+	let hover = $state<{ num: number; x: number; y: number }>();
+	let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+	function hoverAt(num: number, e: PointerEvent) {
+		if (e.buttons) return void (hover = undefined);
+		const at = { num, x: e.clientX, y: e.clientY };
+		if (hover?.num === num) return void (hover = at);
+		clearTimeout(hoverTimer);
+		hoverTimer = setTimeout(() => (hover = at), 350);
+	}
+	function hoverOff() {
+		clearTimeout(hoverTimer);
+		hover = undefined;
+	}
 
 	// ── Task Editor (.pen XBNVi A · 새 태스크 / A' · 편집) · QuickAdd (.pen biSss) ─────────────────────
 	// 목데이터 단계: 만들고 고친 값은 페이지 목록(local) · 상세(details)에 바로 넣는다. 서버 저장은 API 단계(#92).
@@ -1009,19 +1054,34 @@
 										<h3 class="text-body font-semibold">{meta.label}</h3>
 										<Badge variant="secondary" class="rounded-full px-1.5 font-mono">{board[s]?.length ?? 0}</Badge>
 										<span class="flex-1"></span>
-										<Button variant="ghost" size="icon-xs" aria-label="{meta.label}에 태스크 추가"><Plus /></Button>
-										<Button variant="ghost" size="icon-xs" aria-label="{meta.label} 열 메뉴"><Ellipsis /></Button>
+										<Button variant="ghost" size="icon-xs" aria-label="{meta.label}에 태스크 추가" onclick={() => openQuick(s)}><Plus /></Button>
+										<!-- 열 메뉴 — .pen에 항목이 없어 있는 동작만 (#60) -->
+										<DropdownMenu.Root>
+											<DropdownMenu.Trigger>{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-xs" aria-label="{meta.label} 열 메뉴"><Ellipsis /></Button>{/snippet}</DropdownMenu.Trigger>
+											<DropdownMenu.Content align="end" class="w-48">
+												<DropdownMenu.Item onSelect={() => newTask({ status: s })}><SquarePen />{meta.label}로 새 태스크</DropdownMenu.Item>
+												<DropdownMenu.Item onSelect={() => ((leftOpen = true), (panelTab = 'tasks'), (filter = s))}><FilterIcon />Quick Panel에서 이 상태만</DropdownMenu.Item>
+											</DropdownMenu.Content>
+										</DropdownMenu.Root>
 									</div>
 									<div class="flex min-h-24 flex-col gap-2">
 										{#each board[s] ?? [] as num, i (num)}
 											{@const t = task(num)}
 											{@const a = agentOf(t.agent)}
+											<!-- 우클릭: ContextMenu / Task (Diagram과 같은 목록) -->
+											<ContextMenu.Root onOpenChange={(o) => o && hoverOff()}>
+											<ContextMenu.Trigger>
+											{#snippet child({ props })}
 											<KanbanCard
+												{...props}
 												id={num}
 												index={i}
 												group={s}
 												aria-pressed={selected === t.num}
-												onclick={() => open(t.num)}
+												onclick={() => (hoverOff(), open(t.num))}
+												onpointermove={(e) => hoverAt(t.num, e)}
+												onpointerleave={hoverOff}
+												onpointerdown={hoverOff}
 												class={cn(selected === t.num && 'ring-2 ring-primary')}
 											>
 													<span class="flex items-center gap-2 border-b px-4 py-3">
@@ -1064,6 +1124,32 @@
 														<span class="ml-auto inline-flex items-center gap-1"><Timer class="size-3" />{t.run ? `Run ${t.run}` : '—'}</span>
 													</span>
 											</KanbanCard>
+											{/snippet}
+											</ContextMenu.Trigger>
+											<ContextMenu.Content class="w-56">
+												<ContextMenu.Label class="truncate">Task #{t.num} · {t.title}</ContextMenu.Label>
+												<ContextMenu.Separator />
+												{#each taskMenu(t.num) as m, k (k)}
+													{#if m === 'sep'}
+														<ContextMenu.Separator />
+													{:else if m.sub}
+														<ContextMenu.Sub>
+															<ContextMenu.SubTrigger disabled={m.disabled}>{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}</ContextMenu.SubTrigger>
+															<ContextMenu.SubContent class="w-48">
+																{#each m.sub as x (x.label)}
+																	<ContextMenu.Item onSelect={x.onSelect}>{#if x.icon}<x.icon class={x.tone} />{/if}<span class="flex-1">{x.label}</span>{#if x.checked}<Check />{/if}</ContextMenu.Item>
+																{/each}
+															</ContextMenu.SubContent>
+														</ContextMenu.Sub>
+													{:else}
+														<ContextMenu.Item disabled={m.disabled} onSelect={m.onSelect}>
+															{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}
+															{#if m.shortcut}<ContextMenu.Shortcut>{m.shortcut}</ContextMenu.Shortcut>{/if}
+														</ContextMenu.Item>
+													{/if}
+												{/each}
+											</ContextMenu.Content>
+											</ContextMenu.Root>
 										{:else}
 											<p class="rounded-lg border border-dashed p-4 text-center text-xs text-subtle-foreground">비어 있어요</p>
 										{/each}
@@ -1072,6 +1158,42 @@
 							{/each}
 						</div>
 					</DragDropProvider>
+					{#if hover}
+						{@const t = task(hover.num)}
+						{@const d = details[hover.num]}
+						{@const m = statuses[t.status]}
+						{@const next = d?.criteria.find((c) => !c.done)}
+						{@const blocks = (d?.deps ?? []).filter((x) => x.kind === 'blocks').map((x) => task(x.num)).filter(Boolean)}
+						{@const last = d?.activity.at(-1)}
+						{@const ctx = d?.context}
+						{@const W = 300}
+						<!-- .pen KanbanCard/HoverPreview — 화면 오른쪽 · 아래 끝에선 커서 반대쪽으로 -->
+						<div
+							role="tooltip"
+							class="pointer-events-none fixed z-50 flex w-75 flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg"
+							style:left="{hover.x + 18 + W > innerWidth ? hover.x - 18 - W : hover.x + 18}px"
+							style:top="{hover.y + 18 + 320 > innerHeight ? Math.max(8, hover.y - 18 - 320) : hover.y + 18}px"
+						>
+							<div class="flex items-start gap-2 border-b px-3 py-2.5">
+								<span class="pt-0.5 text-xs font-semibold text-muted-foreground">#{t.num}</span>
+								<span class="min-w-0 flex-1 text-body font-semibold">{t.title}</span>
+								<span class={cn('flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', m.soft, m.text)}><m.icon class="size-3" />{m.label}</span>
+							</div>
+							<dl class="flex flex-col gap-2 px-3 py-2.5 text-caption">
+								{#each [['현재 단계', t.steps[1] ? `${t.steps[0]}/${t.steps[1]}${next ? ` · ${next.text}` : d?.criteria.length ? ' · 모두 완료' : ''}` : '—'], ['최근 활동', last ? `${last.type.toLowerCase()} ${last.text}` : '—'], ['막고 있는 Task', blocks.length ? blocks.map((b) => `#${b.num} ${b.title} · ${agentName(b.agent) ?? '미배정'}`).join(', ') : '—'], ['완료 시 전달', blocks[0] ? `${agentName(blocks[0].agent) ?? '미배정'} · ${roles[agentOf(blocks[0].agent)?.role ?? 'agent'].label} (REQUEST_VERIFICATION)` : '—'], ['ETA', d?.eta || '—']] as [k, v] (k)}
+									<div class="flex gap-2"><dt class="shrink-0 text-muted-foreground">{k}</dt><dd class="min-w-0 flex-1 truncate text-right font-medium">{v}</dd></div>
+								{/each}
+								{#if ctx}
+									<div class="flex flex-col gap-1.5 pt-1.5">
+										<div class="flex text-xs font-medium"><span class="flex-1 text-muted-foreground">Context</span><span class={ctx[0] / ctx[1] > 0.9 ? 'text-warning' : ''}>{ctx[0]}K / {ctx[1]}K</span></div>
+										<Progress value={(ctx[0] / ctx[1]) * 100} class="h-2" aria-label="컨텍스트" />
+									</div>
+									{#if ctx[0] / ctx[1] > 0.9}<p class="font-medium text-warning">⚠ Context {Math.round((ctx[0] / ctx[1]) * 100)}% — 요약 또는 새 Session 권장</p>{/if}
+								{/if}
+							</dl>
+							<div class="flex items-center gap-2.5 bg-muted px-3 py-2 text-caption text-muted-foreground">클릭 → 상세 보기 <span class="text-subtle-foreground">·</span> 우클릭 → 메뉴</div>
+						</div>
+					{/if}
 				{:else if view.value === 'diagram'}
 					<SvelteFlow
 						bind:nodes

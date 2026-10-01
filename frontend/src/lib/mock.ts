@@ -132,6 +132,27 @@ export type TaskDetail = {
 };
 
 export const taskDetails: Record<number, TaskDetail> = {
+	// .pen KanbanCard/HoverPreview 예시 (#128)
+	128: {
+		description: "access token 만료 시 refresh token으로 재발급하는 Auth API. 토큰 회전 · 재사용 감지 · 마이그레이션을 포함합니다.",
+		criteria: [
+			{ text: "refresh 엔드포인트", done: true },
+			{ text: "토큰 저장 테이블 마이그레이션", done: true },
+			{ text: "만료 · 서명 검증", done: true },
+			{ text: "재사용 감지 시 세션 폐기", done: true },
+			{ text: "token rotation 구현", done: false },
+			{ text: "통합 테스트", done: false },
+		],
+		deps: [{ kind: "blocks", num: 130 }],
+		runs: [{ num: 79, note: "진행 중 · 4/6 단계", time: "42m", tokens: "118K", live: true }],
+		activity: [
+			{ type: "ASSIGN", who: "Orch → 민수", time: "13:40", text: "#128 배정" },
+			{ type: "TOOL_CALL", who: "민수", time: "14:16", text: "run_migration · 1m" },
+		],
+		eta: "~1h 20m",
+		labels: ["auth", "backend"],
+		context: [118, 128],
+	},
 	129: {
 		description:
 			"Issue #51 Authentication Flow 개선의 로그인 화면을 구현합니다. #128 Auth API(refresh token) 스펙을 기준으로 이메일/비밀번호 로그인, 에러·로딩 상태, 세션 만료 처리를 포함합니다. 시안: 유나의 Login v2 (첨부).",
