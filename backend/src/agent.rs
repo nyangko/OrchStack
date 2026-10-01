@@ -1,5 +1,5 @@
 //! tbl_agent_profile CRUD + 하위 매핑 조회 + tbl_template 조회. 쓰기는 event::run 경유 (ProfileCreated · ProfileUpdated · ProfileDeleted)
-use crate::{entity::{tbl_agent_profile::{self as p, Entity as Tbl}, tbl_map_fallback as fb, tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_profile_tool as pt, tbl_template as tp},
+use crate::{entity::{tbl_agent_profile::{self as p, Entity as Tbl}, tbl_map_fallback as fb, tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_profile_rule as pr, tbl_profile_tool as pt, tbl_template as tp},
     error::{Body, Error, ErrorBody, Res, Sn, in_use}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::{NotSet, Set}, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, EntityTrait,
@@ -11,6 +11,10 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 
 /// 허용되는 하위 작업 모델 등급 (#67)
 pub(crate) const TIERS: [&str; 3] = ["S", "M", "L"];
+
+/// 기본 차단 명령 (하위 Run · #67). 프로필 tbl_profile_rule(command · pattern = 명령 글자)이 같은 명령이면 그 정책이 이긴다.
+/// 명령 글자 → 실행기 인자 맵핑은 runner::perms
+pub(crate) const CMDS: [&str; 3] = ["git stash", "git checkout", "git reset"];
 
 /// 허용되는 프로필 소유 종류
 const KINDS: [&str; 3] = ["workspace", "template", "member"];
@@ -28,6 +32,7 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
         .routes(routes!(read, update, remove))
         .routes(routes!(caps))
         .routes(routes!(fallbacks, chain))
+        .routes(routes!(commands, set_commands))
         .routes(routes!(templates))
         .routes(routes!(template))
 }
@@ -336,6 +341,55 @@ async fn chain(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<V
         Ok(((), vec![Ev::new(None, "profile", sn, "ProfileUpdated", &json!({ "fallbacks": &b }))]))
     }).await?;
     Ok(Json(b))
+}
+
+/// 명령 사용 여부 한 줄
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug, PartialEq)]
+pub struct Cmd {
+    /// 명령 글자 (예: git push). 이 글자로 시작하는 명령 전체에 적용
+    pub cmd: String,
+    /// true = 사용 · false = 차단
+    pub on: bool,
+    /// 서버 기본 목록(CMDS)에 있는 명령 (응답 전용 · 지우면 기본값으로 돌아간다)
+    #[serde(default)]
+    pub builtin: bool,
+}
+
+/// 기본 목록 + 프로필 command 규칙 → 실제 적용 목록 (기본 순서 → 추가 명령)
+pub(crate) fn effective(rules: &[pr::Model]) -> Vec<Cmd> {
+    let mine: Vec<(&str, bool)> = rules.iter().filter(|r| r.action_code == "command").filter_map(|r| Some((r.pattern.as_deref()?, r.policy == "auto"))).collect();
+    let on = |c: &str| mine.iter().find(|(p, _)| *p == c).map(|(_, o)| *o);
+    CMDS.iter().map(|c| Cmd { cmd: (*c).into(), on: on(c).unwrap_or(false), builtin: true })
+        .chain(mine.iter().filter(|(p, _)| !CMDS.contains(p)).map(|(p, o)| Cmd { cmd: (*p).into(), on: *o, builtin: false }))
+        .collect()
+}
+
+/// 명령 사용 여부 조회 (기본 목록 + 프로필 설정). 프로필이 없으면 404
+#[utoipa::path(operation_id = "agent_commands", get, path = "/profiles/{sn}/commands", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Vec<Cmd>), (status = "default", body = ErrorBody)))]
+async fn commands(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Cmd>>> {
+    get(&db, sn).await?;
+    Ok(Json(effective(&pr::Entity::find().filter(pr::Column::ProfileSn.eq(sn)).order_by_asc(pr::Column::Sort).all(&db).await?)))
+}
+
+/// 명령 사용 여부 전체 교체 (ProfileUpdated). 기본값과 같은 기본 명령은 저장하지 않는다. 빈 명령은 422
+#[utoipa::path(operation_id = "agent_set_commands", put, path = "/profiles/{sn}/commands", params(("sn" = i64, Path, description = "프로필 번호")), request_body = Vec<Cmd>, responses((status = 200, body = Vec<Cmd>), (status = "default", body = ErrorBody)))]
+async fn set_commands(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Vec<Cmd>>) -> Res<Json<Vec<Cmd>>> {
+    if b.iter().any(|c| c.cmd.trim().is_empty()) {
+        return Err(Error::invalid("cmd must not be empty".into()));
+    }
+    let out = event::run(&db, async |tx| {
+        get(tx, sn).await?;
+        pr::Entity::delete_many().filter(pr::Column::ProfileSn.eq(sn)).filter(pr::Column::ActionCode.eq("command")).exec(tx).await?;
+        for (i, c) in b.iter().filter(|c| !(CMDS.contains(&c.cmd.trim()) && !c.on)).enumerate() {
+            pr::ActiveModel {
+                profile_sn: Set(sn), action_code: Set("command".into()), title: Set(c.cmd.trim().into()), pattern: Set(Some(c.cmd.trim().into())),
+                policy: Set(if c.on { "auto" } else { "block" }.into()), sort: Set(i as i64), ..Default::default()
+            }.insert(tx).await?;
+        }
+        let out = effective(&pr::Entity::find().filter(pr::Column::ProfileSn.eq(sn)).order_by_asc(pr::Column::Sort).all(tx).await?);
+        Ok((out.clone(), vec![Ev::new(None, "profile", sn, "ProfileUpdated", &json!({ "commands": &out }))]))
+    }).await?;
+    Ok(Json(out))
 }
 
 /// 템플릿 목록 (보관 제외 · sort → 번호순)

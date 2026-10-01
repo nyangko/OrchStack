@@ -3,6 +3,7 @@
 #![allow(dead_code)] // 리드 Run 디스패처가 호출한다
 
 use crate::{
+    agent,
     entity::{tbl_profile_rule as pr, tbl_profile_tool as pt, tbl_context_manifest as cm, tbl_context_source as cs, tbl_log_token as lt, tbl_map_fallback as fb, tbl_member, tbl_model, tbl_project, tbl_run as r, tbl_runtime, tbl_session as s, tbl_task, tbl_team, tbl_workspace},
     error::{Error, Res},
     event::{self, Ev},
@@ -22,7 +23,7 @@ const RULES: &str = "\
 You are a sub-task worker. Rules:
 - Do only the @TASK below. Edit only files in `paths`. Read nothing else.
 - Follow the existing code style of the given files. Smallest change that meets every `ac`.
-- Never git stash, checkout or reset (other workers share this tree). No new dependencies.
+- No new dependencies.
 - Before reporting, run format, lint and type check on your `paths` files only. Fix what they flag.
 - If you cannot finish without another file or a decision, stop and reply with one `@ASK v1` block (`need: [path, ...]` or `q: ...`).
 - When done, reply with only this block (English, no prose, no diff):
@@ -50,7 +51,7 @@ pub fn block(code: &str) -> Vec<String> {
     a.iter().map(|s| s.to_string()).collect()
 }
 
-/// 리드 프로필의 도구 정책 · 명령 규칙 → Claude 허용 · 차단 인자. 행이 없으면 허용 (스키마 기본 allow).
+/// 리드 프로필의 도구 정책 · 명령 사용 여부(기본 목록 agent::CMDS + 프로필) → Claude 허용 · 차단 인자. 도구 행이 없으면 허용 (스키마 기본 allow).
 /// 하위 Run은 승인을 물을 수 없어(`--permission-prompts none`) approval · allowlist도 차단으로 본다
 // ponytail: Codex는 명령별 차단이 없어 무시 (workspace-write 샌드박스만). 필요하면 shell 차단 → --sandbox read-only
 pub fn perms(code: &str, tools: &[pt::Model], rules: &[pr::Model]) -> Vec<String> {
@@ -59,7 +60,8 @@ pub fn perms(code: &str, tools: &[pt::Model], rules: &[pr::Model]) -> Vec<String
     let mut deny = vec!["mcp__*".to_owned()];
     if off("git_push") { deny.extend(["Bash(git push:*)".into(), "Bash(gh pr:*)".into()]); }
     if off("git_destructive") { deny.extend(["Bash(git push --force:*)".into(), "Bash(git push -f:*)".into(), "Bash(git reset --hard:*)".into()]); }
-    deny.extend(rules.iter().filter(|r| r.action_code == "command" && r.policy != "auto").filter_map(|r| r.pattern.as_ref()).map(|p| format!("Bash({p})")));
+    // 명령 글자 → `Bash(<글자>:*)` (그 글자로 시작하는 명령 전체)
+    deny.extend(agent::effective(rules).into_iter().filter(|c| !c.on).map(|c| format!("Bash({}:*)", c.cmd)));
     let mut a = vec![];
     if !off("shell") { a.extend(["--allowedTools".into(), "Bash".into()]); }
     a.push("--disallowedTools".into());
@@ -457,10 +459,12 @@ mod tests {
         assert!(block("claude_code").contains(&"--strict-mcp-config".to_owned()));
         // 프로필 정책: 행 없음 = Bash 허용 · shell 차단 = Bash 없음 · push 차단 · 명령 규칙 차단
         let tool = |c: &str, p: &str| pt::Model { sn: 0, profile_sn: 1, tool_code: c.into(), scope_text: None, policy: p.into(), sort: 0, create_at: String::new() };
-        assert_eq!(perms("claude_code", &[], &[]), ["--allowedTools", "Bash", "--disallowedTools", "mcp__*"]);
-        let rule = pr::Model { sn: 0, profile_sn: 1, action_code: "command".into(), title: "rm".into(), pattern: Some("rm -rf:*".into()), description: None, policy: "block".into(), approver: None, is_notify: 1, sort: 0, create_at: String::new() };
-        let a = perms("claude_code", &[tool("shell", "approval"), tool("git_push", "block")], &[rule]);
+        assert_eq!(perms("claude_code", &[], &[]), ["--allowedTools", "Bash", "--disallowedTools", "mcp__*", "Bash(git stash:*)", "Bash(git checkout:*)", "Bash(git reset:*)"]);
+        // 명령 사용 여부: 기본 차단을 켜고(checkout) · 새 명령을 차단(rm -rf)
+        let rule = |c: &str, p: &str| pr::Model { sn: 0, profile_sn: 1, action_code: "command".into(), title: c.into(), pattern: Some(c.into()), description: None, policy: p.into(), approver: None, is_notify: 1, sort: 0, create_at: String::new() };
+        let a = perms("claude_code", &[tool("shell", "approval"), tool("git_push", "block")], &[rule("git checkout", "auto"), rule("rm -rf", "block")]);
         assert!(!a.contains(&"Bash".to_owned()) && a.contains(&"Bash(git push:*)".to_owned()) && a.contains(&"Bash(rm -rf:*)".to_owned()));
+        assert!(!a.contains(&"Bash(git checkout:*)".to_owned()) && a.contains(&"Bash(git stash:*)".to_owned()));
         assert!(perms("codex", &[tool("shell", "block")], &[]).is_empty());
         assert!(block("codex").contains(&"project_doc_max_bytes=0".to_owned()));
     }

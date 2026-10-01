@@ -371,6 +371,14 @@ mod tests {
         assert_eq!(call(&app, "PUT", &fbs, Some(json!([{"runtime_sn": 1, "connection_sn": 1, "tier": "X"}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(call(&app, "PUT", &fbs, Some(json!([{"runtime_sn": 1, "connection_sn": 9}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(call(&app, "GET", &fbs, None).await.1.as_array().unwrap().len(), 2); // 실패한 교체는 기존 체인을 지우지 않는다
+        // 명령 사용 여부: 기본 3개 차단 → checkout 켜기 · rm -rf 차단 추가 → 기본 목록 순서 뒤에 추가 명령
+        let cmds = format!("/profiles/{ps}/commands");
+        let on = |v: &Value| v.as_array().unwrap().iter().map(|c| (c["cmd"].as_str().unwrap().to_owned(), c["on"].as_bool().unwrap())).collect::<Vec<_>>();
+        assert_eq!(on(&call(&app, "GET", &cmds, None).await.1), [("git stash".into(), false), ("git checkout".into(), false), ("git reset".into(), false)]);
+        let v = call(&app, "PUT", &cmds, Some(json!([{"cmd": "git checkout", "on": true}, {"cmd": "rm -rf", "on": false}]))).await.1;
+        assert_eq!(on(&v), [("git stash".into(), false), ("git checkout".into(), true), ("git reset".into(), false), ("rm -rf".into(), false)]);
+        assert_eq!(v[3]["builtin"], false);
+        assert_eq!(call(&app, "PUT", &cmds, Some(json!([{"cmd": " ", "on": true}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(call(&app, "DELETE", &format!("/profiles/{ps}"), None).await.0, StatusCode::NO_CONTENT);
 
         // 템플릿(live v2 · 도구 정책 1개)과 draft 템플릿은 SQL로 넣는다 (템플릿 편집은 이 Task 범위 밖)
@@ -471,7 +479,7 @@ mod tests {
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());
