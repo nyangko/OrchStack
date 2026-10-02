@@ -58,7 +58,7 @@
 	<article class={['flex flex-col gap-2.5 rounded-lg border p-3.5 text-xs', orch ? 'border-status-waiting bg-warning-soft' : 'border-primary bg-card']}>
 		<button type="button" aria-expanded="true" onclick={() => (open = false)} class="flex items-center gap-2 text-left outline-none focus-visible:underline">
 			<BookMarked class={['size-4 shrink-0', orch ? 'text-status-waiting' : 'text-primary']} />
-			<span class={['rounded-xs px-1.75 py-px text-caption font-semibold text-on-solid', orch ? 'bg-status-waiting' : 'bg-primary']}>{orch ? '대신 결정' : '결정'}</span>
+			<span class={['rounded-xs px-2 py-px text-caption font-semibold text-on-solid', orch ? 'bg-status-waiting' : 'bg-primary']}>{orch ? '대신 결정' : '결정'}</span>
 			<span class={['flex size-5 items-center justify-center rounded-xs text-on-solid', orch ? 'bg-primary' : 'bg-foreground']}>{#if orch}<Sparkles class="size-3" />{:else}<User class="size-3" />{/if}</span>
 			<span class="flex-1 font-semibold">{orch ? 'Orch · 사용자 대신' : '나'}</span>
 			<span class="font-mono text-caption text-subtle-foreground">#{record.task} · {record.time}</span>
@@ -81,8 +81,8 @@
 			</div>
 		{:else}
 			<div class="flex items-center gap-3 border-t pt-2">
-				<span class="flex items-center gap-1.25 text-muted-foreground"><Send class="size-3.5" />{record.sent}</span>
-				{#if onreview}<button type="button" class="flex items-center gap-1.25 font-medium text-primary outline-none hover:underline focus-visible:underline" onclick={onreview}><MessageSquareText class="size-3.5" />답변 전문</button>{/if}
+				<span class="flex items-center gap-1.5 text-muted-foreground"><Send class="size-3.5" />{record.sent}</span>
+				{#if onreview}<button type="button" class="flex items-center gap-1.5 font-medium text-primary outline-none hover:underline focus-visible:underline" onclick={onreview}><MessageSquareText class="size-3.5" />답변 전문</button>{/if}
 			</div>
 		{/if}
 	</article>

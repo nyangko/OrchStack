@@ -123,7 +123,7 @@
 		<span class="font-medium text-foreground">{tplNav.flatMap((g) => g.items).find((i) => i.v === tplTab)?.label}</span>
 	</nav>
 	<div class="flex min-h-0 flex-1">
-		<nav aria-label="템플릿 메뉴" class="flex w-52.5 shrink-0 flex-col gap-0.5 border-r bg-sidebar px-2.5 py-3.5">
+		<nav aria-label="템플릿 메뉴" class="flex w-53 shrink-0 flex-col gap-0.5 border-r bg-sidebar px-2.5 py-3.5">
 			{#each tplNav as g, gi (g.group)}
 				<span class={['list-label px-2 pb-1.5', gi > 0 ? 'mt-1.5 border-t pt-3.5' : 'pt-0.5']}>{g.group}</span>
 				{#each g.items as it (it.v)}
@@ -133,7 +133,7 @@
 						onclick={() => (tplTab = it.v)}
 						class={['side-nav-item h-8.5', tplTab === it.v ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 					>
-						<it.icon class="size-3.75" />
+						<it.icon class="size-4" />
 						<span class="flex-1 text-left">{it.label}</span>
 						{#if it.v === 'revisions' && t.draft}<span class="size-1.5 rounded-full bg-status-waiting" aria-label="초안 있음"></span>{/if}
 					</button>
@@ -145,7 +145,7 @@
 				<RoleAvatar role={t.role} size="lg" class="overflow-visible">
 					<RuntimeLogo runtime={t.runtime} class="absolute -right-1 -bottom-1 size-4" />
 				</RoleAvatar>
-				<div class="flex min-w-0 flex-1 flex-col gap-1.25">
+				<div class="flex min-w-0 flex-1 flex-col gap-1.5">
 					<div class="flex items-center gap-2.5">
 						<h1 class="text-xl font-bold">{t.name}</h1>
 						<Badge variant="secondary" class="gap-1"><LayoutTemplate class="size-3" />템플릿 · v{t.version}</Badge>
@@ -279,7 +279,7 @@
 									type="button"
 									aria-current={tplOpened[tplActive]?.name === f.name ? 'true' : undefined}
 									onclick={() => openTplFile(f.name)}
-									class={['flex items-center gap-1.5 rounded-sm py-1.25 pr-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50', depth ? 'pl-7' : 'pl-2', tplOpened[tplActive]?.name === f.name && 'bg-accent font-medium']}
+									class={['flex items-center gap-1.5 rounded-sm py-1.5 pr-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50', depth ? 'pl-7' : 'pl-2', tplOpened[tplActive]?.name === f.name && 'bg-accent font-medium']}
 								>
 									{#if f.name === 'SOUL.md'}<Heart class="size-3.5 text-muted-foreground" />{:else}<FileText class="size-3.5 text-muted-foreground" />{/if}
 									<span class="flex-1 truncate">{f.name.split('/').pop()}</span>
@@ -299,7 +299,7 @@
 								<CardHeader><CardTitle>Run 시 합성되는 컨텍스트</CardTitle></CardHeader>
 								<CardContent class="gap-0">
 									{#each stack as [label, kind, n], i (label)}
-										<div class="flex items-center gap-2 border-t py-1.75 text-xs first:border-t-0">
+										<div class="flex items-center gap-2 border-t py-2 text-xs first:border-t-0">
 											<span class="flex size-4.5 items-center justify-center rounded-full bg-muted font-mono text-2xs">{i + 1}</span>
 											<span class="flex-1 truncate">{label}</span>
 											<span class="text-caption text-subtle-foreground">{kind}</span>

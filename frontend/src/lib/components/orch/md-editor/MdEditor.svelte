@@ -177,7 +177,7 @@
 			{#each files as f, i (f.name)}
 				<div class={cn("-mb-px flex shrink-0 items-center gap-1.5 border-r px-3.5 py-2 text-xs", i === active ? "border-b border-b-card bg-card font-medium" : "text-muted-foreground")}>
 					<button type="button" role="tab" aria-selected={i === active} onclick={() => (active = i)} class="flex items-center gap-1.5 outline-none focus-visible:underline">
-						{#if f.name.endsWith("SOUL.md")}<Heart class={cn("size-3.25", i === active && "text-primary")} />{:else}<FileText class={cn("size-3.25", i === active && "text-primary")} />{/if}
+						{#if f.name.endsWith("SOUL.md")}<Heart class={cn("size-3.5", i === active && "text-primary")} />{:else}<FileText class={cn("size-3.5", i === active && "text-primary")} />{/if}
 						{f.name.split("/").pop()}
 					</button>
 					{#if changed(f)}<span class="size-1.5 rounded-full bg-status-waiting" aria-label="변경됨"></span>{/if}
@@ -190,14 +190,14 @@
 	{/if}
 
 	<div class="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b px-3 py-1.5 whitespace-nowrap">
-		<div role="radiogroup" aria-label="보기" class="flex gap-0.5 rounded-sm bg-muted p-0.75">
+		<div role="radiogroup" aria-label="보기" class="flex gap-0.5 rounded-sm bg-muted p-1">
 			{#each modes as m (m.v)}
 				<button
 					type="button"
 					role="radio"
 					aria-checked={mode === m.v}
 					onclick={() => (mode = m.v)}
-					class={cn("rounded-xs px-2.5 py-0.75 text-caption outline-none focus-visible:ring-3 focus-visible:ring-ring/50", mode === m.v ? "bg-card font-semibold text-foreground shadow-xs" : "text-muted-foreground")}
+					class={cn("rounded-xs px-2.5 py-1 text-caption outline-none focus-visible:ring-3 focus-visible:ring-ring/50", mode === m.v ? "bg-card font-semibold text-foreground shadow-xs" : "text-muted-foreground")}
 				>{m.label}</button>
 			{/each}
 		</div>
@@ -209,8 +209,8 @@
 				</button>
 			{/each}
 			<span class="mx-1.5 h-4.5 w-px bg-border"></span>
-			<button type="button" onclick={() => format("var")} class="flex items-center gap-1.25 rounded-xs border px-2 py-1 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"><Braces class="size-3.25 text-primary" />변수</button>
-			<button type="button" onclick={() => format("include")} class="ml-1 flex items-center gap-1.25 rounded-xs border px-2 py-1 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"><FileInput class="size-3.25 text-primary" />@include</button>
+			<button type="button" onclick={() => format("var")} class="flex items-center gap-1.5 rounded-xs border px-2 py-1 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"><Braces class="size-3.5 text-primary" />변수</button>
+			<button type="button" onclick={() => format("include")} class="ml-1 flex items-center gap-1.5 rounded-xs border px-2 py-1 text-xs font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"><FileInput class="size-3.5 text-primary" />@include</button>
 		{/if}
 		<span class="flex-1"></span>
 		{#if mode === "diff"}<span class="font-mono text-caption text-muted-foreground">+{plus} −{minus}</span>{/if}

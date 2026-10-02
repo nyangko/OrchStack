@@ -34,7 +34,7 @@
 				aria-current={on ? 'page' : undefined}
 				class={['side-nav-item h-8.5', on ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 			>
-				<m.icon class="size-3.75" />{m.label}
+				<m.icon class="size-4" />{m.label}
 			</a>
 		{/each}
 	</nav>

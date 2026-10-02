@@ -8,7 +8,7 @@
 				default: "bg-card text-card-foreground",
 				warning: "bg-warning-soft border-warning px-3 text-warning **:data-[slot=alert-title]:text-body **:data-[slot=alert-title]:font-semibold **:data-[slot=alert-description]:text-xs **:data-[slot=alert-description]:text-foreground",
 				// .pen TaskEditor · Orch Draft: 파란 띠 · 테두리 없음 · 12px (오른쪽 버튼은 Alert.Action)
-				primary: "bg-primary-soft border-transparent px-3 py-2.5 items-center **:data-[slot=alert-description]:text-xs **:data-[slot=alert-description]:text-foreground *:[svg]:size-3.75 *:[svg]:text-primary has-data-[slot=alert-action]:pr-28",
+				primary: "bg-primary-soft border-transparent px-3 py-2.5 items-center **:data-[slot=alert-description]:text-xs **:data-[slot=alert-description]:text-foreground *:[svg]:size-4 *:[svg]:text-primary has-data-[slot=alert-action]:pr-28",
 				// .pen InfoStrip: 회색 띠 · 12px
 				info: "bg-muted border-border px-3.5 py-2 **:data-[slot=alert-title]:text-xs **:data-[slot=alert-title]:font-semibold **:data-[slot=alert-description]:text-xs *:[svg]:size-3.5",
 				// .pen Quota Alert: 붉은 띠 · 제목은 본문색

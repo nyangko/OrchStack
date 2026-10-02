@@ -165,7 +165,7 @@
 		onclick={() => pickView(key, x)}
 		class={['side-nav-item h-8.5 w-full', view === key ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 	>
-		<Icon class="size-3.75 shrink-0" />
+		<Icon class="size-4 shrink-0" />
 		<span class="flex-1 truncate text-left">{label}</span>
 		<span class="font-mono text-caption">{count(x)}</span>
 	</button>
@@ -190,7 +190,7 @@
 			</div>
 		{/each}
 		<button type="button" onclick={saveView} class="side-nav-item h-8.5 text-muted-foreground">
-			<Plus class="size-3.75" />지금 필터로 보기 저장
+			<Plus class="size-4" />지금 필터로 보기 저장
 		</button>
 	</nav>
 
@@ -335,7 +335,7 @@
 										</RoleAvatar>
 										<span class="font-medium">{a.name}</span>
 										<span class="text-muted-foreground">{roles[a.role].label}</span>
-										{#if t.model}<span class="code-tag truncate"><Cpu class="size-2.25 shrink-0" />{t.model}</span>{/if}
+										{#if t.model}<span class="code-tag truncate"><Cpu class="size-2.5 shrink-0" />{t.model}</span>{/if}
 									{:else}
 										<span class="text-muted-foreground">미배정</span>
 									{/if}

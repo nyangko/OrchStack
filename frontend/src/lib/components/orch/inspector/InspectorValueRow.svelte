@@ -16,7 +16,7 @@
 </script>
 
 <div bind:this={ref} data-slot="inspector-value-row" class={cn("flex h-7 items-center gap-2", className)} {...restProps}>
-	<Icon class="size-3.25 shrink-0 text-muted-foreground" />
+	<Icon class="size-3.5 shrink-0 text-muted-foreground" />
 	<span class="flex-1 text-muted-foreground">{label}</span>
 	{#if children}{@render children()}{:else}<span class="font-medium">{value}</span>{/if}
 </div>

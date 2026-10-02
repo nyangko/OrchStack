@@ -257,15 +257,15 @@
 						{@const st = stateMeta[c.state]}
 						<div class={['flex items-center rounded-md border gap-3 px-4 py-3.5', isOn(c) ? 'bg-card' : 'bg-muted']}>
 							<span class="icon-tile size-9.5">{@render mark(c.key, 'size-5')}</span>
-							<span class="flex min-w-0 flex-1 flex-col gap-1.25">
+							<span class="flex min-w-0 flex-1 flex-col gap-1.5">
 								<span class="label-xs-strong">{c.name}<Pill class={kindPill[c.kind]}>{c.kind}</Pill></span>
-								<span class={['meta-truncate gap-1.25', st.tone]}><st.icon class="size-3 shrink-0" />{c.note}</span>
+								<span class={['meta-truncate gap-1.5', st.tone]}><st.icon class="size-3 shrink-0" />{c.note}</span>
 							</span>
 							{#each c.quotas as q (q.label)}
 								{@const money = q.limit !== undefined}
 								{@const v = money ? ((q.used ?? 0) / q.limit!) * 100 : (q.pct ?? 0)}
 								{@const tone = money ? 'text-primary' : v < 20 ? 'text-status-blocked' : 'text-status-done'}
-								<span class="flex shrink-0 items-center gap-1.5 rounded-sm border bg-card px-2 py-0.75">
+								<span class="flex shrink-0 items-center gap-1.5 rounded-sm border bg-card px-2 py-1">
 									<span class="text-2xs font-semibold text-muted-foreground">{q.label}</span>
 									<Progress value={v} class="h-1 w-8 bg-muted" indicator={money ? 'bg-primary' : v < 20 ? 'bg-status-blocked' : 'bg-status-done'} aria-label="{c.name} {q.label}" />
 									<span class={['font-mono text-caption font-semibold', tone]}>{money ? `$${q.used}/$${q.limit}` : `${q.pct}%`}</span>
@@ -324,7 +324,7 @@
 									}
 								}}
 							>
-								<GripVertical class="size-3.25" />
+								<GripVertical class="size-3.5" />
 							</button>
 							<span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-caption font-semibold text-background">{i + 1}</span>
 							<span class="flex items-center justify-center size-6 shrink-0">{@render mark(s.key, 'size-5')}</span>
@@ -364,7 +364,7 @@
 					{@const Icon = costIcon[i]}
 					<div class="flex flex-col gap-1.5 py-1.5">
 						<span class="flex items-center gap-2 text-xs">
-							<Icon class="size-3.25 text-muted-foreground" />
+							<Icon class="size-3.5 text-muted-foreground" />
 							<span class="flex-1 text-muted-foreground">{c.label}</span>
 							<span class="font-mono font-medium">${c.used}</span>
 							<span class="text-subtle-foreground"><span class="font-mono">/ {c.limit ? `$${c.limit}` : ''}</span>{c.limit ? '' : '월'}</span>
@@ -374,7 +374,7 @@
 					</div>
 				{/each}
 				<span class="value-line">
-					<HardDrive class="size-3.25 text-muted-foreground" />
+					<HardDrive class="size-3.5 text-muted-foreground" />
 					<span class="flex-1 text-muted-foreground">로컬</span>
 					<span class="font-medium"><span class="font-mono">$0</span> · 비용 없음</span>
 				</span>

@@ -62,10 +62,10 @@
 						<a
 							href="/teams/agents/{t.sn}"
 							aria-current={on ? 'page' : undefined}
-							class={['flex items-center gap-2.5 rounded-md px-2 py-1.75 outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50', on && 'bg-accent']}
+							class={['flex items-center gap-2.5 rounded-md px-2 py-2 outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/50', on && 'bg-accent']}
 						>
 							<RoleAvatar role={t.role} />
-							<span class="flex min-w-0 flex-1 flex-col gap-0.75">
+							<span class="flex min-w-0 flex-1 flex-col gap-1">
 								<span class="truncate text-xs font-semibold">{t.name}</span>
 								<span class="text-caption text-muted-foreground">v{t.version} · {n ? `멤버 ${n}` : '미사용'}{t.draft ? ' · 초안' : ''}</span>
 							</span>
@@ -99,9 +99,9 @@
 						<span class="flex flex-col items-end gap-0.5 text-muted-foreground">
 							<span class="font-mono text-caption">{t.members.length}</span>
 							{#if t.members.some((m) => m.status === 'running')}
-								<LoaderCircle class="size-2.75 text-status-in-progress" aria-label="실행 중" />
+								<LoaderCircle class="size-3 text-status-in-progress" aria-label="실행 중" />
 							{:else}
-								<CirclePause class="size-2.75" aria-label="쉬는 중" />
+								<CirclePause class="size-3" aria-label="쉬는 중" />
 							{/if}
 						</span>
 					</a>

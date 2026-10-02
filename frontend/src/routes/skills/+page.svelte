@@ -142,7 +142,7 @@
 					onclick={() => ((filterKey = it.key), (filter = it.f))}
 					class={['side-nav-item h-8', filterKey === it.key ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 				>
-					<it.icon class="size-3.75 shrink-0" />
+					<it.icon class="size-4 shrink-0" />
 					<span class="flex-1 truncate text-left">{it.label}</span>
 					<span class="font-mono text-caption">{it.n}</span>
 				</button>

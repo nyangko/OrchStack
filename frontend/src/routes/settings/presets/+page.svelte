@@ -158,7 +158,7 @@
 							type="button"
 							aria-current={p.key === sel.key ? 'true' : undefined}
 							onclick={() => (selKey = p.key)}
-							class={['list-panel-item px-2 py-1.75', p.key === sel.key ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
+							class={['list-panel-item px-2 py-2', p.key === sel.key ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 						>
 							<k.icon class="size-3.5 shrink-0" />
 							<span class="truncate">{p.key} · {p.tok} tok{p.kind === 'style' && p.default ? ' (기본)' : ''}</span>

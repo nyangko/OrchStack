@@ -33,7 +33,7 @@
 	{#if status !== false}
 		{@const StatusIcon = statusIcon}
 		<span class="flex items-center gap-1 text-xs font-medium text-status-done" role="status">
-			{#if status}<StatusIcon class="size-3.25" />{status}{/if}
+			{#if status}<StatusIcon class="size-3.5" />{status}{/if}
 		</span>
 	{/if}
 	{@render children?.()}

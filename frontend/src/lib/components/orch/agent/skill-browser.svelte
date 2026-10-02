@@ -128,7 +128,7 @@
 				<aside class="flex w-64 shrink-0 flex-col gap-4 border-l bg-background px-5 py-4 text-xs">
 					<span class="font-semibold">이 스킬은</span>
 					{#each [[Zap, '트리거', h.skillMd.find((l) => l.startsWith('description:'))?.slice(13) ?? '관련 작업 시'], [Layers, '컨텍스트', `+${(h.tok / 1000).toFixed(1)}K tok`], [Hash, 'sha256', '3f9a…c21e'], [Users, '이 팀 사용', store.library.some((k) => k.name === h.name) ? '설치됨' : '처음 추가']] as const as [Icon, k, v] (k)}
-						<div class="flex items-start gap-2"><Icon class="mt-0.5 size-3.25 text-muted-foreground" /><span class="w-16 text-muted-foreground">{k}</span><span class="flex-1 font-medium">{v}</span></div>
+						<div class="flex items-start gap-2"><Icon class="mt-0.5 size-3.5 text-muted-foreground" /><span class="w-16 text-muted-foreground">{k}</span><span class="flex-1 font-medium">{v}</span></div>
 					{/each}
 					<span class="border-t pt-3 font-semibold">지원 에이전트</span>
 					<div class="flex items-center gap-2"><RuntimeLogo runtime="claude" class="size-4 ring-0" />Claude Code</div>

@@ -811,7 +811,7 @@
 		{#snippet child({ props: row })}
 			<svelte:element this={props ? 'button' : 'div'} {...mergeProps(row, props ?? {})}>
 				<ItemContent><ItemDescription>{label}</ItemDescription></ItemContent>
-				<ItemActions class="min-w-0 text-xs font-medium"><Icon class={['size-3.25 shrink-0', tone]} /><span class="truncate">{value}</span>{#if props}<ChevronsUpDown class="size-3 text-muted-foreground" />{/if}</ItemActions>
+				<ItemActions class="min-w-0 text-xs font-medium"><Icon class={['size-3.5 shrink-0', tone]} /><span class="truncate">{value}</span>{#if props}<ChevronsUpDown class="size-3 text-muted-foreground" />{/if}</ItemActions>
 			</svelte:element>
 		{/snippet}
 	</Item>
@@ -833,7 +833,7 @@
 				{#if depth === 0}
 					<span class="kind-mark size-5 bg-node-issue"><CircleDot class="size-3" /></span>
 				{:else}
-					<span class="flex size-4.5 items-center justify-center rounded-xs border border-node-issue text-node-issue"><GitBranch class="size-2.75" /></span>
+					<span class="flex size-4.5 items-center justify-center rounded-xs border border-node-issue text-node-issue"><GitBranch class="size-3" /></span>
 				{/if}
 				<icon.icon class={['size-3.5', icon.text]} aria-label={icon.label} />
 				<span class="font-mono text-xs font-medium text-muted-foreground">#{i.num}</span>
@@ -1238,7 +1238,7 @@
 						<Controls position="bottom-right" showLock={false} />
 						<Panel position="bottom-left">
 							<div class="card flex items-center gap-3 px-2.5 py-1.5 text-xs text-muted-foreground rounded-md" aria-label="연결선 범례">
-								{#each [['contains', 'bg-input', 'h-0.5'], ['delegate', 'bg-primary', 'h-0.5'], ['assigned', 'bg-node-agent', 'h-0.5'], ['interaction (idle)', 'bg-status-review', 'h-0.5'], ['live event', 'bg-primary', 'h-0.75'], ['spawn', 'bg-node-agent', 'h-0.5'], ['queued · waits', 'bg-subtle-foreground', 'h-0.5']] as [l, bg, h] (l)}
+								{#each [['contains', 'bg-input', 'h-0.5'], ['delegate', 'bg-primary', 'h-0.5'], ['assigned', 'bg-node-agent', 'h-0.5'], ['interaction (idle)', 'bg-status-review', 'h-0.5'], ['live event', 'bg-primary', 'h-1'], ['spawn', 'bg-node-agent', 'h-0.5'], ['queued · waits', 'bg-subtle-foreground', 'h-0.5']] as [l, bg, h] (l)}
 									<span class="flex items-center gap-1.5"><span class={['w-3.5 rounded-full', bg, h]}></span>{l}</span>
 								{/each}
 							</div>
@@ -1910,7 +1910,7 @@
 													<span class="text-caption font-semibold text-subtle-foreground">다른 선택</span>
 													{#each k.alternatives as alt, n (alt)}
 														{@const AltIcon = [UserRound, Inbox, Archive, CircleCheckBig][n] ?? Check}
-														<button type="button" class="flex items-center gap-2 py-0.75 text-left text-xs outline-none hover:underline focus-visible:underline" onclick={() => settle(k, alt)}><AltIcon class="size-3.5 text-muted-foreground" />{alt}</button>
+														<button type="button" class="flex items-center gap-2 py-1 text-left text-xs outline-none hover:underline focus-visible:underline" onclick={() => settle(k, alt)}><AltIcon class="size-3.5 text-muted-foreground" />{alt}</button>
 													{/each}
 												</div>
 											{/if}

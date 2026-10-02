@@ -176,31 +176,31 @@
 		<Card size="sm">
 			<CardHeader><CardTitle>이 조합으로 실행하면</CardTitle></CardHeader>
 			<CardContent class="gap-1">
-				<div class="value-line"><Coins class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">Run당 평균</span><span class="font-mono font-medium">35K tok</span></div>
+				<div class="value-line"><Coins class="size-3.5 text-muted-foreground" /><span class="flex-1 text-muted-foreground">Run당 평균</span><span class="font-mono font-medium">35K tok</span></div>
 				<LimitRow icon={BadgeCheck} label="구독 주간 창 사용" used="{perRun(runtime)}%" max="/ Run" value={perRun(runtime) * 10} note="주간 잔량 {acc.week}% → 약 {Math.floor(acc.week / perRun(runtime))} Run 가능" warn={low(acc.week)} />
-				<div class="value-line"><Wallet class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">폴백 시 비용</span><span class="font-medium">{h.fallback[0] === 'sub' ? 'OmniRoute · Run당 ~$0.4' : '첫 단계부터 과금'}</span></div>
-				<div class="value-line"><PlugZap class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">호환성</span><Pill class="bg-success-soft text-status-done"><Check />모두 호환</Pill></div>
+				<div class="value-line"><Wallet class="size-3.5 text-muted-foreground" /><span class="flex-1 text-muted-foreground">폴백 시 비용</span><span class="font-medium">{h.fallback[0] === 'sub' ? 'OmniRoute · Run당 ~$0.4' : '첫 단계부터 과금'}</span></div>
+				<div class="value-line"><PlugZap class="size-3.5 text-muted-foreground" /><span class="flex-1 text-muted-foreground">호환성</span><Pill class="bg-success-soft text-status-done"><Check />모두 호환</Pill></div>
 			</CardContent>
 		</Card>
 		<Card size="sm">
 			<CardHeader><CardTitle>실행 한도</CardTitle></CardHeader>
 			<CardContent class="gap-1.5 text-xs">
 				<div class="flex items-center gap-2">
-					<Timer class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">Run 최대 시간</span>
+					<Timer class="size-3.5 text-muted-foreground" /><span class="flex-1 text-muted-foreground">Run 최대 시간</span>
 					<Select type="single" bind:value={h.maxTime}>
 						<SelectTrigger size="sm" class="h-7 w-24">{h.maxTime}</SelectTrigger>
 						<SelectContent>{#each ['30m', '1h', '2h', '4h'] as t (t)}<SelectItem value={t} label={t} />{/each}</SelectContent>
 					</Select>
 				</div>
 				<label class="flex items-center gap-2">
-					<Repeat class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">최대 turn</span>
+					<Repeat class="size-3.5 text-muted-foreground" /><span class="flex-1 text-muted-foreground">최대 turn</span>
 					<Input type="number" min={10} max={500} bind:value={h.maxTurns} class="h-7 w-24 text-xs" />
 				</label>
 				<label class="flex h-7 items-center gap-2">
-					<History class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">세션 resume · 태스크 단위</span><Switch bind:checked={h.resume} />
+					<History class="size-3.5 text-muted-foreground" /><span class="flex-1 text-muted-foreground">세션 resume · 태스크 단위</span><Switch bind:checked={h.resume} />
 				</label>
 				<label class="flex h-7 items-center gap-2">
-					<Play class="size-3.25 text-muted-foreground" /><span class="flex-1 text-muted-foreground">한도 리셋 후 자동 재개</span><Switch bind:checked={h.autoResume} />
+					<Play class="size-3.5 text-muted-foreground" /><span class="flex-1 text-muted-foreground">한도 리셋 후 자동 재개</span><Switch bind:checked={h.autoResume} />
 				</label>
 			</CardContent>
 		</Card>

@@ -31,7 +31,7 @@
 		<span class="text-caption font-semibold text-muted-foreground">{label}</span>
 		<div class="flex flex-wrap items-center gap-1.5">
 			{#each list as g, i (g)}
-				<span class="flex items-center gap-1 rounded-sm border bg-muted px-2 py-0.75 font-mono text-xs">
+				<span class="flex items-center gap-1 rounded-sm border bg-muted px-2 py-1 font-mono text-xs">
 					{g}
 					<button type="button" aria-label="{g} 삭제" onclick={() => list.splice(i, 1)} class="text-subtle-foreground hover:text-foreground"><X class="size-3" /></button>
 				</span>

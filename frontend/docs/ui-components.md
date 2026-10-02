@@ -224,6 +224,14 @@ Use a `style` property or CSS variable for values computed at runtime, such as p
 
 Explain a non-obvious arbitrary-value exception near its use or in the change report. Do not bulk-edit shadcn-svelte selectors such as `data-[state=open]:` merely to eliminate brackets.
 
+### Size scale (#116)
+
+All sizes are rem through Tailwind. Write px only in comments that quote the `.pen` value.
+
+- Text: Tailwind names `text-xs` 12 · `sm` 14 · `base` 16 · `lg` 18 · `xl` 20 · `2xl` 24 · `3xl` 30 · `6xl` 60, plus three density tokens `text-2xs` 10 · `text-caption` 11 · `text-body` 13. The `.pen` variables use the same names (`$text-caption` = `text-caption`).
+- Spacing and sizes: Tailwind steps down to 0.5 (2px). Do not use quarter steps (`.25` · `.75`). Inline icons are `size-2.5` · `3` · `3.5` · `4` (10 · 12 · 14 · 16); larger marks and tiles use whole steps (`size-5` and up).
+- Widths: standard spacing utilities (`w-53`, `w-95`). Give a width a purpose-named token only when several places share the same meaning.
+
 ## 13. Compose complete class names
 
 Do not build Tailwind class names through string interpolation.

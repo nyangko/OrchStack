@@ -422,7 +422,7 @@
 			{#if delta}<span class="pb-0.5 font-mono text-xs font-medium text-status-done">{delta}</span>{/if}
 			<span class="flex-1"></span>
 			{#if trend}
-				<span class="flex h-6 w-18 items-end gap-0.75" aria-hidden="true">
+				<span class="flex h-6 w-18 items-end gap-1" aria-hidden="true">
 					{#each trend as h, i (i)}
 						<span class={['flex-1 rounded-t-xs bg-primary', i < trend.length - 1 && 'opacity-35']} style="height: {h}px"></span>
 					{/each}
@@ -452,7 +452,7 @@
 				<div class="flex flex-1 flex-col gap-1.5">
 					<div class="flex items-center gap-2.5">
 						<h1 class="text-2xl font-bold">{team.name}</h1>
-						{#if team.project}<Pill dot="bg-success" class="rounded-sm px-2 py-0.75 text-xs text-foreground">{team.project}</Pill>{/if}
+						{#if team.project}<Pill dot="bg-success" class="rounded-sm px-2 py-1 text-xs text-foreground">{team.project}</Pill>{/if}
 					</div>
 					<p class="max-w-160 text-body text-muted-foreground">{team.desc}</p>
 				</div>
@@ -487,8 +487,8 @@
 							<AlertTitle>{a.name} 계정 주간 잔량 {a.week}% — {a.weekReset} 리셋까지 {a.left}</AlertTitle>
 							<AlertDescription>{hit.map((m) => m.name).join(' · ')} 영향. {a.forecast}. 정책: 잔량 {teamPolicy.quotaWarn}% 미만 → 확인 요청</AlertDescription>
 						</div>
-						<Button variant="outline" size="sm" class="h-7.5 text-xs"><Filter class="size-3.25" />P0–P1만 실행</Button>
-						<Button variant="outline" size="sm" class="h-7.5 text-xs"><Route class="size-3.25" />폴백 적용 · Anthropic Max</Button>
+						<Button variant="outline" size="sm" class="h-7.5 text-xs"><Filter class="size-3.5" />P0–P1만 실행</Button>
+						<Button variant="outline" size="sm" class="h-7.5 text-xs"><Route class="size-3.5" />폴백 적용 · Anthropic Max</Button>
 					</Alert>
 				{/each}
 
@@ -525,18 +525,18 @@
 									</TableCell>
 									<TableCell>
 										<span class={['flex items-center gap-1.5 text-xs', m.status === 'idle' && 'text-muted-foreground']}>
-											{#if m.next}<CircleDashed class="size-3.25 shrink-0 text-node-task" />{:else}<SquareCheck class="size-3.25 shrink-0 text-node-task" />{/if}
+											{#if m.next}<CircleDashed class="size-3.5 shrink-0 text-node-task" />{:else}<SquareCheck class="size-3.5 shrink-0 text-node-task" />{/if}
 											<span class="truncate">{m.work}</span>
 										</span>
 									</TableCell>
 									<TableCell>
 										<span class="code-tag font-medium">
-											<Terminal class="size-2.25" />{m.model}
+											<Terminal class="size-2.5" />{m.model}
 										</span>
 									</TableCell>
 									<TableCell>
 										<span class="flex items-center gap-2">
-											<Progress value={m.context} class="h-1.25 bg-muted" indicator={full ? 'bg-status-blocked' : undefined} aria-label="{m.name} 컨텍스트" />
+											<Progress value={m.context} class="h-1.5 bg-muted" indicator={full ? 'bg-status-blocked' : undefined} aria-label="{m.name} 컨텍스트" />
 											<span class={['font-mono text-caption', full ? 'font-semibold text-status-blocked' : 'text-muted-foreground']}>{m.context}%</span>
 										</span>
 									</TableCell>
@@ -563,7 +563,7 @@
 					<CardContent>
 						<div class="flex items-center gap-3">
 							{#each Object.values(loads) as l (l.label)}
-								<span class="meta-line gap-1.25"><span class={['size-2 rounded-xs', l.bg]}></span>{l.label}</span>
+								<span class="meta-line gap-1.5"><span class={['size-2 rounded-xs', l.bg]}></span>{l.label}</span>
 							{/each}
 						</div>
 						{#each team.members as m (m.sn)}
@@ -616,7 +616,7 @@
 											<span class={['font-semibold', low(q.pct) && 'text-destructive']}><span class="font-mono">{q.pct}%</span> 남음</span>
 											<span class="text-subtle-foreground">· {q.reset} 리셋</span>
 										</span>
-										<Progress value={q.pct} class="h-1.25 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" />
+										<Progress value={q.pct} class="h-1.5 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" />
 									</div>
 								{/each}
 							</div>
@@ -651,10 +651,10 @@
 							{/each}
 						</div>
 						<div class="meta-xs gap-1.5 border-t pt-2">
-							<ShieldCheck class="size-3.25 shrink-0 text-status-done" />루프 가드 {policy.guards.filter((g) => g.on).length}개 켜짐 · 마지막 정지: {policy.lastStop}
+							<ShieldCheck class="size-3.5 shrink-0 text-status-done" />루프 가드 {policy.guards.filter((g) => g.on).length}개 켜짐 · 마지막 정지: {policy.lastStop}
 						</div>
 						<div class="meta-xs gap-1.5">
-							<Layers class="size-3.25 shrink-0" />하위 작업 · 기본 {policy.spawn.mode} · 허용 {policy.spawn.allow.join(' · ')} · 리드당 {policy.spawn.maxChild}
+							<Layers class="size-3.5 shrink-0" />하위 작업 · 기본 {policy.spawn.mode} · 허용 {policy.spawn.allow.join(' · ')} · 리드당 {policy.spawn.maxChild}
 						</div>
 					</CardContent>
 				</Card>
@@ -666,7 +666,7 @@
 					</CardHeader>
 					<CardContent class="gap-1">
 						<div class="value-line">
-							<Terminal class="size-3.25 text-muted-foreground" />
+							<Terminal class="size-3.5 text-muted-foreground" />
 							<span class="flex-1 text-muted-foreground">기본 Runtime</span>
 							<span class="font-medium">{teamPolicy.runtime}</span>
 						</div>
@@ -690,12 +690,12 @@
 							note={running < teamPolicy.maxRuns ? `${teamPolicy.maxRuns - running}개 여유` : '가득 참'}
 						/>
 						<div class="value-line">
-							<ShieldCheck class="size-3.25 text-muted-foreground" />
+							<ShieldCheck class="size-3.5 text-muted-foreground" />
 							<span class="flex-1 text-muted-foreground">Review 필수</span>
 							<Pill class="bg-review-soft text-status-review"><GitMerge />{teamPolicy.review}</Pill>
 						</div>
 						<div class="value-line">
-							<GitBranch class="size-3.25 text-muted-foreground" />
+							<GitBranch class="size-3.5 text-muted-foreground" />
 							<span class="flex-1 text-muted-foreground">Repo 권한</span>
 							<span class="font-mono font-medium">{teamPolicy.repo}</span>
 						</div>
@@ -740,12 +740,12 @@
 					<ChoiceCards aria-label="템플릿" class="grid-cols-2" bind:value={() => pick, (v) => (pick = v as typeof pick)}>
 						{#each tplShown as t (t.sn)}
 							{@const on = pick === t.sn}
-							<ChoiceCard value={t.sn} layout="row" ondblclick={toCharacter} class="gap-2.5 bg-card px-2 py-1.75">
+							<ChoiceCard value={t.sn} layout="row" ondblclick={toCharacter} class="gap-2.5 bg-card px-2 py-2">
 								<RoleAvatar role={t.role} />
-								<span class="flex min-w-0 flex-1 flex-col gap-0.75">
+								<span class="flex min-w-0 flex-1 flex-col gap-1">
 									<span class="text-xs font-semibold">{t.name}</span>
 									<span class="text-caption text-muted-foreground">v{t.version} · {t.focus}</span>
-									<span class="subtle-meta gap-1.25">
+									<span class="subtle-meta gap-1.5">
 										<RuntimeLogo runtime={t.runtime} class="size-3 ring-0" />
 										{runtimeName(t.runtime)} · {t.model} · {t.members ? `멤버 ${t.members}` : '미사용'}
 									</span>
@@ -872,14 +872,14 @@
 						<div class="flex flex-wrap items-center gap-1.5 text-caption">
 							<span class="font-semibold text-muted-foreground">폴백</span>
 							{#each chain as a, i (a.runtime)}
-								<span class="pill-soft gap-1.25">
+								<span class="pill-soft gap-1.5">
 									<span class="font-mono text-2xs text-muted-foreground">{i + 1}</span>
 									{a.plan}
 									<span class={['font-mono text-2xs', low(a.week) ? 'text-status-blocked' : 'text-muted-foreground']}>{a.week}%</span>
 								</span>
 								<ChevronRight class="size-3 text-subtle-foreground" />
 							{/each}
-							<span class="pill-soft gap-1.25">
+							<span class="pill-soft gap-1.5">
 								<span class="font-mono text-2xs text-muted-foreground">3</span>
 								OmniRoute
 								<span class="font-mono text-2xs text-muted-foreground">${Math.round(gateway.used)}/${gateway.limit}</span>
@@ -900,9 +900,9 @@
 								</div>
 							</div>
 							<div class="flex flex-wrap items-center gap-4 rounded-sm bg-muted px-3 py-2.5 text-xs text-muted-foreground">
-								<span class="flex items-center gap-1.25"><ShieldCheck class="size-3" />Trust {tpl.config.trust}</span>
-								<span class="flex items-center gap-1.25"><FolderGit2 class="size-3" />{scopeText(tpl.config)}</span>
-								<span class="flex items-center gap-1.25"><GitPullRequest class="size-3" />PR 승인 필요</span>
+								<span class="flex items-center gap-1.5"><ShieldCheck class="size-3" />Trust {tpl.config.trust}</span>
+								<span class="flex items-center gap-1.5"><FolderGit2 class="size-3" />{scopeText(tpl.config)}</span>
+								<span class="flex items-center gap-1.5"><GitPullRequest class="size-3" />PR 승인 필요</span>
 							</div>
 						</section>
 					{/if}
@@ -997,8 +997,8 @@
 	{@const max = Math.max(1, ...cols.map(([a, b]) => a + (b ?? 0)))}
 	<div class="flex flex-col gap-2.5">
 		<div class="meta-line gap-3.5">
-			<span class="flex items-center gap-1.25"><span class="size-2 rounded-xs bg-primary"></span>{legend[0]}</span>
-			{#if legend[1]}<span class="flex items-center gap-1.25"><span class="size-2 rounded-xs bg-status-blocked"></span>{legend[1]}</span>{/if}
+			<span class="flex items-center gap-1.5"><span class="size-2 rounded-xs bg-primary"></span>{legend[0]}</span>
+			{#if legend[1]}<span class="flex items-center gap-1.5"><span class="size-2 rounded-xs bg-status-blocked"></span>{legend[1]}</span>{/if}
 			<span class="flex-1"></span>
 			<span>{total}</span>
 		</div>
@@ -1062,7 +1062,7 @@
 						<span>{m.title} · {team.name}</span>
 						{#if origin}
 							<span class="text-subtle-foreground">·</span>
-							<span class="chip-box gap-1.25 py-0.5">
+							<span class="chip-box gap-1.5 py-0.5">
 								<LayoutTemplate class="size-3" />원본 {origin.name} v{origin.version}{#if det?.diff.length}{` · 변경 ${det.diff.length}`}{/if}
 							</span>
 						{/if}
@@ -1075,7 +1075,7 @@
 			</SheetHeader>
 
 			<SheetBody padded={false} class="flex-row">
-				<nav aria-label="멤버 메뉴" class="side-nav w-52.5 px-2.5 py-3.5">
+				<nav aria-label="멤버 메뉴" class="side-nav w-53 px-2.5 py-3.5">
 					{#each nav as g, gi (g.group)}
 						<span class={['list-label px-2 pb-1.5', gi > 0 ? 'mt-1.5 border-t pt-3.5' : 'pt-0.5']}>{g.group}</span>
 						{#each g.items as it (it.v)}
@@ -1085,7 +1085,7 @@
 								onclick={() => (tab = it.v)}
 								class={['side-nav-item h-8.5', tab === it.v ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground']}
 							>
-								<it.icon class="size-3.75" />
+								<it.icon class="size-4" />
 								<span class="flex-1 text-left">{it.label}</span>
 								{#if 'changed' in it && it.changed}<span class="size-1.5 rounded-full bg-primary" aria-label="템플릿과 다름"></span>{/if}
 							</button>
@@ -1131,9 +1131,9 @@
 									</div>
 									<Progress value={det.now.pct} class="h-1.5" aria-label="#{now.num} 진행" />
 									<div class="flex flex-wrap gap-4 text-xs text-muted-foreground">
-										<span class="flex items-center gap-1.25"><LoaderCircle class="size-3" />Run #{det.now.run} · {det.now.elapsed}</span>
-										<span class="flex items-center gap-1.25"><GitBranch class="size-3" />{det.now.branch} · {det.now.commits} commits</span>
-										<span class="flex items-center gap-1.25"><Timer class="size-3" />ETA {det.now.eta}</span>
+										<span class="flex items-center gap-1.5"><LoaderCircle class="size-3" />Run #{det.now.run} · {det.now.elapsed}</span>
+										<span class="flex items-center gap-1.5"><GitBranch class="size-3" />{det.now.branch} · {det.now.commits} commits</span>
+										<span class="flex items-center gap-1.5"><Timer class="size-3" />ETA {det.now.eta}</span>
 									</div>
 								</CardContent>
 							</Card>
@@ -1249,7 +1249,7 @@
 								<CardContent class="gap-0">
 									{#each [[ArrowDownWideNarrow, '정렬 기준', det.rules.sort], [Play, '자동 시작', det.rules.autostart ? '켜짐' : '꺼짐'], [Shuffle, 'Orch 재배치', det.rules.rebalance ? '허용' : '안 함'], [Layers, '동시 실행', det.rules.runs]] as const as [Icon, l, v] (l)}
 										<div class="value-line">
-											<Icon class="size-3.25 text-muted-foreground" />
+											<Icon class="size-3.5 text-muted-foreground" />
 											<span class="flex-1 text-muted-foreground">{l}</span>
 											<span class="font-medium">{v}</span>
 										</div>
@@ -1378,7 +1378,7 @@
 											{@const KindIcon = kindIcon[a.kind]}
 											<div class="row-divided gap-2.5 py-2">
 												<RoleAvatar role={a.role} />
-												<div class="flex min-w-0 flex-1 flex-col gap-0.75">
+												<div class="flex min-w-0 flex-1 flex-col gap-1">
 													<div class="flex items-center gap-1.5 text-xs">
 														<span class="font-semibold">{a.who}</span>
 														<Badge variant="secondary" class="gap-1"><KindIcon class="size-3" />{a.kind}</Badge>
@@ -1441,7 +1441,7 @@
 												<span class={['font-semibold', low(q.pct) && 'text-destructive']}><span class="font-mono">{q.pct}%</span> 남음</span>
 												<span class="text-subtle-foreground">· {q.reset} 리셋</span>
 											</span>
-											<Progress value={q.pct} class="h-1.25 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" />
+											<Progress value={q.pct} class="h-1.5 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" />
 										</div>
 									{/each}
 								</div>
@@ -1545,13 +1545,13 @@
 												type="button"
 												aria-pressed={sel}
 												onclick={() => ((d.mode = 'timer'), (d.timer = sec), (customTimer = false))}
-												class={['rounded-xs border px-2 py-0.75 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', sel ? 'border-primary bg-primary text-on-solid' : 'bg-card']}
+												class={['rounded-xs border px-2 py-1 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50', sel ? 'border-primary bg-primary text-on-solid' : 'bg-card']}
 											>{sec}초</button>
 										{/each}
 										{#if customTimer}
 											<Input type="number" min={1} max={600} bind:value={d.timer} aria-label="대기 초" class="h-6.5 w-16 px-2 text-xs" />
 										{:else}
-											<button type="button" onclick={() => ((d.mode = 'timer'), (customTimer = true))} class="rounded-xs border bg-card px-2 py-0.75 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50">직접</button>
+											<button type="button" onclick={() => ((d.mode = 'timer'), (customTimer = true))} class="rounded-xs border bg-card px-2 py-1 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50">직접</button>
 										{/if}
 									</div>
 								{/if}
@@ -1564,17 +1564,17 @@
 					{@render heading('2 · 작업 레벨별 처리', '결정의 무게에 따라 처리 방식을 나눠요. 레벨이 높을수록 사람의 판단이 필요해요.')}
 					<div class="overflow-hidden rounded-md border">
 						<div class="flex bg-muted text-caption font-medium text-muted-foreground gap-4 px-4 py-2">
-							<span class="w-57.5">레벨</span><span class="flex-1">예시</span><span class="w-75">처리</span><span class="w-42.5">응답 없으면</span>
+							<span class="w-58">레벨</span><span class="flex-1">예시</span><span class="w-75">처리</span><span class="w-42">응답 없으면</span>
 						</div>
 						{#each d.levels as l, i (i)}
 							<div class="flex items-center border-t px-4 gap-4 py-3">
-								<span class="flex w-57.5 items-center gap-2.5">
+								<span class="flex w-58 items-center gap-2.5">
 									<span class={['mono-tag py-px text-on-solid', levelTone[i].bg]}>L{i}</span>
 									<span class="text-body font-semibold">{l.name}</span>
 								</span>
 								<span class="flex-1 text-xs text-muted-foreground">{l.example}</span>
 								<Segmented class="w-75" options={actions} bind:value={() => l.action, (v) => (l.action = v as LevelAction)} disabled={l.locked} aria-label="L{i} 처리" />
-								<span class="w-42.5 text-xs">
+								<span class="w-42 text-xs">
 									{#if l.locked}
 										<span class="text-subtle-foreground">변경 불가</span>
 									{:else if l.action === 'timer'}

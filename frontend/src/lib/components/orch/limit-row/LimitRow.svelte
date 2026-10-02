@@ -31,7 +31,7 @@
 
 <div data-slot="limit-row" class={cn("flex flex-col gap-1.5 py-1.5", className)}>
 	<span class="flex items-center gap-2 text-xs">
-		<Icon class="size-3.25 text-muted-foreground" />
+		<Icon class="size-3.5 text-muted-foreground" />
 		<span class="flex-1 text-muted-foreground">{label}</span>
 		<span class={cn("font-mono font-medium", warn && "text-status-blocked")}>{used}</span>
 		<span class="font-mono text-subtle-foreground">{max}</span>

@@ -70,7 +70,7 @@
 			ondrop={() => drop(i)}
 		>
 			{#if sortable}
-				<GripVertical class="size-3.25 shrink-0 cursor-grab text-transparent group-hover:text-subtle-foreground" aria-hidden="true" />
+				<GripVertical class="size-3.5 shrink-0 cursor-grab text-transparent group-hover:text-subtle-foreground" aria-hidden="true" />
 			{/if}
 			<Checkbox bind:checked={c.done} aria-label={c.text} />
 			{#if editing === i}
