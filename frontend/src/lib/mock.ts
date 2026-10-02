@@ -441,6 +441,8 @@ export const providers: Provider[] = [
 /// state — low: 잔량 20% 미만 · exhausted: 한도 소진 · expired: 키 만료 (폴백에서 빠짐).
 export type Quota = { label: string; pct?: number; used?: number; limit?: number };
 export type Connection = {
+	/** 서버 연결 번호 (서버 모드). 같은 제공자 연결이 여럿일 수 있어 목록 키로 쓴다. */
+	sn?: number;
 	key: string;
 	name: string;
 	kind: ProviderKind;

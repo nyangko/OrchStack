@@ -1,7 +1,8 @@
 <script lang="ts">
 	/// Settings › 모델 연결 — 연결 목록 · 폴백 체인 · 이번 달 비용 (.pen Settings · 모델 연결 · 오류 · 한도 소진 상태).
-	/// 연결 추가 · 로그인 · 키 갱신은 인트로와 같은 연결 추가 다이얼로그. 점검 · 한도는 목데이터 (서버 연결 #47).
-	import { onDestroy, type Component } from 'svelte';
+	/// 연결 추가 · 로그인 · 키 갱신은 인트로와 같은 연결 추가 다이얼로그.
+	/// 서버 모드(A-4 #95): 목록 · 한도는 GET /connections · /quotas, 추가는 POST /connections. 폴백 체인 · 비용은 서버 계약이 달라(#60) 화면 상태.
+	import { onDestroy, onMount, type Component } from 'svelte';
 	import Activity from '@lucide/svelte/icons/activity';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Settings2 from '@lucide/svelte/icons/settings-2';
@@ -32,13 +33,19 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { RuntimeLogo, type Runtime } from '$lib/components/orch/runtime-logo';
 	import { AddConnectionDialog, providerMark, type AddedConnection } from '$lib/components/orch/connection';
-	import { connections, fallbackChains, monthCost, type Connection, type ProviderKind, type SubRunTier } from '$lib/mock';
+	import { connections, fallbackChains, monthCost, type Connection, type ProviderKind, type Quota, type SubRunTier } from '$lib/mock';
+	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '$lib/components/ui/empty';
+	import { api } from '$lib/api/client';
+	import { useMock } from '$lib/api/env';
+	import type { components } from '$lib/api/schema';
+	import { langCode } from '$lib/lang';
 	
 	type Filter = '전체' | '구독 · 플랜' | 'API 키' | '게이트웨이' | '로컬';
 	/// 한도 문제 알림 — 점검 결과로 생긴다.
 	type Notice = { key: string; title: string; desc: string };
 
-	let list = $state(structuredClone(connections));
+	let list = $state(useMock ? structuredClone(connections) : []);
+	let loadState = $state<'loading' | 'ready' | 'error'>(useMock ? 'ready' : 'loading');
 	let chains = $state(structuredClone(fallbackChains));
 	let chainOf = $state<Runtime>('claude');
 	let filter = $state<Filter>('전체');
@@ -46,6 +53,8 @@
 	let checking = $state(false);
 	let addOpen = $state(false);
 	let addKey = $state<string>();
+	/// 서버 모드에서 키 갱신 · 로그인으로 연 기존 연결 — 있으면 새로 만들지 않고 고친다.
+	let addSn = $state<number>();
 	let dragFrom = -1;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	onDestroy(() => clearTimeout(timer));
@@ -76,8 +85,51 @@
 	const costIcon = [BadgeCheck, KeyRound, Route];
 	const total = monthCost.reduce((n, c) => n + c.used, 0);
 
-	/// 전체 연결 점검 — 한도를 새로 읽고 키를 시험한다. 목데이터: Codex 주간 소진 · Anthropic API 키 만료가 발견된다.
-	function checkAll() {
+	// ---- 서버 모드: 서버 행 → 화면 줄 (Connection 모양)
+	type ApiConnection = components['schemas']['Connection'];
+	type ApiQuota = components['schemas']['Quota'];
+	const kindCode: Record<ProviderKind, string> = { 구독: 'subscription', 플랜: 'plan', 'API 키': 'api_key', 게이트웨이: 'gateway', 로컬: 'local' };
+	const kindOf = (code: string) => (Object.keys(kindCode) as ProviderKind[]).find((k) => kindCode[k] === code) ?? '로컬';
+	const periodLabel: Record<string, string> = { minute: '분', '5h': '5H', day: '일', week: '주간', month: '월' };
+	const statusNote: Record<string, string> = { connected: '연결됨', checking: '확인 중', login_required: '로그인 필요', expired: '키 · 토큰 만료', error: '연결 오류', available: '연결 가능' };
+	const stateOf: Record<string, Connection['state']> = { connected: 'ok', checking: 'ok', login_required: 'login', expired: 'expired', error: 'exhausted', available: 'open' };
+
+	/// 한도 1건 → 칩. 달러는 사용액/한도, 나머지는 남은 비율(모르면 칩 없음).
+	function quotaOf(q: ApiQuota): Quota | undefined {
+		const label = periodLabel[q.period] ?? q.period;
+		if (q.unit === 'usd' && q.limit_value != null) return { label, used: q.used_value, limit: q.limit_value };
+		const pct = q.remain_percent ?? (q.unit === 'percent' ? 100 - q.used_value : q.limit_value ? Math.round(100 - (q.used_value / q.limit_value) * 100) : undefined);
+		return pct === undefined ? undefined : { label, pct: Math.max(0, pct) };
+	}
+
+	function view(c: ApiConnection, qs: ApiQuota[]): Connection {
+		const quotas = qs.map(quotaOf).filter((q): q is Quota => !!q);
+		const low = c.status === 'connected' && quotas.some((q) => q.pct !== undefined && q.pct < 20);
+		return { sn: c.sn, key: c.provider_code, name: c.provider_name, kind: kindOf(c.kind), state: low ? 'low' : (stateOf[c.status] ?? 'open'), note: c.status_message ?? statusNote[c.status] ?? c.status, quotas };
+	}
+
+	/// 연결 목록 + 연결별 한도를 읽는다. 한도를 못 읽은 연결은 칩 없이.
+	async function load() {
+		loadState = 'loading';
+		const { data } = await api.GET('/connections').catch(() => ({ data: undefined }));
+		if (!data) return void (loadState = 'error');
+		const qs = await Promise.all(data.map((c) => api.GET('/connections/{sn}/quotas', { params: { path: { sn: c.sn } } }).then((r) => r.data ?? []).catch(() => [])));
+		list = data.map((c, i) => view(c, qs[i]));
+		loadState = 'ready';
+	}
+	onMount(() => {
+		if (!useMock) void load();
+	});
+
+	/// 전체 연결 점검 — 한도를 새로 읽고 키를 시험한다. 서버 모드는 다시 읽기만(점검 · 한도 갱신은 실행기 #13).
+	/// 목데이터: Codex 주간 소진 · Anthropic API 키 만료가 발견된다.
+	async function checkAll() {
+		if (!useMock) {
+			checking = true;
+			await load();
+			checking = false;
+			return;
+		}
 		checking = true;
 		timer = setTimeout(() => {
 			const codex = list.find((c) => c.key === 'chatgpt');
@@ -99,13 +151,33 @@
 		}, 1200);
 	}
 
-	function openAdd(key?: string) {
+	function openAdd(key?: string, sn?: number) {
 		addKey = key;
+		addSn = sn;
 		addOpen = true;
+	}
+
+	/// 서버 모드 추가 — 키 원문은 보내지 않는다(키체인 저장은 실행기 Task) · 끝 4자리만. 실패하면 false(창 유지).
+	async function addOnServer(a: AddedConnection): Promise<boolean> {
+		const { data: runtimes } = a.provider.cli ? await api.GET('/runtimes').catch(() => ({ data: undefined })) : { data: undefined };
+		const body = {
+			provider_name: a.title, name: a.name, plan_name: a.provider.plan,
+			runtime_sn: runtimes?.find((r) => r.name === a.provider.cli)?.sn, login_method: a.method === 'device' ? 'device_code' : a.method,
+			base_url: a.baseUrl || undefined, key_hint: a.keyHint || undefined, monthly_budget_usd_micro: a.budget ? a.budget * 1_000_000 : undefined,
+			scope: a.scope, report_language: langCode[a.lang] ?? a.lang, commit_language: langCode[a.commitLang] ?? a.commitLang
+		};
+		const res = await (addSn
+			? api.PATCH('/connections/{sn}', { params: { path: { sn: addSn } }, body })
+			: api.POST('/connections', { body: { ...body, kind: kindCode[a.provider.kind], provider_code: a.provider.key } })
+		).catch(() => undefined);
+		if (!res || res.error) return false;
+		await load();
+		return true;
 	}
 
 	/// 다이얼로그에서 연결을 마치면 목록에 반영 — 있던 연결은 정상으로, 없으면 새 줄.
 	function onAdded(a: AddedConnection) {
+		if (!useMock) return addOnServer(a);
 		const c = list.find((x) => x.key === a.provider.key);
 		if (c) {
 			c.state = 'ok';
@@ -160,12 +232,28 @@
 		{/each}
 	</div>
 
+	{#if loadState !== 'ready'}
+		<!-- 서버 모드 불러오기 -->
+		<Empty class="card py-16 rounded-lg">
+			<EmptyHeader>
+				{#if loadState === 'error'}
+					<EmptyTitle>연결을 불러오지 못했어요</EmptyTitle>
+					<EmptyDescription>서버 연결을 확인하고 다시 시도하세요.</EmptyDescription>
+				{:else}
+					<EmptyMedia variant="icon"><LoaderCircle class="animate-spin" /></EmptyMedia>
+					<EmptyTitle>연결을 불러오는 중…</EmptyTitle>
+				{/if}
+			</EmptyHeader>
+			{#if loadState === 'error'}<EmptyContent><Button variant="outline" onclick={load}>다시 시도</Button></EmptyContent>{/if}
+		</Empty>
+	{/if}
+
 	{#each groups as g (g.title)}
 		{#if g.items.length}
 			<section class="flex flex-col gap-2.5">
 				<h2 class="label-xs-strong text-muted-foreground">{g.title}<span class="font-mono text-subtle-foreground">{g.items.length}</span></h2>
 				<div class="grid grid-cols-2 gap-2.5">
-					{#each g.items as c (c.key)}
+					{#each g.items as c (c.sn ?? c.key)}
 						{@const st = stateMeta[c.state]}
 						<div class={['flex items-center rounded-md border gap-3 px-4 py-3.5', isOn(c) ? 'bg-card' : 'bg-muted']}>
 							<span class="icon-tile size-9.5">{@render mark(c.key, 'size-5')}</span>
@@ -184,11 +272,11 @@
 								</span>
 							{/each}
 							{#if c.state === 'expired'}
-								<Button variant="ghost" size="sm" onclick={() => openAdd(c.key)}><RefreshCw />키 갱신</Button>
+								<Button variant="ghost" size="sm" onclick={() => openAdd(c.key, c.sn)}><RefreshCw />키 갱신</Button>
 							{:else if c.state === 'login'}
-								<Button variant="ghost" size="sm" onclick={() => openAdd(c.key)}><LogIn />로그인</Button>
+								<Button variant="ghost" size="sm" onclick={() => openAdd(c.key, c.sn)}><LogIn />로그인</Button>
 							{:else if c.state === 'open'}
-								<Button variant="ghost" size="sm" onclick={() => openAdd(c.key)}><Plus />{c.action ?? '연결'}</Button>
+								<Button variant="ghost" size="sm" onclick={() => openAdd(c.key, c.sn)}><Plus />{c.action ?? '연결'}</Button>
 							{:else}
 								<!-- 연결 관리 화면은 .pen에 아직 없음 -->
 								<Button variant="ghost" size="sm"><Settings2 />관리</Button>

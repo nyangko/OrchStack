@@ -22,8 +22,23 @@
 		omniroute: Route, openrouter: GitFork, vercel: Triangle, ollama: Cpu, lmstudio: MonitorCog, compat: Plug,
 	};
 
-	/** 추가된 연결 — 부르는 쪽 목록에 한 줄로 보여줄 값. */
-	export type AddedConnection = { provider: Provider; title: string; note: string };
+	/** 추가된 연결 — 부르는 쪽 목록에 한 줄로 보여줄 값과 입력값. 키 원문은 넘기지 않고 끝 4자리(keyHint)만. */
+	export type AddedConnection = {
+		provider: Provider;
+		title: string;
+		note: string;
+		name: string;
+		baseUrl?: string;
+		keyHint?: string;
+		/** 월 예산 (달러). */
+		budget?: number;
+		/** browser | device | terminal (구독 로그인 방식) */
+		method?: string;
+		/** workspace | team | me */
+		scope: string;
+		lang: string;
+		commitLang: string;
+	};
 </script>
 
 <script lang="ts">
@@ -82,7 +97,8 @@
 		open?: boolean;
 		/** 열 때 고른 제공자 key — 있으면 인증 단계부터 시작한다. */
 		provider?: string;
-		onadd?: (c: AddedConnection) => void;
+		/** false를 돌려주면(저장 실패) 창을 닫지 않고 입력을 둔다. */
+		onadd?: (c: AddedConnection) => void | Promise<boolean | void>;
 	} = $props();
 
 	const kinds: ProviderKind[] = ['구독', '플랜', 'API 키', '게이트웨이', '로컬'];
@@ -222,14 +238,25 @@
 		setTimeout(() => set('ok'), 1200);
 	}
 
-	function add() {
-		if (!sel) return;
-		onadd?.({
+	let adding = $state(false);
+	async function add() {
+		if (!sel || adding) return;
+		adding = true;
+		const ok = await onadd?.({
 			provider: sel,
 			title,
 			note: isSub ? `연결됨 · ${sel.cli}` : sel.kind === '로컬' ? `연결됨 · 모델 ${sel.models}` : `연결됨 · ${sel.models} 모델 · 월 $${budget}`,
+			name: name.trim() || sel.key,
+			baseUrl: needsUrl ? baseUrl.trim() : undefined,
+			keyHint: needsKey ? apiKey.trim().slice(-4) : undefined,
+			budget: needsKey ? Number(budget) : undefined,
+			method: isSub ? method : undefined,
+			scope,
+			lang,
+			commitLang,
 		});
-		open = false;
+		adding = false;
+		if (ok !== false) open = false;
 	}
 
 	const confirmRows = $derived<[string, string][]>(
@@ -497,7 +524,7 @@
 				<Button size="sm" disabled={!authed} onclick={toScope}><ArrowRight />다음 · 사용 범위</Button>
 			{:else}
 				<Button variant="ghost" size="sm" onclick={() => (step = 1)}><ArrowLeft />이전</Button>
-				<Button size="sm" onclick={add}><Check />연결 추가</Button>
+				<Button size="sm" disabled={adding} onclick={add}><Check />연결 추가</Button>
 			{/if}
 		</DialogFooter>
 	</DialogContent>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	/// Settings › 일반 — 워크스페이스 이름 · 언어 · 시간대 · 테마 · 데이터 보관 (.pen Settings · 일반).
-	/// 바꾸면 바로 저장(목데이터)되고 헤더에 저장됨이 뜬다. 서버 연결은 #47.
+	/// 바꾸면 바로 저장되고 헤더에 저장됨이 뜬다. 서버 모드는 GET/PATCH /workspace(A-4 #95) — 데이터 보관 칸은 아직 서버 필드가 없어 화면 상태.
 	import type { Component } from 'svelte';
 	import Building2 from '@lucide/svelte/icons/building-2';
 	import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
@@ -26,6 +26,13 @@
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { FieldRow } from '$lib/components/ui/field';
+	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '$lib/components/ui/empty';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import { onMount } from 'svelte';
+	import { api } from '$lib/api/client';
+	import { useMock } from '$lib/api/env';
+	import type { components } from '$lib/api/schema';
+	import { langCode, langName } from '$lib/lang';
 
 	type Key = keyof typeof s;
 	/// Select 한 줄 — note는 값 옆 회색 설명 (값에 따라 다를 수 있다).
@@ -47,10 +54,50 @@
 	let deleting = $state(false);
 	let confirmName = $state('');
 
-	/// 목데이터라 바로 반영 — 서버 연결 후 PATCH 성공 시 표시.
-	function set(key: Key, v: string) {
+	let loadState = $state<'loading' | 'ready' | 'error'>(useMock ? 'ready' : 'loading');
+
+	/// 화면 값 ↔ 서버 값. 시간대는 화면 표기의 앞 단어(예: 'Asia/Seoul (UTC+9)' → 'Asia/Seoul').
+	const dateCode: Record<string, string> = { iso: 'YYYY-MM-DD', short: 'M/D', long: 'M월 D일' };
+	const field: Partial<Record<Key, (v: string) => components['schemas']['WorkspacePatch']>> = {
+		name: (v) => ({ name: v }),
+		repo: (v) => ({ default_repo: v }),
+		timezone: (v) => ({ timezone: v.split(' ')[0] }),
+		uiLang: (v) => ({ ui_language: langCode[v] ?? v }),
+		reportLang: (v) => ({ report_language: langCode[v] ?? v }),
+		commitLang: (v) => ({ commit_language: langCode[v] ?? v }),
+		dateFormat: (v) => ({ date_format: dateCode[v] ?? v })
+	};
+
+	async function load() {
+		loadState = 'loading';
+		const { data: w } = await api.GET('/workspace').catch(() => ({ data: undefined }));
+		if (!w) return void (loadState = 'error');
+		Object.assign(s, {
+			name: w.name, repo: w.default_repo ?? '', timezone: workspaceRows[1].options.find((o) => o.split(' ')[0] === w.timezone) ?? w.timezone,
+			uiLang: langName(w.ui_language), reportLang: langName(w.report_language), commitLang: langName(w.commit_language),
+			dateFormat: Object.keys(dateCode).find((k) => dateCode[k] === w.date_format) ?? 'iso'
+		});
+		loadState = 'ready';
+	}
+	onMount(() => {
+		if (!useMock) void load();
+	});
+
+	/// 바로 반영 — 서버 모드는 PATCH가 성공해야 저장됨. 실패하면 입력은 두고 토스트(클라이언트).
+	async function set(key: Key, v: string) {
 		s[key] = v;
+		const body = field[key];
+		if (useMock || !body) return void (saved = true);
+		saved = false;
+		const res = await api.PATCH('/workspace', { body: body(v) }).catch(() => undefined);
+		saved = !!res && !res.error;
+	}
+
+	/// 테마는 이 브라우저에 바로 적용(mode-watcher)하고, 서버 모드면 워크스페이스에도 저장.
+	function setTheme(v: 'light' | 'dark' | 'system') {
+		setMode(v);
 		saved = true;
+		if (!useMock) void api.PATCH('/workspace', { body: { theme: v } }).catch(() => undefined);
 	}
 
 	const langs = ['한국어', 'English', '日本語'];
@@ -95,88 +142,104 @@
 <main class="page-main">
 	<PageHeader title="일반" desc="워크스페이스 이름 · 언어 · 시간대 · 테마 · 데이터 보관" status={saved && '저장됨'} />
 
-	<div class="flex items-start gap-5">
-		<div class="flex min-w-0 flex-1 flex-col gap-5">
-			<Card size="sm">
-				<CardHeader>
-					<CardTitle>워크스페이스</CardTitle>
-					<CardDescription>팀원 모두에게 보이는 기본 정보</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<FieldRow label="이름" as="label">
-						<InputGroup>
-							<InputGroupAddon><Building2 /></InputGroupAddon>
-							<InputGroupInput class="text-xs font-medium" value={s.name} onchange={(e) => set('name', e.currentTarget.value)} />
-						</InputGroup>
-					</FieldRow>
-					{#each workspaceRows as r (r.key)}{@render selectRow(r)}{/each}
-				</CardContent>
-			</Card>
+	{#if loadState !== 'ready'}
+		<!-- 서버 모드 불러오기 -->
+		<Empty class="card py-16 rounded-lg">
+			<EmptyHeader>
+				{#if loadState === 'error'}
+					<EmptyTitle>설정을 불러오지 못했어요</EmptyTitle>
+					<EmptyDescription>서버 연결을 확인하고 다시 시도하세요.</EmptyDescription>
+				{:else}
+					<EmptyMedia variant="icon"><LoaderCircle class="animate-spin" /></EmptyMedia>
+					<EmptyTitle>설정을 불러오는 중…</EmptyTitle>
+				{/if}
+			</EmptyHeader>
+			{#if loadState === 'error'}<EmptyContent><Button variant="outline" onclick={load}>다시 시도</Button></EmptyContent>{/if}
+		</Empty>
+	{:else}
+		<div class="flex items-start gap-5">
+			<div class="flex min-w-0 flex-1 flex-col gap-5">
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>워크스페이스</CardTitle>
+						<CardDescription>팀원 모두에게 보이는 기본 정보</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<FieldRow label="이름" as="label">
+							<InputGroup>
+								<InputGroupAddon><Building2 /></InputGroupAddon>
+								<InputGroupInput class="text-xs font-medium" value={s.name} onchange={(e) => set('name', e.currentTarget.value)} />
+							</InputGroup>
+						</FieldRow>
+						{#each workspaceRows as r (r.key)}{@render selectRow(r)}{/each}
+					</CardContent>
+				</Card>
 
-			<Card size="sm">
-				<CardHeader>
-					<CardTitle>언어 · 지역</CardTitle>
-					<CardDescription>화면과 에이전트 출력 언어의 기본값 · 연결 · 멤버별로 바꿀 수 있어요</CardDescription>
-				</CardHeader>
-				<CardContent>
-					{#each langRows as r (r.key)}{@render selectRow(r)}{/each}
-					<FieldRow label="날짜 형식">
-						<Segmented
-							aria-label="날짜 형식"
-							options={[
-								{ value: 'iso', label: '2026-09-29', icon: Calendar },
-								{ value: 'short', label: '9/29', icon: Calendar },
-								{ value: 'long', label: '9월 29일', icon: Calendar }
-							]}
-							bind:value={() => s.dateFormat, (v) => set('dateFormat', v ?? 'iso')}
-						/>
-					</FieldRow>
-				</CardContent>
-			</Card>
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>언어 · 지역</CardTitle>
+						<CardDescription>화면과 에이전트 출력 언어의 기본값 · 연결 · 멤버별로 바꿀 수 있어요</CardDescription>
+					</CardHeader>
+					<CardContent>
+						{#each langRows as r (r.key)}{@render selectRow(r)}{/each}
+						<FieldRow label="날짜 형식">
+							<Segmented
+								aria-label="날짜 형식"
+								options={[
+									{ value: 'iso', label: '2026-09-29', icon: Calendar },
+									{ value: 'short', label: '9/29', icon: Calendar },
+									{ value: 'long', label: '9월 29일', icon: Calendar }
+								]}
+								bind:value={() => s.dateFormat, (v) => set('dateFormat', v ?? 'iso')}
+							/>
+						</FieldRow>
+					</CardContent>
+				</Card>
+			</div>
+
+			<div class="flex shrink-0 flex-col w-95 gap-5">
+				<Card size="sm">
+					<CardHeader><CardTitle>화면</CardTitle></CardHeader>
+					<CardContent>
+						<FieldRow label="테마">
+							<!-- 바로 적용 · 이 브라우저에 저장 · 서버 모드면 워크스페이스에도 -->
+							<Segmented
+								aria-label="테마"
+								options={[
+									{ value: 'light', label: '라이트', icon: Sun },
+									{ value: 'dark', label: '다크', icon: Moon },
+									{ value: 'system', label: '시스템', icon: Monitor }
+								]}
+								bind:value={() => userPrefersMode.current, (v) => setTheme(v ?? 'light')}
+							/>
+						</FieldRow>
+					</CardContent>
+				</Card>
+
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>데이터 보관</CardTitle>
+						<CardDescription>오래된 기록은 자동으로 정리돼요</CardDescription>
+					</CardHeader>
+					<CardContent>
+						{#each keepRows as r (r.key)}{@render selectRow(r)}{/each}
+					</CardContent>
+				</Card>
+
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>위험 구역</CardTitle>
+						<CardDescription>되돌릴 수 없는 작업</CardDescription>
+					</CardHeader>
+					<CardContent class="flex flex-col gap-2.5 pt-1">
+						<!-- 내보내기 · 삭제는 서버 연결(#47) 후 실제 동작 -->
+						<Button variant="outline" class="w-full"><Download />워크스페이스 내보내기 (.zip)</Button>
+						<Button variant="destructive" class="w-full" onclick={() => ((confirmName = ''), (deleting = true))}><Trash2 />워크스페이스 삭제</Button>
+					</CardContent>
+				</Card>
+			</div>
 		</div>
-
-		<div class="flex shrink-0 flex-col w-95 gap-5">
-			<Card size="sm">
-				<CardHeader><CardTitle>화면</CardTitle></CardHeader>
-				<CardContent>
-					<FieldRow label="테마">
-						<!-- 바로 적용 · 이 브라우저에 저장 (워크스페이스 설정 API #47 전) -->
-						<Segmented
-							aria-label="테마"
-							options={[
-								{ value: 'light', label: '라이트', icon: Sun },
-								{ value: 'dark', label: '다크', icon: Moon },
-								{ value: 'system', label: '시스템', icon: Monitor }
-							]}
-							bind:value={() => userPrefersMode.current, (v) => (setMode(v ?? 'light'), (saved = true))}
-						/>
-					</FieldRow>
-				</CardContent>
-			</Card>
-
-			<Card size="sm">
-				<CardHeader>
-					<CardTitle>데이터 보관</CardTitle>
-					<CardDescription>오래된 기록은 자동으로 정리돼요</CardDescription>
-				</CardHeader>
-				<CardContent>
-					{#each keepRows as r (r.key)}{@render selectRow(r)}{/each}
-				</CardContent>
-			</Card>
-
-			<Card size="sm">
-				<CardHeader>
-					<CardTitle>위험 구역</CardTitle>
-					<CardDescription>되돌릴 수 없는 작업</CardDescription>
-				</CardHeader>
-				<CardContent class="flex flex-col gap-2.5 pt-1">
-					<!-- 내보내기 · 삭제는 서버 연결(#47) 후 실제 동작 -->
-					<Button variant="outline" class="w-full"><Download />워크스페이스 내보내기 (.zip)</Button>
-					<Button variant="destructive" class="w-full" onclick={() => ((confirmName = ''), (deleting = true))}><Trash2 />워크스페이스 삭제</Button>
-				</CardContent>
-			</Card>
-		</div>
-	</div>
+	{/if}
 </main>
 
 <AlertDialog bind:open={deleting}>
