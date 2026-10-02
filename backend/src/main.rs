@@ -768,7 +768,7 @@ mod tests {
         let app = app(db.clone());
         let ts = task_of(&app, &db, true).await; // 프로젝트 1 · 팀 1 · 멤버 1(m)
         let v = call(&app, "GET", "/projects/1/conversation", None).await.1;
-        assert_eq!((v["conversation_sn"].is_null(), v["member_sn"].is_null(), v["messages"].as_array().unwrap().len()), (true, true, 0));
+        assert_eq!((v["member_sn"].is_null(), v["messages"].as_array().unwrap().len()), (true, 0)); // 팀 · Orch 없음
         assert_eq!(call(&app, "POST", "/projects/1/messages", Some(json!({"content": "hi"}))).await.0, StatusCode::CONFLICT); // 팀 · Orch 없음
         db.execute_unprepared("UPDATE tbl_project SET team_sn = 1; INSERT INTO tbl_member (team_sn, profile_sn, name, role_name, is_orch) VALUES (1, 1, 'Orch', 'PM', 1);").await.unwrap();
 
@@ -1266,8 +1266,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
             INSERT INTO tbl_issue (sn, project_sn, num, title) VALUES (1, 1, 1, 'I');
             INSERT INTO tbl_task (sn, project_sn, issue_sn, num, title, description, member_sn) VALUES (1, 1, 1, 2, 'Login', 'desc a', 1), (2, 1, 1, 3, 'Logout', NULL, 1);
             INSERT INTO tbl_task_criterion (task_sn, content, is_done, sort) VALUES (1, 'works', 0, 1), (1, 'errors', 1, 2);
-            INSERT INTO tbl_label (sn, project_sn, name) VALUES (1, 1, 'auth');
-            INSERT INTO tbl_map_task_label (task_sn, label_sn) VALUES (1, 1);
+            UPDATE tbl_task SET label_json = '[\"auth\"]' WHERE sn = 1;
             INSERT INTO tbl_map_task_dependency (task_sn, depend_task_sn) VALUES (1, 2);
             UPDATE tbl_agent_profile SET path_json = '[{{\"kind\":\"include\",\"pattern\":\"src/**\"}},{{\"kind\":\"exclude\",\"pattern\":\"**/.env*\"}}]' WHERE sn = 1;
             INSERT INTO tbl_profile_file (profile_sn, path, content, sort) VALUES (1, 'rules/a11y.md', 'A11Y-FILE', 1);

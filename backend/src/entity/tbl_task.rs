@@ -23,6 +23,8 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub assign_by: Option<String>,
     pub queue_sort: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub label_json: Option<String>,
     pub estimate_min: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub eta_at: Option<String>,
@@ -67,8 +69,6 @@ pub enum Relation {
     TblLogActivity,
     #[sea_orm(has_many = "super::tbl_map_task_contract::Entity")]
     TblMapTaskContract,
-    #[sea_orm(has_many = "super::tbl_map_task_label::Entity")]
-    TblMapTaskLabel,
     #[sea_orm(
         belongs_to = "super::tbl_member::Entity",
         from = "Column::MemberSn",
@@ -134,12 +134,6 @@ impl Related<super::tbl_log_activity::Entity> for Entity {
 impl Related<super::tbl_map_task_contract::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblMapTaskContract.def()
-    }
-}
-
-impl Related<super::tbl_map_task_label::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblMapTaskLabel.def()
     }
 }
 

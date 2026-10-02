@@ -11,10 +11,12 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub kind: String,
     #[sea_orm(column_type = "Text")]
-    pub contract_key: String,
+    pub key: String,
     pub version: i64,
     #[sea_orm(column_type = "Text")]
     pub summary: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub delta_json: Option<String>,
     pub owner_task_sn: Option<i64>,
     pub update_run_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
@@ -25,8 +27,6 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::tbl_log_contract::Entity")]
-    TblLogContract,
     #[sea_orm(has_many = "super::tbl_map_task_contract::Entity")]
     TblMapTaskContract,
     #[sea_orm(
@@ -55,12 +55,6 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     TblTask,
-}
-
-impl Related<super::tbl_log_contract::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblLogContract.def()
-    }
 }
 
 impl Related<super::tbl_map_task_contract::Entity> for Entity {

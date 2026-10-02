@@ -1,7 +1,6 @@
-//! 태스크 부가 데이터: 완료 조건(tbl_task_criterion) · 의존(tbl_map_task_dependency) · 프로젝트 라벨 목록 · 저장 보기(tbl_task_view) · Diagram 배치(tbl_diagram_view · _node).
+//! 태스크 부가 데이터: 완료 조건(tbl_task_criterion) · 의존(tbl_map_task_dependency) · 프로젝트 라벨 목록(tbl_project.label_json) · 저장 보기(tbl_user.task_view_json) · Diagram 배치(tbl_diagram).
 //! 쓰기는 event::run 경유. Diagram 배치는 사용자별 화면 상태라 이벤트를 남기지 않는다
-use crate::{entity::{tbl_diagram_node as dn, tbl_diagram_view as dv, tbl_label as lb, tbl_map_task_dependency as dp, tbl_project as pj, tbl_task as t,
-    tbl_task_criterion as cr, tbl_task_view as tv},
+use crate::{entity::{tbl_diagram as dg, tbl_map_task_dependency as dp, tbl_project as pj, tbl_task as t, tbl_task_criterion as cr, tbl_user as us},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}};
 use axum::{Json, extract::{Path, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
@@ -45,13 +44,12 @@ struct DepNew {
 /// 프로젝트 라벨 (API 응답 형태)
 #[derive(Serialize, ToSchema)]
 struct Label {
-    sn: i64,
     name: String,
     color: Option<String>,
 }
 
 /// 저장 보기 (API 응답 형태 · 생성 요청 본문 겸용)
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 struct View {
     /// 응답에서만
     sn: Option<i64>,
@@ -192,16 +190,31 @@ async fn remove_dep(State(db): State<DatabaseConnection>, Path((sn, dep)): Path<
 /// 프로젝트 라벨 목록 (이름순). 라벨은 태스크 PATCH labels로 만든다. 프로젝트가 없으면 404
 #[utoipa::path(operation_id = "meta_labels", get, path = "/projects/{sn}/labels", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 200, body = Vec<Label>), (status = "default", body = ErrorBody)))]
 async fn labels(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Label>>> {
-    pj::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
-    Ok(Json(lb::Entity::find().filter(lb::Column::ProjectSn.eq(sn)).order_by_asc(lb::Column::Name).all(&db).await?.into_iter()
-        .map(|m| Label { sn: m.sn, name: m.name, color: m.color }).collect()))
+    let p = pj::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
+    let mut out: Vec<Label> = p.label_json.as_deref().and_then(|j| serde_json::from_str::<Vec<serde_json::Value>>(j).ok()).unwrap_or_default().into_iter()
+        .filter_map(|l| Some(Label { name: l["name"].as_str()?.to_owned(), color: l["color"].as_str().map(str::to_owned) })).collect();
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(Json(out))
+}
+
+/// 사용자의 저장 보기 (task_view_json · sort → 번호순)
+async fn saved(db: &impl ConnectionTrait) -> Res<Vec<View>> {
+    let u = us::Entity::find_by_id(crate::USER).one(db).await?.ok_or_else(Error::not_found)?;
+    let mut v: Vec<View> = u.task_view_json.as_deref().and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default();
+    v.sort_by_key(|x| (x.sort, x.sn));
+    Ok(v)
+}
+
+/// 저장 보기 전체를 사용자 행에 쓴다
+async fn put_views(tx: &impl ConnectionTrait, v: &[View]) -> Res<()> {
+    us::Entity::update_many().filter(us::Column::Sn.eq(crate::USER)).col_expr(us::Column::TaskViewJson, json!(v).to_string().into()).exec(tx).await?;
+    Ok(())
 }
 
 /// 저장 보기 목록 (sort → 번호순)
 #[utoipa::path(operation_id = "meta_views", get, path = "/task-views", responses((status = 200, body = Vec<View>), (status = "default", body = ErrorBody)))]
 async fn views(State(db): State<DatabaseConnection>) -> Res<Json<Vec<View>>> {
-    Ok(Json(tv::Entity::find().filter(tv::Column::UserSn.eq(crate::USER)).order_by_asc(tv::Column::Sort).order_by_asc(tv::Column::Sn).all(&db).await?.into_iter()
-        .map(|m| View { sn: Some(m.sn), name: m.name, filter: serde_json::from_str(&m.filter_json).unwrap_or_default(), sort: m.sort }).collect()))
+    saved(&db).await.map(Json)
 }
 
 /// 저장 보기 만들기 (워크스페이스 TaskViewSaved). 빈 이름 · 객체가 아닌 필터는 422
@@ -211,11 +224,12 @@ async fn save_view(State(db): State<DatabaseConnection>, Body(b): Body<View>) ->
         return Err(Error::invalid("name must not be empty, filter must be an object".into()));
     }
     let out = event::run(&db, async |tx| {
-        let m = tv::ActiveModel {
-            workspace_sn: Set(crate::WORKSPACE), user_sn: Set(crate::USER), name: Set(b.name.clone()), filter_json: Set(b.filter.to_string()), sort: Set(b.sort), ..Default::default()
-        }.insert(tx).await?;
-        let out = View { sn: Some(m.sn), name: m.name, filter: b.filter.clone(), sort: m.sort };
-        Ok((out, vec![Ev::new(None, "workspace", crate::WORKSPACE, "TaskViewSaved", &json!({ "view_sn": m.sn, "name": b.name }))]))
+        let mut all = saved(tx).await?;
+        let sn = all.iter().filter_map(|x| x.sn).max().unwrap_or(0) + 1;
+        let out = View { sn: Some(sn), name: b.name.clone(), filter: b.filter.clone(), sort: b.sort };
+        all.push(View { sn: Some(sn), name: b.name.clone(), filter: b.filter.clone(), sort: b.sort });
+        put_views(tx, &all).await?;
+        Ok((out, vec![Ev::new(None, "workspace", crate::WORKSPACE, "TaskViewSaved", &json!({ "view_sn": sn, "name": b.name }))]))
     }).await?;
     Ok((StatusCode::CREATED, Json(out)))
 }
@@ -224,9 +238,12 @@ async fn save_view(State(db): State<DatabaseConnection>, Body(b): Body<View>) ->
 #[utoipa::path(operation_id = "meta_remove_view", delete, path = "/task-views/{sn}", params(("sn" = i64, Path, description = "보기 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
 async fn remove_view(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusCode> {
     event::run(&db, async |tx| {
-        if tv::Entity::delete_many().filter(tv::Column::Sn.eq(sn)).filter(tv::Column::UserSn.eq(crate::USER)).exec(tx).await?.rows_affected == 0 {
+        let all = saved(tx).await?;
+        let keep: Vec<View> = all.iter().filter(|x| x.sn != Some(sn)).cloned().collect();
+        if keep.len() == all.len() {
             return Err(Error::not_found());
         }
+        put_views(tx, &keep).await?;
         Ok(((), vec![Ev::new(None, "workspace", crate::WORKSPACE, "TaskViewDeleted", &json!({ "view_sn": sn }))]))
     }).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -236,11 +253,10 @@ async fn remove_view(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<St
 #[utoipa::path(operation_id = "meta_diagram", get, path = "/projects/{sn}/diagram", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 200, body = Diagram), (status = "default", body = ErrorBody)))]
 async fn diagram(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Diagram>> {
     pj::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
-    let view = dv::Entity::find().filter(dv::Column::ProjectSn.eq(sn)).filter(dv::Column::UserSn.eq(crate::USER)).one(&db).await?
-        .map_or(DiagramView { layout_mode: "auto".into(), zoom_percent: 100, is_show_capability: 1, is_show_done: 0 },
-            |m| DiagramView { layout_mode: m.layout_mode, zoom_percent: m.zoom_percent, is_show_capability: m.is_show_capability, is_show_done: m.is_show_done });
-    let nodes = dn::Entity::find().filter(dn::Column::ProjectSn.eq(sn)).filter(dn::Column::UserSn.eq(crate::USER)).order_by_asc(dn::Column::Sn).all(&db).await?.into_iter()
-        .map(|m| Node { node_type: m.node_type, node_sn: m.node_sn, pos_x: m.pos_x, pos_y: m.pos_y, is_collapsed: m.is_collapsed }).collect();
+    let row = dg::Entity::find().filter(dg::Column::ProjectSn.eq(sn)).filter(dg::Column::UserSn.eq(crate::USER)).one(&db).await?;
+    let nodes = row.as_ref().and_then(|m| m.node_json.as_deref()).and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default();
+    let view = row.map_or(DiagramView { layout_mode: "auto".into(), zoom_percent: 100, is_show_capability: 1, is_show_done: 0 },
+        |m| DiagramView { layout_mode: m.layout_mode, zoom_percent: m.zoom_percent, is_show_capability: m.is_show_capability, is_show_done: m.is_show_done });
     Ok(Json(Diagram { view, nodes }))
 }
 
@@ -259,18 +275,11 @@ async fn set_diagram(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): 
     pj::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
     // 이벤트 0개 — 쓰기 직렬화 락 · 트랜잭션만 쓴다
     event::run(&db, async |tx| {
-        dv::Entity::delete_many().filter(dv::Column::ProjectSn.eq(sn)).filter(dv::Column::UserSn.eq(crate::USER)).exec(tx).await?;
-        dv::ActiveModel {
+        dg::Entity::delete_many().filter(dg::Column::ProjectSn.eq(sn)).filter(dg::Column::UserSn.eq(crate::USER)).exec(tx).await?;
+        dg::ActiveModel {
             project_sn: Set(sn), user_sn: Set(crate::USER), layout_mode: Set(v.layout_mode.clone()), zoom_percent: Set(v.zoom_percent),
-            is_show_capability: Set(v.is_show_capability), is_show_done: Set(v.is_show_done), ..Default::default()
+            is_show_capability: Set(v.is_show_capability), is_show_done: Set(v.is_show_done), node_json: Set(Some(json!(b.nodes).to_string())), ..Default::default()
         }.insert(tx).await?;
-        dn::Entity::delete_many().filter(dn::Column::ProjectSn.eq(sn)).filter(dn::Column::UserSn.eq(crate::USER)).exec(tx).await?;
-        for n in &b.nodes {
-            dn::ActiveModel {
-                project_sn: Set(sn), user_sn: Set(crate::USER), node_type: Set(n.node_type.clone()), node_sn: Set(n.node_sn), pos_x: Set(n.pos_x), pos_y: Set(n.pos_y),
-                is_collapsed: Set(n.is_collapsed), ..Default::default()
-            }.insert(tx).await?;
-        }
         Ok(((), vec![]))
     }).await?;
     Ok(Json(b))

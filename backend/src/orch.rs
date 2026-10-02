@@ -1,10 +1,10 @@
-//! PM Dock: 프로젝트 Orch 대화(tbl_conversation · tbl_message · 첨부 조회) · 작업 제안(WorkProposal 메시지) 진행 → 이슈 · 태스크 생성,
+//! PM Dock: 프로젝트 Orch 대화(tbl_message · 첨부 조회) · 작업 제안(WorkProposal 메시지) 진행 → 이슈 · 태스크 생성,
 //! 실행 중 지시(tbl_log_activity). Orch가 답 · 제안을 만드는 것은 실행기 Task(#13 #14) — 여기서는 저장 · 조회 · 진행만
-use crate::{entity::{tbl_attachment as at, tbl_conversation as cv, tbl_issue as i, tbl_log_activity as la, tbl_member as mb, tbl_message as ms,
+use crate::{entity::{tbl_attachment as at, tbl_issue as i, tbl_log_activity as la, tbl_member as mb, tbl_message as ms,
     tbl_project as pj, tbl_run as r, tbl_task as t},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::{Issue, next_num}, run, task::Task};
 use axum::{Json, extract::State, http::StatusCode};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
@@ -35,7 +35,7 @@ pub struct Attachment {
 #[derive(Serialize, ToSchema)]
 pub struct Message {
     sn: i64,
-    conversation_sn: i64,
+    project_sn: i64,
     /// user | orch | member
     sender_type: String,
     member_sn: Option<i64>,
@@ -56,16 +56,15 @@ impl From<ms::Model> for Message {
     fn from(m: ms::Model) -> Self {
         Self {
             payload: m.payload_json.as_deref().and_then(|p| serde_json::from_str(p).ok()),
-            sn: m.sn, conversation_sn: m.conversation_sn, sender_type: m.sender_type, member_sn: m.member_sn, kind: m.kind, content: m.content,
+            sn: m.sn, project_sn: m.project_sn, sender_type: m.sender_type, member_sn: m.member_sn, kind: m.kind, content: m.content,
             proposal_status: m.proposal_status, task_sn: m.task_sn, run_sn: m.run_sn, attachments: Vec::new(), create_at: m.create_at,
         }
     }
 }
 
-/// 프로젝트 Orch 대화 (API 응답 형태). 대화가 아직 없으면 conversation_sn은 null · 메시지 0개
+/// 프로젝트 Orch 대화 (API 응답 형태). 메시지가 없으면 빈 목록
 #[derive(Serialize, ToSchema)]
 pub struct Conversation {
-    conversation_sn: Option<i64>,
     /// 대화 상대 Orch 멤버 (팀에 Orch가 없으면 null)
     member_sn: Option<i64>,
     messages: Vec<Message>,
@@ -136,29 +135,16 @@ pub(crate) async fn orch_of(db: &impl ConnectionTrait, project_sn: i64) -> Res<O
         .order_by_asc(mb::Column::Sn).one(db).await?.map(|m| m.sn))
 }
 
-/// 프로젝트의 열린 Orch 대화 (가장 최근)
-async fn open_of(db: &impl ConnectionTrait, project_sn: i64) -> Res<Option<cv::Model>> {
-    Ok(cv::Entity::find().filter(cv::Column::ProjectSn.eq(project_sn)).filter(cv::Column::Status.eq("open")).order_by_desc(cv::Column::Sn).one(db).await?)
-}
-
-/// 대화에 메시지 1건을 넣고 대화 update_at을 갱신한다. 대화가 없으면 Orch 멤버와 새로 연다 (Orch가 없으면 409)
+/// 메시지 1건을 프로젝트 대화에 넣는다. 팀에 Orch가 없으면 409 (대화 상대가 없다)
 async fn append(tx: &DatabaseTransaction, project_sn: i64, m: ms::ActiveModel) -> Res<Message> {
-    let conv = match open_of(tx, project_sn).await? {
-        Some(c) => c.sn,
-        None => {
-            let orch = orch_of(tx, project_sn).await?.ok_or_else(|| Error::conflict("project team has no Orch member".into()))?;
-            cv::ActiveModel { project_sn: Set(project_sn), member_sn: Set(orch), user_sn: Set(crate::USER), ..Default::default() }.insert(tx).await?.sn
-        }
-    };
-    cv::Entity::update_many().filter(cv::Column::Sn.eq(conv)).col_expr(cv::Column::UpdateAt, Expr::cust("datetime('now')")).exec(tx).await?;
-    Ok(ms::ActiveModel { conversation_sn: Set(conv), ..m }.insert(tx).await?.into())
+    orch_of(tx, project_sn).await?.ok_or_else(|| Error::conflict("project team has no Orch member".into()))?;
+    Ok(ms::ActiveModel { project_sn: Set(project_sn), ..m }.insert(tx).await?.into())
 }
 
 /// 메시지의 프로젝트 번호 + 메시지. 없으면 404
 async fn message(db: &impl ConnectionTrait, sn: i64) -> Res<(i64, ms::Model)> {
     let m = ms::Entity::find_by_id(sn).one(db).await?.ok_or_else(Error::not_found)?;
-    let c = cv::Entity::find_by_id(m.conversation_sn).one(db).await?.ok_or_else(Error::not_found)?;
-    Ok((c.project_sn, m))
+    Ok((m.project_sn, m))
 }
 
 /// 초안 작업 제안이어야 한다 (아니면 409)
@@ -196,18 +182,17 @@ pub async fn propose(db: &DatabaseConnection, project_sn: i64, content: Option<S
 #[utoipa::path(operation_id = "orch_conversation", get, path = "/projects/{sn}/conversation", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 200, body = Conversation), (status = "default", body = ErrorBody)))]
 async fn conversation(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Conversation>> {
     let orch = orch_of(&db, sn).await?;
-    let Some(c) = open_of(&db, sn).await? else { return Ok(Json(Conversation { conversation_sn: None, member_sn: orch, messages: Vec::new() })) };
-    let mut messages: Vec<Message> = ms::Entity::find().filter(ms::Column::ConversationSn.eq(c.sn)).order_by_asc(ms::Column::Sn).all(&db).await?.into_iter().map(Message::from).collect();
+    let mut messages: Vec<Message> = ms::Entity::find().filter(ms::Column::ProjectSn.eq(sn)).order_by_asc(ms::Column::Sn).all(&db).await?.into_iter().map(Message::from).collect();
     let files = at::Entity::find().filter(at::Column::OwnerType.eq("message")).filter(at::Column::OwnerSn.is_in(messages.iter().map(|m| m.sn))).order_by_asc(at::Column::Sn).all(&db).await?;
     for f in files {
         if let Some(m) = messages.iter_mut().find(|m| m.sn == f.owner_sn) {
             m.attachments.push(Attachment { sn: f.sn, file_name: f.file_name, mime_type: f.mime_type, file_size: f.file_size, create_at: f.create_at });
         }
     }
-    Ok(Json(Conversation { conversation_sn: Some(c.sn), member_sn: Some(c.member_sn), messages }))
+    Ok(Json(Conversation { member_sn: orch, messages }))
 }
 
-/// 사용자 메시지 보내기 (MessagePosted). 대화가 없으면 연다. 빈 본문 422 · 팀에 Orch가 없으면 409 · 프로젝트가 없으면 404
+/// 사용자 메시지 보내기 (MessagePosted). 빈 본문 422 · 팀에 Orch가 없으면 409 · 프로젝트가 없으면 404
 #[utoipa::path(operation_id = "orch_post", post, path = "/projects/{sn}/messages", params(("sn" = i64, Path, description = "프로젝트 번호")), request_body = MessageNew, responses((status = 201, body = Message), (status = "default", body = ErrorBody)))]
 async fn post(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<MessageNew>) -> Res<(StatusCode, Json<Message>)> {
     if b.content.trim().is_empty() {

@@ -2,7 +2,7 @@
 //! 리드 Run 순서: protocol → rule → role → style → report → repo_rule → 프로필 파일 → @TASK → (파일). 접두(@TASK 앞)는 같은 프로필이면 바이트까지 같다.
 //! 하위 Run은 최소 입력(고정 규칙 → @TASK → paths 파일)이다. 토큰은 `preset::tokens` 추정이고 실측은 tbl_log_token에만 있다. manifest · source는 이벤트를 남기지 않는다
 use crate::{entity::{tbl_agent_profile as ap, tbl_context_manifest as cm, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv,
-    tbl_label as lb, tbl_log_token as lt, tbl_map_profile_preset as mp, tbl_map_task_dependency as dp, tbl_map_task_label as tl, tbl_member as mb, tbl_profile_file as pf,
+    tbl_log_token as lt, tbl_map_profile_preset as mp, tbl_map_task_dependency as dp, tbl_member as mb, tbl_profile_file as pf,
     tbl_project as pj, tbl_run as r, tbl_task as t, tbl_task_criterion as tc, tbl_connection as cn},
     error::{Error, ErrorBody, Res, Sn}, event, preset::tokens, rule, runner::{FILE_MAX, RULES, granted}};
 use axum::{Json, extract::State};
@@ -103,8 +103,7 @@ async fn task_block(db: &impl ConnectionTrait, task: &t::Model, profile: &ap::Mo
     for d in t::Entity::find().filter(t::Column::Sn.is_in(deps.iter().map(|d| d.depend_task_sn))).order_by_asc(t::Column::Num).all(db).await? {
         l.push(format!("dep #{} {}: {}", d.num, d.status, d.title));
     }
-    let maps = tl::Entity::find().filter(tl::Column::TaskSn.eq(task.sn)).all(db).await?;
-    let names: Vec<String> = lb::Entity::find().filter(lb::Column::Sn.is_in(maps.iter().map(|m| m.label_sn))).order_by_asc(lb::Column::Name).all(db).await?.into_iter().map(|x| x.name).collect();
+    let names: Vec<String> = task.label_json.as_deref().and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default();
     if !names.is_empty() {
         l.push(format!("labels: {}", names.join(", ")));
     }

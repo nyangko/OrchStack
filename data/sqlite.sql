@@ -45,6 +45,7 @@ CREATE TABLE tbl_user (
     name            TEXT NOT NULL,                                  -- 표시 이름 (화면의 '나')
     initial         TEXT,                                           -- 아바타 이니셜 (예: S)
     ui_language     TEXT,                                           -- 화면 언어 (NULL = 워크스페이스 기본 · 다국어 지원)
+    task_view_json  TEXT,                                           -- 저장된 보기 JSON 배열 [{sn, name, filter, sort}] · Tasks 페이지의 필터 묶음 (조회 전용, domain 아님) · filter = 프로젝트 · 담당 · 상태 · 우선순위 · 정렬 조건 객체 · sn = 이 배열 안의 번호
     status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','blocked','left')),  -- 상태: active(사용 중) | blocked(로그인 차단) | left(탈퇴 · 기록만 보존)
     last_login_at   TEXT,                                           -- 마지막 로그인 시각
     create_at       TEXT NOT NULL DEFAULT (datetime('now')),        -- 생성 시각
@@ -404,6 +405,7 @@ CREATE TABLE tbl_project (
     is_pause_on_view   INTEGER,                                     -- 카드를 보고 있으면 타이머 멈춤 (NULL = 팀 값)
     level_json         TEXT,                                        -- 작업 레벨별 처리 JSON (NULL = 팀 값 · 구조는 tbl_team.level_json)
     guard_json         TEXT,                                        -- 루프 가드 JSON (NULL = 팀 값 · 구조는 tbl_team.guard_json)
+    label_json         TEXT,                                        -- 프로젝트 라벨 JSON 배열 [{name, color}] · color = 색 토큰 · 태스크에 처음 붙는 이름은 자동으로 들어간다
     status             TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),  -- 상태: active(진행 중) | archived(보관 · 읽기 전용)
     sort               INTEGER NOT NULL DEFAULT 0,                  -- 탭 순서
     create_at          TEXT NOT NULL DEFAULT (datetime('now')),     -- 생성 시각
@@ -491,6 +493,7 @@ CREATE TABLE tbl_issue (
     source           TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','github','orch')),  -- 만든 경로: manual(사용자 작성) | github(GitHub 이슈 가져오기) | orch(Orch 작업 제안에서 생성)
     github_number    INTEGER,                                       -- 연결된 GitHub 이슈 번호
     github_url       TEXT,                                          -- GitHub 이슈 주소
+    label_json       TEXT,                                          -- 라벨 이름 JSON 배열 (Issue Board 라벨 · GitHub 이슈 라벨 가져오기)
     user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자 (Orch가 만들면 NULL)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
@@ -512,6 +515,7 @@ CREATE TABLE tbl_task (
     spawn_mode        TEXT CHECK (spawn_mode IN ('sub','fork','runner')),  -- 하위 작업 방식: sub | fork | runner · NULL = 팀 기본값(tbl_team.spawn_mode) (#67)
     assign_by         TEXT CHECK (assign_by IN ('orch_auto','orch_move','user')),  -- 배정한 쪽: orch_auto(Orch 자동 배정) | orch_move(Orch 재배치) | user(사용자 수동)
     queue_sort        INTEGER,                                      -- 담당 멤버의 실행 대기열 순서
+    label_json        TEXT,                                         -- 라벨 이름 JSON 배열 (예: ["auth", "ui"] · 이름순 · 중복 없음) · 프로젝트 라벨 목록은 tbl_project.label_json
     estimate_min      INTEGER,                                      -- 예상 소요(분)
     eta_at            TEXT,                                         -- 예상 완료 시각
     block_reason      TEXT,                                         -- 막힌 이유 (예: 의존성: Redis 설정 대기)
@@ -545,43 +549,6 @@ CREATE TABLE tbl_map_task_dependency (
     depend_task_sn   INTEGER NOT NULL REFERENCES tbl_task(sn) ON DELETE CASCADE,      -- 먼저 끝나야 하는 태스크 (예: #128)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     UNIQUE (task_sn, depend_task_sn)
-);
-
--- 라벨. 태스크 분류
-CREATE TABLE tbl_label (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 라벨 번호
-    project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE,   -- 프로젝트
-    name             TEXT NOT NULL,                                 -- 라벨 이름 (예: auth)
-    color            TEXT,                                          -- 색 토큰
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (project_sn, name)
-);
-
--- 태스크 ↔ 라벨
-CREATE TABLE tbl_map_task_label (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 연결 관계 번호
-    task_sn          INTEGER NOT NULL REFERENCES tbl_task(sn) ON DELETE CASCADE,      -- 태스크
-    label_sn         INTEGER NOT NULL REFERENCES tbl_label(sn) ON DELETE CASCADE,     -- 라벨
-    UNIQUE (task_sn, label_sn)
-);
-
--- 이슈 ↔ 라벨 (Issue Board 라벨 · GitHub 이슈 라벨 가져오기)
-CREATE TABLE tbl_map_issue_label (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 연결 관계 번호
-    issue_sn         INTEGER NOT NULL REFERENCES tbl_issue(sn) ON DELETE CASCADE,     -- 이슈
-    label_sn         INTEGER NOT NULL REFERENCES tbl_label(sn) ON DELETE CASCADE,     -- 라벨
-    UNIQUE (issue_sn, label_sn)
-);
-
--- 저장된 보기. Tasks 페이지의 필터 묶음 · 사용자 설정(조회 전용, domain 아님)
-CREATE TABLE tbl_task_view (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 보기 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
-    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 만든 사용자
-    name             TEXT NOT NULL,                                 -- 보기 이름 (예: P0–P1 · 이번 주)
-    filter_json      TEXT NOT NULL,                                 -- 필터 조건 JSON (프로젝트 · 담당 · 상태 · 우선순위 · 정렬)
-    sort             INTEGER NOT NULL DEFAULT 0,                    -- 목록 순서
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 생성 시각
 );
 
 
@@ -662,14 +629,15 @@ CREATE TABLE tbl_contract (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 계약 번호
     project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE,  -- 프로젝트
     kind             TEXT NOT NULL CHECK (kind IN ('api','schema','export','config','dep','route','env')),  -- 종류: api(HTTP · RPC) | schema(DB) | export(공유 모듈 · 컴포넌트) | config(설정) | dep(패키지 의존성) | route(화면 경로) | env(환경 변수)
-    contract_key     TEXT NOT NULL,                                 -- 식별 키 (예: api:POST /auth/refresh, export:$lib/ui/Input)
+    key              TEXT NOT NULL,                                 -- 식별 키 (예: api:POST /auth/refresh, export:$lib/ui/Input)
     version          INTEGER NOT NULL DEFAULT 1,                    -- 버전 (변경될 때마다 +1)
     summary          TEXT NOT NULL,                                 -- 현재 계약 한 줄 요약 (영어 · 최대 200자 · 예: resp {access, refresh, expires_in:sec})
+    delta_json       TEXT,                                          -- 버전별 한 줄 차이 JSON 배열 [{version, change_code, delta, run_sn, create_at}] · change_code = add | modify | remove | breaking(호환 깨짐 · 소비 태스크 재작업 필요) · delta = 영어 · 최대 200자 (예: expires_in ms -> sec) · 소비 태스크에는 seen_version 이후만 보낸다
     owner_task_sn    INTEGER REFERENCES tbl_task(sn) ON DELETE SET NULL,  -- 계약을 만든 · 책임지는 태스크
     update_run_sn    INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,   -- 마지막으로 바꾼 Run
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (project_sn, contract_key)
+    UNIQUE (project_sn, key)
 );
 
 -- 보고 항목. @REPORT 블록을 항목 단위로 쪼개 저장 (받는 쪽은 필요한 기계 항목만 받고, 사용자 보고서는 사람 칸 + 시스템 사실로 조립)
@@ -689,17 +657,6 @@ CREATE TABLE tbl_report_item (
     create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 생성 시각
 );
 
-
--- 계약 변경 기록. 버전별 한 줄 차이 (소비 태스크에 보낼 delta)
-CREATE TABLE tbl_log_contract (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 기록 번호
-    contract_sn      INTEGER NOT NULL REFERENCES tbl_contract(sn) ON DELETE CASCADE,  -- 계약
-    version          INTEGER NOT NULL,                              -- 이 변경 후 버전
-    change_code      TEXT NOT NULL CHECK (change_code IN ('add','modify','remove','breaking')),  -- 변경: add(추가) | modify(수정) | remove(삭제) | breaking(호환 깨짐 · 소비 태스크 재작업 필요)
-    delta            TEXT NOT NULL,                                 -- 차이 한 줄 (영어 · 최대 200자 · 예: expires_in ms -> sec)
-    run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,  -- 바꾼 Run
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 기록 시각
-);
 
 -- 태스크 ↔ 계약. 태스크가 쓰는(소비) 또는 만드는(제공) 계약 · 마지막으로 본 버전
 CREATE TABLE tbl_map_task_contract (
@@ -732,23 +689,9 @@ CREATE TABLE tbl_interaction (
     close_at         TEXT                                           -- 끝난 시각
 );
 
--- 다이어그램 노드 위치. 사용자가 옮긴 위치만 저장 (없으면 자동 배치) · 사용자 화면 설정(조회 전용, domain 아님)
-CREATE TABLE tbl_diagram_node (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 위치 번호
-    project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE, -- 프로젝트
-    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 배치한 사용자 (사용자마다 따로)
-    node_type        TEXT NOT NULL CHECK (node_type IN ('project','issue','task','member','skill','mcp','tools')),  -- 노드 종류: project | issue | task | member | skill | mcp | tools (node_sn이 가리키는 테이블)
-    node_sn          INTEGER NOT NULL,                              -- 노드 대상의 sn (node_type 테이블 기준 · 대상이 여러 테이블이라 FK 없음 → 태스크 · 멤버 삭제 시 앱에서 함께 정리)
-    pos_x            INTEGER NOT NULL,                              -- X 좌표
-    pos_y            INTEGER NOT NULL,                              -- Y 좌표
-    is_collapsed     INTEGER NOT NULL DEFAULT 0,                    -- 접힘 여부
-    update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (project_sn, user_sn, node_type, node_sn)
-);
 
--- 다이어그램 보기 설정. 배치 방식 · 확대 비율 · 표시 범위 · 사용자 화면 설정(조회 전용, domain 아님)
-CREATE TABLE tbl_diagram_view (
+-- 다이어그램. 배치 방식 · 확대 비율 · 표시 범위 · 노드 위치 · 사용자별 화면 설정(조회 전용, domain 아님)
+CREATE TABLE tbl_diagram (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 보기 설정 번호
     project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE, -- 프로젝트
     user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 사용자
@@ -756,6 +699,7 @@ CREATE TABLE tbl_diagram_view (
     zoom_percent     INTEGER NOT NULL DEFAULT 100,                  -- 확대 비율(%)
     is_show_capability INTEGER NOT NULL DEFAULT 1,                  -- 스킬 · MCP · 도구 노드 표시
     is_show_done     INTEGER NOT NULL DEFAULT 0,                    -- 완료된 태스크 표시
+    node_json        TEXT,                                          -- 노드 위치 JSON 배열 [{node_type, node_sn, pos_x, pos_y, is_collapsed}] · 사용자가 옮긴 위치만 (없으면 자동 배치) · node_type = project | issue | task | member | skill | mcp | tools (node_sn이 가리키는 테이블 · 대상이 여러 테이블이라 FK 없음 → 태스크 · 멤버 삭제 시 앱에서 함께 정리)
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     UNIQUE (project_sn, user_sn)
@@ -798,22 +742,11 @@ CREATE TABLE tbl_ask (
     decide_at        TEXT                                           -- 처리 시각
 );
 
--- 대화. PM Dock의 Orch 대화 · 멤버에게 보내는 지시
-CREATE TABLE tbl_conversation (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 대화 번호
-    project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE,   -- 프로젝트
-    member_sn        INTEGER NOT NULL REFERENCES tbl_member(sn) ON DELETE RESTRICT,    -- 대화 상대 (Orch 또는 멤버)
-    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 대화한 사용자
-    title            TEXT,                                          -- 대화 제목
-    status           TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed')),  -- 상태: open(진행 중) | closed(종료)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    update_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 마지막 메시지 시각
-);
 
--- 메시지. 대화 안의 말 · 작업 제안 · 명령 결과
+-- 메시지. 프로젝트 Orch 대화 안의 말 · 작업 제안 · 명령 결과 (member_sn = 보낸 멤버 · Orch가 보낸 것이면 그 Orch)
 CREATE TABLE tbl_message (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 메시지 번호
-    conversation_sn  INTEGER NOT NULL REFERENCES tbl_conversation(sn) ON DELETE CASCADE,  -- 대화
+    project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE,   -- 프로젝트 (Orch 대화는 프로젝트마다 하나)
     sender_type      TEXT NOT NULL CHECK (sender_type IN ('user','orch','member')),  -- 보낸 쪽: user(사용자) | orch(Orch) | member(멤버)
     member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 보낸 멤버 (user면 NULL)
     kind             TEXT NOT NULL DEFAULT 'text' CHECK (kind IN ('text','work_proposal','command_result','runtime_instruction')),  -- 종류: text(일반 메시지) | work_proposal(작업 제안 카드) | command_result(명령 실행 결과) | runtime_instruction(실행 중 멤버에게 보낸 지시)
@@ -972,7 +905,7 @@ CREATE INDEX idx_run_parent             ON tbl_run (parent_run_sn);
 CREATE INDEX idx_run_wait               ON tbl_run (wait_run_sn);
 CREATE INDEX idx_session_run            ON tbl_session (run_sn);
 CREATE INDEX idx_ask_status             ON tbl_ask (project_sn, kind, status);
-CREATE INDEX idx_message_conversation   ON tbl_message (conversation_sn, create_at);
+CREATE INDEX idx_message_project        ON tbl_message (project_sn, create_at);
 CREATE INDEX idx_attachment_owner       ON tbl_attachment (owner_type, owner_sn);
 CREATE INDEX idx_notification_user      ON tbl_notification (user_sn, is_read, create_at);
 CREATE INDEX idx_notification_ref       ON tbl_notification (ref_type, ref_sn);                  -- 대상 처리 시(판단 요청 답변 등) 확인 필요 알림 해제
@@ -986,7 +919,6 @@ CREATE INDEX idx_interaction_task       ON tbl_interaction (task_sn, status);
 CREATE INDEX idx_interaction_project    ON tbl_interaction (project_sn, status);
 CREATE INDEX idx_report_item_run       ON tbl_report_item (run_sn, kind);
 CREATE INDEX idx_report_item_target    ON tbl_report_item (target_task_sn, is_routed);
-CREATE INDEX idx_log_contract          ON tbl_log_contract (contract_sn, version);
 CREATE INDEX idx_map_task_contract     ON tbl_map_task_contract (contract_sn, role);
 CREATE INDEX idx_preset_version        ON tbl_instruction_preset_version (preset_sn, version);
 CREATE INDEX idx_map_profile_preset    ON tbl_map_profile_preset (preset_sn);
@@ -997,8 +929,6 @@ CREATE INDEX idx_task_dependency_depend ON tbl_map_task_dependency (depend_task_
 CREATE INDEX idx_context_manifest_run   ON tbl_context_manifest (run_sn);
 CREATE INDEX idx_task_criterion_task    ON tbl_task_criterion (task_sn, sort);
 CREATE INDEX idx_issue_parent           ON tbl_issue (parent_sn);
-CREATE INDEX idx_map_task_label_label   ON tbl_map_task_label (label_sn);
-CREATE INDEX idx_map_issue_label_label  ON tbl_map_issue_label (label_sn);
 CREATE INDEX idx_map_profile_skill      ON tbl_map_profile_skill (skill_sn);
 CREATE INDEX idx_map_profile_mcp        ON tbl_map_profile_mcp (mcp_sn);
 CREATE INDEX idx_template_revision      ON tbl_template_revision (template_sn);
@@ -1029,11 +959,7 @@ CREATE INDEX idx_fk_connection_user_sn ON tbl_connection (user_sn);
 CREATE INDEX idx_fk_context_manifest_session_sn ON tbl_context_manifest (session_sn);
 CREATE INDEX idx_fk_contract_owner_task_sn ON tbl_contract (owner_task_sn);
 CREATE INDEX idx_fk_contract_update_run_sn ON tbl_contract (update_run_sn);
-CREATE INDEX idx_fk_conversation_member_sn ON tbl_conversation (member_sn);
-CREATE INDEX idx_fk_conversation_project_sn ON tbl_conversation (project_sn);
-CREATE INDEX idx_fk_conversation_user_sn ON tbl_conversation (user_sn);
-CREATE INDEX idx_fk_diagram_node_user_sn ON tbl_diagram_node (user_sn);
-CREATE INDEX idx_fk_diagram_view_user_sn ON tbl_diagram_view (user_sn);
+CREATE INDEX idx_fk_diagram_user_sn ON tbl_diagram (user_sn);
 CREATE INDEX idx_fk_instruction_preset_copy_from_sn ON tbl_instruction_preset (copy_from_sn);
 CREATE INDEX idx_fk_instruction_preset_project_sn ON tbl_instruction_preset (project_sn);
 CREATE INDEX idx_fk_instruction_preset_user_sn ON tbl_instruction_preset (user_sn);
@@ -1052,7 +978,6 @@ CREATE INDEX idx_fk_log_activity_user_sn ON tbl_log_activity (user_sn);
 CREATE INDEX idx_fk_log_audit_member_sn ON tbl_log_audit (member_sn);
 CREATE INDEX idx_fk_log_audit_run_sn ON tbl_log_audit (run_sn);
 CREATE INDEX idx_fk_log_audit_user_sn ON tbl_log_audit (user_sn);
-CREATE INDEX idx_fk_log_contract_run_sn ON tbl_log_contract (run_sn);
 CREATE INDEX idx_fk_log_event_member_sn ON tbl_log_event (member_sn);
 CREATE INDEX idx_fk_log_event_run_sn ON tbl_log_event (run_sn);
 CREATE INDEX idx_fk_log_event_user_sn ON tbl_log_event (user_sn);
@@ -1081,8 +1006,6 @@ CREATE INDEX idx_fk_report_item_criterion_sn ON tbl_report_item (criterion_sn);
 CREATE INDEX idx_fk_skill_source_sn ON tbl_skill (source_sn);
 CREATE INDEX idx_fk_skill_source_workspace_sn ON tbl_skill_source (workspace_sn);
 CREATE INDEX idx_fk_task_user_sn ON tbl_task (user_sn);
-CREATE INDEX idx_fk_task_view_user_sn ON tbl_task_view (user_sn);
-CREATE INDEX idx_fk_task_view_workspace_sn ON tbl_task_view (workspace_sn);
 CREATE INDEX idx_fk_team_workspace_sn ON tbl_team (workspace_sn);
 CREATE INDEX idx_fk_template_user_sn ON tbl_template (user_sn);
 CREATE INDEX idx_fk_template_workspace_sn ON tbl_template (workspace_sn);

@@ -1,5 +1,5 @@
 //! tbl_task CRUD + 전체 목록(/tasks) + MoveTask + 배정 + 라벨(PATCH labels). 응답에 의존 · 의존 대기 · 라벨을 채운다. 쓰기는 event::run 경유 (TaskCreated · TaskUpdated · TaskMoved · TaskDeleted · AgentAssigned · AgentUnassigned)
-use crate::{entity::{tbl_label as lb, tbl_map_task_dependency as dp, tbl_map_task_label as tl, tbl_task::{self as t, Entity as Tbl}}, error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::next_num};
+use crate::{entity::{tbl_map_task_dependency as dp, tbl_project as pj, tbl_task::{self as t, Entity as Tbl}}, error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::next_num};
 use axum::{Json, extract::{Query, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
 use serde::{Deserialize, Serialize};
@@ -63,7 +63,7 @@ pub struct Task {
     deps: Vec<i64>,
     /// 의존 대기: 끝나지 않은 의존이 있다 (저장하지 않고 계산 · #9)
     waiting: bool,
-    /// 라벨 이름 (프로젝트 라벨)
+    /// 라벨 이름 (label_json · 이름순)
     labels: Vec<String>,
 }
 
@@ -75,7 +75,7 @@ impl From<t::Model> for Task {
             estimate_min: m.estimate_min, eta_at: m.eta_at, block_reason: m.block_reason, branch: m.branch,
             commit_count: m.commit_count, pr_number: m.pr_number, pr_status: m.pr_status, create_by: m.create_by,
             create_at: m.create_at, update_at: m.update_at, start_at: m.start_at, done_at: m.done_at,
-            deps: Vec::new(), waiting: false, labels: Vec::new(),
+            deps: Vec::new(), waiting: false, labels: m.label_json.as_deref().and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default(),
         }
     }
 }
@@ -143,34 +143,34 @@ async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<Task> {
     enrich(db, vec![one]).await?.pop().ok_or_else(Error::not_found)
 }
 
-/// 태스크 목록에 의존 · 의존 대기 · 라벨 이름을 채운다
+/// 태스크 목록에 의존 · 의존 대기를 채운다 (라벨은 label_json에서 이미 읽었다)
 pub(crate) async fn enrich(db: &impl ConnectionTrait, mut ts: Vec<Task>) -> Res<Vec<Task>> {
     let sns: Vec<i64> = ts.iter().map(|x| x.sn).collect();
-    let deps = dp::Entity::find().filter(dp::Column::TaskSn.is_in(sns.clone())).order_by_asc(dp::Column::DependTaskSn).all(db).await?;
+    let deps = dp::Entity::find().filter(dp::Column::TaskSn.is_in(sns)).order_by_asc(dp::Column::DependTaskSn).all(db).await?;
     let open: Vec<i64> = Tbl::find().filter(t::Column::Sn.is_in(deps.iter().map(|d| d.depend_task_sn))).filter(t::Column::Status.ne("done")).all(db).await?
         .into_iter().map(|m| m.sn).collect();
-    let maps = tl::Entity::find().filter(tl::Column::TaskSn.is_in(sns)).all(db).await?;
-    let names = lb::Entity::find().filter(lb::Column::Sn.is_in(maps.iter().map(|m| m.label_sn))).order_by_asc(lb::Column::Name).all(db).await?;
     for x in &mut ts {
         x.deps = deps.iter().filter(|d| d.task_sn == x.sn).map(|d| d.depend_task_sn).collect();
         x.waiting = x.deps.iter().any(|d| open.contains(d));
-        x.labels = names.iter().filter(|l| maps.iter().any(|m| m.task_sn == x.sn && m.label_sn == l.sn)).map(|l| l.name.clone()).collect();
     }
     Ok(ts)
 }
 
-/// 라벨 이름 → 태스크 라벨 전체 교체. 프로젝트에 없는 이름은 만든다. 빈 이름은 422
+/// 라벨 이름 → 태스크 label_json 전체 교체 (trim · 중복 제거 · 이름순). 프로젝트 label_json에 없는 이름은 거기에도 넣는다. 빈 이름은 422
 async fn relabel(tx: &DatabaseTransaction, sn: i64, project_sn: i64, names: &[String]) -> Res<()> {
     if names.iter().any(|n| n.trim().is_empty()) {
         return Err(Error::invalid("label name is empty".into()));
     }
-    tl::Entity::delete_many().filter(tl::Column::TaskSn.eq(sn)).exec(tx).await?;
-    for n in names.iter().map(|n| n.trim()).collect::<std::collections::BTreeSet<_>>() {
-        let label = match lb::Entity::find().filter(lb::Column::ProjectSn.eq(project_sn)).filter(lb::Column::Name.eq(n)).one(tx).await? {
-            Some(l) => l.sn,
-            None => lb::ActiveModel { project_sn: Set(project_sn), name: Set(n.to_owned()), ..Default::default() }.insert(tx).await?.sn,
-        };
-        tl::ActiveModel { task_sn: Set(sn), label_sn: Set(label), ..Default::default() }.insert(tx).await?;
+    let names: Vec<&str> = names.iter().map(|n| n.trim()).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+    Tbl::update_many().filter(t::Column::Sn.eq(sn)).col_expr(t::Column::LabelJson, json!(names).to_string().into()).exec(tx).await?;
+    let p = pj::Entity::find_by_id(project_sn).one(tx).await?.ok_or_else(Error::not_found)?;
+    let mut all: Vec<serde_json::Value> = p.label_json.as_deref().and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default();
+    let before = all.len();
+    for n in names {
+        if !all.iter().any(|l| l["name"] == n) { all.push(json!({ "name": n, "color": null })); }
+    }
+    if all.len() != before {
+        pj::Entity::update_many().filter(pj::Column::Sn.eq(project_sn)).col_expr(pj::Column::LabelJson, json!(all).to_string().into()).exec(tx).await?;
     }
     Ok(())
 }

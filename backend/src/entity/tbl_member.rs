@@ -43,8 +43,6 @@ pub enum Relation {
     TblAgentProfile,
     #[sea_orm(has_many = "super::tbl_ask::Entity")]
     TblAsk,
-    #[sea_orm(has_many = "super::tbl_conversation::Entity")]
-    TblConversation,
     #[sea_orm(has_many = "super::tbl_log_audit::Entity")]
     TblLogAudit,
     #[sea_orm(has_many = "super::tbl_log_event::Entity")]
@@ -84,12 +82,6 @@ impl Related<super::tbl_agent_profile::Entity> for Entity {
 impl Related<super::tbl_ask::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblAsk.def()
-    }
-}
-
-impl Related<super::tbl_conversation::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblConversation.def()
     }
 }
 

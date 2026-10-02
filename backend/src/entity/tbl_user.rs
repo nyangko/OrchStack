@@ -17,6 +17,8 @@ pub struct Model {
     pub initial: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub ui_language: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub task_view_json: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub status: String,
     #[sea_orm(column_type = "Text", nullable)]
@@ -35,12 +37,8 @@ pub enum Relation {
     TblAttachment,
     #[sea_orm(has_many = "super::tbl_connection::Entity")]
     TblConnection,
-    #[sea_orm(has_many = "super::tbl_conversation::Entity")]
-    TblConversation,
-    #[sea_orm(has_many = "super::tbl_diagram_node::Entity")]
-    TblDiagramNode,
-    #[sea_orm(has_many = "super::tbl_diagram_view::Entity")]
-    TblDiagramView,
+    #[sea_orm(has_many = "super::tbl_diagram::Entity")]
+    TblDiagram,
     #[sea_orm(has_many = "super::tbl_instruction_preset::Entity")]
     TblInstructionPreset,
     #[sea_orm(has_many = "super::tbl_instruction_preset_version::Entity")]
@@ -59,8 +57,6 @@ pub enum Relation {
     TblNotification,
     #[sea_orm(has_many = "super::tbl_task::Entity")]
     TblTask,
-    #[sea_orm(has_many = "super::tbl_task_view::Entity")]
-    TblTaskView,
     #[sea_orm(has_many = "super::tbl_template::Entity")]
     TblTemplate,
     #[sea_orm(has_many = "super::tbl_template_revision::Entity")]
@@ -87,21 +83,9 @@ impl Related<super::tbl_connection::Entity> for Entity {
     }
 }
 
-impl Related<super::tbl_conversation::Entity> for Entity {
+impl Related<super::tbl_diagram::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TblConversation.def()
-    }
-}
-
-impl Related<super::tbl_diagram_node::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblDiagramNode.def()
-    }
-}
-
-impl Related<super::tbl_diagram_view::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblDiagramView.def()
+        Relation::TblDiagram.def()
     }
 }
 
@@ -156,12 +140,6 @@ impl Related<super::tbl_notification::Entity> for Entity {
 impl Related<super::tbl_task::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblTask.def()
-    }
-}
-
-impl Related<super::tbl_task_view::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblTaskView.def()
     }
 }
 

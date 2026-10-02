@@ -7,7 +7,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub sn: i64,
-    pub conversation_sn: i64,
+    pub project_sn: i64,
     #[sea_orm(column_type = "Text")]
     pub sender_type: String,
     pub member_sn: Option<i64>,
@@ -28,14 +28,6 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "super::tbl_conversation::Entity",
-        from = "Column::ConversationSn",
-        to = "super::tbl_conversation::Column::Sn",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    TblConversation,
-    #[sea_orm(
         belongs_to = "super::tbl_member::Entity",
         from = "Column::MemberSn",
         to = "super::tbl_member::Column::Sn",
@@ -43,6 +35,14 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     TblMember,
+    #[sea_orm(
+        belongs_to = "super::tbl_project::Entity",
+        from = "Column::ProjectSn",
+        to = "super::tbl_project::Column::Sn",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    TblProject,
     #[sea_orm(
         belongs_to = "super::tbl_run::Entity",
         from = "Column::RunSn",
@@ -61,15 +61,15 @@ pub enum Relation {
     TblTask,
 }
 
-impl Related<super::tbl_conversation::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblConversation.def()
-    }
-}
-
 impl Related<super::tbl_member::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblMember.def()
+    }
+}
+
+impl Related<super::tbl_project::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblProject.def()
     }
 }
 

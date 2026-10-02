@@ -93,8 +93,6 @@ pub enum Relation {
     TblSkill,
     #[sea_orm(has_many = "super::tbl_skill_source::Entity")]
     TblSkillSource,
-    #[sea_orm(has_many = "super::tbl_task_view::Entity")]
-    TblTaskView,
     #[sea_orm(has_many = "super::tbl_team::Entity")]
     TblTeam,
     #[sea_orm(has_many = "super::tbl_template::Entity")]
@@ -178,12 +176,6 @@ impl Related<super::tbl_skill::Entity> for Entity {
 impl Related<super::tbl_skill_source::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblSkillSource.def()
-    }
-}
-
-impl Related<super::tbl_task_view::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblTaskView.def()
     }
 }
 

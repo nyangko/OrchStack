@@ -29,6 +29,8 @@ pub struct Model {
     pub level_json: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub guard_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub label_json: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub status: String,
     pub sort: i64,
@@ -44,24 +46,20 @@ pub enum Relation {
     TblAsk,
     #[sea_orm(has_many = "super::tbl_contract::Entity")]
     TblContract,
-    #[sea_orm(has_many = "super::tbl_conversation::Entity")]
-    TblConversation,
-    #[sea_orm(has_many = "super::tbl_diagram_node::Entity")]
-    TblDiagramNode,
-    #[sea_orm(has_many = "super::tbl_diagram_view::Entity")]
-    TblDiagramView,
+    #[sea_orm(has_many = "super::tbl_diagram::Entity")]
+    TblDiagram,
     #[sea_orm(has_many = "super::tbl_instruction_preset::Entity")]
     TblInstructionPreset,
     #[sea_orm(has_many = "super::tbl_interaction::Entity")]
     TblInteraction,
     #[sea_orm(has_many = "super::tbl_issue::Entity")]
     TblIssue,
-    #[sea_orm(has_many = "super::tbl_label::Entity")]
-    TblLabel,
     #[sea_orm(has_many = "super::tbl_log_activity::Entity")]
     TblLogActivity,
     #[sea_orm(has_many = "super::tbl_log_event::Entity")]
     TblLogEvent,
+    #[sea_orm(has_many = "super::tbl_message::Entity")]
+    TblMessage,
     #[sea_orm(has_many = "super::tbl_run::Entity")]
     TblRun,
     #[sea_orm(has_many = "super::tbl_task::Entity")]
@@ -96,21 +94,9 @@ impl Related<super::tbl_contract::Entity> for Entity {
     }
 }
 
-impl Related<super::tbl_conversation::Entity> for Entity {
+impl Related<super::tbl_diagram::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TblConversation.def()
-    }
-}
-
-impl Related<super::tbl_diagram_node::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblDiagramNode.def()
-    }
-}
-
-impl Related<super::tbl_diagram_view::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblDiagramView.def()
+        Relation::TblDiagram.def()
     }
 }
 
@@ -132,12 +118,6 @@ impl Related<super::tbl_issue::Entity> for Entity {
     }
 }
 
-impl Related<super::tbl_label::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblLabel.def()
-    }
-}
-
 impl Related<super::tbl_log_activity::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblLogActivity.def()
@@ -147,6 +127,12 @@ impl Related<super::tbl_log_activity::Entity> for Entity {
 impl Related<super::tbl_log_event::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblLogEvent.def()
+    }
+}
+
+impl Related<super::tbl_message::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblMessage.def()
     }
 }
 
