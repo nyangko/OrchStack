@@ -1,6 +1,7 @@
 // OrchStack 백엔드 진입점: DB 준비 → 라우터 구성 → HTTP 서버 실행
 
 mod agent; // /profiles CRUD · /templates 조회
+mod connection; // /connections CRUD · 한도 조회
 #[allow(unused_imports, dead_code)] // sea-orm-cli 생성 코드
 mod entity; // 테이블별 SeaORM entity (sea-orm-cli 생성물 · 직접 수정하지 않는다)
 mod error; // 공통 에러 응답
@@ -11,6 +12,7 @@ mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
 mod rule; // 하위 작업 규칙 엔진 (#67 · LLM 0)
 mod runner; // runner 하위 Run 실행 · @REPORT 회수 (#67)
+mod setting; // /workspace · /runtimes · /presets
 mod stream; // /projects/{sn}/snapshot · events · stream (SSE)
 mod task; // /tasks CRUD + MoveTask + 배정
 mod team; // /teams · /members CRUD
@@ -55,7 +57,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(stream::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -475,11 +477,74 @@ mod tests {
     }
 
     /// 문서에 모든 경로와 공통 에러 스키마가 있다
+    /// 연결 CRUD (key_ref 응답 · 이벤트 미노출) · 한도 · 실행기 · 워크스페이스 · 프리셋 버전
+    #[tokio::test]
+    async fn setting() {
+        let db = mem().await;
+        let app = app(db.clone());
+        db.execute_unprepared("INSERT INTO tbl_runtime (sn, wid, code, name, sort) VALUES (1, 1, 'codex', 'Codex CLI', 1), (2, 1, 'claude_code', 'Claude Code', 0);").await.unwrap();
+        let v = call(&app, "GET", "/runtimes", None).await.1;
+        assert_eq!((v[0]["code"].as_str(), v[1]["code"].as_str()), (Some("claude_code"), Some("codex")));
+
+        // 연결: 생성 응답 · 조회 · 목록 어디에도 key_ref가 없고 key_hint만 있다
+        let new = json!({"kind": "api_key", "provider_code": "openai", "provider_name": "OpenAI", "name": "work", "runtime_sn": 1, "key_ref": "orch.openai.work", "key_hint": "3f9a"});
+        let (st, c) = call(&app, "POST", "/connections", Some(new)).await;
+        assert_eq!((st, c["status"].as_str(), c["key_hint"].as_str(), c.get("key_ref")), (StatusCode::CREATED, Some("available"), Some("3f9a"), None));
+        let cs = c["sn"].as_i64().unwrap();
+        let (_, c) = call(&app, "PATCH", &format!("/connections/{cs}"), Some(json!({"name": "team", "key_ref": "orch.openai.team", "budget_warn_percent": 70}))).await;
+        assert_eq!((c["name"].as_str(), c["budget_warn_percent"].as_i64(), c.get("key_ref")), (Some("team"), Some(70), None));
+        assert!(call(&app, "GET", &format!("/connections/{cs}"), None).await.1.get("key_ref").is_none());
+        assert!(call(&app, "GET", "/connections", None).await.1[0].get("key_ref").is_none());
+        let payload: Vec<String> = { use crate::entity::tbl_log_event as ev; use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+            ev::Entity::find().filter(ev::Column::AggregateType.eq("connection")).all(&db).await.unwrap().into_iter().map(|r| r.payload_json).collect() };
+        assert!(payload.iter().all(|p| !p.contains("orch.openai")), "{payload:?}");
+        assert_eq!(events(&db, "connection", cs).await, [("ConnectionCreated".into(), 1), ("ConnectionUpdated".into(), 2)]);
+        for bad in [json!({"kind": "x", "provider_code": "a", "provider_name": "a", "name": "a"}), json!({"kind": "local", "provider_code": "a", "provider_name": "a", "name": "a", "scope": "x"})] {
+            assert_eq!(call(&app, "POST", "/connections", Some(bad)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        assert_eq!(call(&app, "PATCH", &format!("/connections/{cs}"), Some(json!({"budget_warn_percent": 101}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "PATCH", "/connections/99", Some(json!({"name": "x"}))).await.0, StatusCode::NOT_FOUND);
+
+        // 한도: 연결별 목록 · 없는 연결 404
+        db.execute_unprepared(&format!("INSERT INTO tbl_connection_quota (connection_sn, period, unit, used_value, remain_percent) VALUES ({cs}, 'week', 'percent', 82, 18);")).await.unwrap();
+        let v = call(&app, "GET", &format!("/connections/{cs}/quotas"), None).await.1;
+        assert_eq!((v[0]["period"].as_str(), v[0]["remain_percent"].as_i64()), (Some("week"), Some(18)));
+        assert_eq!(call(&app, "GET", "/connections/99/quotas", None).await.0, StatusCode::NOT_FOUND);
+
+        // 삭제: 폴백 체인에 쓰이면 409, 빠지면 204 (한도도 함께 지워짐)
+        let ps = call(&app, "POST", "/profiles", Some(json!({}))).await.1["sn"].as_i64().unwrap();
+        call(&app, "PUT", &format!("/profiles/{ps}/fallbacks"), Some(json!([{"runtime_sn": 1, "connection_sn": cs, "tier": null}]))).await;
+        assert_eq!(call(&app, "DELETE", &format!("/connections/{cs}"), None).await.0, StatusCode::CONFLICT);
+        call(&app, "PUT", &format!("/profiles/{ps}/fallbacks"), Some(json!([]))).await;
+        assert_eq!(call(&app, "DELETE", &format!("/connections/{cs}"), None).await.0, StatusCode::NO_CONTENT);
+        assert_eq!(call(&app, "GET", &format!("/connections/{cs}"), None).await.0, StatusCode::NOT_FOUND);
+
+        // 워크스페이스: 기본값 · 수정 유지 · 모르는 테마 422
+        let w = call(&app, "GET", "/workspace", None).await.1;
+        assert_eq!((w["ui_language"].as_str(), w["theme"].as_str(), w["is_onboarded"].as_i64()), (Some("ko"), Some("system"), Some(0)));
+        call(&app, "PATCH", "/workspace", Some(json!({"timezone": "UTC", "default_repo": "orchstack/app", "is_onboarded": 1}))).await;
+        let w = call(&app, "GET", "/workspace", None).await.1;
+        assert_eq!((w["timezone"].as_str(), w["default_repo"].as_str(), w["is_onboarded"].as_i64()), (Some("UTC"), Some("orchstack/app"), Some(1)));
+        assert_eq!(call(&app, "PATCH", "/workspace", Some(json!({"theme": "blue"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(events(&db, "workspace", WID).await.len(), 1);
+
+        // 프리셋: 종류 필터 · 버전 최신순 · 없는 프리셋 404
+        db.execute_unprepared(
+            "INSERT INTO tbl_instruction_preset (sn, wid, kind, preset_key, name, version, limit_tok, is_builtin) VALUES (1, 1, 'role', 'frontend', 'Frontend', 2, 400, 1), (2, 1, 'style', 'terse', 'Terse', 1, 200, 1); \
+             INSERT INTO tbl_instruction_preset_version (preset_sn, version, content, source) VALUES (1, 1, 'v1', 'builtin'), (1, 2, 'v2', 'user');",
+        ).await.unwrap();
+        let v = call(&app, "GET", "/presets?kind=role", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["preset_key"].as_str()), (1, Some("frontend")));
+        let v = call(&app, "GET", "/presets/1/versions", None).await.1;
+        assert_eq!((v[0]["version"].as_i64(), v[0]["content"].as_str(), v[1]["version"].as_i64()), (Some(2), Some("v2"), Some(1)));
+        assert_eq!(call(&app, "GET", "/presets/99/versions", None).await.0, StatusCode::NOT_FOUND);
+    }
+
     #[tokio::test]
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

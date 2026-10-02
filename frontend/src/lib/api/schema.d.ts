@@ -4,6 +4,60 @@
  */
 
 export interface paths {
+    "/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 연결 목록 (번호순) */
+        get: operations["connection_list"];
+        put?: never;
+        /** 연결 생성 (ConnectionCreated). 모르는 종류 · 로그인 방식 · 범위는 422, 없는 실행기는 422(invalid_ref) */
+        post: operations["connection_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connections/{sn}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 연결 1건 조회. 없으면 404 */
+        get: operations["connection_read"];
+        put?: never;
+        post?: never;
+        /** 연결 삭제 (ConnectionDeleted). 한도 · 팀 매핑은 함께 지워진다. 폴백 체인에 쓰이고 있으면 409 */
+        delete: operations["connection_remove"];
+        options?: never;
+        head?: never;
+        /** 연결 부분 수정 (ConnectionUpdated). 없으면 404, 모르는 로그인 방식 · 범위는 422 */
+        patch: operations["connection_update"];
+        trace?: never;
+    };
+    "/connections/{sn}/quotas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 연결 한도 목록 (번호순). 연결이 없으면 404 */
+        get: operations["connection_quotas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -75,6 +129,40 @@ export interface paths {
         head?: never;
         /** 멤버 부분 수정 (MemberUpdated). 모르는 상태는 422, 없으면 404 */
         patch: operations["team_edit"];
+        trace?: never;
+    };
+    "/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Instruction preset 목록 (종류 → 번호순). `kind`로 거른다 */
+        get: operations["setting_presets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/presets/{sn}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 프리셋 버전 목록 (최신순). 프리셋이 없으면 404 */
+        get: operations["setting_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/profiles": {
@@ -413,6 +501,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runtimes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 실행기 목록 (sort → 번호순). 연결 생성 폼의 선택지 */
+        get: operations["setting_runtimes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{sn}": {
         parameters: {
             query?: never;
@@ -574,6 +679,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 워크스페이스 일반 설정 조회 */
+        get: operations["setting_workspace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 워크스페이스 부분 수정 (WorkspaceUpdated). 모르는 테마는 422 */
+        patch: operations["setting_edit"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -600,6 +723,92 @@ export interface components {
             cmd: string;
             /** @description true = 사용 · false = 차단 */
             on: boolean;
+        };
+        /** @description 연결 (API 응답 형태). 키체인 항목 이름(key_ref)은 빼고 끝 4자리(key_hint)만 준다 */
+        Connection: {
+            account_label?: string | null;
+            base_url?: string | null;
+            /** Format: int64 */
+            budget_warn_percent: number;
+            /** Format: int64 */
+            cache_hit_percent?: number | null;
+            commit_language?: string | null;
+            create_at: string;
+            /** Format: int64 */
+            is_budget_exclude: number;
+            key_hint?: string | null;
+            /** @description subscription | plan | api_key | gateway | local */
+            kind: string;
+            /** Format: int64 */
+            latency_ms?: number | null;
+            /** @description browser | device_code | terminal */
+            login_method?: string | null;
+            /** Format: int64 */
+            monthly_budget_usd_micro?: number | null;
+            name: string;
+            plan_name?: string | null;
+            provider_code: string;
+            provider_name: string;
+            report_language?: string | null;
+            /** Format: int64 */
+            runtime_sn?: number | null;
+            /** @description workspace | team | me */
+            scope: string;
+            /** Format: int64 */
+            sn: number;
+            /** @description connected | checking | login_required | expired | error | available */
+            status: string;
+            status_message?: string | null;
+            sync_at?: string | null;
+            test_at?: string | null;
+            update_at: string;
+        };
+        /** @description 연결 생성 요청 본문. 상태는 available로 시작하고 실행기가 확인해 바꾼다 */
+        ConnectionNew: {
+            account_label?: string | null;
+            base_url?: string | null;
+            /** Format: int64 */
+            budget_warn_percent?: number | null;
+            commit_language?: string | null;
+            /** Format: int64 */
+            is_budget_exclude?: number | null;
+            key_hint?: string | null;
+            /** @description 키체인 항목 이름 (키 원문이 아니다 · 응답에는 나오지 않는다) */
+            key_ref?: string | null;
+            /** @description subscription | plan | api_key | gateway | local */
+            kind: string;
+            login_method?: string | null;
+            /** Format: int64 */
+            monthly_budget_usd_micro?: number | null;
+            name: string;
+            plan_name?: string | null;
+            provider_code: string;
+            provider_name: string;
+            report_language?: string | null;
+            /** Format: int64 */
+            runtime_sn?: number | null;
+            scope?: string | null;
+        };
+        /** @description 연결 수정 요청 본문. 보낸 필드만 바꾼다 */
+        ConnectionPatch: {
+            account_label?: string | null;
+            base_url?: string | null;
+            /** Format: int64 */
+            budget_warn_percent?: number | null;
+            commit_language?: string | null;
+            /** Format: int64 */
+            is_budget_exclude?: number | null;
+            key_hint?: string | null;
+            login_method?: string | null;
+            /** Format: int64 */
+            monthly_budget_usd_micro?: number | null;
+            name?: string | null;
+            plan_name?: string | null;
+            provider_name?: string | null;
+            report_language?: string | null;
+            /** Format: int64 */
+            runtime_sn?: number | null;
+            scope?: string | null;
         };
         /** @description 에러 응답 본문 (OpenAPI 공통 에러 스키마) */
         ErrorBody: {
@@ -758,6 +967,49 @@ export interface components {
             /** @description 옮겨갈 상태 */
             status: string;
         };
+        /** @description Instruction preset (API 응답 형태) */
+        Preset: {
+            /** Format: int64 */
+            copy_from_sn?: number | null;
+            description?: string | null;
+            /** Format: int64 */
+            is_builtin: number;
+            /** Format: int64 */
+            is_default: number;
+            /** Format: int64 */
+            is_locked: number;
+            /** @description protocol | role | style | rule | report */
+            kind: string;
+            /** Format: int64 */
+            limit_tok: number;
+            name: string;
+            preset_key: string;
+            /** Format: int64 */
+            project_sn?: number | null;
+            /** Format: int64 */
+            sn: number;
+            /** @description active | archived */
+            status: string;
+            update_at: string;
+            /**
+             * Format: int64
+             * @description 현재 최신 버전
+             */
+            version: number;
+        };
+        /** @description 프리셋 버전 1건 (API 응답 형태) */
+        PresetVersion: {
+            change_note?: string | null;
+            content: string;
+            create_at: string;
+            language: string;
+            /** @description builtin | user | import | translated */
+            source: string;
+            /** Format: int64 */
+            token_count: number;
+            /** Format: int64 */
+            version: number;
+        };
         /** @description 에이전트 프로필 (API 응답 형태) */
         Profile: {
             /** Format: int64 */
@@ -875,6 +1127,23 @@ export interface components {
             sort?: number | null;
             status?: string | null;
         };
+        /** @description 연결 한도 1건 (API 응답 형태). 갱신은 실행기가 한다 */
+        Quota: {
+            /** Format: double */
+            limit_value?: number | null;
+            /** @description minute | 5h | day | week | month */
+            period: string;
+            /** Format: int64 */
+            remain_percent?: number | null;
+            reset_at?: string | null;
+            /** Format: int64 */
+            sn: number;
+            /** @description percent | usd | request | token */
+            unit: string;
+            update_at: string;
+            /** Format: double */
+            used_value: number;
+        };
         /** @description 반려 요청 본문 */
         RejectBody: {
             /**
@@ -916,6 +1185,24 @@ export interface components {
             status: string;
             /** Format: int64 */
             task_sn: number;
+        };
+        /** @description 실행기 (API 응답 형태). 감지 · 설치 · 로그인 상태 갱신은 실행기 Task가 한다 */
+        Runtime: {
+            bin_path?: string | null;
+            /** @description codex | claude_code | gemini | opencode | cursor | kiro */
+            code: string;
+            detect_at?: string | null;
+            /** @description installed | missing */
+            install_status: string;
+            latest_version?: string | null;
+            /** @description logged_in | login_required | none */
+            login_status: string;
+            name: string;
+            /** Format: int64 */
+            sn: number;
+            /** Format: int64 */
+            sort: number;
+            version?: string | null;
         };
         /** @description Session (API 응답 형태) */
         Session: {
@@ -1116,6 +1403,38 @@ export interface components {
             /** @description read | edit | shell | git_push | web_fetch | git_destructive */
             tool_code: string;
         };
+        /** @description 워크스페이스 일반 설정 (API 응답 형태) */
+        Workspace: {
+            commit_language: string;
+            date_format: string;
+            default_repo?: string | null;
+            /**
+             * Format: int64
+             * @description 인트로(연결 → 프로젝트 → 기본 팀) 완료 여부
+             */
+            is_onboarded: number;
+            name: string;
+            report_language: string;
+            /** @description light | dark | system */
+            theme: string;
+            timezone: string;
+            ui_language: string;
+            update_at: string;
+        };
+        /** @description 워크스페이스 수정 요청 본문. 보낸 필드만 바꾼다 */
+        WorkspacePatch: {
+            commit_language?: string | null;
+            date_format?: string | null;
+            default_repo?: string | null;
+            /** Format: int64 */
+            is_onboarded?: number | null;
+            name?: string | null;
+            report_language?: string | null;
+            /** @description light | dark | system */
+            theme?: string | null;
+            timezone?: string | null;
+            ui_language?: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -1125,6 +1444,187 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    connection_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connection"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    connection_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionNew"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connection"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    connection_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 연결 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connection"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    connection_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 연결 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 삭제됨 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    connection_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 연결 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connection"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    connection_quotas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 연결 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quota"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     main_health: {
         parameters: {
             query?: never;
@@ -1390,6 +1890,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Member"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    setting_presets: {
+        parameters: {
+            query?: {
+                /** @description 이 종류만 */
+                kind?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preset"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    setting_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 프리셋 번호 */
+                sn: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresetVersion"][];
                 };
             };
             default: {
@@ -2275,6 +2835,33 @@ export interface operations {
             };
         };
     };
+    setting_runtimes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Runtime"][];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     task_read: {
         parameters: {
             query?: never;
@@ -2786,6 +3373,64 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Template"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    setting_workspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Workspace"];
+                };
+            };
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    setting_edit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkspacePatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Workspace"];
                 };
             };
             default: {
