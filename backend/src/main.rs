@@ -13,11 +13,12 @@ mod issue; // /issues CRUD
 mod orch; // PM Dock: /projects/{sn}/conversation · messages · /messages/* · /proposals · /runs/{sn}/instruct
 mod meta; // 완료 조건 · 의존 · 라벨 목록 · 저장 보기 · Diagram 배치
 mod notify; // /notifications · /notify/* · /audit + 이벤트 → 알림 projection
+mod preset; // 프리셋 편집 · 가져오기 · 사용처 · 보고서 양식 · 미리보기
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
 mod rule; // 하위 작업 규칙 엔진 (#67 · LLM 0)
 mod runner; // runner 하위 Run 실행 · @REPORT 회수 (#67)
-mod setting; // /workspace · /runtimes · /presets
+mod setting; // /workspace · /workspace/profile · /runtimes · /presets
 mod skill; // /skills · /mcps · /skill-sources 조회 · 스킬 허용/차단
 mod stat; // /teams/{sn}/stats · /teams/{sn}/quota · /workspace/cost 집계
 mod stream; // /projects/{sn}/snapshot · events · stream (SSE)
@@ -64,7 +65,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(stat::routes()).merge(meta::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -885,8 +886,8 @@ mod tests {
         assert_eq!(call(&app, "POST", &format!("/tasks/{a}/deps"), Some(json!({"depend_task_sn": b}))).await.0, StatusCode::CONFLICT);
         let other = task_of(&app, &db, false).await;
         assert_eq!(call(&app, "POST", &format!("/tasks/{a}/deps"), Some(json!({"depend_task_sn": other}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
-        call(&app, "POST", &format!("/tasks/{b}/move"), Some(json!({"status": "in_progress"}))).await;
-        call(&app, "POST", &format!("/tasks/{b}/move"), Some(json!({"status": "done"}))).await;
+        // 이동 API 대신 SQL로 완료 — move_task가 프로세스 전역 버스의 TaskMoved 수를 센다
+        db.execute_unprepared(&format!("UPDATE tbl_task SET status = 'done' WHERE sn = {b};")).await.unwrap();
         assert_eq!(call(&app, "GET", &format!("/tasks/{a}"), None).await.1["waiting"], false);
         assert_eq!(call(&app, "DELETE", &format!("/tasks/{a}/deps/{b}"), None).await.0, StatusCode::NO_CONTENT);
         assert_eq!(call(&app, "DELETE", &format!("/tasks/{a}/deps/{b}"), None).await.0, StatusCode::NOT_FOUND);
@@ -924,11 +925,107 @@ mod tests {
         assert_eq!(call(&app, "GET", "/projects/99/diagram", None).await.0, StatusCode::NOT_FOUND);
     }
 
+    /// B-14: 프리셋 만들기 · 복제 · 새 버전(DoD: 연결 고정 버전 유지) · 검사 422(상한 · 비밀키 · 겹치는 규칙 줄) · 기본 제공 409 · 사용처 · .md 가져오기,
+    /// 보고서 양식 수정(잠긴 칸 422) · 미리보기 조립, 워크스페이스 보안 기본값
+    #[tokio::test]
+    async fn preset() {
+        let db = mem().await;
+        let app = app(db.clone());
+        let ts = task_of(&app, &db, true).await; // 프로필 1 · 멤버 1(m)
+
+        // 만들기 → 새 버전: 버전 2, 연결(고정 v1)은 그대로
+        let (st, p) = call(&app, "POST", "/presets", Some(json!({"kind": "role", "preset_key": "qa", "name": "QA", "limit_tok": 100, "content": "# Role: QA\n- Test every endpoint."}))).await;
+        assert_eq!((st, p["version"].as_i64(), p["is_builtin"].as_i64()), (StatusCode::CREATED, Some(1), Some(0)));
+        let ps = p["sn"].as_i64().unwrap();
+        db.execute_unprepared(&format!("INSERT INTO tbl_map_profile_preset (profile_sn, preset_sn, pinned_version) VALUES (1, {ps}, 1);")).await.unwrap();
+        let (st, p) = call(&app, "PUT", &format!("/presets/{ps}"), Some(json!({"content": "# Role: QA\n- Test every endpoint.\n- Report flaky tests.", "change_note": "flaky"}))).await;
+        assert_eq!((st, p["version"].as_i64()), (StatusCode::OK, Some(2)));
+        let pinned: Option<i64> = { use crate::entity::tbl_map_profile_preset as pp; use sea_orm::EntityTrait; pp::Entity::find().one(&db).await.unwrap().map(|m| m.pinned_version) };
+        assert_eq!(pinned, Some(1));
+        let v = call(&app, "GET", &format!("/presets/{ps}/versions"), None).await.1;
+        assert_eq!((v[0]["version"].as_i64(), v[0]["change_note"].as_str(), v[1]["version"].as_i64()), (Some(2), Some("flaky"), Some(1)));
+        assert_eq!(events(&db, "preset", ps).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["PresetCreated", "PresetVersioned"]);
+
+        // 사용처: 멤버 m · 고정 v1
+        let u = call(&app, "GET", &format!("/presets/{ps}/usage"), None).await.1;
+        assert_eq!((u[0]["owner"].as_str(), u[0]["name"].as_str(), u[0]["detail"].as_str()), (Some("member"), Some("m"), Some("v1")));
+
+        // 검사: 상한 · 비밀키 · 본문 안 겹치는 줄 · 다른 rule 프리셋과 겹치는 줄 → 422 사유
+        let long = "x".repeat(500);
+        let (st, e) = call(&app, "PUT", &format!("/presets/{ps}"), Some(json!({"content": long}))).await;
+        assert!(st == StatusCode::UNPROCESSABLE_ENTITY && e["message"].as_str().unwrap().contains("token limit"), "{e}");
+        let (_, e) = call(&app, "PUT", &format!("/presets/{ps}"), Some(json!({"content": "key sk-abcdefghijklmnop1234"}))).await;
+        assert!(e["message"].as_str().unwrap().contains("secret pattern: sk-"), "{e}");
+        let (_, e) = call(&app, "PUT", &format!("/presets/{ps}"), Some(json!({"content": "- a\n- a"}))).await;
+        assert!(e["message"].as_str().unwrap().contains("duplicate rule line"), "{e}");
+        call(&app, "POST", "/presets", Some(json!({"kind": "rule", "preset_key": "base", "name": "Base", "limit_tok": 100, "content": "- Keep diffs small."}))).await;
+        let (st, e) = call(&app, "POST", "/presets", Some(json!({"kind": "rule", "preset_key": "more", "name": "More", "limit_tok": 100, "content": "- Keep diffs small.\n- Ask first."}))).await;
+        assert!(st == StatusCode::UNPROCESSABLE_ENTITY && e["message"].as_str().unwrap().contains("also in base"), "{e}");
+        assert_eq!(call(&app, "POST", "/presets", Some(json!({"kind": "protocol", "preset_key": "p", "name": "P", "limit_tok": 9, "content": "x"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", "/presets", Some(json!({"kind": "role", "preset_key": "qa", "name": "QA2", "limit_tok": 100, "content": "x"}))).await.0, StatusCode::CONFLICT);
+
+        // 기본 제공은 수정 409 → 복제하면 새 프리셋(본문 · 상한 이어받음)
+        db.execute_unprepared("INSERT INTO tbl_instruction_preset (sn, wid, kind, preset_key, name, version, limit_tok, is_builtin) VALUES (90, 1, 'style', 'terse', 'Terse', 1, 50, 1); \
+            INSERT INTO tbl_instruction_preset_version (preset_sn, version, content) VALUES (90, 1, 'Be terse.');").await.unwrap();
+        assert_eq!(call(&app, "PUT", "/presets/90", Some(json!({"content": "x"}))).await.0, StatusCode::CONFLICT);
+        let (st, c) = call(&app, "POST", "/presets", Some(json!({"preset_key": "terse2", "name": "Terse 2", "copy_from_sn": 90}))).await;
+        assert_eq!((st, c["kind"].as_str(), c["limit_tok"].as_i64(), c["copy_from_sn"].as_i64()), (StatusCode::CREATED, Some("style"), Some(50), Some(90)));
+        assert_eq!(call(&app, "GET", &format!("/presets/{}/versions", c["sn"]), None).await.1[0]["content"], "Be terse.");
+
+        // .md 가져오기: 새 프리셋(import) · 같은 키면 새 버전 · 앞머리 없음 / 새인데 limit 없음 422
+        let md = "---\nkind: role\nkey: backend\nname: Backend\nlimit_tok: 600\n---\n# Role: Backend\n- Validate input.";
+        let (st, b) = call(&app, "POST", "/presets/import", Some(json!({"markdown": md}))).await;
+        assert_eq!((st, b["preset_key"].as_str(), b["version"].as_i64()), (StatusCode::OK, Some("backend"), Some(1)));
+        assert_eq!(call(&app, "GET", &format!("/presets/{}/versions", b["sn"]), None).await.1[0]["source"], "import");
+        assert_eq!(call(&app, "POST", "/presets/import", Some(json!({"markdown": md.replace("Validate", "Check")}))).await.1["version"], 2);
+        assert_eq!(call(&app, "POST", "/presets/import", Some(json!({"markdown": "# no head"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", "/presets/import", Some(json!({"markdown": "---\nkind: role\nkey: z\n---\nbody"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+
+        // 보고서 양식: 잠긴 칸을 지우면 422 · 고치면 버전 +1
+        db.execute_unprepared("INSERT INTO tbl_report_form (wid, kind, form_key, name, body, locked_json, is_default) VALUES (1, 'task_report', 'task-report', '태스크 보고서', \
+            '#{{task.num}} {{task.title}} [{{status.label}}]\n[[result]]\n{{#each area}}- {{key}}: {{value}}\n{{/each}}통과: {{tests.passed_summary}} / 미확인: [[unverified]]{{#if pr}} · PR #{{pr.num}}{{/if}} / {{run.tokens}} tok', \
+            '[\"unverified\",\"tests.passed_summary\"]', 1);").await.unwrap();
+        assert_eq!(call(&app, "GET", "/report-forms", None).await.1.as_array().unwrap().len(), 1);
+        let f = call(&app, "GET", "/report-forms/task-report", None).await.1;
+        assert_eq!(f["locked"], json!(["unverified", "tests.passed_summary"]));
+        let (st, e) = call(&app, "PUT", "/report-forms/task-report", Some(json!({"body": "[[result]]"}))).await;
+        assert!(st == StatusCode::UNPROCESSABLE_ENTITY && e["message"].as_str().unwrap().contains("unverified"), "{e}");
+        let body = f["body"].as_str().unwrap().to_owned();
+        assert_eq!(call(&app, "PUT", "/report-forms/task-report", Some(json!({"body": body}))).await.1["version"], 2);
+        assert_eq!(call(&app, "GET", "/report-forms/nope", None).await.0, StatusCode::NOT_FOUND);
+
+        // 미리보기: Run 보고 항목 · 결과 요약 · 토큰으로 조립, PR 없으면 if 블록 빠짐
+        let rs = call(&app, "POST", &format!("/tasks/{ts}/runs"), None).await.1["sn"].as_i64().unwrap();
+        db.execute_unprepared(&format!("UPDATE tbl_run SET result_summary = 'tests 12/12' WHERE sn = {rs}; \
+            INSERT INTO tbl_log_token (run_sn, token_input) VALUES ({rs}, 420); \
+            INSERT INTO tbl_report_item (run_sn, task_sn, kind, ref_key, code, value) VALUES ({rs}, {ts}, 'result', NULL, 'ok', '로그인 완료'), ({rs}, {ts}, 'area', 'auth', 'ok', '토큰 갱신'), ({rs}, {ts}, 'unverified', NULL, 'ok', '없음');")).await.unwrap();
+        let (st, pv) = call(&app, "POST", &format!("/report-forms/task-report/preview?task={ts}"), None).await;
+        let text = pv["body"].as_str().unwrap();
+        assert_eq!(st, StatusCode::OK);
+        assert!(text.starts_with("#2 T [in_progress]\n로그인 완료\n- auth: 토큰 갱신\n통과: tests 12/12 / 미확인: 없음 / 420 tok"), "{text}");
+        assert_eq!(pv["missing"], json!([]));
+
+        // 워크스페이스 보안 기본값: 기본 → 저장(프로필 생성 · 규칙 · 가드 · GitHub) → 다시 읽기 · 잘못된 값 422
+        let w = call(&app, "GET", "/workspace/profile", None).await.1;
+        assert_eq!((w["trust_level"].as_i64(), w["github_mode"].as_str(), w["rules"].as_array().unwrap().len()), (Some(3), Some("bot"), 0));
+        let body = json!({"trust_level": 2, "github_mode": "personal", "github_account": "me", "github_repo_scope": "orch/*",
+            "rules": [{"action_code": "pr_create", "title": "PR 생성", "policy": "approval", "approver": "user"}, {"action_code": "command", "title": "git push --force", "pattern": "git push --force", "policy": "block"}],
+            "guards": [{"name": "비밀키 출력", "stage": "output", "pattern": "sk-"}]});
+        let w = call(&app, "PUT", "/workspace/profile", Some(body.clone())).await.1;
+        assert_eq!((w["trust_level"].as_i64(), w["rules"][1]["policy"].as_str(), w["guards"][0]["is_enabled"].as_i64(), w["github_account"].as_str()), (Some(2), Some("block"), Some(1), Some("me")));
+        assert_eq!(call(&app, "GET", "/workspace/profile", None).await.1["rules"].as_array().unwrap().len(), 2);
+        for bad in [json!({"trust_level": 5}), json!({"rules": [{"action_code": "command", "title": "x", "policy": "block"}]}), json!({"guards": [{"name": "g", "stage": "x"}]})] {
+            let mut b = body.clone();
+            b.as_object_mut().unwrap().extend(bad.as_object().unwrap().clone());
+            assert_eq!(call(&app, "PUT", "/workspace/profile", Some(b)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+    }
+
     #[tokio::test]
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/proposals", "/proposals/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/proposals", "/proposals/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram", "/presets/{sn}", "/presets/{sn}/usage", "/presets/import", "/report-forms", "/report-forms/{key}", "/report-forms/{key}/preview", "/workspace/profile"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

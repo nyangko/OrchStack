@@ -1,8 +1,8 @@
-//! 설정: 워크스페이스(tbl_workspace sn=WID) 조회 · 수정, 실행기 목록, Instruction preset 목록 · 버전 조회(읽기 전용)
-use crate::{entity::{tbl_instruction_preset as ip, tbl_instruction_preset_version as iv, tbl_runtime as rt, tbl_workspace as ws},
+//! 설정: 워크스페이스(tbl_workspace sn=WID) 조회 · 수정, 보안 기본값(workspace 프로필), 실행기 목록, Instruction preset 목록 · 버전 조회 (편집은 preset.rs)
+use crate::{entity::{tbl_agent_profile as ap, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv, tbl_profile_guard as pg, tbl_profile_rule as pr, tbl_runtime as rt, tbl_workspace as ws},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}};
-use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -17,6 +17,57 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
         .routes(routes!(runtimes))
         .routes(routes!(presets))
         .routes(routes!(versions))
+        .routes(routes!(profile, set_profile))
+}
+
+/// 허용되는 규칙 동작 · 정책 · 승인자, 가드 시점
+const ACTIONS: [&str; 6] = ["pr_create", "dependency_add", "external_message", "env_access", "run_extend", "command"];
+const POLICIES: [&str; 3] = ["auto", "approval", "block"];
+const APPROVERS: [&str; 2] = ["user", "orch_then_user"];
+const STAGES: [&str; 3] = ["tool_use", "tool_result", "output"];
+
+/// 승인 규칙 · 차단 패턴 1줄 (tbl_profile_rule)
+#[derive(Serialize, Deserialize, ToSchema)]
+struct Rule {
+    /// pr_create | dependency_add | external_message | env_access | run_extend | command
+    action_code: String,
+    title: String,
+    /// 명령 패턴 (command일 때)
+    pattern: Option<String>,
+    description: Option<String>,
+    /// auto | approval | block
+    policy: String,
+    /// user | orch_then_user (approval일 때)
+    approver: Option<String>,
+    #[serde(default = "one")]
+    is_notify: i64,
+}
+
+/// 가드 트리거 1줄 (tbl_profile_guard)
+#[derive(Serialize, Deserialize, ToSchema)]
+struct Guard {
+    name: String,
+    /// tool_use | tool_result | output
+    stage: String,
+    pattern: Option<String>,
+    #[serde(default = "one")]
+    is_enabled: i64,
+}
+
+/// 기본값 1
+fn one() -> i64 { 1 }
+
+/// 워크스페이스 보안 기본값: kind=workspace 프로필의 Trust · 규칙 · 가드 + 워크스페이스 GitHub 계정 (조회 응답 · 저장 본문 겸용)
+#[derive(Serialize, Deserialize, ToSchema)]
+struct SecurityProfile {
+    /// 1(읽기 전용) ~ 4(자율)
+    trust_level: i64,
+    rules: Vec<Rule>,
+    guards: Vec<Guard>,
+    /// bot | personal
+    github_mode: String,
+    github_account: Option<String>,
+    github_repo_scope: Option<String>,
 }
 
 /// 워크스페이스 일반 설정 (API 응답 형태)
@@ -241,4 +292,71 @@ async fn presets(State(db): State<DatabaseConnection>, Query(q): Query<std::coll
 async fn versions(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<PresetVersion>>> {
     ip::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
     Ok(Json(iv::Entity::find().filter(iv::Column::PresetSn.eq(sn)).order_by_desc(iv::Column::Version).all(&db).await?.into_iter().map(PresetVersion::from).collect()))
+}
+
+/// 워크스페이스 기본 프로필 (kind = workspace 중 첫 번째)
+async fn base(db: &impl ConnectionTrait) -> Res<Option<ap::Model>> {
+    Ok(ap::Entity::find().filter(ap::Column::Kind.eq("workspace")).order_by_asc(ap::Column::Sn).one(db).await?)
+}
+
+/// 보안 기본값 읽기. 기본 프로필이 아직 없으면 Trust 3 · 규칙 · 가드 없음
+async fn security(db: &impl ConnectionTrait) -> Res<SecurityProfile> {
+    let w = ws::Entity::find_by_id(crate::WID).one(db).await?.ok_or_else(Error::not_found)?;
+    let p = base(db).await?;
+    let sn = p.as_ref().map_or(0, |p| p.sn);
+    let rules = pr::Entity::find().filter(pr::Column::ProfileSn.eq(sn)).order_by_asc(pr::Column::Sort).order_by_asc(pr::Column::Sn).all(db).await?.into_iter()
+        .map(|m| Rule { action_code: m.action_code, title: m.title, pattern: m.pattern, description: m.description, policy: m.policy, approver: m.approver, is_notify: m.is_notify }).collect();
+    let guards = pg::Entity::find().filter(pg::Column::ProfileSn.eq(sn)).order_by_asc(pg::Column::Sort).order_by_asc(pg::Column::Sn).all(db).await?.into_iter()
+        .map(|m| Guard { name: m.name, stage: m.stage, pattern: m.pattern, is_enabled: m.is_enabled }).collect();
+    Ok(SecurityProfile {
+        trust_level: p.map_or(3, |p| p.trust_level), rules, guards, github_mode: w.github_mode, github_account: w.github_account, github_repo_scope: w.github_repo_scope,
+    })
+}
+
+/// 워크스페이스 보안 기본값 조회 (Trust · 승인 규칙 · 항상 차단 패턴 · 가드 · GitHub 계정)
+#[utoipa::path(operation_id = "setting_profile", get, path = "/workspace/profile", responses((status = 200, body = SecurityProfile), (status = "default", body = ErrorBody)))]
+async fn profile(State(db): State<DatabaseConnection>) -> Res<Json<SecurityProfile>> {
+    security(&db).await.map(Json)
+}
+
+/// 워크스페이스 보안 기본값 저장 (ProfileUpdated · WorkspaceUpdated). 규칙 · 가드는 전체 교체(배열 순서 = 표시 순서), 기본 프로필이 없으면 만든다.
+/// Trust 1~4 · 모르는 동작 · 정책 · 승인자 · 시점 · GitHub 방식, command인데 패턴 없음, 빈 이름은 422
+#[utoipa::path(operation_id = "setting_set_profile", put, path = "/workspace/profile", request_body = SecurityProfile, responses((status = 200, body = SecurityProfile), (status = "default", body = ErrorBody)))]
+async fn set_profile(State(db): State<DatabaseConnection>, Body(b): Body<SecurityProfile>) -> Res<Json<SecurityProfile>> {
+    let bad_rule = b.rules.iter().any(|r| !ACTIONS.contains(&r.action_code.as_str()) || !POLICIES.contains(&r.policy.as_str()) || r.title.trim().is_empty()
+        || r.approver.as_deref().is_some_and(|a| !APPROVERS.contains(&a)) || (r.action_code == "command" && r.pattern.as_deref().is_none_or(|p| p.trim().is_empty())));
+    let bad_guard = b.guards.iter().any(|g| !STAGES.contains(&g.stage.as_str()) || g.name.trim().is_empty());
+    if !(1..=4).contains(&b.trust_level) || !["bot", "personal"].contains(&b.github_mode.as_str()) || bad_rule || bad_guard {
+        return Err(Error::invalid(format!("trust_level 1..=4, github_mode bot|personal, action in {ACTIONS:?}, policy in {POLICIES:?}, approver in {APPROVERS:?}, stage in {STAGES:?}, command needs pattern")));
+    }
+    let out = event::run(&db, async |tx| {
+        let sn = match base(tx).await? {
+            Some(p) => p.sn,
+            None => ap::ActiveModel { wid: Set(crate::WID), kind: Set("workspace".into()), ..Default::default() }.insert(tx).await?.sn,
+        };
+        ap::Entity::update_many().filter(ap::Column::Sn.eq(sn)).col_expr(ap::Column::TrustLevel, b.trust_level.into()).exec(tx).await?;
+        pr::Entity::delete_many().filter(pr::Column::ProfileSn.eq(sn)).exec(tx).await?;
+        for (i, r) in b.rules.iter().enumerate() {
+            pr::ActiveModel {
+                profile_sn: Set(sn), action_code: Set(r.action_code.clone()), title: Set(r.title.trim().into()), pattern: Set(r.pattern.clone()), description: Set(r.description.clone()),
+                policy: Set(r.policy.clone()), approver: Set(r.approver.clone()), is_notify: Set(r.is_notify), sort: Set(i as i64), ..Default::default()
+            }.insert(tx).await?;
+        }
+        pg::Entity::delete_many().filter(pg::Column::ProfileSn.eq(sn)).exec(tx).await?;
+        for (i, g) in b.guards.iter().enumerate() {
+            pg::ActiveModel {
+                profile_sn: Set(sn), name: Set(g.name.trim().into()), stage: Set(g.stage.clone()), pattern: Set(g.pattern.clone()), is_enabled: Set(g.is_enabled), sort: Set(i as i64), ..Default::default()
+            }.insert(tx).await?;
+        }
+        ws::Entity::update_many().filter(ws::Column::Sn.eq(crate::WID)).col_expr(ws::Column::GithubMode, b.github_mode.clone().into())
+            .col_expr(ws::Column::GithubAccount, b.github_account.clone().into()).col_expr(ws::Column::GithubRepoScope, b.github_repo_scope.clone().into())
+            .col_expr(ws::Column::UpdateAt, Expr::cust("datetime('now')")).exec(tx).await?;
+        let out = security(tx).await?;
+        let evs = vec![
+            Ev::new(None, "profile", sn, "ProfileUpdated", &serde_json::json!({ "trust_level": b.trust_level, "rules": b.rules.len(), "guards": b.guards.len() })),
+            Ev::new(None, "workspace", crate::WID, "WorkspaceUpdated", &serde_json::json!({ "github_mode": b.github_mode, "github_account": b.github_account, "github_repo_scope": b.github_repo_scope })),
+        ];
+        Ok((out, evs))
+    }).await?;
+    Ok(Json(out))
 }

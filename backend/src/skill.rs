@@ -128,7 +128,7 @@ async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<sk::Model> {
 }
 
 /// (프로필 번호, detail) 목록 → 멤버 · 템플릿 사용처. 보관된 멤버 · 지난 템플릿 버전은 뺀다
-async fn owners(db: &impl ConnectionTrait, links: Vec<(i64, String)>) -> Res<Vec<Usage>> {
+pub(crate) async fn owners(db: &impl ConnectionTrait, links: Vec<(i64, String)>) -> Res<Vec<Usage>> {
     let sns = links.iter().map(|l| l.0).collect::<Vec<_>>();
     let detail = |p: i64| links.iter().find(|l| l.0 == p).map(|l| l.1.clone()).unwrap_or_default();
     let mut out: Vec<Usage> = mb::Entity::find().filter(mb::Column::ProfileSn.is_in(sns.clone())).filter(mb::Column::Status.ne("archived"))
