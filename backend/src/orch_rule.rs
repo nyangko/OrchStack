@@ -240,7 +240,7 @@ impl Cx<'_> {
     async fn wait(&self, nb: &ProposalNew, lv: Option<&Level>) -> Res<()> {
         let c = |code: &str| Choice { code: code.into(), label: code.into(), note: None, is_recommended: code == "proceed", is_selected: false };
         let deadline = match lv.and_then(|x| x.wait_min) { Some(m) => Some(at(self.db, &format!("+{m} minutes")).await?), None => None };
-        let q = Question { title: nb.title.clone(), body: nb.reason.clone(), code_snippet: None, reference: None, options: vec![c("proceed"), c("stop")], answer_text: None, is_delegate: false, answer_at: None };
+        let q = Question { title: nb.title.clone(), body: nb.reason.clone(), code_snippet: None, reference: Some(serde_json::json!({ "proposal": nb })), options: vec![c("proceed"), c("stop")], answer_text: None, is_delegate: false, answer_at: None };
         ask::decision(self.db, DecisionNew {
             project_sn: self.ps, task_sn: nb.task_sn, run_sn: nb.run_sn, member_sn: self.orch, level: nb.level.max(2), title: nb.title.clone(), deadline_at: deadline, questions: vec![q],
         }).await?;
@@ -299,6 +299,9 @@ pub async fn ticker(db: DatabaseConnection) {
         if let Err(err) = ask::tick(&db).await {
             eprintln!("orch timer: {}", err.message());
         }
+        // 기한 지난 판단 요청 대행 (모델 호출이 길 수 있어 따로 돌린다 · 같은 ask는 중복 호출하지 않는다)
+        let db = db.clone();
+        tokio::spawn(async move { if let Err(err) = crate::orch_llm::sweep(&db).await { eprintln!("orch decide: {}", err.message()); } });
     }
 }
 

@@ -17,7 +17,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 // ponytail: 상수 40K (#14 목표). 워크스페이스 · 팀별로 바꿀 칸이 필요해지면 설정 칸으로
 pub const INPUT_CAP: i64 = 40_000;
 /// 블록 끝 구분자. 본문을 다듬지 않고 그대로 붙여 접두 바이트를 고정한다
-const END: &str = "\n\n";
+pub(crate) const END: &str = "\n\n";
 /// 프리셋 종류 조합 순서
 const KINDS: [&str; 5] = ["protocol", "rule", "role", "style", "report"];
 /// 저장소 규칙 파일 (cwd 기준)

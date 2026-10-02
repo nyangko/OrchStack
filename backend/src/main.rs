@@ -10,6 +10,7 @@ mod event; // 명령 실행 틀 (상태 변경 + 이벤트 append + 발행)
 mod exec; // 실행기: Claude Code · Codex CLI 비대화형 실행 (#13)
 mod issue; // /issues CRUD
 mod context; // 컨텍스트 조립기 (고정 접두 · 반복 · 상한 · 견적) + /tasks/{sn}/estimate · /runs/{sn}/context
+mod orch_llm; // Orch 모델 호출 2곳 (#122): 자유 글 → WorkProposal · 기한 지난 판단 대행 + POST /messages/{sn}/plan
 mod orch_rule; // Orch 규칙 엔진 (LLM 0): 이벤트 → 제안 · 제안 실행 · 타이머 · 가드 · 멤버 대기열
 mod orch; // PM Dock: /projects/{sn}/conversation · messages · /messages/* · /runs/{sn}/instruct
 mod meta; // 완료 조건 · 의존 · 라벨 목록 · 저장 보기 · Diagram 배치
@@ -67,7 +68,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(ask::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(orch_rule::routes()).merge(context::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(ask::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(orch_rule::routes()).merge(orch_llm::routes()).merge(context::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -110,6 +111,7 @@ async fn main() {
     // Orch 규칙 엔진: 이벤트 소비 + 1초 타이머 (테스트는 on · tick을 직접 부른다)
     tokio::spawn(orch_rule::listen(db.clone()));
     tokio::spawn(orch_rule::ticker(db.clone()));
+    tokio::spawn(orch_llm::listen(db.clone()));
     axum::serve(listener, app(db)).await.unwrap();
 }
 
@@ -1500,6 +1502,283 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         assert_eq!(call(&app, "GET", "/members/1", None).await.1["work"], "running");
     }
 
+    /// B-18 도우미: 가짜 Claude CLI(받은 프롬프트를 prompt.N.txt에 남기고 호출 순서대로 outs를 낸다 · 마지막은 계속 반복)와 Orch 설정이 있는 DB.
+    /// rig(프로젝트 1 · 팀 1 · 멤버 1(m) · Orch 2 · 태스크 a b c)에 실행기 · 연결을 붙인다
+    async fn llm_rig(name: &str, outs: &[&str]) -> (DatabaseConnection, Router, std::path::PathBuf) {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("orch-llm-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let esc = |t: &str| { let j = serde_json::to_string(t).unwrap(); j[1..j.len() - 1].to_owned() };
+        let mut arms = String::new();
+        for (i, o) in outs.iter().enumerate() {
+            arms += &if i + 1 == outs.len() { format!("*) R='{}' ;;\n", esc(o)) } else { format!("{i}) R='{}' ;;\n", esc(o)) };
+        }
+        let bin = dir.join("claude");
+        std::fs::write(&bin, format!(r#"#!/bin/sh
+D={0}
+cat > $D/prompt.txt
+n=$(cat $D/n 2>/dev/null || echo 0); echo $((n+1)) > $D/n
+cp $D/prompt.txt $D/prompt.$n.txt
+case $n in
+{1}esac
+echo '{{"type":"system","subtype":"init","session_id":"s"}}'
+printf '{{"type":"result","is_error":false,"result":"%s","usage":{{"input_tokens":50,"output_tokens":20,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}}\n' "$R"
+"#, dir.display(), arms)).unwrap();
+        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let db = mem().await;
+        let app = app(db.clone());
+        rig(&app, &db).await;
+        db.execute_unprepared(&format!("INSERT INTO tbl_runtime (sn, workspace_sn, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{}'); \
+            INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c'); \
+            UPDATE tbl_agent_profile SET runtime_sn = 1, connection_sn = 1 WHERE sn = 1;", bin.display())).await.unwrap();
+        (db, app, dir)
+    }
+
+    /// 호출 수 (이 스레드에서 exec::run이 불린 횟수)
+    fn calls() -> u32 {
+        crate::exec::CALLS.with(|c| c.get())
+    }
+
+    /// 사용자 글 보내기 → 메시지 sn
+    async fn say(app: &Router, text: &str) -> i64 {
+        let (st, m) = call(app, "POST", "/projects/1/messages", Some(json!({"content": text}))).await;
+        assert_eq!(st, StatusCode::CREATED);
+        m["sn"].as_i64().unwrap()
+    }
+
+    const PLAN_OK: &str = "ok\n@PLAN v1\n{\"issue\":{\"title\":\"로그인 개선\",\"body\":\"b\"},\"tasks\":[{\"title\":\"UI\",\"member_sn\":1},{\"title\":\"API\",\"member_sn\":99}]}";
+
+    /// B-18 DoD 1: 자유 글 1건 → 호출 1회 → WorkProposal 1개(초안 · 행위자 orch) · 팀에 없는 멤버 번호는 배정 없음 · 입력에 원문 그대로 · 프리셋 시드 ·
+    /// 토큰 기록(run_sn NULL · provider) · OrchCalled 이벤트 · 통계 · 이벤트 소비(on)는 같은 글로 두 번 부르지 않고 수동 재시도(POST)는 다시 부른다
+    #[tokio::test]
+    async fn orch_llm_plan() {
+        let (db, app, dir) = llm_rig("plan", &[PLAN_OK]).await;
+        assert_eq!(db_count(&db, "tbl_instruction_preset").await, 0);
+        let ms = say(&app, "로그인을 개선해줘").await;
+        let user_ev = last(&db, "MessagePosted").await;
+        assert_eq!(calls(), 0); // 글을 보내는 것만으로는 부르지 않는다 (소비 루프가 on을 부른다)
+
+        let out = crate::orch_llm::on(&db, &user_ev).await.unwrap().unwrap();
+        assert_eq!((calls(), out.ask_sn), (1, None));
+        let p = out.proposal.unwrap();
+        let c = call(&app, "GET", "/projects/1/conversation", None).await.1;
+        assert_eq!(c["messages"].as_array().unwrap().len(), 2);
+        assert_eq!((c["messages"][1]["sender_type"].as_str(), c["messages"][1]["member_sn"].as_i64(), c["messages"][1]["kind"].as_str(), c["messages"][1]["proposal_status"].as_str(), c["messages"][1]["sn"].as_i64()),
+            (Some("orch"), Some(2), Some("work_proposal"), Some("draft"), Some(serde_json::to_value(&p).unwrap()["sn"].as_i64().unwrap())));
+        let t = &c["messages"][1]["payload"]["tasks"];
+        assert_eq!((c["messages"][1]["payload"]["issue"]["title"].as_str(), t[0]["member_sn"].as_i64(), t[1]["member_sn"].is_null()), (Some("로그인 개선"), Some(1), true));
+        assert_eq!(actor(&db, "MessagePosted", serde_json::to_value(&p).unwrap()["sn"].as_i64().unwrap()).await.0, "orch");
+
+        // 입력: 프리셋 접두(protocol → role · 시드) + 요약 + 팀 + 원문 그대로 + 형식 지침이 맨 끝
+        assert_eq!(db_count(&db, "tbl_instruction_preset").await, 2);
+        let sent = std::fs::read_to_string(dir.join("prompt.0.txt")).unwrap();
+        assert!(sent.starts_with("# OrchStack protocol") && sent.find("# Role: Orch (PM)").unwrap() > sent.find("# OrchStack protocol").unwrap(), "{sent}");
+        assert!(sent.contains("@PROJECT\nissue #1 I [open]\ntask #2 T [todo] @1\ntask #3 B [todo] @-\n"), "{sent}");
+        assert!(sent.contains("@TEAM\n1 m / Dev / idle\n") && !sent.contains("Orch / PM"), "{sent}");
+        assert!(sent.contains("@USER\n로그인을 개선해줘\n\n") && sent.trim_end().ends_with("\"member_sn\":<sn from @TEAM or null>}]}"), "{sent}");
+
+        // 토큰 기록: Run 없이(run_sn NULL) 실측 · OrchCalled(행위자 orch · 멤버 2) · 연결 캐시율 갱신 · 통계
+        assert_eq!((scalar(&db, "SELECT COUNT(*) FROM tbl_log_token WHERE run_sn IS NULL AND usage_source = 'provider' AND token_input = 50 AND token_output = 20").await, db_count(&db, "tbl_run").await), (1, 0));
+        assert_eq!((events(&db, "message", ms).await.last().unwrap().0.as_str(), actor(&db, "OrchCalled", ms).await), ("OrchCalled", ("orch".into(), Some(2), None)));
+        assert_eq!(call(&app, "GET", "/connections/1", None).await.1["cache_hit_percent"].as_i64(), Some(0));
+        let st = call(&app, "GET", "/teams/1/stats", None).await.1;
+        assert_eq!((st["orch_call_count"].as_i64(), st["orch_call_per_task"].is_null()), (Some(1), true)); // 완료 태스크 없음
+
+        // 같은 글로 두 번 부르지 않는다 (그 글 뒤에 orch 메시지가 있다) · 수동 재시도는 다시 부른다 · 사용자 글이 아니면 409
+        assert!(crate::orch_llm::on(&db, &user_ev).await.unwrap().is_none());
+        assert_eq!(calls(), 1);
+        let (st, v) = call(&app, "POST", &format!("/messages/{ms}/plan"), None).await;
+        assert_eq!((st, calls(), v["proposal"]["kind"].as_str()), (StatusCode::OK, 2, Some("work_proposal")));
+        assert_eq!(call(&app, "POST", &format!("/messages/{}/plan", v["proposal"]["sn"]), None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", "/messages/99/plan", None).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(db_count(&db, "tbl_instruction_preset").await, 2); // 시드는 한 번만
+    }
+
+    /// B-18 DoD 2: 첫 출력이 형식 오류 → 같은 입력 + 오류 한 줄로 재시도 1회 → 성공(CALLS 2) / 두 번 다 실패 → 판단 요청 1개(plan_failed · retry | manual · CALLS 2) · 실행기 실패는 재시도 없이 1회
+    #[tokio::test]
+    async fn orch_llm_retry() {
+        let (db, app, dir) = llm_rig("retry", &["no block here", PLAN_OK]).await;
+        let ms = say(&app, "해줘").await;
+        let out = crate::orch_llm::plan(&db, ms).await.unwrap();
+        assert_eq!((calls(), out.proposal.is_some(), out.ask_sn), (2, true, None));
+        let (p0, p1) = (std::fs::read_to_string(dir.join("prompt.0.txt")).unwrap(), std::fs::read_to_string(dir.join("prompt.1.txt")).unwrap());
+        assert!(!p0.contains("@ERROR") && p1.starts_with(&p0) && p1[p0.len()..].starts_with("@ERROR @PLAN v1 block missing"), "{}", &p1[p0.len()..]);
+        assert_eq!(scalar(&db, "SELECT COUNT(*) FROM tbl_log_token").await, 2);
+
+        // 두 번 다 실패(JSON 깨짐 · 빈 tasks): 판단 요청 1개 · 질문 코드 plan_failed · 선택지 retry · manual · 제안 없음 · 알림 decision_request(orch)
+        let (db, app, _) = llm_rig("retry2", &["@PLAN v1\n{\"issue\":", "@PLAN v1\n{\"issue\":{\"title\":\"x\"},\"tasks\":[]}"]).await;
+        let before = calls();
+        let ms = say(&app, "해줘").await;
+        let out = crate::orch_llm::plan(&db, ms).await.unwrap();
+        assert_eq!((calls() - before, out.proposal.is_none(), out.ask_sn.is_some()), (2, true, true));
+        let d = call(&app, "GET", "/asks?kind=decision", None).await.1;
+        let q = &d[0]["option"][0];
+        assert_eq!((d.as_array().unwrap().len(), d[0]["title"].as_str(), q["title"].as_str(), q["options"][0]["code"].as_str(), q["options"][1]["code"].as_str(), q["ref"]["message_sn"].as_i64(), d[0]["member_sn"].as_i64()),
+            (1, Some("plan_failed"), Some("plan_failed"), Some("retry"), Some("manual"), Some(ms), Some(2)));
+        assert!(q["body"].as_str().unwrap().contains("titled task")); // 원인 한 줄 (사람용 문구 아님)
+        assert_eq!(call(&app, "GET", "/projects/1/conversation", None).await.1["messages"].as_array().unwrap().len(), 1);
+        assert_eq!(call(&app, "GET", "/notifications", None).await.1[0]["event_code"], "decision_request");
+
+        // 실행기 실패(없는 실행 파일): 재시도 없이 바로 판단 요청 · 호출 기록 없음
+        db.execute_unprepared("UPDATE tbl_runtime SET bin_path = '/nonexistent/claude'").await.unwrap();
+        let before = (calls(), db_count(&db, "tbl_log_token").await);
+        let ms = say(&app, "또 해줘").await;
+        let out = crate::orch_llm::plan(&db, ms).await.unwrap();
+        assert_eq!((calls() - before.0, db_count(&db, "tbl_log_token").await, out.ask_sn.is_some()), (1, before.1, true));
+        // Orch 실행기가 없으면 409 no_orch
+        db.execute_unprepared("UPDATE tbl_agent_profile SET runtime_sn = NULL").await.unwrap();
+        let (st, e) = call(&app, "POST", &format!("/messages/{ms}/plan"), None).await;
+        assert_eq!((st, e["error"].as_str()), (StatusCode::CONFLICT, Some("no_orch")));
+    }
+
+    /// B-18 DoD 3: 기한 지난 판단 요청 — orch_decide(L2 기본) → 호출 1회 · orch_decided · decide_by orch · 근거 · 선택 표시 · 알림 / keep_wait(L3 기본) → 호출 0 · 그대로 /
+    /// proceed → 호출 0 · 추천 선택지 / 기한 전 · 작성 중은 건드리지 않음 / 중복 호출 없음 / 형식 오류 · 실행기 실패는 추천 선택지로 (근거 코드)
+    #[tokio::test]
+    async fn orch_llm_decide() {
+        use crate::ask::{self, Choice, DecisionNew, Question};
+        let (db, app, dir) = llm_rig("decide", &["@DECIDE v1\n{\"choice\":[{\"question\":0,\"option\":\"B\"},{\"question\":1,\"option\":\"A\"}],\"reason\":\"safest   reversible\"}"]).await;
+        let opt = |code: &str| Choice { code: code.into(), label: format!("opt {code}"), note: Some("tradeoff".into()), is_recommended: code == "A", is_selected: false };
+        let qn = |t: &str| Question { title: t.into(), body: Some("body".into()), code_snippet: None, reference: None, options: vec![opt("A"), opt("B")], answer_text: None, is_delegate: false, answer_at: None };
+        let past = Some("2000-01-01 00:00:00".to_owned());
+        let mk = |level: i64, deadline: Option<String>| { let db = db.clone(); let qs = vec![qn("Q1"), qn("Q2")]; async move {
+            ask::decision(&db, DecisionNew { project_sn: 1, task_sn: None, run_sn: None, member_sn: 1, level, title: format!("D{level}"), deadline_at: deadline, questions: qs }).await.unwrap()
+        }};
+        let (d2, d3) = (mk(2, past.clone()).await, mk(3, past.clone()).await); // 1 · 2: 기본 정책 L2 orch_decide · L3 keep_wait
+        let _future = mk(2, Some("2999-01-01 00:00:00".into())).await; // 3
+        let _none = mk(2, None).await; // 4
+        let writing = mk(2, past.clone()).await; // 5
+        let w = format!("/asks/{}/writing", serde_json::to_value(&writing).unwrap()["sn"]);
+        assert_eq!(call(&app, "POST", &w, None).await.0, StatusCode::OK);
+        let sn = |a: &crate::ask::Ask| serde_json::to_value(a).unwrap()["sn"].as_i64().unwrap();
+        let (s2, s3) = (sn(&d2), sn(&d3));
+
+        assert_eq!(crate::orch_llm::sweep(&db).await.unwrap(), 1); // 1번만 (L3 keep_wait · 기한 전 · 기한 없음 · 작성 중은 그대로)
+        assert_eq!(calls(), 1);
+        let a = call(&app, "GET", &format!("/asks/{s2}"), None).await.1;
+        assert_eq!((a["status"].as_str(), a["decide_by"].as_str(), a["reason"].as_str(), a["user_sn"].is_null(), a["is_timer_pause"].as_i64()), (Some("orch_decided"), Some("orch"), Some("safest reversible"), true, Some(0)));
+        let sel = |a: &Value, q: usize| a["option"][q]["options"].as_array().unwrap().iter().filter(|c| c["is_selected"] == true).map(|c| c["code"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        assert_eq!((sel(&a, 0), sel(&a, 1), a["option"][0]["answer_at"].is_string()), (vec!["B".to_owned()], vec!["A".to_owned()], true));
+        assert_eq!(call(&app, "GET", &format!("/asks/{s3}"), None).await.1["status"], "pending");
+        assert_eq!(call(&app, "GET", "/asks?kind=decision&status=pending", None).await.1.as_array().unwrap().len(), 3);
+        let n = call(&app, "GET", "/notifications", None).await.1;
+        let nd = n.as_array().unwrap().iter().find(|x| x["event_code"] == "orch_decided").unwrap();
+        assert_eq!((nd["actor_type"].as_str(), nd["member_sn"].as_i64(), nd["ref_type"].as_str(), nd["ref_sn"].as_i64(), nd["title"].as_str(), nd["is_action"].as_i64()), (Some("orch"), Some(2), Some("ask"), Some(s2), Some("D2"), Some(0)));
+        assert_eq!(actor(&db, "DecisionOrchDecided", s2).await, ("orch".into(), Some(2), None));
+        // 입력: 프리셋 접두 + 질문 · 선택지 · 추천 표시만 (대화 · 태스크 요약 없음)
+        let sent = std::fs::read_to_string(dir.join("prompt.0.txt")).unwrap();
+        assert!(sent.starts_with("# OrchStack protocol") && sent.contains("@DECISION level: L2 title: D2\nQ0 Q1\nbody\n  A opt A *recommended | tradeoff\n  B opt B | tradeoff\nQ1 Q2"), "{sent}");
+        assert!(!sent.contains("@PROJECT") && !sent.contains("@USER"), "{sent}");
+        assert_eq!(calls(), 1);
+        assert_eq!(crate::orch_llm::sweep(&db).await.unwrap(), 0); // 이미 결정한 것을 다시 부르지 않는다
+        assert_eq!(calls(), 1);
+
+        // proceed: 호출 없이 추천 선택지 · keep_wait: 아무것도 안 한다
+        assert_eq!(set_policy(&app, |p| p["levels"][2]["no_reply"] = json!("proceed")).await.0, StatusCode::OK);
+        let p = mk(2, past.clone()).await;
+        assert_eq!(crate::orch_llm::sweep(&db).await.unwrap(), 1);
+        let a = call(&app, "GET", &format!("/asks/{}", sn(&p)), None).await.1;
+        assert_eq!((calls(), a["status"].as_str(), a["reason"].as_str(), sel(&a, 0), sel(&a, 1)), (1, Some("orch_decided"), Some("proceed"), vec!["A".to_owned()], vec!["A".to_owned()]));
+        assert_eq!(set_policy(&app, |p| p["levels"][2]["no_reply"] = json!("keep_wait")).await.0, StatusCode::OK);
+        let k = mk(2, past.clone()).await;
+        assert_eq!((crate::orch_llm::sweep(&db).await.unwrap(), calls()), (0, 1));
+        assert_eq!(call(&app, "GET", &format!("/asks/{}", sn(&k)), None).await.1["status"], "pending");
+        // 사용자가 먼저 답했으면 건드리지 않는다
+        assert!(crate::orch_llm::decide(&db, s2).await.unwrap().is_none());
+
+        // 형식 오류 · 실행기 실패 → 추천 선택지 + 근거 코드 (호출은 1회씩 · 다시 부르지 않는다)
+        assert_eq!(set_policy(&app, |p| p["levels"][2]["no_reply"] = json!("orch_decide")).await.0, StatusCode::OK);
+        let (db2, app2, _) = llm_rig("decide2", &["no block"]).await;
+        let q2 = vec![qn("Q1")];
+        ask::decision(&db2, DecisionNew { project_sn: 1, task_sn: None, run_sn: None, member_sn: 1, level: 2, title: "F".into(), deadline_at: past.clone(), questions: q2.clone() }).await.unwrap();
+        let before = calls();
+        assert_eq!(crate::orch_llm::sweep(&db2).await.unwrap(), 1);
+        let a = call(&app2, "GET", "/asks/1", None).await.1;
+        assert_eq!((calls() - before, a["status"].as_str(), a["reason"].as_str().unwrap().starts_with("fallback"), sel(&a, 0)), (1, Some("orch_decided"), true, vec!["A".to_owned()]));
+        db2.execute_unprepared("UPDATE tbl_runtime SET bin_path = '/nonexistent/claude'").await.unwrap();
+        ask::decision(&db2, DecisionNew { project_sn: 1, task_sn: None, run_sn: None, member_sn: 1, level: 2, title: "G".into(), deadline_at: past, questions: q2 }).await.unwrap();
+        assert_eq!(crate::orch_llm::sweep(&db2).await.unwrap(), 1);
+        assert_eq!(call(&app2, "GET", "/asks/2", None).await.1["reason"], "fallback exec");
+    }
+
+    /// B-18 DoD 4: 레벨 wait로 만든 판단 요청(option_json ref.proposal에 원래 제안) — 사용자가 proceed로 답하면 원래 제안을 만들어 실행(user_done · 배정 orch_auto),
+    /// stop이면 끝 · 기한이 지나 Orch가 대신 proceed로 정하면 자동 실행(auto_done) · 호출은 대신 결정 때만 1회 (B-16 흐름은 호출 0)
+    #[tokio::test]
+    async fn orch_llm_wait() {
+        use crate::orch_rule as rule;
+        let (db, app, _) = llm_rig("wait", &["@DECIDE v1\n{\"choice\":[{\"question\":0,\"option\":\"proceed\"}],\"reason\":\"reversible\"}"]).await;
+        // 태스크 a를 SQL로 끝내고 TaskMoved 이벤트 행도 SQL로 넣는다 (전역 이벤트 버스를 흔들지 않는다)
+        db.execute_unprepared("UPDATE tbl_task SET status = 'done' WHERE sn = 1; INSERT INTO tbl_log_event (workspace_sn, project_sn, aggregate_type, aggregate_sn, seq, event_type, payload_json, actor_type, user_sn) \
+            VALUES (1, 1, 'task', 1, 99, 'TaskMoved', '{\"from\":\"in_progress\",\"to\":\"done\"}', 'user', 1);").await.unwrap();
+        let ev = last(&db, "TaskMoved").await;
+        assert_eq!(set_policy(&app, |p| p["levels"][1]["handle"] = json!("wait")).await.0, StatusCode::OK);
+        assert_eq!(rule::on(&db, &ev).await.unwrap(), None);
+        let d = call(&app, "GET", "/asks?kind=decision", None).await.1;
+        let q = &d[0]["option"][0];
+        assert_eq!((d.as_array().unwrap().len(), q["ref"]["proposal"]["kind"].as_str(), q["ref"]["proposal"]["task_sn"].as_i64(), q["ref"]["proposal"]["member_sn"].as_i64(), q["options"][0]["code"].as_str(), calls()), (1, Some("assign"), Some(2), Some(1), Some("proceed"), 0));
+        assert_eq!(call(&app, "GET", "/asks?kind=proposal", None).await.1.as_array().unwrap().len(), 0);
+
+        // proceed → 원래 제안 생성 · 실행 (user_done · 태스크 2가 멤버 1에게 orch_auto 배정)
+        let ds = d[0]["sn"].as_i64().unwrap();
+        assert_eq!(call(&app, "POST", &format!("/asks/{ds}/answer"), Some(json!({"answers": [{"question": 0, "option": "proceed"}]}))).await.1["status"], "answered");
+        let v = call(&app, "GET", "/asks?kind=proposal", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["status"].as_str(), v[0]["action"].as_str(), v[0]["user_sn"].as_i64(), v[0]["deadline_at"].is_null()), (1, Some("user_done"), Some("assign"), Some(USER), true));
+        let t = call(&app, "GET", "/tasks/2", None).await.1;
+        assert_eq!((t["member_sn"].as_i64(), t["assign_by"].as_str()), (Some(1), Some("orch_auto")));
+
+        // stop → 제안 없음 (다음 후보 태스크 3)
+        assert_eq!(rule::on(&db, &ev).await.unwrap(), None);
+        let d = call(&app, "GET", "/asks?kind=decision&status=pending", None).await.1;
+        assert_eq!((d.as_array().unwrap().len(), d[0]["option"][0]["ref"]["proposal"]["task_sn"].as_i64()), (1, Some(3)));
+        let ds = d[0]["sn"].as_i64().unwrap();
+        call(&app, "POST", &format!("/asks/{ds}/answer"), Some(json!({"answers": [{"question": 0, "option": "stop"}]}))).await;
+        assert_eq!((call(&app, "GET", "/asks?kind=proposal", None).await.1.as_array().unwrap().len(), call(&app, "GET", "/tasks/3", None).await.1["member_sn"].is_null()), (1, true));
+
+        // 기한이 지나 Orch가 대신 정함: 원래 제안(L1)의 정책 no_reply = orch_decide · 호출 1회 · 선택 proceed → 자동 실행(auto_done)
+        assert_eq!(set_policy(&app, |p| { p["levels"][1]["wait_min"] = json!(1); p["levels"][1]["no_reply"] = json!("orch_decide"); }).await.0, StatusCode::OK);
+        assert_eq!(rule::on(&db, &ev).await.unwrap(), None);
+        let d = call(&app, "GET", "/asks?kind=decision&status=pending", None).await.1;
+        let ds = d[0]["sn"].as_i64().unwrap();
+        assert_eq!((d[0]["deadline_at"].is_string(), calls()), (true, 0));
+        db.execute_unprepared(&format!("UPDATE tbl_ask SET deadline_at = datetime('now', '-1 seconds') WHERE sn = {ds}")).await.unwrap();
+        assert_eq!(crate::orch_llm::sweep(&db).await.unwrap(), 1);
+        assert_eq!(calls(), 1);
+        let a = call(&app, "GET", &format!("/asks/{ds}"), None).await.1;
+        assert_eq!((a["status"].as_str(), a["reason"].as_str()), (Some("orch_decided"), Some("reversible")));
+        let v = call(&app, "GET", "/asks?kind=proposal&status=auto_done", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), call(&app, "GET", "/tasks/3", None).await.1["assign_by"].as_str()), (1, Some("orch_auto")));
+    }
+
+    /// B-18 DoD 5: 입력 조립 — 대화 기록 · 이전 제안이 없고 사용자 원문이 그대로 들어간다 · 추정 입력 ≤ 8K (프로젝트 요약은 최대 50줄 · 넘으면 줄을 줄인다 · 원문만으로 넘으면 422)
+    #[tokio::test]
+    async fn orch_llm_input() {
+        let (db, app, dir) = llm_rig("input", &[PLAN_OK]).await;
+        let a = say(&app, "첫 번째 요청 AAA").await;
+        crate::orch_llm::plan(&db, a).await.unwrap();
+        let b = say(&app, "두 번째 요청 BBB  (공백  유지)\n둘째 줄").await;
+        crate::orch_llm::plan(&db, b).await.unwrap();
+        let sent = std::fs::read_to_string(dir.join("prompt.1.txt")).unwrap();
+        assert!(sent.contains("@USER\n두 번째 요청 BBB  (공백  유지)\n둘째 줄\n\n"), "{sent}");
+        assert!(!sent.contains("AAA") && !sent.contains("로그인 개선") && !sent.contains("work_proposal"), "{sent}"); // 이전 글 · 이전 제안은 다시 보내지 않는다
+        assert_eq!(&sent[..sent.find("@PROJECT").unwrap()], &std::fs::read_to_string(dir.join("prompt.0.txt")).unwrap()[..sent.find("@PROJECT").unwrap()]); // 접두는 같은 바이트
+
+        // 큰 프로젝트: 이슈 · 태스크 200개 → 요약 50줄 · 추정 ≤ 8K
+        db.execute_unprepared("INSERT INTO tbl_issue (project_sn, num, title) SELECT 1, 100 + value, 'issue ' || value FROM (WITH RECURSIVE c(value) AS (SELECT 1 UNION ALL SELECT value + 1 FROM c WHERE value < 100) SELECT value FROM c);
+            INSERT INTO tbl_task (project_sn, num, title, status) SELECT 1, 300 + value, 'task ' || value, 'todo' FROM (WITH RECURSIVE c(value) AS (SELECT 1 UNION ALL SELECT value + 1 FROM c WHERE value < 100) SELECT value FROM c);").await.unwrap();
+        let n_lines = |s: &str| s.lines().filter(|l| l.starts_with("issue #") || l.starts_with("task #")).count();
+        let (body, est) = crate::orch_llm::input_plan(&db, 1, "짧은 글", "").await.unwrap();
+        assert_eq!((n_lines(&body), est <= 8000), (50, true));
+        // 원문이 크면 요약 줄을 줄여 8K 안으로 (모델로 요약하지 않는다)
+        let (body, est) = crate::orch_llm::input_plan(&db, 1, &"x".repeat(31_000), "").await.unwrap();
+        assert!(est <= 8000 && n_lines(&body) < 50 && n_lines(&body) > 0, "{est} {}", n_lines(&body));
+        assert!(body.contains(&"x".repeat(31_000)));
+        // 원문만으로 넘으면 422 context_over · 호출 없음
+        let big = say(&app, &"y".repeat(40_000)).await;
+        let before = calls();
+        let (st, e) = call(&app, "POST", &format!("/messages/{big}/plan"), None).await;
+        assert_eq!((st, e["error"].as_str(), calls() - before), (StatusCode::UNPROCESSABLE_ENTITY, Some("context_over"), 0));
+    }
+
     /// B-13: 완료 조건 교체(sn 유지 · 체크 이벤트) · 라벨(PATCH 이름 → 생성 · 목록) · 의존(대기 계산 · 순환 · 중복 · 삭제) · 저장 보기 · 전체 목록 필터 · Diagram 배치
     #[tokio::test]
     async fn meta() {
@@ -1681,7 +1960,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/asks/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram", "/presets/{sn}", "/presets/{sn}/usage", "/presets/import", "/report-forms", "/report-forms/{key}", "/report-forms/{key}/preview", "/workspace/profile", "/asks", "/asks/{sn}", "/asks/{sn}/answer", "/asks/{sn}/writing", "/asks/{sn}/approve", "/asks/{sn}/deny", "/asks/{sn}/hold", "/asks/{sn}/{action}"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/asks/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram", "/presets/{sn}", "/presets/{sn}/usage", "/presets/import", "/report-forms", "/report-forms/{key}", "/report-forms/{key}/preview", "/workspace/profile", "/asks", "/asks/{sn}", "/asks/{sn}/answer", "/asks/{sn}/writing", "/asks/{sn}/approve", "/asks/{sn}/deny", "/asks/{sn}/hold", "/asks/{sn}/{action}", "/messages/{sn}/plan"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

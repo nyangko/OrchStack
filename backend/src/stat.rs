@@ -42,6 +42,10 @@ struct TeamStat {
     daily_token_budget: Option<i64>,
     /// 최근 7일 완료 태스크의 평균 사이클(분, 시작 → 완료). 없으면 null
     avg_cycle_minute: Option<i64>,
+    /// 최근 7일 Orch 모델 호출 수 (OrchCalled 이벤트 · 자유 글 → 제안 · 판단 대행)
+    orch_call_count: i64,
+    /// 최근 7일 완료 태스크당 Orch 호출 수 (완료 태스크가 없으면 null · 목표 ≤ 1)
+    orch_call_per_task: Option<f64>,
     /// 최근 7일 리드 Run 호출당 평균 입력 토큰 (새 입력 + 캐시 읽기 + 캐시 쓰기 · 호출 기록이 없으면 null)
     avg_input_token: Option<i64>,
     /// 팀 멤버가 쓰는 연결(프로필 연결 + 폴백 체인)의 캐시 적중률(%) 평균 (측정된 연결이 없으면 null)
@@ -116,6 +120,8 @@ async fn team(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Team
     }
     let team_q = |sql: &str| sql.replace("{team}", "SELECT sn FROM tbl_member WHERE team_sn = ?");
     let v = || vec![Value::from(sn)];
+    let calls = one(&db, "SELECT COUNT(*) FROM tbl_log_event e JOIN tbl_member m ON m.sn = e.member_sn WHERE e.event_type = 'OrchCalled' AND m.team_sn = ? AND e.create_at >= datetime('now','-7 day')", v()).await?.unwrap_or(0);
+    let done = one(&db, &team_q("SELECT COUNT(*) FROM tbl_task WHERE member_sn IN ({team}) AND status = 'done' AND done_at >= date('now','-6 day')"), v()).await?.unwrap_or(0);
     Ok(Json(TeamStat {
         member_count: loads.len() as i64,
         open_task_count: loads.iter().map(|l| l.open_task_count).sum(),
@@ -124,6 +130,8 @@ async fn team(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Team
         daily_token_budget: team.daily_token_budget,
         avg_cycle_minute: one(&db, &team_q("SELECT CAST(AVG((julianday(done_at) - julianday(start_at)) * 1440) AS INTEGER) FROM tbl_task \
             WHERE member_sn IN ({team}) AND status = 'done' AND start_at IS NOT NULL AND done_at >= date('now','-6 day')"), v()).await?,
+        orch_call_count: calls,
+        orch_call_per_task: (done > 0).then(|| calls as f64 / done as f64),
         avg_input_token: one(&db, &team_q("SELECT CAST(AVG(t.token_input + t.token_cache_read + t.token_cache_write) AS INTEGER) FROM tbl_log_token t JOIN tbl_run r ON r.sn = t.run_sn \
             WHERE r.member_sn IN ({team}) AND r.parent_run_sn IS NULL AND t.create_at >= datetime('now','-7 day')"), v()).await?,
         cache_hit_percent: one(&db, &team_q("SELECT CAST(ROUND(AVG(c.cache_hit_percent)) AS INTEGER) FROM tbl_connection c WHERE c.cache_hit_percent IS NOT NULL AND c.sn IN ( \

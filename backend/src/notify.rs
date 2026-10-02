@@ -62,6 +62,11 @@ pub async fn project(tx: &DatabaseTransaction, ev: &e::Model) -> Res<()> {
             let Some(m) = t::Entity::find_by_id(ts).one(tx).await? else { return Ok(()) };
             ("task_done", m.title, None, "task", ts, 0)
         }
+        // Orch가 판단 요청을 대신 결정 (DecisionOrchDecided): 제목 = 판단 요청 제목 · 설명 = 근거
+        "DecisionOrchDecided" => {
+            let Some(m) = ak::Entity::find_by_id(sn).one(tx).await? else { return Ok(()) };
+            ("orch_decided", m.title, m.reason, "ask", sn, 0)
+        }
         // 가드 정지 (OrchProposed kind=guard_stop)
         "OrchProposed" => {
             let Some(m) = ak::Entity::find_by_id(sn).one(tx).await?.filter(|x| x.action.as_deref() == Some("guard_stop")) else { return Ok(()) };

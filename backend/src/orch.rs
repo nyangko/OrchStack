@@ -155,7 +155,7 @@ fn draft(m: &ms::Model) -> Res<()> {
 }
 
 /// Plan 검사: 제목이 비면 422
-fn check(p: &Plan) -> Res<()> {
+pub(crate) fn check(p: &Plan) -> Res<()> {
     if p.issue.title.trim().is_empty() || p.tasks.is_empty() || p.tasks.iter().any(|t| t.title.trim().is_empty()) {
         return Err(Error::invalid("plan needs an issue title and at least one titled task".into()));
     }

@@ -7,7 +7,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub sn: i64,
-    pub run_sn: i64,
+    pub run_sn: Option<i64>,
     pub session_sn: Option<i64>,
     pub connection_sn: Option<i64>,
     pub manifest_sn: Option<i64>,

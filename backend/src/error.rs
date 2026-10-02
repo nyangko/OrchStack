@@ -34,6 +34,11 @@ impl Error {
         Self(StatusCode::NOT_FOUND, "not_found", "not found".into())
     }
 
+    /// 프로젝트 팀에 Orch 멤버가 없거나 그 프로필에 실행기가 없을 때 (409 · 코드 no_orch)
+    pub fn no_orch() -> Self {
+        Self(StatusCode::CONFLICT, "no_orch", "project team has no usable Orch member".into())
+    }
+
     /// 컨텍스트가 호출당 입력 상한을 넘었을 때 (422 · 코드 context_over)
     pub fn over(msg: String) -> Self {
         Self(StatusCode::UNPROCESSABLE_ENTITY, "context_over", msg)

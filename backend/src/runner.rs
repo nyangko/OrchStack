@@ -299,7 +299,7 @@ async fn call(db: &DatabaseConnection, m: &r::Model, built: &context::Built, job
     let u = out.usage;
     event::run(db, async |tx| {
         lt::ActiveModel {
-            run_sn: Set(m.sn), session_sn: Set(Some(session)), connection_sn: Set(conn), manifest_sn: Set(Some(manifest)), model_code: Set(model.clone()),
+            run_sn: Set(Some(m.sn)), session_sn: Set(Some(session)), connection_sn: Set(conn), manifest_sn: Set(Some(manifest)), model_code: Set(model.clone()),
             token_input: Set(u.input), token_cache_read: Set(u.cache_read), token_cache_write: Set(u.cache_write), token_output: Set(u.output), ..Default::default()
         }.insert(tx).await?;
         context::touch(tx, conn).await?;
@@ -556,7 +556,7 @@ printf '%s\n' '{{"type":"result","is_error":false,"result":"done.\n@REPORT v1\ni
         let sum = |sn: i64| { let db = db.clone(); async move { lt::Entity::find().filter(lt::Column::RunSn.eq(sn)).all(&db).await.unwrap().iter().map(|t| t.token_input).sum::<i64>() } };
         assert_eq!((done.status.as_str(), sum(kid.sn).await, done.result_summary.as_deref()), ("completed", 7, Some("done")));
         let toks = lt::Entity::find().all(&db).await.unwrap();
-        assert_eq!(toks.iter().map(|t| t.run_sn).collect::<Vec<_>>(), [kid.sn, next.sn]);
+        assert_eq!(toks.iter().map(|t| t.run_sn).collect::<Vec<_>>(), [Some(kid.sn), Some(next.sn)]);
         let src: serde_json::Value = serde_json::from_str(cm::Entity::find_by_id(1).one(&db).await.unwrap().unwrap().source_json.as_deref().unwrap()).unwrap();
         let kinds: Vec<&str> = src.as_array().unwrap().iter().map(|c| c["kind"].as_str().unwrap()).collect();
         assert_eq!(kinds, ["instruction", "task", "file"]);

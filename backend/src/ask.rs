@@ -173,7 +173,7 @@ pub struct ApprovalNew {
 }
 
 /// 생성할 Orch 제안 (Orch/실행기 · 규칙 엔진 입력)
-#[derive(Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct ProposalNew {
     pub project_sn: i64,
     pub issue_sn: Option<i64>,
@@ -240,7 +240,7 @@ pub enum By {
 }
 
 /// 행 1건 읽기. 없으면 404
-async fn row(db: &impl ConnectionTrait, sn: i64) -> Res<a::Model> {
+pub(crate) async fn row(db: &impl ConnectionTrait, sn: i64) -> Res<a::Model> {
     a::Entity::find_by_id(sn).one(db).await?.ok_or_else(Error::not_found)
 }
 
@@ -269,7 +269,7 @@ async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<Ask> {
 }
 
 /// 판단 요청의 질문 배열 (저장된 JSON)
-fn questions(m: &a::Model) -> Vec<Question> {
+pub(crate) fn questions(m: &a::Model) -> Vec<Question> {
     m.option_json.as_deref().and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default()
 }
 
@@ -388,6 +388,8 @@ async fn answer(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
         let out = get(tx, sn).await?;
         Ok((out, vec![Ev::new(Some(cur.project_sn), "ask", sn, "DecisionAnswered", &json!({ "task_sn": cur.task_sn, "from": cur.status, "answers": b.answers, "review_needed": b.review_needed }))]))
     }).await?;
+    // 레벨 wait로 만든 판단이면 답에 따라 원래 제안을 실행한다 (실패해도 답은 이미 저장됐다)
+    if let Err(e) = follow(&db, sn).await { eprintln!("ask follow: {}", e.message()); }
     Ok(Json(out))
 }
 
@@ -569,4 +571,51 @@ pub async fn tick(db: &DatabaseConnection) -> Res<u32> {
         n += run(db, p.sn, By::Auto).await.is_ok() as u32;
     }
     Ok(n)
+}
+
+/// 판단 요청의 첫 질문에 실린 원래 제안 (레벨 wait로 만든 판단 요청 · ref.proposal)
+fn proposal_of(m: &a::Model) -> Option<ProposalNew> {
+    let q = questions(m).into_iter().next()?;
+    serde_json::from_value(q.reference?["proposal"].clone()).ok()
+}
+
+/// 판단 요청이 끝난 뒤 이어 할 일: 레벨 wait로 만든 것이고 고른 선택지가 proceed면 원래 제안을 만들어 실행한다 (stop이면 끝).
+/// 사용자가 답했으면 user_done(사용자 실행), Orch가 대신 정했으면 auto_done(자동 실행 · 실패하면 dismissed)
+pub(crate) async fn follow(db: &DatabaseConnection, sn: i64) -> Res<()> {
+    let m = row(db, sn).await?;
+    if m.kind != "decision" || !matches!(m.status.as_str(), "answered" | "orch_decided") {
+        return Ok(());
+    }
+    let Some(p) = proposal_of(&m) else { return Ok(()) };
+    let picked = questions(&m).into_iter().next().and_then(|q| q.options.into_iter().find(|c| c.is_selected)).map(|c| c.code);
+    if picked.as_deref() != Some("proceed") {
+        return Ok(());
+    }
+    let orch = orch::orch_of(db, p.project_sn).await?;
+    let made = event::run_as(db, "orch", orch, async |tx| add(tx, ProposalNew { status: None, deadline_at: None, ..p }).await.map(|(out, ev)| (out, vec![ev]))).await?;
+    run(db, made.sn, if m.status == "answered" { By::User } else { By::Auto }).await.map(|_| ())
+}
+
+/// Orch가 판단 요청 하나를 대신 결정한다: picks = (질문 순번, 고른 선택지 code) · reason = 근거 코드 · 한 줄.
+/// 판단의 pending · writing에서만 (아니면 409). 선택 표시 · decide_by orch · 근거를 남기고 DecisionOrchDecided 이벤트 (알림 orch_decided)
+pub(crate) async fn orch_decided(db: &DatabaseConnection, sn: i64, picks: &[(usize, String)], reason: &str) -> Res<Ask> {
+    let cur = row(db, sn).await?;
+    let orch = orch::orch_of(db, cur.project_sn).await?;
+    let out = event::run_as(db, if orch.is_some() { "orch" } else { "system" }, orch, async |tx| {
+        let cur = step(tx, sn, "decision", "orch_decided").await?;
+        let mut qs = questions(&cur);
+        let now = at(tx, "+0 seconds").await?;
+        for (qi, code) in picks {
+            let q = qs.get_mut(*qi).ok_or_else(|| Error::invalid(format!("question {qi} not found")))?;
+            if !q.options.iter().any(|c| &c.code == code) {
+                return Err(Error::invalid(format!("option {code} is not in question {qi}")));
+            }
+            for c in &mut q.options { c.is_selected = &c.code == code; }
+            q.answer_at = Some(now.clone());
+        }
+        a::Entity::update_many().filter(a::Column::Sn.eq(sn)).col_expr(a::Column::OptionJson, json!(qs).to_string().into()).col_expr(a::Column::DecideBy, "orch".into())
+            .col_expr(a::Column::Reason, reason.to_owned().into()).col_expr(a::Column::IsTimerPause, 0.into()).col_expr(a::Column::DecideAt, Expr::cust("datetime('now')")).exec(tx).await?;
+        Ok((get(tx, sn).await?, vec![Ev::new(Some(cur.project_sn), "ask", sn, "DecisionOrchDecided", &json!({ "task_sn": cur.task_sn, "reason": reason, "choice": picks }))]))
+    }).await?;
+    Ok(out)
 }

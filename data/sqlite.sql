@@ -823,7 +823,7 @@ CREATE TABLE tbl_log_run (
 -- 토큰 기록. 모델 호출 1회마다 (TokenLedger)
 CREATE TABLE tbl_log_token (
     sn                 INTEGER PRIMARY KEY AUTOINCREMENT,           -- 기록 번호
-    run_sn             INTEGER NOT NULL REFERENCES tbl_run(sn) ON DELETE CASCADE,     -- Run
+    run_sn             INTEGER REFERENCES tbl_run(sn) ON DELETE CASCADE,               -- Run (NULL = Orch 호출 · Run 없이 부르는 PM 판단 · 프로젝트 · 멤버는 같은 때 남기는 tbl_log_event OrchCalled)
     session_sn         INTEGER REFERENCES tbl_session(sn) ON DELETE SET NULL,          -- 세션
     connection_sn      INTEGER REFERENCES tbl_connection(sn) ON DELETE SET NULL,       -- 사용한 연결
     manifest_sn        INTEGER REFERENCES tbl_context_manifest(sn) ON DELETE SET NULL, -- 이 호출에 보낸 컨텍스트 목록
