@@ -1,7 +1,9 @@
 // OrchStack 백엔드 진입점: DB 준비 → 라우터 구성 → HTTP 서버 실행
 
 mod agent; // /profiles CRUD · /templates 조회
+mod approval; // /approvals 조회 · 승인 · 거부
 mod connection; // /connections CRUD · 한도 조회
+mod decision; // /decisions 조회 · 답변 · 작성 중
 #[allow(unused_imports, dead_code)] // sea-orm-cli 생성 코드
 mod entity; // 테이블별 SeaORM entity (sea-orm-cli 생성물 · 직접 수정하지 않는다)
 mod error; // 공통 에러 응답
@@ -57,7 +59,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -540,11 +542,73 @@ mod tests {
         assert_eq!(call(&app, "GET", "/presets/99/versions", None).await.0, StatusCode::NOT_FOUND);
     }
 
+    /// B-8: 판단 요청 생성(내부) → 목록 범위 필터 → 작성 중 → 답변(상태 · 선택 · 이벤트 · 발행) → 재답변 409. 승인 요청 승인 · 거부 · 재처리 409
+    #[tokio::test]
+    async fn decision() {
+        use crate::{approval::{self, ApprovalNew}, decision::{self, ChoiceNew, DecisionNew, QuestionNew}};
+        use axum::response::IntoResponse;
+        let db = mem().await;
+        let app = app(db.clone());
+        let ts = task_of(&app, &db, true).await;
+        let opt = |code: &str| ChoiceNew { code: code.into(), label: code.into(), note: None, is_recommended: code == "A" };
+        let qn = |t: &str| QuestionNew { title: t.into(), body: None, code_snippet: None, ref_json: None, options: vec![opt("A"), opt("B")] };
+        let new = |level| DecisionNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 1, level, title: "D".into(), deadline_at: None, questions: vec![qn("Q1"), qn("Q2")] };
+        assert_eq!(decision::create(&db, new(1)).await.err().unwrap().into_response().status(), StatusCode::UNPROCESSABLE_ENTITY);
+        decision::create(&db, new(2)).await.unwrap();
+
+        // 목록: 상태 · 프로젝트 · 태스크 범위. 질문 · 선택지를 순서대로 함께 준다
+        let v = call(&app, "GET", &format!("/decisions?status=pending&task_sn={ts}"), None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["questions"][1]["title"].as_str(), v[0]["questions"][0]["options"][1]["code"].as_str()), (1, Some("Q2"), Some("B")));
+        assert_eq!(call(&app, "GET", "/decisions?project_sn=99", None).await.1.as_array().unwrap().len(), 0);
+        let ds = v[0]["sn"].as_i64().unwrap();
+        let (q1, q2) = (v[0]["questions"][0]["sn"].as_i64().unwrap(), v[0]["questions"][1]["sn"].as_i64().unwrap());
+        let (b1, b2) = (v[0]["questions"][0]["options"][1]["sn"].as_i64().unwrap(), v[0]["questions"][1]["options"][0]["sn"].as_i64().unwrap());
+
+        // 작성 중: 타이머 멈춤 · 두 번째는 409
+        let (st, d) = call(&app, "POST", &format!("/decisions/{ds}/writing"), None).await;
+        assert_eq!((st, d["status"].as_str(), d["is_timer_pause"].as_i64()), (StatusCode::OK, Some("writing"), Some(1)));
+        assert_eq!(call(&app, "POST", &format!("/decisions/{ds}/writing"), None).await.0, StatusCode::CONFLICT);
+
+        // 답변 검사: 질문 빠짐 · 다른 질문의 선택지 · 빈 답은 422 (상태는 그대로)
+        let uri = format!("/decisions/{ds}/answer");
+        for bad in [json!({"answers": [{"question_sn": q1, "option_sn": b1}]}),
+                    json!({"answers": [{"question_sn": q1, "option_sn": b2}, {"question_sn": q2, "delegate": true}]}),
+                    json!({"answers": [{"question_sn": q1}, {"question_sn": q2, "delegate": true}]})] {
+            assert_eq!(call(&app, "POST", &uri, Some(bad)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+
+        // 답변: answered · 사용자 결정 · 선택 1개 · 맡김 · 이벤트 3개 · 구독자에게 발행
+        let mut rx = event::subscribe();
+        let (st, d) = call(&app, "POST", &uri, Some(json!({"answers": [{"question_sn": q1, "option_sn": b1, "text": "짧게"}, {"question_sn": q2, "delegate": true}], "review_needed": true}))).await;
+        assert_eq!((st, d["status"].as_str(), d["decide_by"].as_str(), d["is_timer_pause"].as_i64(), d["is_review_needed"].as_i64()), (StatusCode::OK, Some("answered"), Some("user"), Some(0), Some(1)));
+        let o = &d["questions"][0]["options"];
+        assert_eq!((o[0]["is_selected"].as_i64(), o[1]["is_selected"].as_i64(), d["questions"][0]["answer_text"].as_str(), d["questions"][1]["is_delegate"].as_i64()), (Some(0), Some(1), Some("짧게"), Some(1)));
+        assert_eq!(events(&db, "decision", ds).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["DecisionRequested", "DecisionWriting", "DecisionAnswered"]);
+        // 버스는 프로세스 전역 — 병렬 테스트의 다른 이벤트는 건너뛴다
+        let e = loop { let e = rx.recv().await.unwrap(); if e.event_type == "DecisionAnswered" { break e; } };
+        assert_eq!((e.aggregate_sn, e.project_sn), (ds, Some(1)));
+        assert_eq!(call(&app, "POST", &uri, Some(json!({"answers": [{"question_sn": q1, "option_sn": b1}, {"question_sn": q2, "delegate": true}]}))).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", "/decisions/99/answer", Some(json!({"answers": []}))).await.0, StatusCode::NOT_FOUND);
+
+        // 승인 요청: 모르는 동작 422 · 승인 · 거부 · 다시 처리 409 · 상태 필터
+        let an = |code: &str| ApprovalNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 1, rule_sn: None, action_code: code.into(), title: "A".into(), detail: None, deadline_at: None };
+        assert_eq!(approval::create(&db, an("x")).await.err().unwrap().into_response().status(), StatusCode::UNPROCESSABLE_ENTITY);
+        approval::create(&db, an("pr_merge")).await.unwrap();
+        approval::create(&db, an("run_extend")).await.unwrap();
+        assert_eq!(call(&app, "GET", "/approvals?status=pending&project_sn=1", None).await.1.as_array().unwrap().len(), 2);
+        let (st, a) = call(&app, "POST", "/approvals/1/approve", None).await;
+        assert_eq!((st, a["status"].as_str(), a["uid"].as_i64(), a["decide_at"].is_string()), (StatusCode::OK, Some("approved"), Some(UID), true));
+        assert_eq!(call(&app, "POST", "/approvals/2/deny", None).await.1["status"], "denied");
+        assert_eq!(call(&app, "POST", "/approvals/1/deny", None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "GET", "/approvals?status=pending", None).await.1.as_array().unwrap().len(), 0);
+        assert_eq!(events(&db, "approval", 1).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["ApprovalRequested", "ApprovalApproved"]);
+    }
+
     #[tokio::test]
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());
