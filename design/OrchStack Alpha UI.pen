@@ -148888,6 +148888,1344 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "yf1DT",
+      "x": 13920,
+      "y": 5857,
+      "name": "Teams · 머리글 메뉴 (템플릿 ☆ · … · 테스트 Run / 멤버 지시 · …)",
+      "fill": "$muted",
+      "gap": 40,
+      "padding": 40,
+      "children": [
+        {
+          "type": "frame",
+          "id": "BMwgB",
+          "name": "템플릿",
+          "width": 880,
+          "layout": "vertical",
+          "gap": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "GJEtU",
+              "name": "Title",
+              "fill": "$foreground",
+              "content": "템플릿 머리글 · ☆ 즐겨찾기 · … 메뉴",
+              "fontFamily": "$font-sans",
+              "fontSize": "$text-lg",
+              "fontWeight": "$fw-semibold"
+            },
+            {
+              "type": "text",
+              "id": "iVFZ9",
+              "name": "Note",
+              "fill": "$muted-foreground",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "☆ 누르면 즐겨찾기(채운 별 · warning 색) — Agents 목록 · 멤버 추가 1단계에서 맨 위에 고정. … 메뉴: 편집 · 기록 · 비교 · 내보내기, 아래 보관 · 삭제. 이 템플릿으로 만든 멤버가 있으면 삭제는 막고 이유를 보인다.",
+              "lineHeight": 1.5,
+              "fontFamily": "$font-sans",
+              "fontSize": "$text-xs",
+              "fontWeight": "normal"
+            },
+            {
+              "id": "c6qpVD",
+              "type": "ref",
+              "ref": "w37lG",
+              "name": "TemplateHeader · ☆ 켜짐",
+              "width": "fill_container",
+              "fill": "$background",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "descendants": {
+                "InI8o": {
+                  "fill": "$warning-soft"
+                },
+                "InI8o/T7gg2": {
+                  "fill": "$warning"
+                },
+                "L9jAwe": {
+                  "fill": "$accent"
+                }
+              }
+            },
+            {
+              "type": "frame",
+              "id": "yeTE5",
+              "name": "Menus",
+              "width": "fill_container",
+              "gap": 24,
+              "justifyContent": "end",
+              "alignItems": "end",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "MGuYA",
+                  "name": "삭제 막힘 툴팁",
+                  "width": 220,
+                  "fill": "$foreground",
+                  "cornerRadius": "$radius-sm",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "padding": [
+                    8,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "z8FMh4",
+                      "name": "t",
+                      "fill": "$background",
+                      "content": "삭제할 수 없어요",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-xs",
+                      "fontWeight": "$fw-semibold"
+                    },
+                    {
+                      "type": "text",
+                      "id": "fPjIQ",
+                      "name": "s",
+                      "fill": "$background",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "이 템플릿으로 만든 멤버 3명이 있어요. 보관하면 새 멤버 추가에서만 숨겨져요.",
+                      "lineHeight": 1.4,
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-caption",
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "okArw",
+                  "name": "Menu / Template",
+                  "width": 252,
+                  "fill": "$popover",
+                  "cornerRadius": "$radius-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#0000001F",
+                    "offset": {
+                      "x": 0,
+                      "y": 8
+                    },
+                    "blur": 24
+                  },
+                  "layout": "vertical",
+                  "padding": 4,
+                  "children": [
+                    {
+                      "id": "v94op",
+                      "type": "ref",
+                      "ref": "xvisY",
+                      "width": "fill_container",
+                      "descendants": {
+                        "NB2Cw": {
+                          "content": "Frontend Developer · 템플릿 v3",
+                          "fontSize": "$text-xs"
+                        }
+                      }
+                    },
+                    {
+                      "id": "Az10Q",
+                      "type": "ref",
+                      "ref": "HnsnI",
+                      "width": "fill_container"
+                    },
+                    {
+                      "id": "t5lrX",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "이름 · 설명 편집",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "pencil",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "이름 · 설명 편집",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "IvjWv",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "버전 기록",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "history",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "버전 기록",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "SQqrm",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "멤버와 비교 · 3명",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "git-compare",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "멤버와 비교 · 3명",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "oucL3",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "JSON으로 내보내기",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "download",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "JSON으로 내보내기",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "oS5C2",
+                      "type": "ref",
+                      "ref": "HnsnI",
+                      "width": "fill_container"
+                    },
+                    {
+                      "id": "wiK6n",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "보관 · 새 멤버에 숨김",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "archive",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "보관 · 새 멤버에 숨김",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "mWcAy",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "삭제",
+                      "height": 28,
+                      "width": "fill_container",
+                      "opacity": 0.5,
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "trash-2",
+                          "width": 14,
+                          "height": 14,
+                          "fill": "$destructive"
+                        },
+                        "b1w3b": {
+                          "content": "삭제",
+                          "fontSize": "$text-body",
+                          "fill": "$destructive"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "lR6r2",
+          "name": "테스트 Run",
+          "width": 560,
+          "layout": "vertical",
+          "gap": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "MEDUV",
+              "name": "Title",
+              "fill": "$foreground",
+              "content": "테스트 Run 다이얼로그 · 실행 전 / 결과",
+              "fontFamily": "$font-sans",
+              "fontSize": "$text-lg",
+              "fontWeight": "$fw-semibold"
+            },
+            {
+              "type": "text",
+              "id": "K4nOZ",
+              "name": "Note",
+              "fill": "$muted-foreground",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "팀에 넣지 않고 샘플 태스크로 한 번 돌려 본다. 임시 worktree에서 실행하고 끝나면 지운다 — 저장소 · 팀 대기열은 그대로.",
+              "lineHeight": 1.5,
+              "fontFamily": "$font-sans",
+              "fontSize": "$text-xs",
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "CVlhW",
+              "name": "Dialog · 테스트 Run",
+              "clip": true,
+              "width": "fill_container",
+              "fill": "$background",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#00000026",
+                "offset": {
+                  "x": 0,
+                  "y": 16
+                },
+                "blur": 48
+              },
+              "layout": "vertical",
+              "children": [
+                {
+                  "id": "aOKql",
+                  "type": "ref",
+                  "ref": "nWu0z",
+                  "name": "Header",
+                  "width": "fill_container",
+                  "descendants": {
+                    "Io0My": {
+                      "icon": "flask-conical"
+                    },
+                    "uTzHt": {
+                      "content": "테스트 Run · Frontend Developer v3"
+                    },
+                    "m5taQ": {
+                      "content": "팀에 넣지 않고 샘플 태스크로 한 번 실행해 봐요"
+                    }
+                  }
+                },
+                {
+                  "type": "frame",
+                  "id": "LzFmJ",
+                  "name": "Body",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 16,
+                  "padding": [
+                    18,
+                    24
+                  ],
+                  "children": [
+                    {
+                      "id": "KA933",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "샘플 태스크",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "샘플 태스크"
+                        },
+                        "h83gNR": {
+                          "content": "템플릿 역할에 맞는 예시 · 완료 조건까지 함께 실행",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "KYrkb",
+                              "name": "Options",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "id": "Z5ni2",
+                                  "type": "ref",
+                                  "ref": "bM1Ei",
+                                  "name": "로그인 폼 접근성 점검",
+                                  "width": "fill_container",
+                                  "descendants": {
+                                    "F8J1H": {
+                                      "content": "A"
+                                    },
+                                    "e5JZLy": {
+                                      "content": "로그인 폼 접근성 점검"
+                                    },
+                                    "L2ycPO": {
+                                      "content": "라벨 · 대비 · 키보드 이동을 고치고 테스트 통과 · 완료 조건 3"
+                                    }
+                                  }
+                                },
+                                {
+                                  "id": "eIW78",
+                                  "type": "ref",
+                                  "ref": "xZ9NB",
+                                  "name": "버튼 컴포넌트 variant 추가",
+                                  "width": "fill_container",
+                                  "descendants": {
+                                    "eyW7A": {
+                                      "content": "B"
+                                    },
+                                    "VtEc5": {
+                                      "content": "버튼 컴포넌트 variant 추가"
+                                    },
+                                    "DSIvX": {
+                                      "enabled": false
+                                    },
+                                    "i8ASFZ": {
+                                      "content": "shadcn-svelte 규칙대로 · 완료 조건 2"
+                                    }
+                                  }
+                                },
+                                {
+                                  "id": "gdreG",
+                                  "type": "ref",
+                                  "ref": "xZ9NB",
+                                  "name": "직접 입력",
+                                  "width": "fill_container",
+                                  "descendants": {
+                                    "eyW7A": {
+                                      "content": "C"
+                                    },
+                                    "VtEc5": {
+                                      "content": "직접 입력"
+                                    },
+                                    "DSIvX": {
+                                      "enabled": false
+                                    },
+                                    "i8ASFZ": {
+                                      "content": "제목과 완료 조건을 적어서 실행"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "xVLnJ",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "실행 환경",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "실행 환경"
+                        },
+                        "h83gNR": {
+                          "content": "",
+                          "enabled": false
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "RSffD",
+                              "type": "ref",
+                              "ref": "FlX1S",
+                              "name": "Select",
+                              "width": "fill_container",
+                              "descendants": {
+                                "FhBQb": {
+                                  "enabled": false
+                                },
+                                "Xz6fz": {
+                                  "enabled": true,
+                                  "icon": "terminal"
+                                },
+                                "HuTtg": {
+                                  "content": "Codex CLI · gpt-5 · Auto"
+                                },
+                                "Byx0T": {
+                                  "content": "템플릿 기본값"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "XjPIZ",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "작업 폴더",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "작업 폴더"
+                        },
+                        "h83gNR": {
+                          "content": "",
+                          "enabled": false
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Z2bZik",
+                              "name": "Worktree",
+                              "width": "fill_container",
+                              "fill": "$muted",
+                              "cornerRadius": "$radius-md",
+                              "gap": 8,
+                              "padding": [
+                                8,
+                                10
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "ZTKUJ",
+                                  "name": "i",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "folder-git-2",
+                                  "library": "lucide",
+                                  "fill": "$muted-foreground"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ehRAr",
+                                  "name": "t",
+                                  "fill": "$foreground",
+                                  "content": "임시 worktree · 끝나면 삭제 · 커밋 · PR 없음",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-xs",
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "eEUr7",
+                      "type": "ref",
+                      "ref": "zysU6",
+                      "name": "RunEstimate",
+                      "width": "fill_container",
+                      "descendants": {
+                        "b7By4/E2isC": {
+                          "content": "예상 토큰"
+                        },
+                        "b7By4/Hl45o": {
+                          "content": "~18K tok"
+                        },
+                        "HF1NJ": {
+                          "enabled": false
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "x6oUh",
+                  "type": "ref",
+                  "ref": "Lo9Dv",
+                  "name": "Footer",
+                  "width": "fill_container",
+                  "descendants": {
+                    "E1B4Bf": {
+                      "icon": "info"
+                    },
+                    "hAwtB": {
+                      "content": "토큰은 워크스페이스 한도에 포함돼요"
+                    },
+                    "dsJM8/BD2YV": {
+                      "enabled": false
+                    },
+                    "kM2Ho/a9O5YR": {
+                      "icon": "flask-conical"
+                    },
+                    "kM2Ho/TdjlK": {
+                      "content": "테스트 시작"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "jTDmg",
+              "name": "결과 · 테스트 Run 끝",
+              "width": "fill_container",
+              "fill": "$background",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 12,
+              "padding": [
+                16,
+                20
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Cw3oo",
+                  "name": "Head",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "aheco",
+                      "name": "ok",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "circle-check",
+                      "library": "lucide",
+                      "fill": "$success"
+                    },
+                    {
+                      "type": "text",
+                      "id": "OvLgl",
+                      "name": "t",
+                      "fill": "$foreground",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "테스트 통과 · 로그인 폼 접근성 점검",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-body",
+                      "fontWeight": "$fw-semibold"
+                    },
+                    {
+                      "type": "text",
+                      "id": "P7mpS",
+                      "name": "time",
+                      "fill": "$muted-foreground",
+                      "content": "4m 12s",
+                      "fontFamily": "$font-mono",
+                      "fontSize": "$text-xs",
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "DkKQl",
+                  "name": "완료 조건",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "vzarL",
+                      "name": "i",
+                      "width": 14,
+                      "height": 14,
+                      "icon": "list-checks",
+                      "library": "lucide",
+                      "fill": "$muted-foreground"
+                    },
+                    {
+                      "type": "text",
+                      "id": "AZohy",
+                      "name": "l",
+                      "fill": "$muted-foreground",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "완료 조건",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-body",
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "NPXgi",
+                      "name": "v",
+                      "fill": "$success",
+                      "content": "3 / 3 통과",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-body",
+                      "fontWeight": "$fw-medium"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "J5kupt",
+                  "name": "토큰",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "EbV15",
+                      "name": "i",
+                      "width": 14,
+                      "height": 14,
+                      "icon": "coins",
+                      "library": "lucide",
+                      "fill": "$muted-foreground"
+                    },
+                    {
+                      "type": "text",
+                      "id": "eGGB9",
+                      "name": "l",
+                      "fill": "$muted-foreground",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "토큰",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-body",
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "X3756",
+                      "name": "v",
+                      "fill": "$foreground",
+                      "content": "16.4K tok",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-body",
+                      "fontWeight": "$fw-medium"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "x13vmX",
+                  "name": "변경 파일",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "a28ux",
+                      "name": "i",
+                      "width": 14,
+                      "height": 14,
+                      "icon": "file-diff",
+                      "library": "lucide",
+                      "fill": "$muted-foreground"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TXUeu",
+                      "name": "l",
+                      "fill": "$muted-foreground",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "변경 파일",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-body",
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "InNe2",
+                      "name": "v",
+                      "fill": "$foreground",
+                      "content": "4개 · worktree와 함께 삭제됨",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-body",
+                      "fontWeight": "$fw-medium"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "gCAMM",
+                  "name": "Actions",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "justifyContent": "end",
+                  "children": [
+                    {
+                      "id": "i0LcF",
+                      "type": "ref",
+                      "ref": "qpgrR",
+                      "name": "로그 보기",
+                      "descendants": {
+                        "iPrkY": {
+                          "icon": "terminal"
+                        },
+                        "U2l2r": {
+                          "content": "로그 보기"
+                        }
+                      }
+                    },
+                    {
+                      "id": "SE5jS",
+                      "type": "ref",
+                      "ref": "qpgrR",
+                      "name": "다시 실행",
+                      "descendants": {
+                        "iPrkY": {
+                          "icon": "rotate-ccw"
+                        },
+                        "U2l2r": {
+                          "content": "다시 실행"
+                        }
+                      }
+                    },
+                    {
+                      "id": "qn5Qv",
+                      "type": "ref",
+                      "ref": "EcTAi",
+                      "name": "닫기",
+                      "descendants": {
+                        "a9O5YR": {
+                          "enabled": false
+                        },
+                        "TdjlK": {
+                          "content": "닫기"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "TZQJ2",
+          "name": "멤버",
+          "width": 880,
+          "layout": "vertical",
+          "gap": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "rxUJi",
+              "name": "Title",
+              "fill": "$foreground",
+              "content": "멤버 머리글 · 지시 · … 메뉴",
+              "fontFamily": "$font-sans",
+              "fontSize": "$text-lg",
+              "fontWeight": "$fw-semibold"
+            },
+            {
+              "type": "text",
+              "id": "Megmg",
+              "name": "Note",
+              "fill": "$muted-foreground",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "지시 = 실행 중 지시(RuntimeInstructionComposer)와 같은 값. 대상: 지금 Run(다음 단계부터 반영) 또는 다음 태스크부터. 보낸 지시는 Activity '지시'에 남는다. … 메뉴는 Workbench 에이전트 메뉴와 겹치지 않게 멤버 관리만.",
+              "lineHeight": 1.5,
+              "fontFamily": "$font-sans",
+              "fontSize": "$text-xs",
+              "fontWeight": "normal"
+            },
+            {
+              "id": "ilQWb",
+              "type": "ref",
+              "ref": "ElpFU",
+              "name": "MemberHeader · 지시 열림",
+              "width": "fill_container",
+              "fill": "$background",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "descendants": {
+                "udcDe": {
+                  "fill": "$accent"
+                }
+              }
+            },
+            {
+              "type": "frame",
+              "id": "tafWI",
+              "name": "Popovers",
+              "width": "fill_container",
+              "gap": 24,
+              "justifyContent": "end",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "TW8UY",
+                  "name": "Popover / 지시",
+                  "width": 400,
+                  "fill": "$popover",
+                  "cornerRadius": "$radius-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#0000001F",
+                    "offset": {
+                      "x": 0,
+                      "y": 8
+                    },
+                    "blur": 24
+                  },
+                  "layout": "vertical",
+                  "gap": 12,
+                  "padding": 14,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "w7q3lg",
+                      "name": "Head",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "R7i6Y",
+                          "name": "i",
+                          "width": 16,
+                          "height": 16,
+                          "icon": "message-square-plus",
+                          "library": "lucide",
+                          "fill": "$primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "w5IQl",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "진에게 지시",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-body",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "EQsAR",
+                      "name": "대상",
+                      "width": "fill_container",
+                      "fill": "$muted",
+                      "cornerRadius": "$radius-md",
+                      "gap": 2,
+                      "padding": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "gUK7K",
+                          "name": "지금 Run #81 · 다음 단계부터",
+                          "width": "fill_container",
+                          "fill": "$background",
+                          "cornerRadius": "$radius-sm",
+                          "effect": {
+                            "type": "shadow",
+                            "shadowType": "outer",
+                            "color": "#0000001A",
+                            "offset": {
+                              "x": 0,
+                              "y": 1
+                            },
+                            "blur": 2
+                          },
+                          "padding": [
+                            6,
+                            8
+                          ],
+                          "justifyContent": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "C6JjQ",
+                              "name": "l",
+                              "fill": "$foreground",
+                              "content": "지금 Run #81 · 다음 단계부터",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-xs",
+                              "fontWeight": "$fw-semibold"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "FC7IX",
+                          "name": "다음 태스크부터",
+                          "width": "fill_container",
+                          "cornerRadius": "$radius-sm",
+                          "padding": [
+                            6,
+                            8
+                          ],
+                          "justifyContent": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Nc0vQ",
+                              "name": "l",
+                              "fill": "$muted-foreground",
+                              "content": "다음 태스크부터",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-xs",
+                              "fontWeight": "$fw-medium"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "MxmU1",
+                      "name": "Textarea",
+                      "width": "fill_container",
+                      "height": 84,
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$input",
+                      "strokeWidth": 1,
+                      "padding": [
+                        8,
+                        10
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "RQEg6",
+                          "name": "v",
+                          "fill": "$foreground",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "DB 변경은 하지 말고 현재 UI만 수정해.",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-body",
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "tO69x",
+                      "name": "Foot",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Gw5di",
+                          "name": "n",
+                          "fill": "$muted-foreground",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Activity에 '지시'로 남아요 · ⌘↵ 보내기",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "id": "V8Qpg",
+                          "type": "ref",
+                          "ref": "EcTAi",
+                          "name": "보내기",
+                          "descendants": {
+                            "a9O5YR": {
+                              "icon": "send"
+                            },
+                            "TdjlK": {
+                              "content": "보내기"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "NBX72",
+                  "name": "Menu / Member",
+                  "width": 252,
+                  "fill": "$popover",
+                  "cornerRadius": "$radius-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#0000001F",
+                    "offset": {
+                      "x": 0,
+                      "y": 8
+                    },
+                    "blur": 24
+                  },
+                  "layout": "vertical",
+                  "padding": 4,
+                  "children": [
+                    {
+                      "id": "Uinpk",
+                      "type": "ref",
+                      "ref": "xvisY",
+                      "width": "fill_container",
+                      "descendants": {
+                        "NB2Cw": {
+                          "content": "진 · Frontend Developer",
+                          "fontSize": "$text-xs"
+                        }
+                      }
+                    },
+                    {
+                      "id": "kH7mk",
+                      "type": "ref",
+                      "ref": "HnsnI",
+                      "width": "fill_container"
+                    },
+                    {
+                      "id": "rKJDM",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "태스크 배정",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "list-plus",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "태스크 배정",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": "›"
+                        }
+                      }
+                    },
+                    {
+                      "id": "g9HtC",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "Workbench에서 보기",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "external-link",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "Workbench에서 보기",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "o43jKU",
+                      "type": "ref",
+                      "ref": "HnsnI",
+                      "width": "fill_container"
+                    },
+                    {
+                      "id": "SZT1w",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "이름 · 캐릭터 편집",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "pencil",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "이름 · 캐릭터 편집",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "QQEHv",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "템플릿과 비교 · 변경 2",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "git-compare",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "템플릿과 비교 · 변경 2",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "m2DbBL",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "템플릿 v3로 되돌리기",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "rotate-ccw",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "템플릿 v3로 되돌리기",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "MFo5V",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "다른 팀으로 옮기기",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "arrow-right-left",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "다른 팀으로 옮기기",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": "›"
+                        }
+                      }
+                    },
+                    {
+                      "id": "lqxp2",
+                      "type": "ref",
+                      "ref": "HnsnI",
+                      "width": "fill_container"
+                    },
+                    {
+                      "id": "TTOMT",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "세션 다시 시작",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "rotate-cw",
+                          "width": 14,
+                          "height": 14
+                        },
+                        "b1w3b": {
+                          "content": "세션 다시 시작",
+                          "fontSize": "$text-body"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    },
+                    {
+                      "id": "u3NTgv",
+                      "type": "ref",
+                      "ref": "b2NIQ",
+                      "name": "팀에서 빼기",
+                      "height": 28,
+                      "width": "fill_container",
+                      "descendants": {
+                        "MLnbI": {
+                          "icon": "user-minus",
+                          "width": 14,
+                          "height": 14,
+                          "fill": "$destructive"
+                        },
+                        "b1w3b": {
+                          "content": "팀에서 빼기",
+                          "fontSize": "$text-body",
+                          "fill": "$destructive"
+                        },
+                        "V4gSg": {
+                          "content": ""
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "themes": {
