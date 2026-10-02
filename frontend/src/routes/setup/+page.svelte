@@ -45,7 +45,7 @@
 	import { store, defaultTeam, runtimeName, low, teamsLoad } from '$lib/teams.svelte';
 	import { api } from '$lib/api/client';
 	import { useMock } from '$lib/api/env';
-	import { SETUP_KEY } from '$lib/setup';
+	import { markSetupDone } from '$lib/setup';
 	import { AddConnectionDialog, providerMark, type AddedConnection } from '$lib/components/orch/connection';
 		import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 
@@ -175,7 +175,7 @@
 	let mode = $state<OrchPolicy['mode']>('timer');
 
 	/// 서버 모드 시작 — 팀 → 고른 멤버 → 프로젝트(그 팀)를 서버에 만든다 (A-7 #98). 실패하면 그 자리에 머문다(토스트는 클라이언트).
-	/// 연결 · 진행 방식 · 이슈 가져오기는 서버 필드가 없어 화면 상태(#47 · #60). 첫 실행 완료 표시는 localStorage(tbl_workspace setup_done 대기).
+	/// 연결 · 진행 방식 · 이슈 가져오기는 서버 필드가 없어 화면 상태(#47 · #60). 첫 실행 완료는 워크스페이스 is_onboarded.
 	let finishing = $state(false);
 	async function finishOnServer() {
 		finishing = true;
@@ -188,7 +188,7 @@
 			const proj = (await api.POST('/projects', { body: { name: projectName.trim() || 'OrchStack', repo_name: repo, default_branch: branch, team_sn: team.sn } })).data;
 			if (!proj) return;
 			teamsLoad.state = 'idle';
-			localStorage.setItem(SETUP_KEY, '1');
+			await markSetupDone();
 			goto(`/p/${proj.sn}`, { replaceState: true });
 		} catch {
 			// 연결 실패는 클라이언트가 알린다
@@ -211,7 +211,7 @@
 			});
 		}
 		store.policies[team.sn].mode = mode;
-		localStorage.setItem(SETUP_KEY, '1');
+		markSetupDone();
 		goto('/p/1', { replaceState: true });
 	}
 
