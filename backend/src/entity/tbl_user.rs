@@ -41,8 +41,6 @@ pub enum Relation {
     TblDiagram,
     #[sea_orm(has_many = "super::tbl_instruction_preset::Entity")]
     TblInstructionPreset,
-    #[sea_orm(has_many = "super::tbl_instruction_preset_version::Entity")]
-    TblInstructionPresetVersion,
     #[sea_orm(has_many = "super::tbl_interaction::Entity")]
     TblInteraction,
     #[sea_orm(has_many = "super::tbl_issue::Entity")]
@@ -92,12 +90,6 @@ impl Related<super::tbl_diagram::Entity> for Entity {
 impl Related<super::tbl_instruction_preset::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblInstructionPreset.def()
-    }
-}
-
-impl Related<super::tbl_instruction_preset_version::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblInstructionPresetVersion.def()
     }
 }
 

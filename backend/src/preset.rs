@@ -1,6 +1,6 @@
-//! 프리셋 편집(새로 · 복제 · 새 버전 · .md 가져오기 · 사용처)과 보고서 양식(tbl_report_form 조회 · 수정 · 미리보기).
+//! 프리셋 편집(새로 · 복제 · 새 버전 · .md 가져오기 · 사용처 · 한 버전 = tbl_instruction_preset 행 하나)과 보고서 양식(tbl_report_form 조회 · 수정 · 미리보기).
 //! 조회(목록 · 버전)는 setting.rs. 저장 검사(토큰 상한 · 비밀키 · 겹치는 규칙 줄)는 서버가 판정해 422 사유로 돌려준다
-use crate::{entity::{tbl_instruction_preset as ip, tbl_instruction_preset_version as iv, tbl_map_profile_preset as pp, tbl_report_form as rf,
+use crate::{entity::{tbl_instruction_preset as ip, tbl_map_profile_preset as pp, tbl_report_form as rf,
     tbl_report_item as ri, tbl_run as r, tbl_task as t},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, run, setting::Preset, skill::{Usage, owners}};
 use axum::{Json, extract::{Path, Query, State}, http::StatusCode};
@@ -120,7 +120,7 @@ pub(crate) fn tokens(s: &str) -> i64 {
 }
 
 /// 저장 검사. 사유 목록이 비어 있으면 통과. 겹치는 규칙 줄 = 본문 안 중복 "- " 줄 + (rule이면) 다른 활성 rule 프리셋 최신 본문과 같은 줄
-async fn verdict(db: &impl ConnectionTrait, kind: &str, me: Option<i64>, content: &str, limit: i64) -> Res<Vec<String>> {
+async fn verdict(db: &impl ConnectionTrait, kind: &str, me: Option<&str>, content: &str, limit: i64) -> Res<Vec<String>> {
     let mut why = Vec::new();
     let n = tokens(content);
     if n > limit {
@@ -142,10 +142,9 @@ async fn verdict(db: &impl ConnectionTrait, kind: &str, me: Option<i64>, content
         }
     }
     if kind == "rule" {
-        let others = ip::Entity::find().filter(ip::Column::Kind.eq("rule")).filter(ip::Column::Status.eq("active")).all(db).await?;
-        for o in others.into_iter().filter(|o| Some(o.sn) != me) {
-            let Some(v) = iv::Entity::find().filter(iv::Column::PresetSn.eq(o.sn)).filter(iv::Column::Version.eq(o.version)).one(db).await? else { continue };
-            for l in v.content.lines().map(str::trim).filter(|l| lines.contains(l)) {
+        let others = ip::Entity::find().filter(ip::Column::Kind.eq("rule")).filter(ip::Column::Status.eq("active")).filter(ip::Column::IsLatest.eq(1)).all(db).await?;
+        for o in others.into_iter().filter(|o| Some(o.preset_key.as_str()) != me) {
+            for l in o.content.lines().map(str::trim).filter(|l| lines.contains(l)) {
                 why.push(format!("rule line also in {}: {l}", o.preset_key));
             }
         }
@@ -158,21 +157,25 @@ fn reject(why: Vec<String>) -> Res<()> {
     if why.is_empty() { Ok(()) } else { Err(Error::invalid(why.join("; "))) }
 }
 
-/// 프리셋 1건. 없으면 404
+/// 프리셋 버전 행 1건. 없으면 404
 async fn preset(db: &impl ConnectionTrait, sn: i64) -> Res<ip::Model> {
     ip::Entity::find_by_id(sn).one(db).await?.ok_or_else(Error::not_found)
 }
 
-/// 새 프리셋 + 버전 1 (PresetCreated)
+/// 같은 (종류 · 키)의 최신 버전 행. sn은 어느 버전 행이어도 된다
+async fn latest(db: &impl ConnectionTrait, sn: i64) -> Res<ip::Model> {
+    let m = preset(db, sn).await?;
+    ip::Entity::find().filter(ip::Column::WorkspaceSn.eq(m.workspace_sn)).filter(ip::Column::Kind.eq(m.kind)).filter(ip::Column::PresetKey.eq(m.preset_key)).filter(ip::Column::IsLatest.eq(1))
+        .one(db).await?.ok_or_else(Error::not_found)
+}
+
+/// 새 프리셋 = 버전 1 행 (PresetCreated)
 #[allow(clippy::too_many_arguments)]
 async fn insert(tx: &DatabaseTransaction, kind: &str, key: &str, name: &str, description: Option<String>, limit: i64, content: &str, language: &str, source: &str, copy_from: Option<i64>) -> Res<(Preset, Ev)> {
     let m = ip::ActiveModel {
         workspace_sn: Set(crate::WORKSPACE), kind: Set(kind.into()), preset_key: Set(key.into()), name: Set(name.into()), description: Set(description), limit_tok: Set(limit),
-        copy_from_sn: Set(copy_from), user_sn: Set(Some(crate::USER)), ..Default::default()
-    }.insert(tx).await?;
-    iv::ActiveModel {
-        preset_sn: Set(m.sn), version: Set(1), content: Set(content.into()), token_count: Set(tokens(content)), language: Set(language.into()), source: Set(source.into()),
-        user_sn: Set(Some(crate::USER)), ..Default::default()
+        copy_from_sn: Set(copy_from), user_sn: Set(Some(crate::USER)), content: Set(content.into()), token_count: Set(tokens(content)), language: Set(language.into()), source: Set(source.into()),
+        ..Default::default()
     }.insert(tx).await?;
     let ev = Ev::new(None, "preset", m.sn, "PresetCreated", &json!({ "kind": kind, "preset_key": key, "copy_from_sn": copy_from }));
     Ok((Preset::from(m), ev))
@@ -185,17 +188,15 @@ async fn bump(tx: &DatabaseTransaction, cur: &ip::Model, content: &str, note: Op
         return Err(Error::conflict(format!("preset {} is builtin or locked — copy it to edit", cur.preset_key)));
     }
     let version = cur.version + 1;
-    iv::ActiveModel {
-        preset_sn: Set(cur.sn), version: Set(version), content: Set(content.into()), token_count: Set(tokens(content)), language: Set(language.into()), source: Set(source.into()),
-        change_note: Set(note.clone()), user_sn: Set(Some(crate::USER)), ..Default::default()
+    ip::Entity::update_many().filter(ip::Column::Sn.eq(cur.sn)).col_expr(ip::Column::IsLatest, 0.into()).exec(tx).await?;
+    let m = ip::ActiveModel {
+        workspace_sn: Set(cur.workspace_sn), project_sn: Set(cur.project_sn), kind: Set(cur.kind.clone()), preset_key: Set(cur.preset_key.clone()),
+        name: Set(name.unwrap_or_else(|| cur.name.clone())), description: Set(description.or_else(|| cur.description.clone())), version: Set(version), is_latest: Set(1),
+        content: Set(content.into()), token_count: Set(tokens(content)), language: Set(language.into()), source: Set(source.into()), change_note: Set(note.clone()),
+        limit_tok: Set(limit), is_default: Set(cur.is_default), copy_from_sn: Set(cur.copy_from_sn), status: Set(cur.status.clone()), user_sn: Set(Some(crate::USER)), ..Default::default()
     }.insert(tx).await?;
-    let mut u = ip::Entity::update_many().filter(ip::Column::Sn.eq(cur.sn)).col_expr(ip::Column::Version, version.into()).col_expr(ip::Column::LimitTok, limit.into())
-        .col_expr(ip::Column::UpdateAt, Expr::cust("datetime('now')"));
-    if let Some(v) = name { u = u.col_expr(ip::Column::Name, v.into()); }
-    if let Some(v) = description { u = u.col_expr(ip::Column::Description, v.into()); }
-    u.exec(tx).await?;
-    let ev = Ev::new(None, "preset", cur.sn, "PresetVersioned", &json!({ "version": version, "source": source, "change_note": note }));
-    Ok((Preset::from(preset(tx, cur.sn).await?), ev))
+    let ev = Ev::new(None, "preset", m.sn, "PresetVersioned", &json!({ "version": version, "source": source, "change_note": note }));
+    Ok((Preset::from(m), ev))
 }
 
 /// 프리셋 만들기 · 복제 (PresetCreated). 모르는 종류(protocol 포함) · 빈 키 · 이름 · 본문, 검사 실패는 422. 같은 종류 · 키가 있으면 409
@@ -203,17 +204,13 @@ async fn bump(tx: &DatabaseTransaction, cur: &ip::Model, content: &str, note: Op
 async fn create(State(db): State<DatabaseConnection>, Body(b): Body<PresetNew>) -> Res<(StatusCode, Json<Preset>)> {
     let out = event::run(&db, async |tx| {
         let src = match b.copy_from_sn {
-            Some(s) => {
-                let p = preset(tx, s).await?;
-                let v = iv::Entity::find().filter(iv::Column::PresetSn.eq(s)).filter(iv::Column::Version.eq(p.version)).one(tx).await?.ok_or_else(Error::not_found)?;
-                Some((p, v))
-            }
+            Some(s) => Some(latest(tx, s).await?),
             None => None,
         };
-        let kind = b.kind.clone().or_else(|| src.as_ref().map(|s| s.0.kind.clone())).unwrap_or_default();
-        let content = b.content.clone().or_else(|| src.as_ref().map(|s| s.1.content.clone())).unwrap_or_default();
-        let limit = b.limit_tok.or_else(|| src.as_ref().map(|s| s.0.limit_tok)).unwrap_or(0);
-        let language = b.language.clone().or_else(|| src.as_ref().map(|s| s.1.language.clone())).unwrap_or_else(|| "en".into());
+        let kind = b.kind.clone().or_else(|| src.as_ref().map(|s| s.kind.clone())).unwrap_or_default();
+        let content = b.content.clone().or_else(|| src.as_ref().map(|s| s.content.clone())).unwrap_or_default();
+        let limit = b.limit_tok.or_else(|| src.as_ref().map(|s| s.limit_tok)).unwrap_or(0);
+        let language = b.language.clone().or_else(|| src.as_ref().map(|s| s.language.clone())).unwrap_or_else(|| "en".into());
         if !KINDS.contains(&kind.as_str()) || b.preset_key.trim().is_empty() || b.name.trim().is_empty() || content.trim().is_empty() || limit <= 0 {
             return Err(Error::invalid(format!("kind in {KINDS:?}, preset_key · name · content non-empty, limit_tok > 0")));
         }
@@ -231,12 +228,12 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<PresetNew>) 
 #[utoipa::path(operation_id = "preset_edit", put, path = "/presets/{sn}", params(("sn" = i64, Path, description = "프리셋 번호")), request_body = PresetEdit, responses((status = 200, body = Preset), (status = "default", body = ErrorBody)))]
 async fn edit(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<PresetEdit>) -> Res<Json<Preset>> {
     let out = event::run(&db, async |tx| {
-        let cur = preset(tx, sn).await?;
+        let cur = latest(tx, sn).await?;
         let limit = b.limit_tok.unwrap_or(cur.limit_tok);
         if b.content.trim().is_empty() || limit <= 0 {
             return Err(Error::invalid("content non-empty, limit_tok > 0".into()));
         }
-        reject(verdict(tx, &cur.kind, Some(sn), &b.content, limit).await?)?;
+        reject(verdict(tx, &cur.kind, Some(&cur.preset_key), &b.content, limit).await?)?;
         let (out, ev) = bump(tx, &cur, &b.content, b.change_note.clone(), b.language.as_deref().unwrap_or("en"), "user", b.name.clone(), b.description.clone(), limit).await?;
         Ok((out, vec![ev]))
     }).await?;
@@ -246,9 +243,10 @@ async fn edit(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Pr
 /// 프리셋 사용처: 연결한 프로필의 멤버 · 템플릿 (detail = 고정 버전 "v3" · 꺼져 있으면 "v3 off"). 없으면 404
 #[utoipa::path(operation_id = "preset_usage", get, path = "/presets/{sn}/usage", params(("sn" = i64, Path, description = "프리셋 번호")), responses((status = 200, body = Vec<Usage>), (status = "default", body = ErrorBody)))]
 async fn usage(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Usage>>> {
-    preset(&db, sn).await?;
-    let links = pp::Entity::find().filter(pp::Column::PresetSn.eq(sn)).all(&db).await?.into_iter()
-        .map(|m| (m.profile_sn, format!("v{}{}", m.pinned_version, if m.is_enabled == 1 { "" } else { " off" }))).collect();
+    let cur = preset(&db, sn).await?;
+    let rows = ip::Entity::find().filter(ip::Column::WorkspaceSn.eq(cur.workspace_sn)).filter(ip::Column::Kind.eq(cur.kind)).filter(ip::Column::PresetKey.eq(cur.preset_key)).all(&db).await?;
+    let links = pp::Entity::find().filter(pp::Column::PresetSn.is_in(rows.iter().map(|r| r.sn))).all(&db).await?.into_iter()
+        .map(|m| (m.profile_sn, format!("v{}{}", rows.iter().find(|r| r.sn == m.preset_sn).map_or(0, |r| r.version), if m.is_enabled == 1 { "" } else { " off" }))).collect();
     owners(&db, links).await.map(Json)
 }
 
@@ -265,10 +263,10 @@ async fn import(State(db): State<DatabaseConnection>, Body(b): Body<ImportBody>)
     }
     let limit = meta.get("limit_tok").map(|v| v.parse::<i64>().map_err(|_| Error::invalid("limit_tok must be a number".into()))).transpose()?;
     let out = event::run(&db, async |tx| {
-        match ip::Entity::find().filter(ip::Column::Kind.eq(kind)).filter(ip::Column::PresetKey.eq(key)).one(tx).await? {
+        match ip::Entity::find().filter(ip::Column::Kind.eq(kind)).filter(ip::Column::PresetKey.eq(key)).filter(ip::Column::IsLatest.eq(1)).one(tx).await? {
             Some(cur) => {
                 let limit = limit.unwrap_or(cur.limit_tok);
-                reject(verdict(tx, kind, Some(cur.sn), body, limit).await?)?;
+                reject(verdict(tx, kind, Some(&cur.preset_key), body, limit).await?)?;
                 let (out, ev) = bump(tx, &cur, body, Some("import".into()), "en", "import", None, None, limit).await?;
                 Ok((out, vec![ev]))
             }

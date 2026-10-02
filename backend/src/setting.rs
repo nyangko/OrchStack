@@ -1,5 +1,5 @@
 //! 설정: 워크스페이스(tbl_workspace sn=WORKSPACE) 조회 · 수정, 보안 기본값(workspace 프로필), 실행기 목록, Instruction preset 목록 · 버전 조회 (편집은 preset.rs)
-use crate::{agent::{self, Guard, Rule}, entity::{tbl_agent_profile as ap, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv, tbl_runtime as rt, tbl_workspace as ws},
+use crate::{agent::{self, Guard, Rule}, entity::{tbl_agent_profile as ap, tbl_instruction_preset as ip, tbl_runtime as rt, tbl_workspace as ws},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
@@ -150,7 +150,7 @@ pub struct Preset {
     preset_key: String,
     name: String,
     description: Option<String>,
-    /// 현재 최신 버전
+    /// 이 행의 버전 (목록에는 최신 버전 행만 나온다 · 새 버전을 저장하면 sn이 새 행으로 바뀐다)
     version: i64,
     limit_tok: i64,
     is_builtin: i64,
@@ -172,7 +172,7 @@ impl From<ip::Model> for Preset {
     }
 }
 
-/// 프리셋 버전 1건 (API 응답 형태)
+/// 프리셋 버전 1건 (API 응답 형태 · 버전 하나 = tbl_instruction_preset 행 하나)
 #[derive(Serialize, ToSchema)]
 pub struct PresetVersion {
     version: i64,
@@ -185,8 +185,8 @@ pub struct PresetVersion {
     create_at: String,
 }
 
-impl From<iv::Model> for PresetVersion {
-    fn from(m: iv::Model) -> Self {
+impl From<ip::Model> for PresetVersion {
+    fn from(m: ip::Model) -> Self {
         Self { version: m.version, content: m.content, token_count: m.token_count, language: m.language, source: m.source, change_note: m.change_note, create_at: m.create_at }
     }
 }
@@ -247,16 +247,17 @@ async fn runtimes(State(db): State<DatabaseConnection>) -> Res<Json<Vec<Runtime>
 /// Instruction preset 목록 (종류 → 번호순). `kind`로 거른다
 #[utoipa::path(operation_id = "setting_presets", get, path = "/presets", params(("kind" = Option<String>, Query, description = "이 종류만")), responses((status = 200, body = Vec<Preset>), (status = "default", body = ErrorBody)))]
 async fn presets(State(db): State<DatabaseConnection>, Query(q): Query<std::collections::HashMap<String, String>>) -> Res<Json<Vec<Preset>>> {
-    let mut f = ip::Entity::find();
+    let mut f = ip::Entity::find().filter(ip::Column::IsLatest.eq(1));
     if let Some(k) = q.get("kind") { f = f.filter(ip::Column::Kind.eq(k.as_str())); }
     Ok(Json(f.order_by_asc(ip::Column::Kind).order_by_asc(ip::Column::Sn).all(&db).await?.into_iter().map(Preset::from).collect()))
 }
 
-/// 프리셋 버전 목록 (최신순). 프리셋이 없으면 404
+/// 프리셋 버전 목록 (최신순 · 같은 종류 · 키의 모든 행). 프리셋이 없으면 404
 #[utoipa::path(operation_id = "setting_versions", get, path = "/presets/{sn}/versions", params(("sn" = i64, Path, description = "프리셋 번호")), responses((status = 200, body = Vec<PresetVersion>), (status = "default", body = ErrorBody)))]
 async fn versions(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<PresetVersion>>> {
-    ip::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
-    Ok(Json(iv::Entity::find().filter(iv::Column::PresetSn.eq(sn)).order_by_desc(iv::Column::Version).all(&db).await?.into_iter().map(PresetVersion::from).collect()))
+    let cur = ip::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
+    Ok(Json(ip::Entity::find().filter(ip::Column::WorkspaceSn.eq(cur.workspace_sn)).filter(ip::Column::Kind.eq(cur.kind)).filter(ip::Column::PresetKey.eq(cur.preset_key))
+        .order_by_desc(ip::Column::Version).all(&db).await?.into_iter().map(PresetVersion::from).collect()))
 }
 
 /// 워크스페이스 기본 프로필 (kind = workspace 중 첫 번째)

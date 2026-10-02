@@ -8,7 +8,6 @@ pub use super::tbl_context_manifest::Entity as TblContextManifest;
 pub use super::tbl_contract::Entity as TblContract;
 pub use super::tbl_diagram::Entity as TblDiagram;
 pub use super::tbl_instruction_preset::Entity as TblInstructionPreset;
-pub use super::tbl_instruction_preset_version::Entity as TblInstructionPresetVersion;
 pub use super::tbl_interaction::Entity as TblInteraction;
 pub use super::tbl_issue::Entity as TblIssue;
 pub use super::tbl_log_activity::Entity as TblLogActivity;

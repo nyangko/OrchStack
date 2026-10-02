@@ -18,6 +18,16 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
     pub version: i64,
+    pub is_latest: i64,
+    #[sea_orm(column_type = "Text")]
+    pub content: String,
+    pub token_count: i64,
+    #[sea_orm(column_type = "Text")]
+    pub language: String,
+    #[sea_orm(column_type = "Text")]
+    pub source: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub change_note: Option<String>,
     pub limit_tok: i64,
     pub is_builtin: i64,
     pub is_locked: i64,
@@ -42,8 +52,6 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     SelfRef,
-    #[sea_orm(has_many = "super::tbl_instruction_preset_version::Entity")]
-    TblInstructionPresetVersion,
     #[sea_orm(has_many = "super::tbl_map_profile_preset::Entity")]
     TblMapProfilePreset,
     #[sea_orm(
@@ -70,12 +78,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     TblWorkspace,
-}
-
-impl Related<super::tbl_instruction_preset_version::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblInstructionPresetVersion.def()
-    }
 }
 
 impl Related<super::tbl_map_profile_preset::Entity> for Entity {

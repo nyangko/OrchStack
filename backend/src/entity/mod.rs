@@ -10,7 +10,6 @@ pub mod tbl_context_manifest;
 pub mod tbl_contract;
 pub mod tbl_diagram;
 pub mod tbl_instruction_preset;
-pub mod tbl_instruction_preset_version;
 pub mod tbl_interaction;
 pub mod tbl_issue;
 pub mod tbl_log_activity;

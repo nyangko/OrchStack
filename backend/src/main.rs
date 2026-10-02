@@ -556,11 +556,11 @@ mod tests {
 
         // 프리셋: 종류 필터 · 버전 최신순 · 없는 프리셋 404
         db.execute_unprepared(
-            "INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, version, limit_tok, is_builtin) VALUES (1, 1, 'role', 'frontend', 'Frontend', 2, 400, 1), (2, 1, 'style', 'terse', 'Terse', 1, 200, 1); \
-             INSERT INTO tbl_instruction_preset_version (preset_sn, version, content, source) VALUES (1, 1, 'v1', 'builtin'), (1, 2, 'v2', 'user');",
+            "INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, version, is_latest, content, source, limit_tok, is_builtin) VALUES \
+               (1, 1, 'role', 'frontend', 'Frontend', 1, 0, 'v1', 'builtin', 400, 1), (3, 1, 'role', 'frontend', 'Frontend', 2, 1, 'v2', 'user', 400, 1), (2, 1, 'style', 'terse', 'Terse', 1, 1, 'terse', 'builtin', 200, 1);",
         ).await.unwrap();
         let v = call(&app, "GET", "/presets?kind=role", None).await.1;
-        assert_eq!((v.as_array().unwrap().len(), v[0]["preset_key"].as_str()), (1, Some("frontend")));
+        assert_eq!((v.as_array().unwrap().len(), v[0]["preset_key"].as_str(), v[0]["version"].as_i64(), v[0]["sn"].as_i64()), (1, Some("frontend"), Some(2), Some(3))); // 최신 행만
         let v = call(&app, "GET", "/presets/1/versions", None).await.1;
         assert_eq!((v[0]["version"].as_i64(), v[0]["content"].as_str(), v[1]["version"].as_i64()), (Some(2), Some("v2"), Some(1)));
         assert_eq!(call(&app, "GET", "/presets/99/versions", None).await.0, StatusCode::NOT_FOUND);
@@ -1270,9 +1270,8 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
             INSERT INTO tbl_map_task_dependency (task_sn, depend_task_sn) VALUES (1, 2);
             UPDATE tbl_agent_profile SET path_json = '[{{\"kind\":\"include\",\"pattern\":\"src/**\"}},{{\"kind\":\"exclude\",\"pattern\":\"**/.env*\"}}]' WHERE sn = 1;
             INSERT INTO tbl_profile_file (profile_sn, path, content, sort) VALUES (1, 'rules/a11y.md', 'A11Y-FILE', 1);
-            INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, limit_tok) VALUES (1, 1, 'protocol', 'p', 'P', 500), (2, 1, 'rule', 'r', 'R', 500), (3, 1, 'role', 'd', 'D', 500);
-            INSERT INTO tbl_instruction_preset_version (preset_sn, version, content, token_count) VALUES (1, 1, 'P-PROTO v1', 5), (2, 1, '- keep small', 0), (3, 1, '# Role: Dev', 5);
-            INSERT INTO tbl_map_profile_preset (profile_sn, preset_sn, pinned_version, sort) VALUES (1, 3, 1, 0), (1, 1, 1, 1), (1, 2, 1, 2);
+            INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, limit_tok, content, token_count) VALUES (1, 1, 'protocol', 'p', 'P', 500, 'P-PROTO v1', 5), (2, 1, 'rule', 'r', 'R', 500, '- keep small', 0), (3, 1, 'role', 'd', 'D', 500, '# Role: Dev', 5);
+            INSERT INTO tbl_map_profile_preset (profile_sn, preset_sn, sort) VALUES (1, 3, 0), (1, 1, 1), (1, 2, 2);
             INSERT INTO tbl_run (sn, project_sn, task_sn, member_sn, num, status) VALUES (1, 1, 1, 1, 1, 'queued'), (2, 1, 2, 1, 2, 'queued');",
             dir.display(), bin.display())).await.unwrap();
         (db, dir)
@@ -1320,7 +1319,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         db.execute_unprepared("INSERT INTO tbl_session (sn, run_sn, member_sn, num) VALUES (1, 1, 1, 1), (2, 1, 1, 2);").await.unwrap();
         ctx_save(&db, 1, Some(1), &b).await;
         assert_eq!(scalar(&db, "SELECT json_array_length(source_json) FROM tbl_context_manifest WHERE sn = 1").await, 6);
-        assert_eq!((scalar(&db, "SELECT token_count FROM tbl_instruction_preset_version WHERE preset_sn = 2").await > 0, scalar(&db, "SELECT token_count FROM tbl_instruction_preset_version WHERE preset_sn = 3").await), (true, 5));
+        assert_eq!((scalar(&db, "SELECT token_count FROM tbl_instruction_preset WHERE sn = 2").await > 0, scalar(&db, "SELECT token_count FROM tbl_instruction_preset WHERE sn = 3").await), (true, 5));
 
         // 같은 세션 두 번째 호출: 전부 반복 · 프롬프트에서 빠진다 (토큰 0) → 태스크 설명이 바뀌면 태스크 블록만 보낸다
         let two = context::assemble(&db, 1, Some(1)).await.unwrap();
@@ -1539,14 +1538,16 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         let (st, p) = call(&app, "POST", "/presets", Some(json!({"kind": "role", "preset_key": "qa", "name": "QA", "limit_tok": 100, "content": "# Role: QA\n- Test every endpoint."}))).await;
         assert_eq!((st, p["version"].as_i64(), p["is_builtin"].as_i64()), (StatusCode::CREATED, Some(1), Some(0)));
         let ps = p["sn"].as_i64().unwrap();
-        db.execute_unprepared(&format!("INSERT INTO tbl_map_profile_preset (profile_sn, preset_sn, pinned_version) VALUES (1, {ps}, 1);")).await.unwrap();
+        db.execute_unprepared(&format!("INSERT INTO tbl_map_profile_preset (profile_sn, preset_sn) VALUES (1, {ps});")).await.unwrap();
         let (st, p) = call(&app, "PUT", &format!("/presets/{ps}"), Some(json!({"content": "# Role: QA\n- Test every endpoint.\n- Report flaky tests.", "change_note": "flaky"}))).await;
         assert_eq!((st, p["version"].as_i64()), (StatusCode::OK, Some(2)));
-        let pinned: Option<i64> = { use crate::entity::tbl_map_profile_preset as pp; use sea_orm::EntityTrait; pp::Entity::find().one(&db).await.unwrap().map(|m| m.pinned_version) };
-        assert_eq!(pinned, Some(1));
+        let v2 = p["sn"].as_i64().unwrap();
+        assert_ne!(v2, ps); // 새 버전 = 새 행
+        assert_eq!(scalar(&db, "SELECT preset_sn FROM tbl_map_profile_preset").await, ps); // 연결은 고정한 v1 행 그대로
+        assert_eq!(scalar(&db, &format!("SELECT is_latest FROM tbl_instruction_preset WHERE sn = {ps}")).await, 0);
         let v = call(&app, "GET", &format!("/presets/{ps}/versions"), None).await.1;
         assert_eq!((v[0]["version"].as_i64(), v[0]["change_note"].as_str(), v[1]["version"].as_i64()), (Some(2), Some("flaky"), Some(1)));
-        assert_eq!(events(&db, "preset", ps).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["PresetCreated", "PresetVersioned"]);
+        assert_eq!((events(&db, "preset", ps).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), events(&db, "preset", v2).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>()), (vec!["PresetCreated"], vec!["PresetVersioned"]));
 
         // 사용처: 멤버 m · 고정 v1
         let u = call(&app, "GET", &format!("/presets/{ps}/usage"), None).await.1;
@@ -1570,8 +1571,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         assert_eq!(call(&app, "POST", "/presets", Some(json!({"kind": "role", "preset_key": "qa", "name": "QA2", "limit_tok": 100, "content": "x"}))).await.0, StatusCode::CONFLICT);
 
         // 기본 제공은 수정 409 → 복제하면 새 프리셋(본문 · 상한 이어받음)
-        db.execute_unprepared("INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, version, limit_tok, is_builtin) VALUES (90, 1, 'style', 'terse', 'Terse', 1, 50, 1); \
-            INSERT INTO tbl_instruction_preset_version (preset_sn, version, content) VALUES (90, 1, 'Be terse.');").await.unwrap();
+        db.execute_unprepared("INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, version, content, limit_tok, is_builtin) VALUES (90, 1, 'style', 'terse', 'Terse', 1, 'Be terse.', 50, 1);").await.unwrap();
         assert_eq!(call(&app, "PUT", "/presets/90", Some(json!({"content": "x"}))).await.0, StatusCode::CONFLICT);
         let (st, c) = call(&app, "POST", "/presets", Some(json!({"preset_key": "terse2", "name": "Terse 2", "copy_from_sn": 90}))).await;
         assert_eq!((st, c["kind"].as_str(), c["limit_tok"].as_i64(), c["copy_from_sn"].as_i64()), (StatusCode::CREATED, Some("style"), Some(50), Some(90)));

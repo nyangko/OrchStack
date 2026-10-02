@@ -1,7 +1,7 @@
 //! 컨텍스트 조립기 (#120): 모델에 보내는 입력을 한 곳에서 고정 순서로 만들고(`assemble`), 보낸 출처 · 토큰을 manifest에 남긴다(`record`).
 //! 리드 Run 순서: protocol → rule → role → style → report → repo_rule → 프로필 파일 → @TASK → (파일). 접두(@TASK 앞)는 같은 프로필이면 바이트까지 같다.
 //! 하위 Run은 최소 입력(고정 규칙 → @TASK → paths 파일)이다. 토큰은 `preset::tokens` 추정이고 실측은 tbl_log_token에만 있다. manifest · source는 이벤트를 남기지 않는다
-use crate::{entity::{tbl_agent_profile as ap, tbl_context_manifest as cm, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv,
+use crate::{entity::{tbl_agent_profile as ap, tbl_context_manifest as cm, tbl_instruction_preset as ip,
     tbl_log_token as lt, tbl_map_profile_preset as mp, tbl_map_task_dependency as dp, tbl_member as mb, tbl_profile_file as pf,
     tbl_project as pj, tbl_run as r, tbl_task as t, tbl_task_criterion as tc, tbl_connection as cn},
     error::{Error, ErrorBody, Res, Sn}, event, preset::tokens, rule, runner::{FILE_MAX, RULES, granted}};
@@ -154,18 +154,17 @@ async fn build(db: &impl ConnectionTrait, sp: &Spec, run: Option<&r::Model>, mem
         Spec::Lead { task, profile, cwd } => {
             // 프리셋: 종류 순서 → 연결 순서. 고정 버전 본문 그대로
             let maps = mp::Entity::find().filter(mp::Column::ProfileSn.eq(profile.sn)).filter(mp::Column::IsEnabled.eq(1)).order_by_asc(mp::Column::Sort).order_by_asc(mp::Column::Sn).all(db).await?;
-            let presets = ip::Entity::find().filter(ip::Column::Sn.is_in(maps.iter().map(|m| m.preset_sn))).all(db).await?;
+            let presets = ip::Entity::find().filter(ip::Column::Sn.is_in(maps.iter().map(|m| m.preset_sn))).all(db).await?; // 고정한 버전 행
             let mut rows = Vec::new();
             for m in &maps {
                 let Some(p) = presets.iter().find(|p| p.sn == m.preset_sn) else { continue };
                 let Some(k) = KINDS.iter().position(|k| *k == p.kind) else { continue };
-                let Some(v) = iv::Entity::find().filter(iv::Column::PresetSn.eq(p.sn)).filter(iv::Column::Version.eq(m.pinned_version)).one(db).await? else { continue };
-                rows.push((k, p, v));
+                rows.push((k, p));
             }
             rows.sort_by_key(|x| x.0);
-            for (_, p, v) in rows {
-                if v.token_count == 0 { fill.push((v.sn, tokens(&v.content))); }
-                items.push(it("preset", format!("{}/{}", p.kind, p.preset_key), Some(p.sn), Some(v.version), format!("{}{END}", v.content)));
+            for (_, p) in rows {
+                if p.token_count == 0 { fill.push((p.sn, tokens(&p.content))); }
+                items.push(it("preset", format!("{}/{}", p.kind, p.preset_key), Some(p.sn), Some(p.version), format!("{}{END}", p.content)));
             }
             // 저장소 규칙 (use일 때만 · 각 FILE_MAX)
             if profile.repo_rule_mode == "use" && let Some(cwd) = cwd {
@@ -277,7 +276,7 @@ pub async fn record(tx: &DatabaseTransaction, b: &Built, manifest_sn: i64) -> Re
 /// 토큰 수 0인 프리셋 버전에 추정값 채우기 (한 번 · 이미 채워졌으면 건드리지 않는다)
 async fn fill(tx: &DatabaseTransaction, rows: &[(i64, i64)]) -> Res<()> {
     for (sn, n) in rows {
-        iv::Entity::update_many().filter(iv::Column::Sn.eq(*sn)).filter(iv::Column::TokenCount.eq(0)).col_expr(iv::Column::TokenCount, (*n).into()).exec(tx).await?;
+        ip::Entity::update_many().filter(ip::Column::Sn.eq(*sn)).filter(ip::Column::TokenCount.eq(0)).col_expr(ip::Column::TokenCount, (*n).into()).exec(tx).await?;
     }
     Ok(())
 }

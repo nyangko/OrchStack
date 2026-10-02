@@ -423,7 +423,13 @@ CREATE TABLE tbl_instruction_preset (
     preset_key       TEXT NOT NULL,                                 -- 식별 키 (예: frontend, token-economy)
     name             TEXT NOT NULL,                                 -- 표시 이름
     description      TEXT,                                          -- 설명 (사람용 · 컨텍스트에 들어가지 않음)
-    version          INTEGER NOT NULL DEFAULT 1,                    -- 현재 최신 버전 (tbl_instruction_preset_version.version)
+    version          INTEGER NOT NULL DEFAULT 1,                    -- 버전 (행 하나 = 버전 하나 · 수정할 때마다 새 행 · 같은 (kind, preset_key)의 다른 행이 다른 버전)
+    is_latest        INTEGER NOT NULL DEFAULT 1,                    -- 그 (kind, preset_key)의 최신 버전인지 (새 버전을 저장하면 이전 행은 0)
+    content          TEXT NOT NULL,                                 -- 본문 (Markdown · 컨텍스트에 그대로 들어감 · 허용 변수 {{…}}만 치환)
+    token_count      INTEGER NOT NULL DEFAULT 0,                    -- 본문 토큰 수 (저장 시 측정)
+    language         TEXT NOT NULL DEFAULT 'en',                    -- 본문 언어 (en 권장 · 토큰 절약)
+    source           TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('builtin','user','import','translated')),  -- 출처: builtin(기본 제공 · 앱 배포) | user(사용자 작성) | import(.md · 저장소 AGENTS.md 가져오기) | translated(저장 시 영어 변환)
+    change_note      TEXT,                                          -- 변경 요약 (사람용)
     limit_tok        INTEGER NOT NULL,                              -- 토큰 상한 (초과 시 저장 차단)
     is_builtin       INTEGER NOT NULL DEFAULT 0,                    -- 기본 제공 (삭제 불가 · 수정하려면 복제)
     is_locked        INTEGER NOT NULL DEFAULT 0,                    -- 잠김 (protocol · 사용자 수정 불가, 앱 업데이트로만 변경)
@@ -433,31 +439,16 @@ CREATE TABLE tbl_instruction_preset (
     user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자 (기본 제공이면 NULL)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
-    UNIQUE (workspace_sn, kind, preset_key)
+    UNIQUE (workspace_sn, kind, preset_key, version)
 );
 
--- Instruction preset 버전. 수정할 때마다 새 버전 · 연결은 버전을 고정해서 쓴다
-CREATE TABLE tbl_instruction_preset_version (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 버전 기록 번호
-    preset_sn        INTEGER NOT NULL REFERENCES tbl_instruction_preset(sn) ON DELETE CASCADE,  -- 프리셋
-    version          INTEGER NOT NULL,                              -- 버전
-    content          TEXT NOT NULL,                                 -- 본문 (Markdown · 컨텍스트에 그대로 들어감 · 허용 변수 {{…}}만 치환)
-    token_count      INTEGER NOT NULL DEFAULT 0,                    -- 본문 토큰 수 (저장 시 측정)
-    language         TEXT NOT NULL DEFAULT 'en',                    -- 본문 언어 (en 권장 · 토큰 절약)
-    source           TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('builtin','user','import','translated')),  -- 출처: builtin(기본 제공 · 앱 배포) | user(사용자 작성) | import(.md · 저장소 AGENTS.md 가져오기) | translated(저장 시 영어 변환)
-    change_note      TEXT,                                          -- 변경 요약 (사람용)
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 작성한 사용자
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (preset_sn, version)
-);
 
 -- 프로필 ↔ Instruction preset. 역할 템플릿 · 멤버가 쓰는 프리셋과 고정 버전
 --   role · style · report 는 프로필당 1개, rule 은 여러 개 (앱에서 검증) · protocol 은 항상 자동 연결
 CREATE TABLE tbl_map_profile_preset (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 연결 관계 번호
     profile_sn       INTEGER NOT NULL REFERENCES tbl_agent_profile(sn) ON DELETE CASCADE,  -- 프로필 (템플릿 버전 · 멤버)
-    preset_sn        INTEGER NOT NULL REFERENCES tbl_instruction_preset(sn) ON DELETE RESTRICT,  -- 프리셋 (사용 중이면 삭제 차단 → 보관만 가능)
-    pinned_version   INTEGER NOT NULL,                              -- 고정 버전 (새 버전은 '업데이트 가능'으로 표시, 사용자가 가져올 때만 변경)
+    preset_sn        INTEGER NOT NULL REFERENCES tbl_instruction_preset(sn) ON DELETE RESTRICT,  -- 고정한 프리셋 버전 행 (새 버전은 '업데이트 가능'으로 표시, 사용자가 가져올 때만 이 번호를 바꾼다 · 사용 중이면 삭제 차단 → 보관만 가능)
     sort             INTEGER NOT NULL DEFAULT 0,                    -- 조합 순서 (같은 종류 안에서)
     is_enabled       INTEGER NOT NULL DEFAULT 1,                    -- 사용 여부
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
@@ -920,8 +911,8 @@ CREATE INDEX idx_interaction_project    ON tbl_interaction (project_sn, status);
 CREATE INDEX idx_report_item_run       ON tbl_report_item (run_sn, kind);
 CREATE INDEX idx_report_item_target    ON tbl_report_item (target_task_sn, is_routed);
 CREATE INDEX idx_map_task_contract     ON tbl_map_task_contract (contract_sn, role);
-CREATE INDEX idx_preset_version        ON tbl_instruction_preset_version (preset_sn, version);
 CREATE INDEX idx_map_profile_preset    ON tbl_map_profile_preset (preset_sn);
+CREATE INDEX idx_preset_latest         ON tbl_instruction_preset (kind, preset_key, is_latest);
 CREATE INDEX idx_log_audit_workspace    ON tbl_log_audit (workspace_sn, create_at);
 
 -- 외래 키 조회 · CASCADE 삭제용 (SQLite는 FK 인덱스를 자동으로 만들지 않음)
@@ -963,7 +954,6 @@ CREATE INDEX idx_fk_diagram_user_sn ON tbl_diagram (user_sn);
 CREATE INDEX idx_fk_instruction_preset_copy_from_sn ON tbl_instruction_preset (copy_from_sn);
 CREATE INDEX idx_fk_instruction_preset_project_sn ON tbl_instruction_preset (project_sn);
 CREATE INDEX idx_fk_instruction_preset_user_sn ON tbl_instruction_preset (user_sn);
-CREATE INDEX idx_fk_instruction_preset_version_user_sn ON tbl_instruction_preset_version (user_sn);
 CREATE INDEX idx_fk_interaction_from_member_sn ON tbl_interaction (from_member_sn);
 CREATE INDEX idx_fk_interaction_issue_sn ON tbl_interaction (issue_sn);
 CREATE INDEX idx_fk_interaction_to_member_sn ON tbl_interaction (to_member_sn);

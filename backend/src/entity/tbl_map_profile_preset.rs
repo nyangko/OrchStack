@@ -9,7 +9,6 @@ pub struct Model {
     pub sn: i64,
     pub profile_sn: i64,
     pub preset_sn: i64,
-    pub pinned_version: i64,
     pub sort: i64,
     pub is_enabled: i64,
     #[sea_orm(column_type = "Text")]
