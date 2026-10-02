@@ -1,5 +1,9 @@
 <script lang="ts">
 	/// Workbench — 좌측 Quick Panel · 가운데 뷰(Diagram / Kanban / Issues) + Ops · 우측 PM Dock.
+	import Circle from '@lucide/svelte/icons/circle';
+	import CircleDashed from '@lucide/svelte/icons/circle-dashed';
+	import OctagonAlert from '@lucide/svelte/icons/octagon-alert';
+	import ChevronsDown from '@lucide/svelte/icons/chevrons-down';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import Workflow from '@lucide/svelte/icons/workflow';
@@ -120,7 +124,7 @@
 	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import { statuses, statusOrder, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
-	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, type Issue, type Chat, type DockCard, type SubRun, type SpawnMode } from '$lib/mock';
+	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, agentQueues, type Issue, type Chat, type DockCard, type SubRun, type SpawnMode } from '$lib/mock';
 	import { store, defaultTeam } from '$lib/teams.svelte';
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { Pill } from '$lib/components/orch/pill';
@@ -338,7 +342,9 @@
 			badge: agentState(a),
 			menuLabel: `${a.name} · ${roles[a.role].label}`,
 			menu: agentMenu(sn),
-			meta: lead.length ? `sub-run ${lead.length} · ctx ${ctx}` : `ctx ${ctx}`
+			meta: lead.length ? `sub-run ${lead.length} · ctx ${ctx}` : `ctx ${ctx}`,
+			// 대기열 받침 — 서버 큐 API 전에는 목데이터에서만 (#88)
+			...(useMock && { queue: agentQueues[sn] ?? [] })
 		};
 	}
 	const diagramTasks = $derived(useMock ? [128, 129, 130, 131] : list.map((t) => t.num));
@@ -641,7 +647,7 @@
 
 	// Agent Inspector (.pen Agent Inspector Card) — 에이전트를 누르면 뷰 오른쪽에 카드로 연다. 태스크 상세와 동시에 열지 않는다.
 	let inspect = $state<number>();
-	let inspectTab = $state('activity');
+	let inspectTab = $state('overview');
 	let activity = $state(structuredClone(agentActivity));
 	let instruction = $state('');
 	const agentSel = $derived(agentOf(inspect));
@@ -1678,6 +1684,55 @@
 							{#each [['overview', 'Overview'], ['activity', 'Activity'], ['runs', 'Runs'], ['config', 'Config']] as [v, l] (v)}<TabsTrigger value={v}>{l}</TabsTrigger>{/each}
 						</TabsList>
 						<TabsContent value="overview" class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3">
+							{@const q = agentQueues[a.sn] ?? []}
+							{@const now = mine.find((t) => t.status === 'in_progress')}
+							<!-- NOW (.pen InspectorSection · Now) — 지금 실행 중인 태스크 -->
+							<section class="-mx-4 mb-3 flex flex-col gap-2 border-b px-4 pb-3" aria-label="지금 하는 작업">
+								<h3 class="font-mono text-2xs font-semibold tracking-wider text-muted-foreground">NOW</h3>
+								{#if now}
+									<button type="button" class="flex flex-col gap-2.5 rounded-md border-l-2 border-status-in-progress bg-primary-soft p-3 text-left" onclick={() => open(now.num)}>
+										<span class="flex items-center gap-1.5">
+											<SquareCheck class="size-3.5 shrink-0 text-node-task" />
+											<span class="flex-1 truncate text-body font-semibold">#{now.num} · {now.title}</span>
+											<span class="font-mono text-xs font-semibold text-status-in-progress">{Math.round((now.steps[0] / Math.max(1, now.steps[1])) * 100)}%</span>
+										</span>
+										<Progress value={(now.steps[0] / Math.max(1, now.steps[1])) * 100} class="h-1.5" indicator="bg-status-in-progress" aria-label="#{now.num} 진행" />
+										<span class="flex items-center gap-1.5 font-mono text-caption text-muted-foreground"><LoaderCircle class="size-3 text-status-in-progress" />완료 조건 {now.steps[0]}/{now.steps[1]}{now.run ? ` · Run ${now.run}` : ''}</span>
+									</button>
+								{:else}
+									<p class="text-xs text-muted-foreground">지금 실행 중인 작업이 없어요.</p>
+								{/if}
+							</section>
+							{#if useMock}
+								<!-- NEXT (.pen Agent Inspector · InspectorSection · Queue) — 3줄까지, 넘으면 +N개 더. 서버 큐 API 전에는 목데이터에서만 (#88) -->
+								<section class="-mx-4 mb-3 flex flex-col border-b px-4 pb-2.5" aria-label="다음 작업 대기열">
+									<div class="flex items-center gap-1.5 pb-1">
+										<h3 class="font-mono text-2xs font-semibold tracking-wider text-muted-foreground">NEXT</h3>
+										<span class="rounded-xs bg-muted px-1.5 text-2xs font-semibold text-muted-foreground">대기 {q.length}</span>
+										<span class="flex-1"></span>
+										<a href="/teams?member={a.sn}" class="text-caption font-medium text-primary hover:underline">Tasks 탭 →</a>
+									</div>
+									{#each q.slice(0, 3) as item, i (item.num)}
+										<div class="flex items-center gap-2 border-b py-2 last:border-b-0">
+											<span class="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-2xs font-semibold text-muted-foreground">{i + 1}</span>
+											{#if item.stuck}<OctagonAlert class="size-3.5 shrink-0 text-status-blocked" />{:else if item.blocked}<CircleDashed class="size-3.5 shrink-0 text-status-waiting" />{:else}<Circle class="size-3.5 shrink-0 text-status-todo" />{/if}
+											<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+												<span class="truncate text-body font-medium">#{item.num} · {item.title}</span>
+												<span class={['truncate text-caption', item.stuck ? 'text-status-blocked' : item.blocked ? 'text-status-waiting' : 'text-status-done']}>{item.note}</span>
+											</span>
+											<span class="shrink-0 font-mono text-caption font-semibold text-muted-foreground">{item.priority}</span>
+										</div>
+									{:else}
+										<p class="py-2 text-xs text-muted-foreground">대기열이 비어 있어요.</p>
+									{/each}
+									{#if q.length > 3}
+										<div class="flex items-center gap-1.5 py-2 text-caption font-medium text-muted-foreground">
+											<ChevronsDown class="size-3" />+{q.length - 3}개 더{#if q.slice(3).some((x) => x.stuck)} · 막힘 {q.slice(3).filter((x) => x.stuck).length}{/if}
+											<span class="flex-1"></span><a href="/teams?member={a.sn}" class="text-primary hover:underline">전체 대기열</a>
+										</div>
+									{/if}
+								</section>
+							{/if}
 							<h3 class="mb-1 text-body font-semibold">맡은 태스크</h3>
 							{#each mine as t (t.num)}
 								<Item variant="row" size="xs" onclick={() => open(t.num)}>

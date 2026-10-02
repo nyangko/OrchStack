@@ -1216,7 +1216,7 @@ export type MemberDetail = {
 	week: { done: number; doneDelta: string; cycle: string; tokens: number; days: number[] };
 	now?: { task: number; pct: number; run: number; elapsed: string; branch: string; commits: number; eta: string };
 	attention: { kind: "quota" | "wait" | "review"; title: string; sub: string; link: string }[];
-	queue: { num: number; title: string; note: string; blocked?: boolean; issue: string; est: string; priority: string }[];
+	queue: QueueItem[];
 	done: { num: number; title: string; tokens: string; when: string }[];
 	diff: { file: string; note: string }[];
 	runs: MemberRun[];
@@ -1236,6 +1236,26 @@ export type MemberDetail = {
 	source: { orch: number; manual: number };
 };
 
+/// 에이전트 작업 큐 한 줄 (.pen Inspector/QueueRow). 순서 = Orch가 꺼낼 순서(우선순위 → 의존 해소).
+/// blocked — 다른 태스크를 기다림(노랑), stuck — 막힘(빨강), 둘 다 없으면 바로 시작 가능.
+export type QueueItem = { num: number; title: string; note: string; blocked?: boolean; stuck?: boolean; issue: string; est: string; priority: string };
+
+/// 멤버 sn → 대기열 (.pen Diagram 큐 받침 · Agent Inspector NEXT · 멤버 상세 실행 대기열이 같은 값을 본다).
+export const agentQueues: Record<number, QueueItem[]> = {
+	1: [
+		{ num: 133, title: "Signup 폼 접근성 개선", note: "#128 Auth API 완료 대기 — 민수 진행 중", blocked: true, issue: "#51", est: "est 1h", priority: "P2" },
+		{ num: 136, title: "Password reset 화면", note: "바로 시작 가능", issue: "#48", est: "est 2h", priority: "P3" },
+	],
+	2: [
+		{ num: 124, title: "Rate limit middleware", note: "Redis 설정이 없어 막힘", stuck: true, issue: "#45", est: "est 3h", priority: "P0" },
+		{ num: 137, title: "Refresh token 회전 테스트", note: "바로 시작 가능", issue: "#52", est: "est 1h", priority: "P2" },
+		{ num: 138, title: "감사 로그 API", note: "바로 시작 가능", issue: "#45", est: "est 2h", priority: "P3" },
+	],
+	3: [{ num: 132, title: "Session expiry toast", note: "바로 시작 가능", issue: "#51", est: "est 1h", priority: "P3" }],
+	4: [{ num: 131, title: "Review · Auth", note: "바로 시작 가능", issue: "#53", est: "est 30m", priority: "P2" }],
+	5: [],
+};
+
 export const memberDetails: Record<number, MemberDetail> = {
 	1: {
 		template: 1,
@@ -1246,10 +1266,7 @@ export const memberDetails: Record<number, MemberDetail> = {
 			{ kind: "wait", title: "#133 이 #128 완료를 기다림", sub: "민수 · Auth API 92% 컨텍스트 경고 중", link: "#128 보기" },
 			{ kind: "review", title: "소라가 #121 리뷰 3회 반려 → 루프 가드 정지", sub: "완료 조건에 접근성 기준 추가 후 통과", link: "리뷰 보기" },
 		],
-		queue: [
-			{ num: 133, title: "Signup 폼 접근성 개선", note: "#128 Auth API 완료 대기 — 민수 진행 중", blocked: true, issue: "#51", est: "est 1h", priority: "P2" },
-			{ num: 136, title: "Password reset 화면", note: "바로 시작 가능", issue: "#48", est: "est 2h", priority: "P3" },
-		],
+		queue: agentQueues[1],
 		done: [
 			{ num: 121, title: "Signup UI", tokens: "61.2K tok", when: "3일 전 · 42m" },
 			{ num: 118, title: "Nav 리팩토링", tokens: "88.0K tok", when: "4일 전 · 1h 5m" },
