@@ -569,11 +569,19 @@ export const security = {
 	github: { name: "orch-bot", note: "사람이 한 작업과 구분돼요 · Repo 권한 orchstack/*" },
 };
 /// 감사 로그 — 권한 · 연결 · 설정 변경 기록 (최근이 앞).
-export type AuditLog = { kind: "KEY" | "POLICY" | "BLOCK"; who: string; when: string; text: string };
+/// when은 "날짜 시각" — 앞 단어로 날짜별로 묶는다.
+export type AuditLog = { kind: "KEY" | "POLICY" | "BLOCK" | "SETTING" | "LOGIN"; who: string; when: string; text: string };
 export const auditLog: AuditLog[] = [
 	{ kind: "KEY", who: "나", when: "오늘 10:40", text: "Vercel AI Gateway 키 추가 · 키체인" },
+	{ kind: "POLICY", who: "나", when: "오늘 09:12", text: "승인 규칙: 새 의존성 추가 → Orch → 나" },
+	{ kind: "BLOCK", who: "시스템", when: "오늘 08:55", text: "git push --force origin main 차단 · 민수 · Run #80" },
 	{ kind: "POLICY", who: "나", when: "어제 19:02", text: "승인 규칙: 새 의존성 → Orch → 나" },
 	{ kind: "BLOCK", who: "시스템", when: "어제 18:10", text: "git reset --hard origin/main 차단 · 진" },
+	{ kind: "SETTING", who: "나", when: "어제 17:40", text: "Core Team 동시 실행 2 → 3 Run" },
+	{ kind: "LOGIN", who: "나", when: "어제 09:05", text: "Codex CLI 다시 로그인 · codex-pro@orch" },
+	{ kind: "KEY", who: "나", when: "9/30 16:20", text: "Anthropic API · prod 키 갱신 · 키체인" },
+	{ kind: "SETTING", who: "나", when: "9/30 11:02", text: "워크스페이스 커밋 언어 한국어 → English" },
+	{ kind: "BLOCK", who: "시스템", when: "9/29 15:48", text: "prompt-injector 추가 차단 · 보안 검사 실패" },
 ];
 
 /// 설정 › Instruction presets (.pen Settings · Instruction presets). 원문은 data/presets — 기본 제공(OrchStack v1)은 잠겨 있고 복제해서 고친다.
