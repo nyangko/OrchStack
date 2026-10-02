@@ -142570,6 +142570,2339 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "B37aSO",
+      "x": 13920,
+      "y": 4128,
+      "name": "Teams · 팀 설정 · 새 팀 (다이얼로그)",
+      "fill": "$muted",
+      "gap": 40,
+      "padding": 40,
+      "children": [
+        {
+          "type": "frame",
+          "id": "km3oP",
+          "name": "팀 설정 · Core Team",
+          "clip": true,
+          "width": 720,
+          "fill": "$background",
+          "cornerRadius": "$radius-lg",
+          "stroke": "$border",
+          "strokeWidth": 1,
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#00000026",
+            "offset": {
+              "x": 0,
+              "y": 16
+            },
+            "blur": 48
+          },
+          "layout": "vertical",
+          "children": [
+            {
+              "id": "biTWB",
+              "type": "ref",
+              "ref": "nWu0z",
+              "name": "Header",
+              "width": "fill_container",
+              "descendants": {
+                "Io0My": {
+                  "icon": "users"
+                },
+                "uTzHt": {
+                  "content": "팀 설정 · Core Team"
+                },
+                "m5taQ": {
+                  "content": "이름 · 실행 한도 · 리뷰 · 저장소. Orch 진행 방식은 ‘정책 편집’에서 정해요."
+                }
+              }
+            },
+            {
+              "type": "frame",
+              "id": "VHC8P",
+              "name": "Body",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 20,
+              "padding": [
+                18,
+                24
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "BsVoZ",
+                  "name": "1 · 기본 정보",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "B1N13d",
+                      "name": "h",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "BHmff",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "1 · 기본 정보",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-sm",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "b72Jvl",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "이름",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "이름"
+                        },
+                        "h83gNR": {
+                          "content": "",
+                          "enabled": false
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "ABN2p",
+                              "type": "ref",
+                              "ref": "Aui6F",
+                              "name": "Input",
+                              "width": "fill_container",
+                              "descendants": {
+                                "c1ZDgT": {
+                                  "icon": "users"
+                                },
+                                "I9FcGK": {
+                                  "content": "Core Team",
+                                  "fill": "$foreground"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "nyIvI",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "설명",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "설명"
+                        },
+                        "h83gNR": {
+                          "content": "팀 목록 · 헤더에 보여요",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "RVx7d",
+                              "type": "ref",
+                              "ref": "Aui6F",
+                              "name": "Input",
+                              "width": "fill_container",
+                              "descendants": {
+                                "c1ZDgT": {
+                                  "icon": "text-align-start"
+                                },
+                                "I9FcGK": {
+                                  "content": "백엔드 · 프론트엔드 · QA · 리뷰를 담당하는 기본 팀",
+                                  "fill": "$foreground"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "b6MQCP",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "연결된 프로젝트",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "연결된 프로젝트"
+                        },
+                        "h83gNR": {
+                          "content": "프로젝트 화면에서 바꿔요",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "anVG7",
+                              "name": "Projects",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "id": "iZrWL",
+                                  "type": "ref",
+                                  "ref": "s09dDZ",
+                                  "name": "OrchStack",
+                                  "descendants": {
+                                    "RsLlp": {
+                                      "content": "OrchStack"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "L575Fk",
+                  "name": "2 · 실행 한도",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "VXSeP",
+                      "name": "h",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "q51vnP",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "2 · 실행 한도",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-sm",
+                          "fontWeight": "$fw-semibold"
+                        },
+                        {
+                          "type": "text",
+                          "id": "WZpj2",
+                          "name": "d",
+                          "fill": "$muted-foreground",
+                          "content": "넘으면 Orch가 다음 태스크를 기다리게 해요",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-xs",
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "sgdsZ",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "기본 Runtime",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "기본 Runtime"
+                        },
+                        "h83gNR": {
+                          "content": "멤버마다 바꿀 수 있어요",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "avHeo",
+                              "type": "ref",
+                              "ref": "FlX1S",
+                              "name": "Select",
+                              "width": "fill_container",
+                              "descendants": {
+                                "XIGR6": {
+                                  "enabled": true
+                                },
+                                "HuTtg": {
+                                  "content": "Claude Code · Codex CLI 혼합"
+                                },
+                                "Byx0T": {
+                                  "content": "멤버별 기본값"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "JEb8I",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "오늘 토큰 예산",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "오늘 토큰 예산"
+                        },
+                        "h83gNR": {
+                          "content": "팀 전체 · 0시에 초기화",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "eEBXX",
+                              "type": "ref",
+                              "ref": "Aui6F",
+                              "name": "Input",
+                              "width": "fill_container",
+                              "descendants": {
+                                "c1ZDgT": {
+                                  "icon": "coins"
+                                },
+                                "I9FcGK": {
+                                  "content": "200K",
+                                  "fill": "$foreground"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "v0jh97",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "Context 경고",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "Context 경고"
+                        },
+                        "h83gNR": {
+                          "content": "넘으면 요약 · 새 세션 제안",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "XEQJp",
+                              "type": "ref",
+                              "ref": "vGJRB",
+                              "name": "Segmented",
+                              "descendants": {
+                                "NLh5H": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "N7TLs": {
+                                  "enabled": false
+                                },
+                                "P4A1Ey": {
+                                  "content": "70%",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "zT15T": {
+                                  "fill": "$card",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "color": "#0000000F",
+                                    "offset": {
+                                      "x": 0,
+                                      "y": 1
+                                    },
+                                    "blur": 2
+                                  }
+                                },
+                                "G1XNB": {
+                                  "enabled": false
+                                },
+                                "Y2q6tl": {
+                                  "content": "80%",
+                                  "fill": "$foreground",
+                                  "fontWeight": "$fw-semibold"
+                                },
+                                "qP459": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "pw2ZX": {
+                                  "enabled": false
+                                },
+                                "L7kBPp": {
+                                  "content": "90%",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "vpDYt": {
+                                  "enabled": false,
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "AScVF": {
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "lGOSd",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "동시 실행",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "동시 실행"
+                        },
+                        "h83gNR": {
+                          "content": "팀 전체 Run 수",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "DPUOF",
+                              "type": "ref",
+                              "ref": "vGJRB",
+                              "name": "Segmented",
+                              "descendants": {
+                                "NLh5H": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "N7TLs": {
+                                  "enabled": false
+                                },
+                                "P4A1Ey": {
+                                  "content": "1 Run",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "zT15T": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "G1XNB": {
+                                  "enabled": false
+                                },
+                                "Y2q6tl": {
+                                  "content": "2 Run",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "qP459": {
+                                  "fill": "$card",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "color": "#0000000F",
+                                    "offset": {
+                                      "x": 0,
+                                      "y": 1
+                                    },
+                                    "blur": 2
+                                  }
+                                },
+                                "pw2ZX": {
+                                  "enabled": false
+                                },
+                                "L7kBPp": {
+                                  "content": "3 Run",
+                                  "fill": "$foreground",
+                                  "fontWeight": "$fw-semibold"
+                                },
+                                "vpDYt": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "RTWFS": {
+                                  "enabled": false
+                                },
+                                "AScVF": {
+                                  "content": "4 Run",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "rmQWU",
+                  "name": "3 · 리뷰 · 저장소",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "irxMX",
+                      "name": "h",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Z3xuNw",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "3 · 리뷰 · 저장소",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-sm",
+                          "fontWeight": "$fw-semibold"
+                        },
+                        {
+                          "type": "text",
+                          "id": "O2zZqV",
+                          "name": "d",
+                          "fill": "$muted-foreground",
+                          "content": "에이전트가 만든 변경을 누가 · 언제 확인하고, 어디까지 쓸 수 있는지",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-xs",
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "ipbTB",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "Review 필수",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "Review 필수"
+                        },
+                        "h83gNR": {
+                          "content": "켜면 리뷰어 통과 전 병합 · 완료 안 됨",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Tw4Sm",
+                              "name": "Review",
+                              "gap": 12,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "id": "ULVcR",
+                                  "type": "ref",
+                                  "ref": "HYQ6I",
+                                  "name": "Switch"
+                                },
+                                {
+                                  "id": "VM2CT",
+                                  "type": "ref",
+                                  "ref": "vGJRB",
+                                  "name": "Segmented",
+                                  "descendants": {
+                                    "NLh5H": {
+                                      "fill": "$card",
+                                      "effect": {
+                                        "type": "shadow",
+                                        "shadowType": "outer",
+                                        "color": "#0000000F",
+                                        "offset": {
+                                          "x": 0,
+                                          "y": 1
+                                        },
+                                        "blur": 2
+                                      }
+                                    },
+                                    "N7TLs": {
+                                      "enabled": false
+                                    },
+                                    "P4A1Ey": {
+                                      "content": "PR 병합 전",
+                                      "fill": "$foreground",
+                                      "fontWeight": "$fw-semibold"
+                                    },
+                                    "zT15T": {
+                                      "fill": "#00000000",
+                                      "effect": {
+                                        "type": "shadow",
+                                        "shadowType": "outer",
+                                        "enabled": false,
+                                        "color": "#000000"
+                                      }
+                                    },
+                                    "G1XNB": {
+                                      "enabled": false
+                                    },
+                                    "Y2q6tl": {
+                                      "content": "완료 처리 전",
+                                      "fill": "$muted-foreground",
+                                      "fontWeight": "$fw-regular"
+                                    },
+                                    "qP459": {
+                                      "enabled": false,
+                                      "fill": "#00000000",
+                                      "effect": {
+                                        "type": "shadow",
+                                        "shadowType": "outer",
+                                        "enabled": false,
+                                        "color": "#000000"
+                                      }
+                                    },
+                                    "L7kBPp": {
+                                      "fill": "$muted-foreground",
+                                      "fontWeight": "$fw-regular"
+                                    },
+                                    "vpDYt": {
+                                      "enabled": false,
+                                      "fill": "#00000000",
+                                      "effect": {
+                                        "type": "shadow",
+                                        "shadowType": "outer",
+                                        "enabled": false,
+                                        "color": "#000000"
+                                      }
+                                    },
+                                    "AScVF": {
+                                      "fill": "$muted-foreground",
+                                      "fontWeight": "$fw-regular"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "o4Faq",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "Repo 범위",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "Repo 범위"
+                        },
+                        "h83gNR": {
+                          "content": "이 팀이 손댈 수 있는 저장소",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "Jf3LS",
+                              "type": "ref",
+                              "ref": "Aui6F",
+                              "name": "Input",
+                              "width": "fill_container",
+                              "descendants": {
+                                "c1ZDgT": {
+                                  "icon": "folder-git-2"
+                                },
+                                "I9FcGK": {
+                                  "content": "orchstack/*",
+                                  "fill": "$foreground"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "jbEJJ",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "Repo 권한",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "Repo 권한"
+                        },
+                        "h83gNR": {
+                          "content": "read · 브랜치 만들기 · push까지",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "ktCqi",
+                              "type": "ref",
+                              "ref": "vGJRB",
+                              "name": "Segmented",
+                              "descendants": {
+                                "NLh5H": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "N7TLs": {
+                                  "enabled": false
+                                },
+                                "P4A1Ey": {
+                                  "content": "읽기만",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "zT15T": {
+                                  "fill": "$card",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "color": "#0000000F",
+                                    "offset": {
+                                      "x": 0,
+                                      "y": 1
+                                    },
+                                    "blur": 2
+                                  }
+                                },
+                                "G1XNB": {
+                                  "enabled": false
+                                },
+                                "Y2q6tl": {
+                                  "content": "브랜치",
+                                  "fill": "$foreground",
+                                  "fontWeight": "$fw-semibold"
+                                },
+                                "qP459": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "pw2ZX": {
+                                  "enabled": false
+                                },
+                                "L7kBPp": {
+                                  "content": "push",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "vpDYt": {
+                                  "enabled": false,
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "AScVF": {
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "tj23w",
+                  "name": "4 · 위험 구역",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "pqebX",
+                      "name": "h",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "I9UsUs",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "4 · 위험 구역",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-sm",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "lnGNK",
+                      "name": "Danger",
+                      "width": "fill_container",
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$destructive",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Hmqa1",
+                          "name": "팀 보관",
+                          "width": "fill_container",
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 12,
+                          "padding": [
+                            12,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "bD1H3",
+                              "name": "t",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Obb6G",
+                                  "name": "t",
+                                  "fill": "$foreground",
+                                  "content": "팀 보관",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-xs",
+                                  "fontWeight": "$fw-semibold"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "W4NLAn",
+                                  "name": "d",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "멤버와 기록은 남고, 새 배정 · 실행이 멈춰요. 언제든 되살릴 수 있어요.",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-caption",
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "m3arOm",
+                              "type": "ref",
+                              "ref": "qpgrR",
+                              "name": "보관",
+                              "height": 32,
+                              "descendants": {
+                                "iPrkY": {
+                                  "icon": "archive"
+                                },
+                                "U2l2r": {
+                                  "content": "보관"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "BRRVs",
+                          "name": "팀 삭제",
+                          "width": "fill_container",
+                          "gap": 12,
+                          "padding": [
+                            12,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "JwBTW",
+                              "name": "t",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "IQIr8",
+                                  "name": "t",
+                                  "fill": "$foreground",
+                                  "content": "팀 삭제",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-xs",
+                                  "fontWeight": "$fw-semibold"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "GnkuO",
+                                  "name": "d",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "멤버 프로필도 지워져요. Run 기록이 있는 멤버가 있으면 삭제 대신 보관만 돼요.",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-caption",
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "IWw11",
+                              "type": "ref",
+                              "ref": "y6797",
+                              "name": "삭제",
+                              "height": 32,
+                              "descendants": {
+                                "y75Uc": {
+                                  "icon": "trash-2"
+                                },
+                                "JuRbu": {
+                                  "content": "팀 삭제"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ERgeT",
+              "type": "ref",
+              "ref": "Lo9Dv",
+              "name": "Footer",
+              "width": "fill_container",
+              "descendants": {
+                "E1B4Bf": {
+                  "icon": "info"
+                },
+                "hAwtB": {
+                  "content": "저장하면 다음 Run부터 적용돼요 · 진행 중 Run은 그대로"
+                },
+                "dsJM8/BD2YV": {
+                  "enabled": false
+                },
+                "dsJM8/pyoSz": {
+                  "content": "취소"
+                },
+                "kM2Ho/a9O5YR": {
+                  "enabled": false
+                },
+                "kM2Ho/TdjlK": {
+                  "content": "저장"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "qAPTi",
+          "name": "새 팀",
+          "clip": true,
+          "width": 560,
+          "fill": "$background",
+          "cornerRadius": "$radius-lg",
+          "stroke": "$border",
+          "strokeWidth": 1,
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#00000026",
+            "offset": {
+              "x": 0,
+              "y": 16
+            },
+            "blur": 48
+          },
+          "layout": "vertical",
+          "children": [
+            {
+              "id": "lcRKZ",
+              "type": "ref",
+              "ref": "nWu0z",
+              "name": "Header",
+              "width": "fill_container",
+              "descendants": {
+                "Io0My": {
+                  "icon": "users-round"
+                },
+                "uTzHt": {
+                  "content": "새 팀"
+                },
+                "m5taQ": {
+                  "content": "함께 일하는 에이전트 묶음이에요. 프로젝트에 연결해서 써요."
+                }
+              }
+            },
+            {
+              "type": "frame",
+              "id": "G3E3T",
+              "name": "Body",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 16,
+              "padding": [
+                18,
+                24
+              ],
+              "children": [
+                {
+                  "id": "BQ9R7",
+                  "type": "ref",
+                  "ref": "r9Aov",
+                  "name": "이름",
+                  "width": "fill_container",
+                  "descendants": {
+                    "K0IIH": {
+                      "content": "이름"
+                    },
+                    "h83gNR": {
+                      "content": "",
+                      "enabled": false
+                    },
+                    "YSAWH": {
+                      "children": [
+                        {
+                          "id": "qklWP",
+                          "type": "ref",
+                          "ref": "Aui6F",
+                          "name": "Input",
+                          "width": "fill_container",
+                          "descendants": {
+                            "c1ZDgT": {
+                              "icon": "users"
+                            },
+                            "I9FcGK": {
+                              "content": "예: Web Squad",
+                              "fill": "$muted-foreground"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "id": "rKoAn",
+                  "type": "ref",
+                  "ref": "r9Aov",
+                  "name": "설명",
+                  "width": "fill_container",
+                  "descendants": {
+                    "K0IIH": {
+                      "content": "설명"
+                    },
+                    "h83gNR": {
+                      "content": "선택",
+                      "enabled": true
+                    },
+                    "YSAWH": {
+                      "children": [
+                        {
+                          "id": "pZD4X",
+                          "type": "ref",
+                          "ref": "Aui6F",
+                          "name": "Input",
+                          "width": "fill_container",
+                          "descendants": {
+                            "c1ZDgT": {
+                              "icon": "text-align-start"
+                            },
+                            "I9FcGK": {
+                              "content": "이 팀이 맡는 일",
+                              "fill": "$muted-foreground"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "id": "f0a9z",
+                  "type": "ref",
+                  "ref": "r9Aov",
+                  "name": "시작 구성",
+                  "width": "fill_container",
+                  "descendants": {
+                    "K0IIH": {
+                      "content": "시작 구성"
+                    },
+                    "h83gNR": {
+                      "content": "나중에 Teams에서 언제든 바꿀 수 있어요",
+                      "enabled": true
+                    },
+                    "YSAWH": {
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Ed2jx",
+                          "name": "Options",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "children": [
+                            {
+                              "id": "Y8TS0w",
+                              "type": "ref",
+                              "ref": "bM1Ei",
+                              "name": "추천 구성 · 웹 앱",
+                              "width": "fill_container",
+                              "descendants": {
+                                "F8J1H": {
+                                  "content": "A"
+                                },
+                                "e5JZLy": {
+                                  "content": "추천 구성 · 웹 앱"
+                                },
+                                "L2ycPO": {
+                                  "content": "Frontend · Backend · QA · Reviewer 4명 — 템플릿 live 버전을 복사해 만들어요"
+                                }
+                              }
+                            },
+                            {
+                              "id": "CXAIk",
+                              "type": "ref",
+                              "ref": "xZ9NB",
+                              "name": "빈 팀",
+                              "width": "fill_container",
+                              "descendants": {
+                                "eyW7A": {
+                                  "content": "B"
+                                },
+                                "VtEc5": {
+                                  "content": "빈 팀"
+                                },
+                                "DSIvX": {
+                                  "enabled": false
+                                },
+                                "i8ASFZ": {
+                                  "content": "멤버 없이 시작 · ‘멤버 추가’로 하나씩"
+                                }
+                              }
+                            },
+                            {
+                              "id": "o7UMz",
+                              "type": "ref",
+                              "ref": "xZ9NB",
+                              "name": "Core Team 복제",
+                              "width": "fill_container",
+                              "descendants": {
+                                "eyW7A": {
+                                  "content": "C"
+                                },
+                                "VtEc5": {
+                                  "content": "Core Team 복제"
+                                },
+                                "DSIvX": {
+                                  "enabled": false
+                                },
+                                "i8ASFZ": {
+                                  "content": "멤버 5명 · 실행 한도 · 리뷰 · Orch 정책을 그대로"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "id": "gMaOB",
+                  "type": "ref",
+                  "ref": "r9Aov",
+                  "name": "연결할 프로젝트",
+                  "width": "fill_container",
+                  "descendants": {
+                    "K0IIH": {
+                      "content": "연결할 프로젝트"
+                    },
+                    "h83gNR": {
+                      "content": "나중에 프로젝트 화면에서도 연결돼요",
+                      "enabled": true
+                    },
+                    "YSAWH": {
+                      "children": [
+                        {
+                          "id": "iumY4",
+                          "type": "ref",
+                          "ref": "FlX1S",
+                          "name": "Select",
+                          "width": "fill_container",
+                          "descendants": {
+                            "FhBQb": {
+                              "enabled": false
+                            },
+                            "Xz6fz": {
+                              "enabled": true,
+                              "icon": "folder"
+                            },
+                            "HuTtg": {
+                              "content": "나중에 연결"
+                            },
+                            "Byx0T": {
+                              "content": "프로젝트 없이 만들기"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "mqzTW",
+              "type": "ref",
+              "ref": "Lo9Dv",
+              "name": "Footer",
+              "width": "fill_container",
+              "descendants": {
+                "E1B4Bf": {
+                  "icon": "info"
+                },
+                "hAwtB": {
+                  "content": "실행 한도 · 리뷰 기본값으로 시작해요 · 팀 설정에서 바꿀 수 있어요"
+                },
+                "dsJM8/BD2YV": {
+                  "enabled": false
+                },
+                "dsJM8/pyoSz": {
+                  "content": "취소"
+                },
+                "kM2Ho/a9O5YR": {
+                  "enabled": false
+                },
+                "kM2Ho/TdjlK": {
+                  "content": "팀 만들기"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ma5gR",
+      "x": 14200,
+      "y": 15008,
+      "name": "Settings · 연결 관리 (다이얼로그 · Codex · ChatGPT Pro)",
+      "fill": "$muted",
+      "padding": 40,
+      "children": [
+        {
+          "type": "frame",
+          "id": "thKPA",
+          "name": "연결 관리",
+          "clip": true,
+          "width": 720,
+          "fill": "$background",
+          "cornerRadius": "$radius-lg",
+          "stroke": "$border",
+          "strokeWidth": 1,
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#00000026",
+            "offset": {
+              "x": 0,
+              "y": 16
+            },
+            "blur": 48
+          },
+          "layout": "vertical",
+          "children": [
+            {
+              "id": "nI7hm",
+              "type": "ref",
+              "ref": "nWu0z",
+              "name": "Header",
+              "width": "fill_container",
+              "descendants": {
+                "Io0My": {
+                  "icon": "settings-2"
+                },
+                "uTzHt": {
+                  "content": "Codex · ChatGPT Pro"
+                },
+                "m5taQ": {
+                  "content": "구독 · Codex CLI 로그인 · codex-pro@orch"
+                }
+              }
+            },
+            {
+              "type": "frame",
+              "id": "t6cbn",
+              "name": "Body",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 20,
+              "padding": [
+                18,
+                24
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "ZF1zc",
+                  "name": "1 · 상태 · 한도",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "N5EdTy",
+                      "name": "h",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "pE9SC",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "1 · 상태 · 한도",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-sm",
+                          "fontWeight": "$fw-semibold"
+                        },
+                        {
+                          "type": "text",
+                          "id": "lgkK6",
+                          "name": "d",
+                          "fill": "$muted-foreground",
+                          "content": "한도는 실행기가 주기적으로 읽어 와요",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-xs",
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "yhetn",
+                      "name": "Status",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "UVOja",
+                          "type": "ref",
+                          "ref": "s09dDZ",
+                          "name": "주간 거의 소진",
+                          "fill": "$destructive-soft",
+                          "descendants": {
+                            "PO4wI": {
+                              "fill": "$status-blocked"
+                            },
+                            "RsLlp": {
+                              "content": "주간 거의 소진 · 폴백 중"
+                            }
+                          }
+                        },
+                        {
+                          "type": "text",
+                          "id": "HIUJZ",
+                          "name": "checked",
+                          "fill": "$muted-foreground",
+                          "content": "마지막 확인 3분 전 · 응답 420ms",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "WyJGz",
+                          "name": "sp",
+                          "width": "fill_container",
+                          "height": 1
+                        },
+                        {
+                          "id": "c0sIE4",
+                          "type": "ref",
+                          "ref": "qpgrR",
+                          "name": "지금 확인",
+                          "height": 30,
+                          "descendants": {
+                            "iPrkY": {
+                              "icon": "refresh-cw"
+                            },
+                            "U2l2r": {
+                              "content": "지금 확인"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "s0S1m",
+                      "type": "ref",
+                      "ref": "G2WrAK",
+                      "name": "5H",
+                      "width": "fill_container",
+                      "descendants": {
+                        "x4VXP": {
+                          "content": "5시간"
+                        },
+                        "hnkgK": {
+                          "content": "71% 남음"
+                        },
+                        "E1xTo": {
+                          "content": "· 2h 후 리셋"
+                        },
+                        "kcwc0/FXgpA": {
+                          "width": 477
+                        }
+                      }
+                    },
+                    {
+                      "id": "k2Tq7",
+                      "type": "ref",
+                      "ref": "G2WrAK",
+                      "name": "주간",
+                      "width": "fill_container",
+                      "descendants": {
+                        "x4VXP": {
+                          "content": "주간"
+                        },
+                        "hnkgK": {
+                          "content": "18% 남음",
+                          "fill": "$status-blocked"
+                        },
+                        "E1xTo": {
+                          "content": "· 화 09:00 리셋 · 목요일 오후 소진 예상"
+                        },
+                        "kcwc0/FXgpA": {
+                          "fill": "$status-blocked",
+                          "width": 121
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "WIOrj",
+                  "name": "2 · 정보",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "VC92D",
+                      "name": "h",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "NSz4q",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "2 · 정보",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-sm",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "m4r46f",
+                      "type": "ref",
+                      "ref": "T4Wd5",
+                      "name": "종류",
+                      "width": "fill_container",
+                      "descendants": {
+                        "oOPZy": {
+                          "content": "종류"
+                        },
+                        "P7xMS": {
+                          "content": "구독 · ChatGPT Pro"
+                        }
+                      }
+                    },
+                    {
+                      "id": "Vx4Do",
+                      "type": "ref",
+                      "ref": "T4Wd5",
+                      "name": "실행기",
+                      "width": "fill_container",
+                      "descendants": {
+                        "oOPZy": {
+                          "content": "실행기"
+                        },
+                        "P7xMS": {
+                          "content": "Codex CLI · v0.41"
+                        }
+                      }
+                    },
+                    {
+                      "id": "OSuDF",
+                      "type": "ref",
+                      "ref": "T4Wd5",
+                      "name": "로그인",
+                      "width": "fill_container",
+                      "descendants": {
+                        "oOPZy": {
+                          "content": "로그인"
+                        },
+                        "P7xMS": {
+                          "content": "codex-pro@orch · 브라우저 로그인"
+                        }
+                      }
+                    },
+                    {
+                      "id": "nJIBD",
+                      "type": "ref",
+                      "ref": "T4Wd5",
+                      "name": "추가",
+                      "width": "fill_container",
+                      "descendants": {
+                        "oOPZy": {
+                          "content": "추가"
+                        },
+                        "P7xMS": {
+                          "content": "9/12 · 나"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "sEL0h",
+                  "name": "3 · 사용 설정",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "jj5MC",
+                      "name": "h",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "kM2D2",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "3 · 사용 설정",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-sm",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "v0FSmn",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "이름",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "이름"
+                        },
+                        "h83gNR": {
+                          "content": "멤버 · 템플릿 화면에 보여요",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "wMZG9",
+                              "type": "ref",
+                              "ref": "Aui6F",
+                              "name": "Input",
+                              "width": "fill_container",
+                              "descendants": {
+                                "c1ZDgT": {
+                                  "icon": "tag"
+                                },
+                                "I9FcGK": {
+                                  "content": "chatgpt-pro",
+                                  "fill": "$foreground"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "OqY2e",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "사용 범위",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "사용 범위"
+                        },
+                        "h83gNR": {
+                          "content": "누가 이 연결을 쓸 수 있는지",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "zy0Hg",
+                              "type": "ref",
+                              "ref": "vGJRB",
+                              "name": "Segmented",
+                              "descendants": {
+                                "NLh5H": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "N7TLs": {
+                                  "enabled": false
+                                },
+                                "P4A1Ey": {
+                                  "content": "워크스페이스",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "zT15T": {
+                                  "fill": "$card",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "color": "#0000000F",
+                                    "offset": {
+                                      "x": 0,
+                                      "y": 1
+                                    },
+                                    "blur": 2
+                                  }
+                                },
+                                "G1XNB": {
+                                  "enabled": false
+                                },
+                                "Y2q6tl": {
+                                  "content": "팀 · Core · Web",
+                                  "fill": "$foreground",
+                                  "fontWeight": "$fw-semibold"
+                                },
+                                "qP459": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "pw2ZX": {
+                                  "enabled": false
+                                },
+                                "L7kBPp": {
+                                  "content": "나만",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "vpDYt": {
+                                  "enabled": false,
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "AScVF": {
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "P0458P",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "잔량 경고",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "잔량 경고"
+                        },
+                        "h83gNR": {
+                          "content": "이 아래로 내려가면 알림 · 폴백 준비",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "E9WXz",
+                              "type": "ref",
+                              "ref": "vGJRB",
+                              "name": "Segmented",
+                              "descendants": {
+                                "NLh5H": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "N7TLs": {
+                                  "enabled": false
+                                },
+                                "P4A1Ey": {
+                                  "content": "10%",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "zT15T": {
+                                  "fill": "$card",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "color": "#0000000F",
+                                    "offset": {
+                                      "x": 0,
+                                      "y": 1
+                                    },
+                                    "blur": 2
+                                  }
+                                },
+                                "G1XNB": {
+                                  "enabled": false
+                                },
+                                "Y2q6tl": {
+                                  "content": "20%",
+                                  "fill": "$foreground",
+                                  "fontWeight": "$fw-semibold"
+                                },
+                                "qP459": {
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "pw2ZX": {
+                                  "enabled": false
+                                },
+                                "L7kBPp": {
+                                  "content": "30%",
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                },
+                                "vpDYt": {
+                                  "enabled": false,
+                                  "fill": "#00000000",
+                                  "effect": {
+                                    "type": "shadow",
+                                    "shadowType": "outer",
+                                    "enabled": false,
+                                    "color": "#000000"
+                                  }
+                                },
+                                "AScVF": {
+                                  "fill": "$muted-foreground",
+                                  "fontWeight": "$fw-regular"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "JaQYg",
+                      "type": "ref",
+                      "ref": "r9Aov",
+                      "name": "보고 언어",
+                      "width": "fill_container",
+                      "descendants": {
+                        "K0IIH": {
+                          "content": "보고 언어"
+                        },
+                        "h83gNR": {
+                          "content": "이 연결로 도는 에이전트의 보고 · 질문 언어",
+                          "enabled": true
+                        },
+                        "YSAWH": {
+                          "children": [
+                            {
+                              "id": "Ltut0",
+                              "type": "ref",
+                              "ref": "FlX1S",
+                              "name": "Select",
+                              "width": "fill_container",
+                              "descendants": {
+                                "FhBQb": {
+                                  "enabled": false
+                                },
+                                "Xz6fz": {
+                                  "enabled": true,
+                                  "icon": "languages"
+                                },
+                                "HuTtg": {
+                                  "content": "워크스페이스 기본 (한국어)"
+                                },
+                                "Byx0T": {
+                                  "content": "커밋 · PR은 English"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "mpC7a",
+                  "name": "4 · 이 연결을 쓰는 곳",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "WFarl",
+                      "name": "h",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "yaFJS",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "4 · 이 연결을 쓰는 곳",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-sm",
+                          "fontWeight": "$fw-semibold"
+                        },
+                        {
+                          "type": "text",
+                          "id": "lXXq6",
+                          "name": "d",
+                          "fill": "$muted-foreground",
+                          "content": "해제하기 전에 확인하세요",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-xs",
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "eoTTV",
+                      "name": "Uses",
+                      "width": "fill_container",
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "KytyG",
+                          "name": "폴백 체인 · Codex CLI 1순위",
+                          "width": "fill_container",
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 10,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "DZdIk",
+                              "name": "i",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "route",
+                              "library": "lucide",
+                              "fill": "$muted-foreground"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "SJpwl",
+                              "name": "t",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "B0R0N",
+                                  "name": "t",
+                                  "fill": "$foreground",
+                                  "content": "폴백 체인 · Codex CLI 1순위",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-xs",
+                                  "fontWeight": "$fw-medium"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "zVKAI",
+                                  "name": "d",
+                                  "fill": "$muted-foreground",
+                                  "content": "한도 소진 시 OmniRoute → Ollama 순으로 넘어가요",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-caption",
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "ybXiF",
+                              "name": "link",
+                              "fill": "$primary",
+                              "content": "체인 보기",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-medium"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ncs4L",
+                          "name": "멤버 3명의 기본 실행",
+                          "width": "fill_container",
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 10,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "FXrkR",
+                              "name": "i",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "users",
+                              "library": "lucide",
+                              "fill": "$muted-foreground"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "X7CAF",
+                              "name": "t",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "VLHo2",
+                                  "name": "t",
+                                  "fill": "$foreground",
+                                  "content": "멤버 3명의 기본 실행",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-xs",
+                                  "fontWeight": "$fw-medium"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ns9bc",
+                                  "name": "d",
+                                  "fill": "$muted-foreground",
+                                  "content": "진 · 유나 · 태오 — Codex CLI · gpt-5",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-caption",
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "D6J9Ta",
+                              "name": "link",
+                              "fill": "$primary",
+                              "content": "멤버 보기",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-medium"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "KAyzq",
+                          "name": "템플릿 2개 기본값",
+                          "width": "fill_container",
+                          "gap": 10,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "T3l9DM",
+                              "name": "i",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "layout-template",
+                              "library": "lucide",
+                              "fill": "$muted-foreground"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "pQIOB",
+                              "name": "t",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "IAak9",
+                                  "name": "t",
+                                  "fill": "$foreground",
+                                  "content": "템플릿 2개 기본값",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-xs",
+                                  "fontWeight": "$fw-medium"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "iaXI2",
+                                  "name": "d",
+                                  "fill": "$muted-foreground",
+                                  "content": "Frontend Developer · Product Designer",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-caption",
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "a2ARP",
+                              "name": "link",
+                              "fill": "$primary",
+                              "content": "템플릿 보기",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-medium"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "QViVG",
+                  "name": "5 · 위험 구역",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "GHwzZ",
+                      "name": "h",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "U1de2",
+                          "name": "t",
+                          "fill": "$foreground",
+                          "content": "5 · 위험 구역",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-sm",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "e6tdnN",
+                      "name": "Danger",
+                      "width": "fill_container",
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$destructive",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "UPTer",
+                          "name": "다시 로그인",
+                          "width": "fill_container",
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 12,
+                          "padding": [
+                            12,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Q13EVO",
+                              "name": "t",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "b04bpz",
+                                  "name": "t",
+                                  "fill": "$foreground",
+                                  "content": "다시 로그인",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-xs",
+                                  "fontWeight": "$fw-semibold"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ImRT0",
+                                  "name": "d",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "로그인이 만료됐거나 다른 계정으로 바꿀 때. Codex CLI 로그인 창이 열려요.",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-caption",
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "P6tSA",
+                              "type": "ref",
+                              "ref": "qpgrR",
+                              "name": "다시 로그인",
+                              "height": 32,
+                              "descendants": {
+                                "iPrkY": {
+                                  "icon": "log-in"
+                                },
+                                "U2l2r": {
+                                  "content": "다시 로그인"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ydJcC",
+                          "name": "연결 해제",
+                          "width": "fill_container",
+                          "gap": 12,
+                          "padding": [
+                            12,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "SR6Rw",
+                              "name": "t",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "pBNgS",
+                                  "name": "t",
+                                  "fill": "$foreground",
+                                  "content": "연결 해제",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-xs",
+                                  "fontWeight": "$fw-semibold"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "YRBrU",
+                                  "name": "d",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "폴백 체인에 쓰이고 있어 지금은 해제할 수 없어요 — 먼저 체인에서 빼세요. 멤버 · 템플릿은 다음 순위 연결로 바뀌어요.",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": "$text-caption",
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "GaVb3",
+                              "type": "ref",
+                              "ref": "y6797",
+                              "name": "연결 해제 (비활성)",
+                              "height": 32,
+                              "opacity": 0.45,
+                              "descendants": {
+                                "y75Uc": {
+                                  "icon": "unplug"
+                                },
+                                "JuRbu": {
+                                  "content": "연결 해제"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "M9tcp7",
+              "type": "ref",
+              "ref": "Lo9Dv",
+              "name": "Footer",
+              "width": "fill_container",
+              "descendants": {
+                "E1B4Bf": {
+                  "icon": "key-round"
+                },
+                "hAwtB": {
+                  "content": "키 · 토큰 원문은 이 기기 키체인에만 있어요"
+                },
+                "dsJM8/BD2YV": {
+                  "enabled": false
+                },
+                "dsJM8/pyoSz": {
+                  "content": "닫기"
+                },
+                "kM2Ho/a9O5YR": {
+                  "enabled": false
+                },
+                "kM2Ho/TdjlK": {
+                  "content": "저장"
+                }
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "themes": {
