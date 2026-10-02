@@ -1,5 +1,5 @@
 //! tbl_team · tbl_member CRUD. 쓰기는 event::run 경유 (Team* · Member* 이벤트). 멤버는 템플릿의 live 버전 프로필을 복사해 만든다
-use crate::{agent, policy::{self, Guard, Level}, entity::{tbl_agent_profile as ap, tbl_member as mb, tbl_team::{self as tm, Entity as Tbl}, tbl_template as tp, tbl_template_revision as tr},
+use crate::{agent, policy::{self, Guard, Level}, entity::{tbl_agent_profile as ap, tbl_member as mb, tbl_team::{self as tm, Entity as Tbl}, tbl_template as tp},
     error::{Body, Error, ErrorBody, Res, Sn, in_use}, event::{self, Ev}};
 use axum::{Json, extract::State, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::{NotSet, Set}, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect, sea_query::Expr};
@@ -309,10 +309,10 @@ async fn add(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Mem
                 if t.status != "active" {
                     return Err(Error::conflict(format!("template is {}", t.status)));
                 }
-                let rev = tr::Entity::find().filter(tr::Column::TemplateSn.eq(ts)).filter(tr::Column::Status.eq("live")).one(tx).await?
+                let rev = ap::Entity::find().filter(ap::Column::TemplateSn.eq(ts)).filter(ap::Column::RevStatus.eq("live")).one(tx).await?
                     .ok_or_else(|| Error::conflict("template has no live version".into()))?;
-                m.profile_sn = Set(agent::copy(tx, rev.profile_sn, "member").await?);
-                (m.template_sn, m.template_version, m.is_orch) = (Set(Some(ts)), Set(Some(rev.version)), Set(t.is_orch));
+                m.profile_sn = Set(agent::copy(tx, rev.sn, "member").await?);
+                (m.template_sn, m.template_version, m.is_orch) = (Set(Some(ts)), Set(rev.version), Set(t.is_orch));
                 // 요청에 없는 표시값은 템플릿 값
                 if let Set(None) = m.icon { m.icon = Set(t.icon); }
                 if let Set(None) = m.color { m.color = Set(t.color); }

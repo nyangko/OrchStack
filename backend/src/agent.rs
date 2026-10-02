@@ -306,6 +306,10 @@ pub async fn copy(tx: &DatabaseTransaction, sn: i64, kind: &str) -> Res<i64> {
     let mut m = Tbl::find_by_id(sn).one(tx).await?.ok_or_else(Error::not_found)?.into_active_model();
     (m.sn, m.create_at, m.update_at) = (NotSet, NotSet, NotSet);
     m.kind = Set(kind.into());
+    // 템플릿 버전 칸은 템플릿 버전 프로필에만 있다 (멤버 · 기본 프로필 복사본에는 없다)
+    if kind != "template" {
+        (m.template_sn, m.version, m.rev_status, m.note, m.author_type, m.publish_at) = (Set(None), Set(None), Set(None), Set(None), Set("user".into()), Set(None));
+    }
     let new = m.insert(tx).await?.sn;
     for t in CHILDREN {
         // sn · profile_sn · 시각을 뺀 컬럼을 그대로 옮긴다 (테이블마다 컬럼이 달라 스키마에서 읽는다)

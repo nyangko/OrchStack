@@ -38,6 +38,5 @@ pub use super::tbl_task::Entity as TblTask;
 pub use super::tbl_task_criterion::Entity as TblTaskCriterion;
 pub use super::tbl_team::Entity as TblTeam;
 pub use super::tbl_template::Entity as TblTemplate;
-pub use super::tbl_template_revision::Entity as TblTemplateRevision;
 pub use super::tbl_user::Entity as TblUser;
 pub use super::tbl_workspace::Entity as TblWorkspace;

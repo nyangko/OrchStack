@@ -412,9 +412,8 @@ mod tests {
 
         // 템플릿(live v2 · 도구 정책 1개)과 draft 템플릿은 SQL로 넣는다 (템플릿 편집은 이 Task 범위 밖)
         db.execute_unprepared(
-            "INSERT INTO tbl_agent_profile (sn, workspace_sn, kind, effort, tool_json) VALUES (10, 1, 'template', 'high', '[{\"tool_code\":\"shell\",\"policy\":\"approval\"}]'); \
-             INSERT INTO tbl_template (sn, workspace_sn, name, role_name, icon, color) VALUES (1, 1, 'Frontend', 'Frontend Developer', 'monitor', 'role-frontend'); \
-             INSERT INTO tbl_template_revision (template_sn, profile_sn, version, status) VALUES (1, 10, 2, 'live'); \
+            "INSERT INTO tbl_template (sn, workspace_sn, name, role_name, icon, color) VALUES (1, 1, 'Frontend', 'Frontend Developer', 'monitor', 'role-frontend'); \
+             INSERT INTO tbl_agent_profile (sn, workspace_sn, kind, effort, tool_json, template_sn, version, rev_status) VALUES (10, 1, 'template', 'high', '[{\"tool_code\":\"shell\",\"policy\":\"approval\"}]', 1, 2, 'live'); \
              INSERT INTO tbl_template (sn, workspace_sn, name, status) VALUES (2, 1, 'Draft', 'draft');",
         ).await.unwrap();
         assert_eq!(call(&app, "GET", "/templates", None).await.1.as_array().unwrap().len(), 2);
@@ -645,9 +644,9 @@ mod tests {
             "INSERT INTO tbl_skill_source (sn, workspace_sn, kind, name, sort) VALUES (1, 1, 'github', 'team', 1), (2, 1, 'builtin', 'base', 0); \
              INSERT INTO tbl_skill (sn, workspace_sn, source_sn, name, scan_status) VALUES (1, 1, 1, 'svelte-ui', 'passed'), (2, 1, 1, 'bad', 'failed'), (3, 1, 2, 'new', 'pending'); \
              INSERT INTO tbl_mcp (sn, workspace_sn, name, install_status) VALUES (1, 1, 'playwright', 'installed'); \
-             INSERT INTO tbl_agent_profile (sn, workspace_sn, kind) VALUES (1, 1, 'member'), (2, 1, 'template'); \
+             INSERT INTO tbl_template (sn, workspace_sn, name) VALUES (1, 1, 'Frontend'); \
+             INSERT INTO tbl_agent_profile (sn, workspace_sn, kind) VALUES (1, 1, 'member'); INSERT INTO tbl_agent_profile (sn, workspace_sn, kind, template_sn, version, rev_status) VALUES (2, 1, 'template', 1, 1, 'live'); \
              INSERT INTO tbl_team (sn, workspace_sn, name) VALUES (1, 1, 'T'); INSERT INTO tbl_member (team_sn, profile_sn, name, role_name) VALUES (1, 1, '진', 'Dev'); \
-             INSERT INTO tbl_template (sn, workspace_sn, name) VALUES (1, 1, 'Frontend'); INSERT INTO tbl_template_revision (template_sn, profile_sn, version, status) VALUES (1, 2, 1, 'live'); \
              INSERT INTO tbl_map_profile_mcp (profile_sn, mcp_sn, access_mode) VALUES (1, 1, 'installed');",
         ).await.unwrap();
         let v = call(&app, "GET", "/skill-sources", None).await.1;

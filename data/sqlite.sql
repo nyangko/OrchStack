@@ -242,7 +242,7 @@ CREATE TABLE tbl_mcp (
 --    멤버 추가 = 템플릿 프로필을 복사해서 새 프로필을 만든다.
 -- =====================================================================
 
--- 에이전트 프로필. Harness · 권한 · 한도 · 도구 · 규칙 · 가드 · 폴백 (작은 목록은 *_json 컬럼에 통째로 둔다)
+-- 에이전트 프로필. Harness · 권한 · 한도 · 도구 · 규칙 · 가드 · 폴백 (작은 목록은 *_json 컬럼에 통째로 둔다) · 템플릿 버전이면 template_sn · version · rev_status 가 채워진다 (버전마다 프로필 1개)
 CREATE TABLE tbl_agent_profile (
     sn                    INTEGER PRIMARY KEY AUTOINCREMENT,        -- 프로필 번호
     workspace_sn          INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
@@ -266,6 +266,12 @@ CREATE TABLE tbl_agent_profile (
     rule_json             TEXT,                                     -- 승인 규칙 · 항상 차단 JSON 배열 [{action_code, title, pattern, description, policy, approver, is_notify}] · action_code = pr_create | dependency_add | external_message | env_access | run_extend | command(명령 패턴 · pattern = 명령 글자) · policy = auto(자동 허용) | approval(승인 필요 · tbl_ask 승인 요청 생성) | block(항상 차단) · approver = user | orch_then_user
     guard_json            TEXT,                                     -- 가드 트리거 JSON 배열 [{name, stage, pattern, is_enabled}] · Run 도중 위험 신호를 감지하면 멈추고 알림 · stage = tool_use(도구 실행 직전) | tool_result(도구 결과) | output(모델 출력)
     fallback_json         TEXT,                                     -- 폴백 체인 JSON 배열 (위에서부터 시도) [{runtime_sn, connection_sn, model_sn, switch_rule, max_level, tier}] · model_sn NULL = 연결 기본 · switch_rule = 다음으로 넘어가는 조건 (예: 429) · max_level = 맡을 수 있는 최대 작업 레벨 · tier = S | M | L 하위 작업 모델 등급 (NULL = 모든 등급 · #67) · 연결을 지우려면 먼저 체인에서 빼야 한다 (앱에서 409)
+    template_sn           INTEGER REFERENCES tbl_template(sn) ON DELETE CASCADE,  -- 템플릿 버전일 때(kind = template)의 템플릿 · 그 밖은 NULL
+    version               INTEGER,                                  -- 템플릿 버전 (v3 → 3 · kind = template일 때) · (template_sn, version)은 하나
+    rev_status            TEXT CHECK (rev_status IN ('draft','live','archived')),  -- 템플릿 버전 상태: draft(초안 · 편집 중) | live(배포 중 · 새 멤버가 이 버전을 복사) | archived(지난 버전) · kind = template일 때만
+    note                  TEXT,                                     -- 템플릿 버전 변경 요약
+    author_type           TEXT NOT NULL DEFAULT 'user' CHECK (author_type IN ('user','orch')),  -- 템플릿 버전 작성자 종류: user(사용자) | orch(Orch 제안 채택)
+    publish_at            TEXT,                                     -- 템플릿 버전 게시 시각
     create_at             TEXT NOT NULL DEFAULT (datetime('now')),  -- 생성 시각
     update_at             TEXT NOT NULL DEFAULT (datetime('now'))   -- 수정 시각
 );
@@ -323,20 +329,6 @@ CREATE TABLE tbl_template (
     update_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 수정 시각
 );
 
--- 템플릿 버전. Revisions · 버전마다 프로필 1개
-CREATE TABLE tbl_template_revision (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 버전 기록 번호
-    template_sn      INTEGER NOT NULL REFERENCES tbl_template(sn) ON DELETE CASCADE,  -- 템플릿
-    profile_sn       INTEGER NOT NULL REFERENCES tbl_agent_profile(sn) ON DELETE CASCADE,  -- 이 버전의 프로필
-    version          INTEGER NOT NULL,                              -- 버전 (v3 → 3)
-    status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','live','archived')),  -- 상태: draft(초안 · 편집 중) | live(배포 중 · 새 멤버가 이 버전을 복사) | archived(지난 버전)
-    note             TEXT,                                          -- 변경 요약
-    author_type      TEXT NOT NULL DEFAULT 'user' CHECK (author_type IN ('user','orch')),  -- 작성자 종류: user(사용자) | orch(Orch 제안 채택)
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 작성한 사용자
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    publish_at       TEXT,                                          -- 게시 시각
-    UNIQUE (template_sn, version)
-);
 
 -- 팀. Teams 탭 · 팀 정책 · Orch 진행 정책(모드 · 타이머 · 레벨 · 가드)
 CREATE TABLE tbl_team (
@@ -920,9 +912,9 @@ CREATE INDEX idx_task_dependency_depend ON tbl_map_task_dependency (depend_task_
 CREATE INDEX idx_context_manifest_run   ON tbl_context_manifest (run_sn);
 CREATE INDEX idx_task_criterion_task    ON tbl_task_criterion (task_sn, sort);
 CREATE INDEX idx_issue_parent           ON tbl_issue (parent_sn);
+CREATE UNIQUE INDEX ux_profile_template_version ON tbl_agent_profile (template_sn, version);
 CREATE INDEX idx_map_profile_skill      ON tbl_map_profile_skill (skill_sn);
 CREATE INDEX idx_map_profile_mcp        ON tbl_map_profile_mcp (mcp_sn);
-CREATE INDEX idx_template_revision      ON tbl_template_revision (template_sn);
 
 
 -- =====================================================================
@@ -999,6 +991,4 @@ CREATE INDEX idx_fk_task_user_sn ON tbl_task (user_sn);
 CREATE INDEX idx_fk_team_workspace_sn ON tbl_team (workspace_sn);
 CREATE INDEX idx_fk_template_user_sn ON tbl_template (user_sn);
 CREATE INDEX idx_fk_template_workspace_sn ON tbl_template (workspace_sn);
-CREATE INDEX idx_fk_template_revision_profile_sn ON tbl_template_revision (profile_sn);
-CREATE INDEX idx_fk_template_revision_user_sn ON tbl_template_revision (user_sn);
 CREATE INDEX idx_fk_workspace_user_sn ON tbl_workspace (user_sn);

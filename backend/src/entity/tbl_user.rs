@@ -57,8 +57,6 @@ pub enum Relation {
     TblTask,
     #[sea_orm(has_many = "super::tbl_template::Entity")]
     TblTemplate,
-    #[sea_orm(has_many = "super::tbl_template_revision::Entity")]
-    TblTemplateRevision,
     #[sea_orm(has_many = "super::tbl_workspace::Entity")]
     TblWorkspace,
 }
@@ -138,12 +136,6 @@ impl Related<super::tbl_task::Entity> for Entity {
 impl Related<super::tbl_template::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblTemplate.def()
-    }
-}
-
-impl Related<super::tbl_template_revision::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblTemplateRevision.def()
     }
 }
 

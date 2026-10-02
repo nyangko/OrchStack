@@ -40,6 +40,18 @@ pub struct Model {
     pub guard_json: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub fallback_json: Option<String>,
+    #[sea_orm(unique_key = "ux_profile_template_version")]
+    pub template_sn: Option<i64>,
+    #[sea_orm(unique_key = "ux_profile_template_version")]
+    pub version: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub rev_status: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub note: Option<String>,
+    #[sea_orm(column_type = "Text")]
+    pub author_type: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub publish_at: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
     #[sea_orm(column_type = "Text")]
@@ -82,8 +94,14 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     TblRuntime,
-    #[sea_orm(has_many = "super::tbl_template_revision::Entity")]
-    TblTemplateRevision,
+    #[sea_orm(
+        belongs_to = "super::tbl_template::Entity",
+        from = "Column::TemplateSn",
+        to = "super::tbl_template::Column::Sn",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    TblTemplate,
     #[sea_orm(
         belongs_to = "super::tbl_workspace::Entity",
         from = "Column::WorkspaceSn",
@@ -142,9 +160,9 @@ impl Related<super::tbl_runtime::Entity> for Entity {
     }
 }
 
-impl Related<super::tbl_template_revision::Entity> for Entity {
+impl Related<super::tbl_template::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TblTemplateRevision.def()
+        Relation::TblTemplate.def()
     }
 }
 

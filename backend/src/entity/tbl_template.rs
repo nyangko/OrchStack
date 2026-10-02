@@ -35,10 +35,10 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::tbl_agent_profile::Entity")]
+    TblAgentProfile,
     #[sea_orm(has_many = "super::tbl_member::Entity")]
     TblMember,
-    #[sea_orm(has_many = "super::tbl_template_revision::Entity")]
-    TblTemplateRevision,
     #[sea_orm(
         belongs_to = "super::tbl_user::Entity",
         from = "Column::UserSn",
@@ -57,15 +57,15 @@ pub enum Relation {
     TblWorkspace,
 }
 
-impl Related<super::tbl_member::Entity> for Entity {
+impl Related<super::tbl_agent_profile::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TblMember.def()
+        Relation::TblAgentProfile.def()
     }
 }
 
-impl Related<super::tbl_template_revision::Entity> for Entity {
+impl Related<super::tbl_member::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TblTemplateRevision.def()
+        Relation::TblMember.def()
     }
 }
 

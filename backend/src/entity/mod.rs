@@ -40,6 +40,5 @@ pub mod tbl_task;
 pub mod tbl_task_criterion;
 pub mod tbl_team;
 pub mod tbl_template;
-pub mod tbl_template_revision;
 pub mod tbl_user;
 pub mod tbl_workspace;

@@ -1,6 +1,6 @@
 //! 워크스페이스 라이브러리 조회: tbl_skill_source · tbl_skill · tbl_mcp + 사용처(프로필 → 멤버 · 템플릿). 쓰기는 스킬 허용/차단만 (워크스페이스 SkillUpdated). 설치 · 업데이트 · 보안 검사는 실행기/Ops
-use crate::{entity::{tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_mcp as mc, tbl_member as mb, tbl_skill as sk, tbl_skill_source as src,
-    tbl_template as tp, tbl_template_revision as tr},
+use crate::{entity::{tbl_agent_profile as ap, tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_mcp as mc, tbl_member as mb, tbl_skill as sk, tbl_skill_source as src,
+    tbl_template as tp},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}};
 use axum::{Json, extract::State};
 use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
@@ -134,9 +134,10 @@ pub(crate) async fn owners(db: &impl ConnectionTrait, links: Vec<(i64, String)>)
     let mut out: Vec<Usage> = mb::Entity::find().filter(mb::Column::ProfileSn.is_in(sns.clone())).filter(mb::Column::Status.ne("archived"))
         .order_by_asc(mb::Column::Sn).all(db).await?.into_iter()
         .map(|m| Usage { profile_sn: m.profile_sn, owner: "member", owner_sn: m.sn, detail: detail(m.profile_sn), name: m.name }).collect();
-    for r in tr::Entity::find().filter(tr::Column::ProfileSn.is_in(sns)).filter(tr::Column::Status.ne("archived")).order_by_asc(tr::Column::Sn).all(db).await? {
-        if let Some(t) = tp::Entity::find_by_id(r.template_sn).one(db).await? {
-            out.push(Usage { profile_sn: r.profile_sn, owner: "template", owner_sn: t.sn, detail: detail(r.profile_sn), name: t.name });
+    // 템플릿 버전 프로필 (초안 · 배포 중만 · 지난 버전은 뺀다)
+    for p in ap::Entity::find().filter(ap::Column::Sn.is_in(sns)).filter(ap::Column::RevStatus.is_in(["draft", "live"])).order_by_asc(ap::Column::Sn).all(db).await? {
+        if let Some(t) = match p.template_sn { Some(ts) => tp::Entity::find_by_id(ts).one(db).await?, None => None } {
+            out.push(Usage { profile_sn: p.sn, owner: "template", owner_sn: t.sn, detail: detail(p.sn), name: t.name });
         }
     }
     Ok(out)
