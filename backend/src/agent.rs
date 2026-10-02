@@ -1,5 +1,5 @@
 //! tbl_agent_profile CRUD + 하위 매핑 조회 + tbl_template 조회. 쓰기는 event::run 경유 (ProfileCreated · ProfileUpdated · ProfileDeleted)
-use crate::{entity::{tbl_agent_profile::{self as p, Entity as Tbl}, tbl_map_fallback as fb, tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_profile_rule as pr, tbl_profile_tool as pt, tbl_template as tp},
+use crate::{entity::{tbl_agent_profile::{self as p, Entity as Tbl}, tbl_map_fallback as fb, tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_profile_rule as pr, tbl_profile_tool as pt, tbl_skill as sk, tbl_template as tp},
     error::{Body, Error, ErrorBody, Res, Sn, in_use}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::{NotSet, Set}, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, EntityTrait,
@@ -31,6 +31,7 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
         .routes(routes!(list, create))
         .routes(routes!(read, update, remove))
         .routes(routes!(caps))
+        .routes(routes!(set_skills))
         .routes(routes!(fallbacks, chain))
         .routes(routes!(commands, set_commands))
         .routes(routes!(templates))
@@ -122,7 +123,7 @@ struct ProfilePatch {
 }
 
 /// 프로필의 스킬 연결
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 struct SkillLink {
     skill_sn: i64,
     is_enabled: i64,
@@ -298,6 +299,25 @@ async fn caps(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Caps
     let tools = pt::Entity::find().filter(pt::Column::ProfileSn.eq(sn)).order_by_asc(pt::Column::Sort).all(&db).await?
         .into_iter().map(|m| ToolRule { tool_code: m.tool_code, scope_text: m.scope_text, policy: m.policy }).collect();
     Ok(Json(Caps { skills, mcps, tools }))
+}
+
+/// 스킬 연결 전체 교체 (ProfileUpdated). 차단 · 보안 검사 미통과 스킬은 422, 없는 스킬은 422(invalid_ref), 프로필이 없으면 404
+#[utoipa::path(operation_id = "agent_set_skills", put, path = "/profiles/{sn}/skills", params(("sn" = i64, Path, description = "프로필 번호")), request_body = Vec<SkillLink>, responses((status = 200, body = Vec<SkillLink>), (status = "default", body = ErrorBody)))]
+async fn set_skills(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Vec<SkillLink>>) -> Res<Json<Vec<SkillLink>>> {
+    event::run(&db, async |tx| {
+        get(tx, sn).await?;
+        let bad = sk::Entity::find().filter(sk::Column::Sn.is_in(b.iter().map(|l| l.skill_sn)))
+            .filter(sea_orm::Condition::any().add(sk::Column::IsBlocked.eq(1)).add(sk::Column::ScanStatus.ne("passed"))).one(tx).await?;
+        if let Some(m) = bad {
+            return Err(Error::invalid(format!("skill {} is blocked or not scanned", m.name)));
+        }
+        ps::Entity::delete_many().filter(ps::Column::ProfileSn.eq(sn)).exec(tx).await?;
+        for l in &b {
+            ps::ActiveModel { profile_sn: Set(sn), skill_sn: Set(l.skill_sn), is_enabled: Set(l.is_enabled), ..Default::default() }.insert(tx).await?;
+        }
+        Ok(((), vec![Ev::new(None, "profile", sn, "ProfileUpdated", &json!({ "skills": &b }))]))
+    }).await?;
+    Ok(Json(b))
 }
 
 /// 폴백 체인 1단계. sort 순으로 시도하고, tier가 있으면 그 등급의 하위 작업만 쓴다 (NULL = 모든 등급)

@@ -15,6 +15,7 @@ mod run; // /runs · Run 명령 · 실행기용 전이 함수
 mod rule; // 하위 작업 규칙 엔진 (#67 · LLM 0)
 mod runner; // runner 하위 Run 실행 · @REPORT 회수 (#67)
 mod setting; // /workspace · /runtimes · /presets
+mod skill; // /skills · /mcps · /skill-sources 조회 · 스킬 허용/차단
 mod stream; // /projects/{sn}/snapshot · events · stream (SSE)
 mod task; // /tasks CRUD + MoveTask + 배정
 mod team; // /teams · /members CRUD
@@ -59,7 +60,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -604,11 +605,57 @@ mod tests {
         assert_eq!(events(&db, "approval", 1).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["ApprovalRequested", "ApprovalApproved"]);
     }
 
+    /// B-9: 스킬 소스 · 스킬 · MCP 조회, 허용/차단(이벤트 · 검사 실패는 차단 해제 409), 사용처(멤버 · 템플릿), 차단 · 미검사 스킬은 프로필 연결 422
+    #[tokio::test]
+    async fn skill() {
+        let db = mem().await;
+        let app = app(db.clone());
+        db.execute_unprepared(
+            "INSERT INTO tbl_skill_source (sn, wid, kind, name, sort) VALUES (1, 1, 'github', 'team', 1), (2, 1, 'builtin', 'base', 0); \
+             INSERT INTO tbl_skill (sn, wid, source_sn, name, scan_status) VALUES (1, 1, 1, 'svelte-ui', 'passed'), (2, 1, 1, 'bad', 'failed'), (3, 1, 2, 'new', 'pending'); \
+             INSERT INTO tbl_mcp (sn, wid, name, install_status) VALUES (1, 1, 'playwright', 'installed'); \
+             INSERT INTO tbl_agent_profile (sn, wid, kind) VALUES (1, 1, 'member'), (2, 1, 'template'); \
+             INSERT INTO tbl_team (sn, wid, name) VALUES (1, 1, 'T'); INSERT INTO tbl_member (team_sn, profile_sn, name, role_name) VALUES (1, 1, '진', 'Dev'); \
+             INSERT INTO tbl_template (sn, wid, name) VALUES (1, 1, 'Frontend'); INSERT INTO tbl_template_revision (template_sn, profile_sn, version, status) VALUES (1, 2, 1, 'live'); \
+             INSERT INTO tbl_map_profile_mcp (profile_sn, mcp_sn, access_mode) VALUES (1, 1, 'installed');",
+        ).await.unwrap();
+        let v = call(&app, "GET", "/skill-sources", None).await.1;
+        assert_eq!((v[0]["name"].as_str(), v[1]["name"].as_str()), (Some("base"), Some("team")));
+        let v = call(&app, "GET", "/skills", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["name"].as_str()), (3, Some("bad")));
+        assert_eq!(call(&app, "GET", "/skills/99", None).await.0, StatusCode::NOT_FOUND);
+
+        // 허용/차단: 보낸 필드만 · 0/1 밖 422 · 검사 실패 스킬 차단 해제 409
+        let (st, s) = call(&app, "PATCH", "/skills/1", Some(json!({"is_enabled": 0}))).await;
+        assert_eq!((st, s["is_enabled"].as_i64(), s["is_blocked"].as_i64()), (StatusCode::OK, Some(0), Some(0)));
+        assert_eq!(call(&app, "PATCH", "/skills/1", Some(json!({"is_blocked": 2}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "PATCH", "/skills/2", Some(json!({"is_blocked": 0}))).await.0, StatusCode::CONFLICT);
+        assert_eq!(events(&db, "workspace", WID).await, [("SkillUpdated".into(), 1)]);
+
+        // 프로필 연결: 통과 스킬만. 차단 · 검사 실패 · 검사 전은 422, 연결은 그대로
+        assert_eq!(call(&app, "PUT", "/profiles/1/skills", Some(json!([{"skill_sn": 1, "is_enabled": 1}]))).await.0, StatusCode::OK);
+        call(&app, "PATCH", "/skills/1", Some(json!({"is_blocked": 1}))).await;
+        for sn in [1, 2, 3] {
+            assert_eq!(call(&app, "PUT", "/profiles/2/skills", Some(json!([{"skill_sn": sn, "is_enabled": 1}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        assert_eq!(call(&app, "GET", "/profiles/2/caps", None).await.1["skills"].as_array().unwrap().len(), 0);
+        assert_eq!(call(&app, "PUT", "/profiles/99/skills", Some(json!([]))).await.0, StatusCode::NOT_FOUND);
+
+        // 사용처: 스킬은 멤버 '진'(on) · MCP는 멤버(installed). 템플릿 버전 프로필도 잡힌다
+        let v = call(&app, "GET", "/skills/1/usage", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["owner"].as_str(), v[0]["name"].as_str(), v[0]["detail"].as_str()), (1, Some("member"), Some("진"), Some("on")));
+        db.execute_unprepared("INSERT INTO tbl_map_profile_mcp (profile_sn, mcp_sn) VALUES (2, 1);").await.unwrap();
+        let v = call(&app, "GET", "/mcps/1/usage", None).await.1;
+        assert_eq!((v[0]["detail"].as_str(), v[1]["owner"].as_str(), v[1]["name"].as_str(), v[1]["detail"].as_str()), (Some("installed"), Some("template"), Some("Frontend"), Some("accessible")));
+        assert_eq!(call(&app, "GET", "/mcps", None).await.1[0]["install_status"], "installed");
+        assert_eq!(call(&app, "GET", "/mcps/9/usage", None).await.0, StatusCode::NOT_FOUND);
+    }
+
     #[tokio::test]
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());
