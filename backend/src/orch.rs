@@ -1,17 +1,14 @@
 //! PM Dock: 프로젝트 Orch 대화(tbl_conversation · tbl_message · 첨부 조회) · 작업 제안(WorkProposal 메시지) 진행 → 이슈 · 태스크 생성,
-//! Orch 제안(tbl_orch_proposal) 처리, 실행 중 지시(tbl_log_activity). Orch가 답 · 제안을 만드는 것은 실행기 Task(#13 #14) — 여기서는 저장 · 조회 · 진행만
+//! 실행 중 지시(tbl_log_activity). Orch가 답 · 제안을 만드는 것은 실행기 Task(#13 #14) — 여기서는 저장 · 조회 · 진행만
 use crate::{entity::{tbl_attachment as at, tbl_conversation as cv, tbl_issue as i, tbl_log_activity as la, tbl_member as mb, tbl_message as ms,
-    tbl_orch_proposal as op, tbl_project as pj, tbl_run as r, tbl_task as t},
-    error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::{Issue, next_num}, orch_rule::{self, By}, run, task::Task};
-use axum::{Json, extract::{Query, State}, http::StatusCode};
+    tbl_project as pj, tbl_run as r, tbl_task as t},
+    error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::{Issue, next_num}, run, task::Task};
+use axum::{Json, extract::State, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
-
-/// Orch 제안 처리 경로 → 바뀌는 상태 (proposed에서만)
-const RESOLVES: [(&str, &str); 4] = [("proceed", "user_done"), ("edit", "changed"), ("cancel", "stopped"), ("dismiss", "dismissed")];
 
 /// orch 관련 경로 묶음
 pub fn routes() -> OpenApiRouter<DatabaseConnection> {
@@ -21,8 +18,6 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
         .routes(routes!(edit))
         .routes(routes!(proceed))
         .routes(routes!(cancel))
-        .routes(routes!(proposals))
-        .routes(routes!(resolve))
         .routes(routes!(instruct))
 }
 
@@ -117,94 +112,6 @@ struct ProceedOut {
     result: Message,
 }
 
-/// Orch 제안 (API 응답 형태)
-#[derive(Serialize, ToSchema)]
-pub struct Proposal {
-    pub(crate) sn: i64,
-    project_sn: i64,
-    issue_sn: Option<i64>,
-    task_sn: Option<i64>,
-    run_sn: Option<i64>,
-    member_sn: Option<i64>,
-    guard_sn: Option<i64>,
-    /// assign | retry | close_issue | next_issue | fallback | guard_stop
-    kind: String,
-    level: i64,
-    title: String,
-    reason: Option<String>,
-    /// 다른 선택지 JSON 배열
-    options: Option<serde_json::Value>,
-    /// proposed | auto_done | user_done | changed | stopped | dismissed
-    status: String,
-    streak_count: i64,
-    deadline_at: Option<String>,
-    event_sn: Option<i64>,
-    create_at: String,
-    resolve_at: Option<String>,
-}
-
-impl From<op::Model> for Proposal {
-    fn from(m: op::Model) -> Self {
-        Self {
-            options: m.option_json.as_deref().and_then(|p| serde_json::from_str(p).ok()),
-            sn: m.sn, project_sn: m.project_sn, issue_sn: m.issue_sn, task_sn: m.task_sn, run_sn: m.run_sn, member_sn: m.member_sn, guard_sn: m.guard_sn,
-            kind: m.kind, level: m.level, title: m.title, reason: m.reason, status: m.status, streak_count: m.streak_count, deadline_at: m.deadline_at,
-            event_sn: m.event_sn, create_at: m.create_at, resolve_at: m.resolve_at,
-        }
-    }
-}
-
-/// 제안의 다른 선택지 (option_json 배열의 원소). kind가 있으면 edit 때 그 동작을 실행하고, 없으면 고른 기록만 남긴다
-#[derive(Serialize, Deserialize, ToSchema, Clone)]
-pub struct Opt {
-    pub label: String,
-    /// assign | retry | close_issue | fallback
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub member_sn: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub task_sn: Option<i64>,
-}
-
-/// 생성할 Orch 제안 (Orch/실행기 입력)
-#[derive(Deserialize, Default)]
-pub struct ProposalNew {
-    pub project_sn: i64,
-    pub issue_sn: Option<i64>,
-    pub task_sn: Option<i64>,
-    pub run_sn: Option<i64>,
-    pub member_sn: Option<i64>,
-    pub kind: String,
-    pub level: i64,
-    pub title: String,
-    pub reason: Option<String>,
-    pub options: Option<Vec<Opt>>,
-    pub streak_count: i64,
-    pub deadline_at: Option<String>,
-    /// 이 제안을 만든 이벤트 (#100)
-    pub event_sn: Option<i64>,
-    /// 걸린 루프 가드 (guard_stop일 때)
-    pub guard_sn: Option<i64>,
-    /// 처음 상태 (없으면 proposed · guard_stop은 stopped)
-    pub status: Option<String>,
-}
-
-/// Orch 제안 목록 쿼리
-#[derive(Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-struct ProposalQuery {
-    project_sn: Option<i64>,
-    /// 이 상태만 (예: proposed)
-    status: Option<String>,
-}
-
-/// Orch 제안 처리 요청 본문 (edit일 때 고른 다른 선택지)
-#[derive(Serialize, Deserialize, ToSchema)]
-struct ResolveBody {
-    option: Option<String>,
-}
-
 /// 실행 중 지시 요청 본문
 #[derive(Deserialize, ToSchema)]
 struct InstructBody {
@@ -283,31 +190,6 @@ pub async fn propose(db: &DatabaseConnection, project_sn: i64, content: Option<S
         let ev = Ev::new(Some(project_sn), "message", out.sn, "MessagePosted", &json!({ "message_sn": out.sn, "kind": out.kind }));
         Ok((out, vec![ev]))
     }).await
-}
-
-/// Orch/실행기용: Orch 제안 생성 (OrchProposed). 모르는 종류 · 레벨 0~4 밖은 422
-#[allow(dead_code)] // Orch · 실행기(#14)가 호출한다
-pub async fn suggest(db: &DatabaseConnection, b: ProposalNew) -> Res<Proposal> {
-    let orch = orch_of(db, b.project_sn).await?;
-    event::run_as(db, "orch", orch, async |tx| add(tx, b).await.map(|(out, ev)| (out, vec![ev]))).await
-}
-
-/// Orch 제안 행 + OrchProposed 이벤트를 만든다 (suggest · 규칙 엔진 공용). 모르는 종류 · 레벨 0~4 밖 · 모르는 처음 상태는 422
-pub(crate) async fn add(tx: &DatabaseTransaction, b: ProposalNew) -> Res<(Proposal, Ev)> {
-    let status = b.status.unwrap_or_else(|| "proposed".into());
-    if !["assign", "retry", "close_issue", "next_issue", "fallback", "guard_stop"].contains(&b.kind.as_str()) || !(0..=4).contains(&b.level)
-        || !["proposed", "auto_done", "user_done", "changed", "stopped", "dismissed"].contains(&status.as_str()) {
-        return Err(Error::invalid("unknown kind · status or level out of 0..=4".into()));
-    }
-    // 바로 끝난 상태로 만들면 처리 시각도 남긴다
-    let done = if status == "proposed" { None } else { Some(crate::orch_rule::at(tx, "+0 seconds").await?) };
-    let out = Proposal::from(op::ActiveModel {
-        project_sn: Set(b.project_sn), issue_sn: Set(b.issue_sn), task_sn: Set(b.task_sn), run_sn: Set(b.run_sn), member_sn: Set(b.member_sn), guard_sn: Set(b.guard_sn),
-        kind: Set(b.kind), level: Set(b.level), title: Set(b.title), reason: Set(b.reason), option_json: Set(b.options.map(|o| json!(o).to_string())),
-        status: Set(status), streak_count: Set(b.streak_count), deadline_at: Set(b.deadline_at), event_sn: Set(b.event_sn), resolve_at: Set(done), ..Default::default()
-    }.insert(tx).await?);
-    let ev = Ev::new(Some(out.project_sn), "proposal", out.sn, "OrchProposed", &json!({ "proposal_sn": out.sn, "kind": out.kind, "title": out.title }));
-    Ok((out, ev))
 }
 
 /// 프로젝트 Orch 대화 + 메시지(오래된 순 · 첨부 포함). 프로젝트가 없으면 404
@@ -403,35 +285,6 @@ async fn cancel(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Me
         let out = Message::from(message(tx, sn).await?.1);
         Ok((out, vec![Ev::new(Some(ps), "message", sn, "ProposalCancelled", &json!({ "message_sn": sn }))]))
     }).await?;
-    Ok(Json(out))
-}
-
-/// Orch 제안 목록 (최신순). project_sn · status로 거른다
-#[utoipa::path(operation_id = "orch_proposals", get, path = "/proposals", params(ProposalQuery), responses((status = 200, body = Vec<Proposal>), (status = "default", body = ErrorBody)))]
-async fn proposals(State(db): State<DatabaseConnection>, Query(q): Query<ProposalQuery>) -> Res<Json<Vec<Proposal>>> {
-    let mut f = op::Entity::find();
-    if let Some(v) = q.project_sn { f = f.filter(op::Column::ProjectSn.eq(v)); }
-    if let Some(v) = q.status { f = f.filter(op::Column::Status.eq(v)); }
-    Ok(Json(f.order_by_desc(op::Column::Sn).all(&db).await?.into_iter().map(Proposal::from).collect()))
-}
-
-/// Orch 제안 처리 (OrchProposalResolved): proceed → 실행 · user_done · edit → 고른 선택지 실행 · changed · cancel → stopped · dismiss → dismissed.
-/// proposed에서만 (409). 실행은 기존 command를 그대로 쓴다 (orch_rule::run)
-#[utoipa::path(operation_id = "orch_resolve", post, path = "/proposals/{sn}/{action}", params(("sn" = i64, Path, description = "제안 번호"), ("action" = String, Path, description = "proceed | edit | cancel | dismiss")), request_body = Option<ResolveBody>, responses((status = 200, body = Proposal), (status = "default", body = ErrorBody)))]
-async fn resolve(State(db): State<DatabaseConnection>, axum::extract::Path((sn, action)): axum::extract::Path<(i64, String)>, raw: axum::body::Bytes) -> Res<Json<Proposal>> {
-    let to = RESOLVES.iter().find(|(a, _)| *a == action).map(|(_, s)| *s).ok_or_else(Error::not_found)?;
-    // 본문은 edit에만 필요 — 비어 있으면 선택지 없음
-    let option = if raw.is_empty() { None } else {
-        serde_json::from_slice::<ResolveBody>(&raw).map_err(|e| Error::invalid(e.to_string()))?.option
-    };
-    if to == "changed" && option.is_none() {
-        return Err(Error::invalid("edit needs option".into()));
-    }
-    let out = match (to, option) {
-        ("user_done", _) => orch_rule::run(&db, sn, By::User).await?,
-        ("changed", Some(label)) => orch_rule::run(&db, sn, By::Pick(label)).await?,
-        _ => orch_rule::end(&db, sn, to).await?,
-    };
     Ok(Json(out))
 }
 

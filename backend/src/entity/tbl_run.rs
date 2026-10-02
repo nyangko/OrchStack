@@ -69,8 +69,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::tbl_approval::Entity")]
-    TblApproval,
+    #[sea_orm(has_many = "super::tbl_ask::Entity")]
+    TblAsk,
     #[sea_orm(
         belongs_to = "super::tbl_connection::Entity",
         from = "Column::ConnectionSn",
@@ -83,8 +83,6 @@ pub enum Relation {
     TblContextManifest,
     #[sea_orm(has_many = "super::tbl_contract::Entity")]
     TblContract,
-    #[sea_orm(has_many = "super::tbl_decision::Entity")]
-    TblDecision,
     #[sea_orm(has_many = "super::tbl_log_activity::Entity")]
     TblLogActivity,
     #[sea_orm(has_many = "super::tbl_log_audit::Entity")]
@@ -107,8 +105,6 @@ pub enum Relation {
     TblMember,
     #[sea_orm(has_many = "super::tbl_message::Entity")]
     TblMessage,
-    #[sea_orm(has_many = "super::tbl_orch_proposal::Entity")]
-    TblOrchProposal,
     #[sea_orm(
         belongs_to = "super::tbl_project::Entity",
         from = "Column::ProjectSn",
@@ -169,9 +165,9 @@ pub enum Relation {
     TblTask,
 }
 
-impl Related<super::tbl_approval::Entity> for Entity {
+impl Related<super::tbl_ask::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TblApproval.def()
+        Relation::TblAsk.def()
     }
 }
 
@@ -190,12 +186,6 @@ impl Related<super::tbl_context_manifest::Entity> for Entity {
 impl Related<super::tbl_contract::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblContract.def()
-    }
-}
-
-impl Related<super::tbl_decision::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblDecision.def()
     }
 }
 
@@ -244,12 +234,6 @@ impl Related<super::tbl_member::Entity> for Entity {
 impl Related<super::tbl_message::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblMessage.def()
-    }
-}
-
-impl Related<super::tbl_orch_proposal::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblOrchProposal.def()
     }
 }
 

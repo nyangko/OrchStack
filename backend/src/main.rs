@@ -1,9 +1,8 @@
 // OrchStack 백엔드 진입점: DB 준비 → 라우터 구성 → HTTP 서버 실행
 
 mod agent; // /profiles CRUD · /templates 조회
-mod approval; // /approvals 조회 · 승인 · 거부
+mod ask; // /asks: 판단 요청 · 승인 요청 · Orch 제안 (조회 · 답변 · 승인 · 거부 · 진행 · 수정 · 취소 · 보류 · 무시) + 제안 실행 · 타이머
 mod connection; // /connections CRUD · 한도 조회
-mod decision; // /decisions 조회 · 답변 · 작성 중
 #[allow(unused_imports, dead_code)] // sea-orm-cli 생성 코드
 mod entity; // 테이블별 SeaORM entity (sea-orm-cli 생성물 · 직접 수정하지 않는다)
 mod error; // 공통 에러 응답
@@ -12,7 +11,7 @@ mod exec; // 실행기: Claude Code · Codex CLI 비대화형 실행 (#13)
 mod issue; // /issues CRUD
 mod context; // 컨텍스트 조립기 (고정 접두 · 반복 · 상한 · 견적) + /tasks/{sn}/estimate · /runs/{sn}/context
 mod orch_rule; // Orch 규칙 엔진 (LLM 0): 이벤트 → 제안 · 제안 실행 · 타이머 · 가드 · 멤버 대기열
-mod orch; // PM Dock: /projects/{sn}/conversation · messages · /messages/* · /proposals · /runs/{sn}/instruct
+mod orch; // PM Dock: /projects/{sn}/conversation · messages · /messages/* · /runs/{sn}/instruct
 mod meta; // 완료 조건 · 의존 · 라벨 목록 · 저장 보기 · Diagram 배치
 mod policy; // /teams/{sn}/policy Orch 진행 정책 (모드 · 타이머 · 레벨 · 가드)
 mod notify; // /notifications · /notify/* · /audit + 이벤트 → 알림 projection
@@ -68,7 +67,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(orch_rule::routes()).merge(policy::routes()).merge(context::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(ask::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(orch_rule::routes()).merge(policy::routes()).merge(context::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -562,66 +561,74 @@ mod tests {
         assert_eq!(call(&app, "GET", "/presets/99/versions", None).await.0, StatusCode::NOT_FOUND);
     }
 
-    /// B-8: 판단 요청 생성(내부) → 목록 범위 필터 → 작성 중 → 답변(상태 · 선택 · 이벤트 · 발행) → 재답변 409. 승인 요청 승인 · 거부 · 재처리 409
+    /// B-8 + #121: 요청(/asks) 한 곳에서 판단 · 승인을 다룬다 — 판단(질문 · 선택지 · 답 = option 배열 · 질문 index + 선택지 code) · 작성 중 · 답변 검사 ·
+    /// 승인 · 거부 · kind에 안 맞는 동작은 409 · 이벤트 대상 ask
     #[tokio::test]
     async fn decision() {
-        use crate::{approval::{self, ApprovalNew}, decision::{self, ChoiceNew, DecisionNew, QuestionNew}};
+        use crate::ask::{self, ApprovalNew, Choice, DecisionNew, Question};
         use axum::response::IntoResponse;
         let db = mem().await;
         let app = app(db.clone());
         let ts = task_of(&app, &db, true).await;
-        let opt = |code: &str| ChoiceNew { code: code.into(), label: code.into(), note: None, is_recommended: code == "A" };
-        let qn = |t: &str| QuestionNew { title: t.into(), body: None, code_snippet: None, ref_json: None, options: vec![opt("A"), opt("B")] };
+        let opt = |code: &str| Choice { code: code.into(), label: code.into(), note: None, is_recommended: code == "A", is_selected: false };
+        let qn = |t: &str| Question { title: t.into(), body: None, code_snippet: None, reference: None, options: vec![opt("A"), opt("B")], answer_text: None, is_delegate: false, answer_at: None };
         let new = |level| DecisionNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 1, level, title: "D".into(), deadline_at: None, questions: vec![qn("Q1"), qn("Q2")] };
-        assert_eq!(decision::create(&db, new(1)).await.err().unwrap().into_response().status(), StatusCode::UNPROCESSABLE_ENTITY);
-        decision::create(&db, new(2)).await.unwrap();
+        assert_eq!(ask::decision(&db, new(1)).await.err().unwrap().into_response().status(), StatusCode::UNPROCESSABLE_ENTITY);
+        ask::decision(&db, new(2)).await.unwrap();
 
-        // 목록: 상태 · 프로젝트 · 태스크 범위. 질문 · 선택지를 순서대로 함께 준다
-        let v = call(&app, "GET", &format!("/decisions?status=pending&task_sn={ts}"), None).await.1;
-        assert_eq!((v.as_array().unwrap().len(), v[0]["questions"][1]["title"].as_str(), v[0]["questions"][0]["options"][1]["code"].as_str()), (1, Some("Q2"), Some("B")));
-        assert_eq!(call(&app, "GET", "/decisions?project_sn=99", None).await.1.as_array().unwrap().len(), 0);
+        // 목록: 종류 · 상태 · 프로젝트 · 태스크 범위. 질문 · 선택지를 순서대로 option에 함께 준다
+        let v = call(&app, "GET", &format!("/asks?kind=decision&status=pending&task_sn={ts}"), None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["option"][1]["title"].as_str(), v[0]["option"][0]["options"][1]["code"].as_str(), v[0]["kind"].as_str(), v[0]["action"].is_null()), (1, Some("Q2"), Some("B"), Some("decision"), true));
+        assert_eq!(call(&app, "GET", "/asks?project_sn=99", None).await.1.as_array().unwrap().len(), 0);
+        assert_eq!(call(&app, "GET", "/asks?kind=approval", None).await.1.as_array().unwrap().len(), 0);
         let ds = v[0]["sn"].as_i64().unwrap();
-        let (q1, q2) = (v[0]["questions"][0]["sn"].as_i64().unwrap(), v[0]["questions"][1]["sn"].as_i64().unwrap());
-        let (b1, b2) = (v[0]["questions"][0]["options"][1]["sn"].as_i64().unwrap(), v[0]["questions"][1]["options"][0]["sn"].as_i64().unwrap());
 
         // 작성 중: 타이머 멈춤 · 두 번째는 409
-        let (st, d) = call(&app, "POST", &format!("/decisions/{ds}/writing"), None).await;
+        let (st, d) = call(&app, "POST", &format!("/asks/{ds}/writing"), None).await;
         assert_eq!((st, d["status"].as_str(), d["is_timer_pause"].as_i64()), (StatusCode::OK, Some("writing"), Some(1)));
-        assert_eq!(call(&app, "POST", &format!("/decisions/{ds}/writing"), None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", &format!("/asks/{ds}/writing"), None).await.0, StatusCode::CONFLICT);
 
-        // 답변 검사: 질문 빠짐 · 다른 질문의 선택지 · 빈 답은 422 (상태는 그대로)
-        let uri = format!("/decisions/{ds}/answer");
-        for bad in [json!({"answers": [{"question_sn": q1, "option_sn": b1}]}),
-                    json!({"answers": [{"question_sn": q1, "option_sn": b2}, {"question_sn": q2, "delegate": true}]}),
-                    json!({"answers": [{"question_sn": q1}, {"question_sn": q2, "delegate": true}]})] {
+        // 답변 검사: 질문 빠짐 · 다른 질문에 없는 선택지 · 빈 답 · 없는 질문 번호 · 같은 질문 두 번은 422 (상태는 그대로)
+        let uri = format!("/asks/{ds}/answer");
+        for bad in [json!({"answers": [{"question": 0, "option": "B"}]}),
+                    json!({"answers": [{"question": 0, "option": "Z"}, {"question": 1, "delegate": true}]}),
+                    json!({"answers": [{"question": 0}, {"question": 1, "delegate": true}]}),
+                    json!({"answers": [{"question": 0, "option": "A"}, {"question": 2, "delegate": true}]}),
+                    json!({"answers": [{"question": 0, "option": "A"}, {"question": 0, "option": "B"}]})] {
             assert_eq!(call(&app, "POST", &uri, Some(bad)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         }
+        assert_eq!(call(&app, "GET", &format!("/asks/{ds}"), None).await.1["status"], "writing");
 
         // 답변: answered · 사용자 결정 · 선택 1개 · 맡김 · 이벤트 3개 · 구독자에게 발행
         let mut rx = event::subscribe();
-        let (st, d) = call(&app, "POST", &uri, Some(json!({"answers": [{"question_sn": q1, "option_sn": b1, "text": "짧게"}, {"question_sn": q2, "delegate": true}], "review_needed": true}))).await;
+        let (st, d) = call(&app, "POST", &uri, Some(json!({"answers": [{"question": 0, "option": "B", "text": "짧게"}, {"question": 1, "delegate": true}], "review_needed": true}))).await;
         assert_eq!((st, d["status"].as_str(), d["decide_by"].as_str(), d["is_timer_pause"].as_i64(), d["is_review_needed"].as_i64()), (StatusCode::OK, Some("answered"), Some("user"), Some(0), Some(1)));
-        let o = &d["questions"][0]["options"];
-        assert_eq!((o[0]["is_selected"].as_i64(), o[1]["is_selected"].as_i64(), d["questions"][0]["answer_text"].as_str(), d["questions"][1]["is_delegate"].as_i64()), (Some(0), Some(1), Some("짧게"), Some(1)));
-        assert_eq!(events(&db, "decision", ds).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["DecisionRequested", "DecisionWriting", "DecisionAnswered"]);
+        let o = &d["option"][0]["options"];
+        assert_eq!((o[0]["is_selected"].as_bool(), o[1]["is_selected"].as_bool(), d["option"][0]["answer_text"].as_str(), d["option"][1]["is_delegate"].as_bool(), d["option"][0]["answer_at"].is_string()), (Some(false), Some(true), Some("짧게"), Some(true), true));
+        assert_eq!(events(&db, "ask", ds).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["DecisionRequested", "DecisionWriting", "DecisionAnswered"]);
         // 버스는 프로세스 전역 — 병렬 테스트의 다른 이벤트는 건너뛴다
         let e = loop { let e = rx.recv().await.unwrap(); if e.event_type == "DecisionAnswered" { break e; } };
         assert_eq!((e.aggregate_sn, e.project_sn), (ds, Some(1)));
-        assert_eq!(call(&app, "POST", &uri, Some(json!({"answers": [{"question_sn": q1, "option_sn": b1}, {"question_sn": q2, "delegate": true}]}))).await.0, StatusCode::CONFLICT);
-        assert_eq!(call(&app, "POST", "/decisions/99/answer", Some(json!({"answers": []}))).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(call(&app, "POST", &uri, Some(json!({"answers": [{"question": 0, "option": "A"}, {"question": 1, "delegate": true}]}))).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", "/asks/99/answer", Some(json!({"answers": []}))).await.0, StatusCode::NOT_FOUND);
 
-        // 승인 요청: 모르는 동작 422 · 승인 · 거부 · 다시 처리 409 · 상태 필터
-        let an = |code: &str| ApprovalNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 1, rule_sn: None, action_code: code.into(), title: "A".into(), detail: None, deadline_at: None };
-        assert_eq!(approval::create(&db, an("x")).await.err().unwrap().into_response().status(), StatusCode::UNPROCESSABLE_ENTITY);
-        approval::create(&db, an("pr_merge")).await.unwrap();
-        approval::create(&db, an("run_extend")).await.unwrap();
-        assert_eq!(call(&app, "GET", "/approvals?status=pending&project_sn=1", None).await.1.as_array().unwrap().len(), 2);
-        let (st, a) = call(&app, "POST", "/approvals/1/approve", None).await;
+        // 승인 요청: 모르는 동작 422 · 승인 · 거부 · 다시 처리 409 · 상태 필터 · 판단에 승인 · 승인에 답변은 409
+        let an = |code: &str| ApprovalNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 1, rule_title: Some("PR 생성".into()), action_code: code.into(), title: "A".into(), detail: Some("20분 초과".into()), deadline_at: None };
+        assert_eq!(ask::approval(&db, an("x")).await.err().unwrap().into_response().status(), StatusCode::UNPROCESSABLE_ENTITY);
+        ask::approval(&db, an("pr_merge")).await.unwrap();
+        ask::approval(&db, an("run_extend")).await.unwrap();
+        let v = call(&app, "GET", "/asks?kind=approval&status=pending&project_sn=1", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[1]["action"].as_str(), v[1]["option"]["rule_title"].as_str(), v[1]["option"]["detail"].as_str()), (2, Some("pr_merge"), Some("PR 생성"), Some("20분 초과")));
+        let (a1, a2) = (v[1]["sn"].as_i64().unwrap(), v[0]["sn"].as_i64().unwrap());
+        assert_eq!(call(&app, "POST", &format!("/asks/{ds}/approve"), None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", &format!("/asks/{a1}/answer"), Some(json!({"answers": []}))).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", &format!("/asks/{a1}/proceed"), None).await.0, StatusCode::CONFLICT);
+        let (st, a) = call(&app, "POST", &format!("/asks/{a1}/approve"), None).await;
         assert_eq!((st, a["status"].as_str(), a["user_sn"].as_i64(), a["decide_at"].is_string()), (StatusCode::OK, Some("approved"), Some(USER), true));
-        assert_eq!(call(&app, "POST", "/approvals/2/deny", None).await.1["status"], "denied");
-        assert_eq!(call(&app, "POST", "/approvals/1/deny", None).await.0, StatusCode::CONFLICT);
-        assert_eq!(call(&app, "GET", "/approvals?status=pending", None).await.1.as_array().unwrap().len(), 0);
-        assert_eq!(events(&db, "approval", 1).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["ApprovalRequested", "ApprovalApproved"]);
+        assert_eq!(call(&app, "POST", &format!("/asks/{a2}/deny"), None).await.1["status"], "denied");
+        assert_eq!(call(&app, "POST", &format!("/asks/{a1}/deny"), None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "GET", "/asks?kind=approval&status=pending", None).await.1.as_array().unwrap().len(), 0);
+        assert_eq!(events(&db, "ask", a1).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(), ["ApprovalRequested", "ApprovalApproved"]);
     }
 
     /// B-9: 스킬 소스 · 스킬 · MCP 조회, 허용/차단(이벤트 · 검사 실패는 차단 해제 409), 사용처(멤버 · 템플릿), 차단 · 미검사 스킬은 프로필 연결 422
@@ -674,12 +681,12 @@ mod tests {
     /// 규칙 교체 검사, 채널(key_ref 없음) · 테스트, 방해 금지 설정, 감사 로그 필터
     #[tokio::test]
     async fn notify() {
-        use crate::{approval::{self, ApprovalNew}, decision::{self, ChoiceNew, DecisionNew, QuestionNew}};
+        use crate::ask::{self, ApprovalNew, Choice, DecisionNew, Question};
         let db = mem().await;
         let app = app(db.clone());
         let ts = task_of(&app, &db, true).await;
-        let q = QuestionNew { title: "Q".into(), body: None, code_snippet: None, ref_json: None, options: vec![ChoiceNew { code: "A".into(), label: "a".into(), note: None, is_recommended: false }] };
-        decision::create(&db, DecisionNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 1, level: 2, title: "재전송 제한".into(), deadline_at: None, questions: vec![q] }).await.unwrap();
+        let q = Question { title: "Q".into(), body: None, code_snippet: None, reference: None, options: vec![Choice { code: "A".into(), label: "a".into(), note: None, is_recommended: false, is_selected: false }], answer_text: None, is_delegate: false, answer_at: None };
+        ask::decision(&db, DecisionNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 1, level: 2, title: "재전송 제한".into(), deadline_at: None, questions: vec![q] }).await.unwrap();
         let rs = call(&app, "POST", &format!("/tasks/{ts}/runs"), None).await.1["sn"].as_i64().unwrap();
         run::run_to(&db, rs, "starting").await.unwrap();
         run::run_to(&db, rs, "failed").await.unwrap();
@@ -704,7 +711,7 @@ mod tests {
         // 규칙: 앱 승인 알림 끄면 승인 요청은 알림을 만들지 않는다 · 잘못된 칸 · 중복 422
         let rule = json!({"connection_sn": null, "event_code": "approval_request", "channel_kind": "app", "is_enabled": 0});
         assert_eq!(call(&app, "PUT", "/notify/rules", Some(json!([rule]))).await.0, StatusCode::OK);
-        approval::create(&db, ApprovalNew { project_sn: 1, task_sn: None, run_sn: None, member_sn: 1, rule_sn: None, action_code: "pr_merge".into(), title: "A".into(), detail: None, deadline_at: None }).await.unwrap();
+        ask::approval(&db, ApprovalNew { project_sn: 1, task_sn: None, run_sn: None, member_sn: 1, rule_title: None, action_code: "pr_merge".into(), title: "A".into(), detail: None, deadline_at: None }).await.unwrap();
         assert_eq!(call(&app, "GET", "/notifications", None).await.1.as_array().unwrap().len(), 2);
         assert_eq!(call(&app, "GET", "/notify/rules", None).await.1[0]["is_enabled"], 0);
         for bad in [json!([rule, rule]), json!([{"event_code": "x", "channel_kind": "app", "is_enabled": 1}]), json!([{"event_code": "pr", "channel_kind": "sms", "is_enabled": 1}])] {
@@ -740,18 +747,18 @@ mod tests {
         let v = call(&app, "GET", "/notifications", None).await.1;
         assert_eq!((v[0]["actor_type"].as_str(), v[0]["member_sn"].as_i64(), v[1]["actor_type"].as_str()), (Some("member"), Some(1), Some("member")));
         db.execute_unprepared("INSERT INTO tbl_member (sn, team_sn, profile_sn, name, role_name, is_orch) VALUES (2, 1, 1, 'Orch', 'PM', 1);").await.unwrap();
-        let q = QuestionNew { title: "Q".into(), body: None, code_snippet: None, ref_json: None, options: vec![ChoiceNew { code: "A".into(), label: "a".into(), note: None, is_recommended: false }] };
-        decision::create(&db, DecisionNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 2, level: 3, title: "배포 시점".into(), deadline_at: None, questions: vec![q] }).await.unwrap();
+        let q = Question { title: "Q".into(), body: None, code_snippet: None, reference: None, options: vec![Choice { code: "A".into(), label: "a".into(), note: None, is_recommended: false, is_selected: false }], answer_text: None, is_delegate: false, answer_at: None };
+        ask::decision(&db, DecisionNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 2, level: 3, title: "배포 시점".into(), deadline_at: None, questions: vec![q] }).await.unwrap();
         let v = call(&app, "GET", "/notifications", None).await.1;
         assert_eq!((v[0]["event_code"].as_str(), v[0]["actor_type"].as_str(), v[0]["member_sn"].as_i64()), (Some("decision_request"), Some("orch"), Some(2)));
-        assert_eq!(actor(&db, "DecisionRequested", 2).await, ("orch".into(), Some(2), None));
+        assert_eq!(actor(&db, "DecisionRequested", 3).await, ("orch".into(), Some(2), None));
     }
 
     /// B-11: Orch 없으면 409 → 대화 열기 · 메시지 저장, 작업 제안 수정 · 진행(이슈 · 태스크 생성 · 배정 · 결과 카드 · 이벤트) · 재진행 409 · 취소,
     /// Orch 제안 처리(proceed · edit · cancel), 실행 중 지시(활동 기록 · 끝난 Run 409)
     #[tokio::test]
     async fn orch() {
-        use crate::orch::{self, Plan, PlanIssue, PlanTask, ProposalNew};
+        use crate::{ask::{self, Opt, ProposalNew}, orch::{self, Plan, PlanIssue, PlanTask}};
         let db = mem().await;
         let app = app(db.clone());
         let ts = task_of(&app, &db, true).await; // 프로젝트 1 · 팀 1 · 멤버 1(m)
@@ -798,20 +805,20 @@ mod tests {
 
         // Orch 제안: 목록 · edit은 선택지 필요 · 처리 후 다시 처리 409 · 모르는 동작 404
         let pn = |kind: &str| ProposalNew { project_sn: 1, issue_sn: None, task_sn: Some(ts), run_sn: None, member_sn: Some(1), kind: kind.into(), level: 1,
-            title: "#130 QA를 하린에게 배정".into(), reason: None, options: Some(vec![orch::Opt { label: "Todo로 보내고 대기".into(), kind: None, member_sn: None, task_sn: None }]),
-            streak_count: 3, deadline_at: None, event_sn: None, guard_sn: None, status: None };
-        orch::suggest(&db, pn("assign")).await.unwrap();
-        orch::suggest(&db, pn("next_issue")).await.unwrap();
-        assert!(orch::suggest(&db, pn("x")).await.is_err());
-        let v = call(&app, "GET", "/proposals?project_sn=1&status=proposed", None).await.1;
-        assert_eq!((v.as_array().unwrap().len(), v[1]["options"][0]["label"].as_str()), (2, Some("Todo로 보내고 대기")));
-        assert_eq!(call(&app, "POST", "/proposals/1/edit", Some(json!({}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(call(&app, "POST", "/proposals/1/edit", Some(json!({"option": "Todo로 보내고 대기"}))).await.1["status"], "changed");
-        assert_eq!(call(&app, "POST", "/proposals/2/proceed", None).await.1["status"], "user_done");
-        assert_eq!(call(&app, "POST", "/proposals/2/cancel", None).await.0, StatusCode::CONFLICT);
-        assert_eq!(call(&app, "POST", "/proposals/2/zzz", None).await.0, StatusCode::NOT_FOUND);
-        assert_eq!(call(&app, "GET", "/proposals?status=proposed", None).await.1.as_array().unwrap().len(), 0);
-        assert_eq!(events(&db, "proposal", 2).await, [("OrchProposed".into(), 1), ("OrchProposalResolved".into(), 2)]); // 대상 종류 proposal
+            title: "#130 QA를 하린에게 배정".into(), reason: None, options: Some(vec![Opt { label: "Todo로 보내고 대기".into(), kind: None, member_sn: None, task_sn: None }]),
+            streak_count: 3, deadline_at: None, event_sn: None, guard_code: None, status: None };
+        ask::suggest(&db, pn("assign")).await.unwrap();
+        ask::suggest(&db, pn("next_issue")).await.unwrap();
+        assert!(ask::suggest(&db, pn("x")).await.is_err());
+        let v = call(&app, "GET", "/asks?kind=proposal&project_sn=1&status=proposed", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[1]["option"][0]["label"].as_str()), (2, Some("Todo로 보내고 대기")));
+        assert_eq!(call(&app, "POST", "/asks/1/edit", Some(json!({}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", "/asks/1/edit", Some(json!({"option": "Todo로 보내고 대기"}))).await.1["status"], "changed");
+        assert_eq!(call(&app, "POST", "/asks/2/proceed", None).await.1["status"], "user_done");
+        assert_eq!(call(&app, "POST", "/asks/2/cancel", None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", "/asks/2/zzz", None).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(call(&app, "GET", "/asks?kind=proposal&status=proposed", None).await.1.as_array().unwrap().len(), 0);
+        assert_eq!(events(&db, "ask", 2).await, [("OrchProposed".into(), 1), ("OrchProposalResolved".into(), 2)]); // 대상 종류 proposal
         assert_eq!(actor(&db, "OrchProposed", 2).await.0, "orch");
 
         // 실행 중 지시: 활동 기록 + 이벤트, 끝난 Run 409 · 빈 지시 422
@@ -941,33 +948,33 @@ mod tests {
 
         // 기본 정책(auto · 5초): 다음 태스크(b = 2)를 끝낸 멤버(1)에게 assign 제안, 아직 배정 전
         let sn = rule::on(&db, &ev).await.unwrap().unwrap();
-        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
-        assert_eq!((v.as_array().unwrap().len(), v[0]["sn"].as_i64(), v[0]["kind"].as_str(), v[0]["task_sn"].as_i64(), v[0]["member_sn"].as_i64()), (1, Some(sn), Some("assign"), Some(2), Some(1)));
+        let v = call(&app, "GET", "/asks?kind=proposal&status=proposed", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["sn"].as_i64(), v[0]["action"].as_str(), v[0]["task_sn"].as_i64(), v[0]["member_sn"].as_i64()), (1, Some(sn), Some("assign"), Some(2), Some(1)));
         assert_eq!((v[0]["event_sn"].as_i64(), v[0]["deadline_at"].is_string(), v[0]["level"].as_i64()), (Some(ev.sn), true, Some(1)));
         assert!(call(&app, "GET", "/tasks/2", None).await.1["member_sn"].is_null());
         assert_eq!(actor(&db, "OrchProposed", sn).await.0, "orch");
         assert_eq!(rule::on(&db, &ev).await.unwrap(), None); // 같은 제안이 대기 중
 
         // 타이머: 기한 전 0건 · 기한이 지나면 auto_done + 배정(orch_auto) + 행위자 orch
-        assert_eq!(rule::tick(&db).await.unwrap(), 0);
-        db.execute_unprepared("UPDATE tbl_orch_proposal SET deadline_at = datetime('now', '-1 seconds');").await.unwrap();
-        assert_eq!(rule::tick(&db).await.unwrap(), 1);
-        let v = call(&app, "GET", "/proposals?status=auto_done", None).await.1;
+        assert_eq!(ask::tick(&db).await.unwrap(), 0);
+        db.execute_unprepared("UPDATE tbl_ask SET deadline_at = datetime('now', '-1 seconds');").await.unwrap();
+        assert_eq!(ask::tick(&db).await.unwrap(), 1);
+        let v = call(&app, "GET", "/asks?kind=proposal&status=auto_done", None).await.1;
         assert_eq!((v.as_array().unwrap().len(), v[0]["streak_count"].as_i64()), (1, Some(1)));
         let t = call(&app, "GET", "/tasks/2", None).await.1;
         assert_eq!((t["member_sn"].as_i64(), t["assign_by"].as_str()), (Some(1), Some("orch_auto")));
         assert_eq!(actor(&db, "AgentAssigned", 2).await, ("orch".into(), Some(2), None));
-        assert_eq!(events(&db, "proposal", sn).await, [("OrchProposed".into(), 1), ("OrchProposalResolved".into(), 2)]);
+        assert_eq!(events(&db, "ask", sn).await, [("OrchProposed".into(), 1), ("OrchProposalResolved".into(), 2)]);
         assert_eq!(calls(), 0); // 모델 · 실행기 호출 0
 
         // manual: 기한 없음 · 타이머가 실행하지 않음 · proceed로만 (다음 태스크 c = 3)
         assert_eq!(set_policy(&app, |p| p["mode"] = json!("manual")).await.0, StatusCode::OK);
         let sn = rule::on(&db, &ev).await.unwrap().unwrap();
-        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
+        let v = call(&app, "GET", "/asks?kind=proposal&status=proposed", None).await.1;
         assert_eq!((v[0]["task_sn"].as_i64(), v[0]["deadline_at"].is_null()), (Some(3), true));
-        assert_eq!(rule::tick(&db).await.unwrap(), 0);
+        assert_eq!(ask::tick(&db).await.unwrap(), 0);
         assert!(call(&app, "GET", "/tasks/3", None).await.1["member_sn"].is_null());
-        let (st, p) = call(&app, "POST", &format!("/proposals/{sn}/proceed"), None).await;
+        let (st, p) = call(&app, "POST", &format!("/asks/{sn}/proceed"), None).await;
         assert_eq!((st, p["status"].as_str(), p["streak_count"].as_i64()), (StatusCode::OK, Some("user_done"), Some(0)));
         let t = call(&app, "GET", "/tasks/3", None).await.1;
         assert_eq!((t["member_sn"].as_i64(), t["assign_by"].as_str()), (Some(1), Some("orch_auto")));
@@ -975,7 +982,7 @@ mod tests {
         assert_eq!(calls(), 0);
     }
 
-    /// B-16 가드: auto_streak threshold 2 → 세 번째 제안은 guard_stop(stopped · guard_sn · trigger_at) + 알림 guard_stop(actor orch),
+    /// B-16 가드: auto_streak threshold 2 → 세 번째 제안은 guard_stop(stopped · guard_code · trigger_at) + 알림 guard_stop(actor orch),
     /// 멈춘 뒤에는 기한 없이 대기 · 사용자가 처리하면 재개, on_trigger = to_manual이면 정책 mode가 manual
     #[tokio::test]
     async fn orch_guard() {
@@ -993,23 +1000,23 @@ mod tests {
             assert!(on(db.clone(), ev.clone()).await.is_some());
             let t = call(&app, "GET", &format!("/tasks/{k}"), None).await.1;
             assert_eq!(t["assign_by"].as_str(), Some("orch_auto"));
-            assert_eq!(call(&app, "GET", "/proposals?status=auto_done", None).await.1[0]["streak_count"].as_i64(), Some(streak));
+            assert_eq!(call(&app, "GET", "/asks?kind=proposal&status=auto_done", None).await.1[0]["streak_count"].as_i64(), Some(streak));
         }
         // 세 번째: 제안 대신 guard_stop. d(4)는 배정되지 않는다
         let sn = on(db.clone(), ev.clone()).await.unwrap();
-        let v = call(&app, "GET", "/proposals?status=stopped", None).await.1;
-        assert_eq!((v.as_array().unwrap().len(), v[0]["sn"].as_i64(), v[0]["kind"].as_str(), v[0]["guard_sn"].is_i64(), v[0]["task_sn"].as_i64()), (1, Some(sn), Some("guard_stop"), true, Some(a)));
+        let v = call(&app, "GET", "/asks?kind=proposal&status=stopped", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["sn"].as_i64(), v[0]["action"].as_str(), v[0]["guard_code"].as_str(), v[0]["task_sn"].as_i64()), (1, Some(sn), Some("guard_stop"), Some("auto_streak"), Some(a)));
         assert!(call(&app, "GET", "/tasks/4", None).await.1["member_sn"].is_null());
         let n = call(&app, "GET", "/notifications", None).await.1;
         assert_eq!((n[0]["event_code"].as_str(), n[0]["actor_type"].as_str(), n[0]["member_sn"].as_i64(), n[0]["ref_type"].as_str(), n[0]["ref_sn"].as_i64(), n[0]["is_action"].as_i64()),
-            (Some("guard_stop"), Some("orch"), Some(2), Some("proposal"), Some(sn), Some(1)));
+            (Some("guard_stop"), Some("orch"), Some(2), Some("ask"), Some(sn), Some(1)));
         assert!(call(&app, "GET", "/teams/1/policy", None).await.1["guards"][0]["trigger_at"].is_string());
 
         // 멈춘 뒤: 제안은 만들되 기한 없이 대기 (full_auto여도 실행하지 않음) → 사용자가 처리하면 재개
         let sn = on(db.clone(), ev.clone()).await.unwrap();
-        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
+        let v = call(&app, "GET", "/asks?kind=proposal&status=proposed", None).await.1;
         assert_eq!((v[0]["sn"].as_i64(), v[0]["task_sn"].as_i64(), v[0]["deadline_at"].is_null()), (Some(sn), Some(4), true));
-        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/proceed"), None).await.1["status"], "user_done");
+        assert_eq!(call(&app, "POST", &format!("/asks/{sn}/proceed"), None).await.1["status"], "user_done");
         assert_eq!(call(&app, "GET", "/tasks/4", None).await.1["member_sn"].as_i64(), Some(1));
 
         // to_manual: 걸리면 정책 mode가 manual로 바뀐다 (이벤트 OrchPolicyUpdated)
@@ -1018,7 +1025,7 @@ mod tests {
         assert_eq!(set_policy(&app, |p| { p["guards"][0]["threshold"] = json!(1); p["guards"][0]["on_trigger"] = json!("to_manual"); }).await.0, StatusCode::OK);
         assert!(on(db.clone(), ev.clone()).await.is_some()); // e 자동 배정
         let sn = on(db.clone(), ev.clone()).await.unwrap(); // 걸림
-        assert_eq!(call(&app, "GET", "/proposals?status=stopped", None).await.1[0]["sn"].as_i64(), Some(sn));
+        assert_eq!(call(&app, "GET", "/asks?kind=proposal&status=stopped", None).await.1[0]["sn"].as_i64(), Some(sn));
         assert_eq!(call(&app, "GET", "/teams/1/policy", None).await.1["mode"], "manual");
         assert_eq!(events(&db, "team", 1).await.last().unwrap().0, "OrchPolicyUpdated");
     }
@@ -1081,38 +1088,38 @@ mod tests {
 
         // 같은 역할의 노는 멤버가 선택지로 붙는다
         let sn = rule::on(&db, &ev).await.unwrap().unwrap();
-        let v = call(&app, "GET", "/proposals?project_sn=1&status=proposed", None).await.1;
-        assert_eq!((v[0]["options"][0]["label"].as_str(), v[0]["options"][0]["kind"].as_str(), v[0]["options"][0]["member_sn"].as_i64(), v[0]["options"][0]["task_sn"].as_i64()), (Some("m3"), Some("assign"), Some(3), Some(2)));
+        let v = call(&app, "GET", "/asks?kind=proposal&project_sn=1&status=proposed", None).await.1;
+        assert_eq!((v[0]["option"][0]["label"].as_str(), v[0]["option"][0]["kind"].as_str(), v[0]["option"][0]["member_sn"].as_i64(), v[0]["option"][0]["task_sn"].as_i64()), (Some("m3"), Some("assign"), Some(3), Some(2)));
 
         // hold: 기한이 뒤로 밀린다 (본문 없이도 · 정책 timer_sec) · 모르는 선택지 422(제안은 그대로)
         let before = v[0]["deadline_at"].as_str().unwrap().to_owned();
-        let (st, h) = call(&app, "POST", &format!("/proposals/{sn}/hold"), Some(json!({"sec": 60}))).await;
+        let (st, h) = call(&app, "POST", &format!("/asks/{sn}/hold"), Some(json!({"sec": 60}))).await;
         assert_eq!((st, h["status"].as_str(), h["deadline_at"].as_str().unwrap() > before.as_str()), (StatusCode::OK, Some("proposed"), true));
-        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/hold"), None).await.0, StatusCode::OK);
-        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/hold"), Some(json!({"sec": 0}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/edit"), Some(json!({"option": "zzz"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(call(&app, "GET", "/proposals?status=proposed", None).await.1.as_array().unwrap().len(), 1);
+        assert_eq!(call(&app, "POST", &format!("/asks/{sn}/hold"), None).await.0, StatusCode::OK);
+        assert_eq!(call(&app, "POST", &format!("/asks/{sn}/hold"), Some(json!({"sec": 0}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", &format!("/asks/{sn}/edit"), Some(json!({"option": "zzz"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "GET", "/asks?kind=proposal&status=proposed", None).await.1.as_array().unwrap().len(), 1);
 
         // edit(m3) → changed + 그 멤버에게 배정
-        let (st, p) = call(&app, "POST", &format!("/proposals/{sn}/edit"), Some(json!({"option": "m3"}))).await;
+        let (st, p) = call(&app, "POST", &format!("/asks/{sn}/edit"), Some(json!({"option": "m3"}))).await;
         assert_eq!((st, p["status"].as_str()), (StatusCode::OK, Some("changed")));
         let t = call(&app, "GET", "/tasks/2", None).await.1;
         assert_eq!((t["member_sn"].as_i64(), t["assign_by"].as_str()), (Some(3), Some("orch_auto")));
-        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/hold"), None).await.0, StatusCode::CONFLICT); // 이미 처리됨
+        assert_eq!(call(&app, "POST", &format!("/asks/{sn}/hold"), None).await.0, StatusCode::CONFLICT); // 이미 처리됨
 
         // dismiss · cancel (다음 태스크 c = 3 제안을 두 번)
         let s1 = rule::on(&db, &ev).await.unwrap().unwrap();
-        assert_eq!(call(&app, "POST", &format!("/proposals/{s1}/dismiss"), None).await.1["status"], "dismissed");
+        assert_eq!(call(&app, "POST", &format!("/asks/{s1}/dismiss"), None).await.1["status"], "dismissed");
         let s2 = rule::on(&db, &ev).await.unwrap().unwrap();
         assert_ne!(s1, s2);
-        assert_eq!(call(&app, "POST", &format!("/proposals/{s2}/cancel"), None).await.1["status"], "stopped");
+        assert_eq!(call(&app, "POST", &format!("/asks/{s2}/cancel"), None).await.1["status"], "stopped");
         assert!(call(&app, "GET", "/tasks/3", None).await.1["member_sn"].is_null());
 
         // 자동 실행 실패(그 사이 c가 다른 멤버에게 배정됨) → dismissed + 사유, 배정은 그대로 · 사용자 proceed는 409 + proposed 유지
         let s3 = rule::on(&db, &ev).await.unwrap().unwrap();
-        db.execute_unprepared("UPDATE tbl_task SET member_sn = 3 WHERE sn = 3; UPDATE tbl_orch_proposal SET deadline_at = datetime('now', '-1 seconds');").await.unwrap();
-        assert_eq!(rule::tick(&db).await.unwrap(), 1);
-        let v = call(&app, "GET", "/proposals?status=dismissed", None).await.1;
+        db.execute_unprepared("UPDATE tbl_task SET member_sn = 3 WHERE sn = 3; UPDATE tbl_ask SET deadline_at = datetime('now', '-1 seconds');").await.unwrap();
+        assert_eq!(ask::tick(&db).await.unwrap(), 1);
+        let v = call(&app, "GET", "/asks?kind=proposal&status=dismissed", None).await.1;
         assert_eq!((v[0]["sn"].as_i64(), v[0]["reason"].as_str().unwrap().contains("failed")), (Some(s3), true));
         assert_eq!(call(&app, "GET", "/tasks/3", None).await.1["member_sn"].as_i64(), Some(3));
         assert_eq!(rule::on(&db, &ev).await.unwrap(), None); // 후보 없음
@@ -1135,9 +1142,9 @@ mod tests {
         // retry: 첫 실패 → 제안 → 실행(새 Run · retry_run_sn) → 두 번째 실패 → 제안 없음
         let rs = call(&app, "POST", &format!("/tasks/{a}/runs"), None).await.1["sn"].as_i64().unwrap();
         let sn = rule::on(&db, &fail(rs).await).await.unwrap().unwrap();
-        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
-        assert_eq!((v[0]["kind"].as_str(), v[0]["run_sn"].as_i64(), v[0]["task_sn"].as_i64(), v[0]["member_sn"].as_i64()), (Some("retry"), Some(rs), Some(a), Some(1)));
-        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/proceed"), None).await.1["status"], "user_done");
+        let v = call(&app, "GET", "/asks?kind=proposal&status=proposed", None).await.1;
+        assert_eq!((v[0]["action"].as_str(), v[0]["run_sn"].as_i64(), v[0]["task_sn"].as_i64(), v[0]["member_sn"].as_i64()), (Some("retry"), Some(rs), Some(a), Some(1)));
+        assert_eq!(call(&app, "POST", &format!("/asks/{sn}/proceed"), None).await.1["status"], "user_done");
         let runs = call(&app, "GET", &format!("/tasks/{a}/runs"), None).await.1;
         assert_eq!((runs.as_array().unwrap().len(), runs[1]["retry_run_sn"].as_i64(), runs[1]["status"].as_str()), (2, Some(rs), Some("queued")));
         let rs2 = runs[1]["sn"].as_i64().unwrap();
@@ -1154,9 +1161,9 @@ mod tests {
         let rs3 = call(&app, "POST", &format!("/tasks/{b}/runs"), None).await.1["sn"].as_i64().unwrap();
         db.execute_unprepared(&format!("UPDATE tbl_run SET connection_sn = 1 WHERE sn = {rs3};")).await.unwrap();
         let sn = rule::on(&db, &fail(rs3).await).await.unwrap().unwrap();
-        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
-        assert_eq!((v[0]["kind"].as_str(), v[0]["title"].as_str().unwrap().contains("good")), (Some("fallback"), true));
-        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/proceed"), None).await.1["status"], "user_done");
+        let v = call(&app, "GET", "/asks?kind=proposal&status=proposed", None).await.1;
+        assert_eq!((v[0]["action"].as_str(), v[0]["title"].as_str().unwrap().contains("good")), (Some("fallback"), true));
+        assert_eq!(call(&app, "POST", &format!("/asks/{sn}/proceed"), None).await.1["status"], "user_done");
         assert_eq!(r::Entity::find_by_id(rs3).one(&db).await.unwrap().unwrap().connection_sn, Some(2));
         assert_eq!(events(&db, "run", rs3).await.last().unwrap().0, "FallbackUsed");
         let n = call(&app, "GET", "/notifications", None).await.1;
@@ -1173,8 +1180,8 @@ mod tests {
         let ev = finish(&app, &db, a).await;
         assert_eq!(set_policy(&app, |p| p["levels"][1]["handle"] = json!("wait")).await.0, StatusCode::OK);
         assert_eq!(rule::on(&db, &ev).await.unwrap(), None);
-        assert_eq!(call(&app, "GET", "/proposals", None).await.1.as_array().unwrap().len(), 0);
-        let d = call(&app, "GET", "/decisions", None).await.1;
+        assert_eq!(call(&app, "GET", "/asks?kind=proposal", None).await.1.as_array().unwrap().len(), 0);
+        let d = call(&app, "GET", "/asks?kind=decision", None).await.1;
         assert_eq!((d.as_array().unwrap().len(), d[0]["level"].as_i64(), d[0]["member_sn"].as_i64(), d[0]["deadline_at"].is_null()), (1, Some(2), Some(2), true));
         let n = call(&app, "GET", "/notifications", None).await.1;
         assert_eq!((n[0]["event_code"].as_str(), n[0]["actor_type"].as_str()), (Some("decision_request"), Some("orch")));
@@ -1608,7 +1615,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/proposals", "/proposals/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram", "/presets/{sn}", "/presets/{sn}/usage", "/presets/import", "/report-forms", "/report-forms/{key}", "/report-forms/{key}/preview", "/workspace/profile"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/asks/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram", "/presets/{sn}", "/presets/{sn}/usage", "/presets/import", "/report-forms", "/report-forms/{key}", "/report-forms/{key}/preview", "/workspace/profile", "/asks", "/asks/{sn}", "/asks/{sn}/answer", "/asks/{sn}/writing", "/asks/{sn}/approve", "/asks/{sn}/deny", "/asks/{sn}/hold", "/asks/{sn}/{action}"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

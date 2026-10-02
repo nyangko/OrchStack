@@ -41,12 +41,10 @@ pub enum Relation {
         on_delete = "Restrict"
     )]
     TblAgentProfile,
-    #[sea_orm(has_many = "super::tbl_approval::Entity")]
-    TblApproval,
+    #[sea_orm(has_many = "super::tbl_ask::Entity")]
+    TblAsk,
     #[sea_orm(has_many = "super::tbl_conversation::Entity")]
     TblConversation,
-    #[sea_orm(has_many = "super::tbl_decision::Entity")]
-    TblDecision,
     #[sea_orm(has_many = "super::tbl_log_audit::Entity")]
     TblLogAudit,
     #[sea_orm(has_many = "super::tbl_log_event::Entity")]
@@ -55,8 +53,6 @@ pub enum Relation {
     TblMessage,
     #[sea_orm(has_many = "super::tbl_notification::Entity")]
     TblNotification,
-    #[sea_orm(has_many = "super::tbl_orch_proposal::Entity")]
-    TblOrchProposal,
     #[sea_orm(has_many = "super::tbl_review::Entity")]
     TblReview,
     #[sea_orm(has_many = "super::tbl_run::Entity")]
@@ -89,21 +85,15 @@ impl Related<super::tbl_agent_profile::Entity> for Entity {
     }
 }
 
-impl Related<super::tbl_approval::Entity> for Entity {
+impl Related<super::tbl_ask::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TblApproval.def()
+        Relation::TblAsk.def()
     }
 }
 
 impl Related<super::tbl_conversation::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblConversation.def()
-    }
-}
-
-impl Related<super::tbl_decision::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblDecision.def()
     }
 }
 
@@ -128,12 +118,6 @@ impl Related<super::tbl_message::Entity> for Entity {
 impl Related<super::tbl_notification::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblNotification.def()
-    }
-}
-
-impl Related<super::tbl_orch_proposal::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblOrchProposal.def()
     }
 }
 

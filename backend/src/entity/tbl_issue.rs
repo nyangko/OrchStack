@@ -32,6 +32,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::tbl_ask::Entity")]
+    TblAsk,
     #[sea_orm(has_many = "super::tbl_interaction::Entity")]
     TblInteraction,
     #[sea_orm(
@@ -44,8 +46,6 @@ pub enum Relation {
     SelfRef,
     #[sea_orm(has_many = "super::tbl_map_issue_label::Entity")]
     TblMapIssueLabel,
-    #[sea_orm(has_many = "super::tbl_orch_proposal::Entity")]
-    TblOrchProposal,
     #[sea_orm(
         belongs_to = "super::tbl_project::Entity",
         from = "Column::ProjectSn",
@@ -66,6 +66,12 @@ pub enum Relation {
     TblUser,
 }
 
+impl Related<super::tbl_ask::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblAsk.def()
+    }
+}
+
 impl Related<super::tbl_interaction::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblInteraction.def()
@@ -75,12 +81,6 @@ impl Related<super::tbl_interaction::Entity> for Entity {
 impl Related<super::tbl_map_issue_label::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblMapIssueLabel.def()
-    }
-}
-
-impl Related<super::tbl_orch_proposal::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblOrchProposal.def()
     }
 }
 

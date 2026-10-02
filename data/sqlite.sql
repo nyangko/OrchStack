@@ -356,7 +356,7 @@ CREATE TABLE tbl_profile_rule (
     title            TEXT NOT NULL,                                 -- 표시 이름 (예: PR 생성, git push --force)
     pattern          TEXT,                                          -- 명령 패턴 (action_code = command 일 때)
     description      TEXT,                                          -- 설명 (예: 원격 기록 덮어쓰기)
-    policy           TEXT NOT NULL CHECK (policy IN ('auto','approval','block')),  -- 정책: auto(자동 허용) | approval(승인 필요 · tbl_approval 생성) | block(항상 차단)
+    policy           TEXT NOT NULL CHECK (policy IN ('auto','approval','block')),  -- 정책: auto(자동 허용) | approval(승인 필요 · tbl_ask 승인 요청 생성) | block(항상 차단)
     approver         TEXT CHECK (approver IN ('user','orch_then_user')),  -- 승인자: user(사용자) | orch_then_user(Orch가 먼저 검토 후 사용자)
     is_notify        INTEGER NOT NULL DEFAULT 1,                    -- 알림 여부
     sort             INTEGER NOT NULL DEFAULT 0,                    -- 표시 순서
@@ -947,95 +947,38 @@ CREATE TABLE tbl_diagram_view (
 
 
 -- =====================================================================
--- 8. Orch 제안 · 판단 · 승인 · 대화
+-- 8. Orch 요청(판단 · 승인 · 제안) · 대화
 -- =====================================================================
 
--- Orch 제안 카드. 다음 배정 · 재시도 · 가드 정지 등 PM Dock에 뜨는 카드
-CREATE TABLE tbl_orch_proposal (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 제안 번호
+
+-- 요청. Orch가 사람에게 묻거나 알리는 카드 하나 · PM Dock · 결정 패널 · 알림의 '확인 필요'
+--   kind별 option_json 구조 (응답에서는 파싱해 객체로 준다)
+--     decision = 질문 배열 [{title, body, code_snippet, ref, options:[{code, label, note, is_recommended, is_selected}], answer_text, is_delegate, answer_at}]
+--     approval = {rule_title, detail}
+--     proposal = 다른 선택지 배열 [{label, kind, member_sn?, task_sn?}]
+CREATE TABLE tbl_ask (
+    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 요청 번호
     project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE,   -- 프로젝트
     issue_sn         INTEGER REFERENCES tbl_issue(sn) ON DELETE SET NULL,              -- 관련 이슈
     task_sn          INTEGER REFERENCES tbl_task(sn) ON DELETE SET NULL,               -- 관련 태스크
-    run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,                -- 관련 Run
-    member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 대상 멤버
-    guard_sn         INTEGER REFERENCES tbl_orch_guard(sn) ON DELETE SET NULL,         -- 걸린 루프 가드 (가드 정지일 때)
-    kind             TEXT NOT NULL CHECK (kind IN ('assign','retry','close_issue','next_issue','fallback','guard_stop')),  -- 종류: assign(다음 태스크 배정) | retry(실패 후 재시도) | close_issue(이슈 완료 처리) | next_issue(다음 이슈 제안) | fallback(연결 전환 · 폴백) | guard_stop(루프 가드 정지)
-    level            INTEGER NOT NULL DEFAULT 1,                    -- 작업 레벨 0 ~ 4
-    title            TEXT NOT NULL,                                 -- 제안 내용 (예: #130 QA를 하린에게 배정)
-    reason           TEXT,                                          -- 근거
-    option_json      TEXT,                                          -- 다른 선택지 JSON 배열
-    status           TEXT NOT NULL DEFAULT 'proposed' CHECK (status IN ('proposed','auto_done','user_done','changed','stopped','dismissed')),  -- 상태: proposed(제안 · 타이머 진행 중) | auto_done(타이머 후 자동 진행) | user_done(사용자가 바로 진행) | changed(다른 선택으로 변경) | stopped(사용자가 멈춤) | dismissed(무시 · 나중에)
-    streak_count     INTEGER NOT NULL DEFAULT 0,                    -- 연속 자동 진행 횟수 (예: 3 / 10)
-    deadline_at      TEXT,                                          -- 자동 진행 예정 시각
-    event_sn         INTEGER REFERENCES tbl_log_event(sn) ON DELETE SET NULL,  -- 이 제안을 만든 이벤트
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 처리한 사용자 (자동 진행이면 NULL)
+    run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,                -- 관련 Run (판단 · 승인이면 답을 기다리는 Run)
+    member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 묻거나 요청한 멤버 · 제안의 대상 멤버 (Orch가 만든 제안은 대상 멤버)
+    kind             TEXT NOT NULL CHECK (kind IN ('decision','approval','proposal')),  -- 종류: decision(판단 요청 · 에이전트가 사람에게 묻는 질문 묶음) | approval(승인 요청 · 승인 규칙에 걸린 동작) | proposal(Orch 제안 · 배정 · 재시도 · 가드 정지 등 규칙 엔진이 만든 카드)
+    action           TEXT CHECK (action IN ('pr_create','pr_merge','dependency_add','run_extend','external_message','assign','retry','close_issue','next_issue','fallback','guard_stop')),  -- 동작: approval = pr_create(PR 생성) | pr_merge(PR 병합) | dependency_add(새 의존성 추가) | run_extend(Run 제한 시간 연장) | external_message(팀 외부로 메시지) · proposal = assign(다음 태스크 배정) | retry(실패 후 재시도) | close_issue(이슈 완료 처리) | next_issue(다음 이슈 제안) | fallback(연결 전환 · 폴백) | guard_stop(루프 가드 정지) · decision = NULL
+    level            INTEGER NOT NULL DEFAULT 1,                    -- 작업 레벨 0 ~ 4 (판단 요청은 L2 이상)
+    title            TEXT NOT NULL,                                 -- 요약 제목 (예: 재전송 제한 · #130 QA를 하린에게 배정)
+    reason           TEXT,                                          -- 근거 (제안 · 가드 정지의 이유 · Orch가 대신 결정한 근거)
+    option_json      TEXT,                                          -- 질문 · 선택지 · 답 / 승인 내용 / 다른 선택지 (위 구조)
+    status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','writing','answered','orch_decided','cancelled','approved','denied','expired','proposed','auto_done','user_done','changed','stopped','dismissed')),  -- 상태 (kind마다 쓰는 값이 다르다): decision = pending(답변 대기 · 타이머 진행) | writing(사용자가 작성 중 · 타이머 멈춤) | answered(사용자가 답함) | orch_decided(시간 초과로 Orch가 대신 결정) | cancelled(취소) · approval = pending(승인 대기) | approved(승인) | denied(거부) | expired(시간 초과로 만료) · proposal = proposed(제안 · 타이머 진행 중) | auto_done(타이머 후 자동 진행) | user_done(사용자가 바로 진행) | changed(다른 선택으로 변경) | stopped(사용자가 멈춤 · 가드 정지) | dismissed(무시 · 나중에)
+    is_timer_pause   INTEGER NOT NULL DEFAULT 0,                    -- 타이머 멈춤 (작성 중)
+    is_review_needed INTEGER NOT NULL DEFAULT 0,                    -- 사용자가 재검토하기로 표시 (판단 요청)
+    deadline_at      TEXT,                                          -- 이 시각이 지나면 판단 = Orch가 결정 · 승인 = 만료 · 제안 = 자동 진행
+    decide_by        TEXT CHECK (decide_by IN ('user','orch')),     -- 결정한 쪽: user(사용자) | orch(사용자 대신 Orch)
+    user_sn          INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 처리한 사용자 (자동 진행이면 NULL)
+    streak_count     INTEGER NOT NULL DEFAULT 0,                    -- 연속 자동 진행 횟수 (제안 · 예: 3 / 10)
+    guard_code       TEXT,                                          -- 걸린 루프 가드 코드 (가드 정지 제안 · auto_streak · reject_loop …)
+    event_sn         INTEGER REFERENCES tbl_log_event(sn) ON DELETE SET NULL,  -- 이 요청을 만든 이벤트
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    resolve_at       TEXT                                           -- 처리 시각
-);
-
--- 판단 요청. 에이전트가 사람에게 묻는 질문 묶음 · 결정 패널
-CREATE TABLE tbl_decision (
-    sn                INTEGER PRIMARY KEY AUTOINCREMENT,            -- 판단 요청 번호
-    project_sn        INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE,  -- 프로젝트
-    task_sn           INTEGER REFERENCES tbl_task(sn) ON DELETE SET NULL,              -- 관련 태스크
-    run_sn            INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,               -- 답을 기다리는 Run
-    member_sn         INTEGER NOT NULL REFERENCES tbl_member(sn) ON DELETE RESTRICT,   -- 질문한 멤버
-    level             INTEGER NOT NULL DEFAULT 2,                   -- 작업 레벨 (L2 이상)
-    title             TEXT NOT NULL,                                -- 요약 제목
-    status            TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','writing','answered','orch_decided','cancelled')),  -- 상태: pending(답변 대기 · 타이머 진행) | writing(사용자가 작성 중 · 타이머 멈춤) | answered(사용자가 답함) | orch_decided(시간 초과로 Orch가 대신 결정) | cancelled(취소)
-    decide_by         TEXT CHECK (decide_by IN ('user','orch')),  -- 결정한 쪽: user(사용자) | orch(사용자 대신 Orch)
-    user_sn               INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,             -- 답한 사용자
-    orch_reason       TEXT,                                         -- Orch가 대신 결정한 근거
-    is_timer_pause    INTEGER NOT NULL DEFAULT 0,                   -- 타이머 멈춤 (작성 중)
-    deadline_at       TEXT,                                         -- 이 시각이 지나면 Orch가 결정
-    is_review_needed  INTEGER NOT NULL DEFAULT 0,                   -- 사용자가 재검토하기로 표시
-    create_at         TEXT NOT NULL DEFAULT (datetime('now')),      -- 생성 시각
-    decide_at         TEXT                                          -- 결정 시각
-);
-
--- 질문. 판단 요청 안의 개별 질문
-CREATE TABLE tbl_decision_question (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 질문 번호
-    decision_sn      INTEGER NOT NULL REFERENCES tbl_decision(sn) ON DELETE CASCADE,  -- 판단 요청
-    sort             INTEGER NOT NULL,                              -- 순서 (Q1, Q2 …)
-    title            TEXT NOT NULL,                                 -- 짧은 제목 (예: 재전송 제한)
-    body             TEXT,                                          -- 질문 본문
-    code_snippet     TEXT,                                          -- 함께 보여줄 코드
-    ref_json         TEXT,                                          -- 참고 자료 JSON 배열 (파일 · 줄 · 태스크)
-    answer_text      TEXT,                                          -- 덧붙인 말 또는 직접 쓴 답
-    is_delegate      INTEGER NOT NULL DEFAULT 0,                    -- 이 질문은 Orch에게 맡김
-    answer_at        TEXT,                                          -- 답한 시각
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))       -- 생성 시각
-);
-
--- 선택지. 질문의 답 후보
-CREATE TABLE tbl_decision_option (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 선택지 번호
-    question_sn      INTEGER NOT NULL REFERENCES tbl_decision_question(sn) ON DELETE CASCADE,  -- 질문
-    sort             INTEGER NOT NULL,                              -- 순서
-    code             TEXT NOT NULL,                                 -- 표시 기호 (A, B, C)
-    label            TEXT NOT NULL,                                 -- 내용 (예: 60초 쿨다운 표시)
-    note             TEXT,                                          -- 장단점 설명
-    is_recommended   INTEGER NOT NULL DEFAULT 0,                    -- 추천 여부
-    is_selected      INTEGER NOT NULL DEFAULT 0,                    -- 사용자가 고른 선택지 (질문당 1개 · 서버에서 보장 · 질문 → 선택지 순환 참조를 피하려고 선택지 쪽에 둔다)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))       -- 생성 시각
-);
-
--- 승인 요청. 승인 규칙에 걸린 동작 (PR 생성 · 병합 · Run 연장 · 의존성 추가)
-CREATE TABLE tbl_approval (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 승인 요청 번호
-    project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE,   -- 프로젝트
-    task_sn          INTEGER REFERENCES tbl_task(sn) ON DELETE SET NULL,               -- 관련 태스크
-    run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,                -- 관련 Run
-    member_sn        INTEGER NOT NULL REFERENCES tbl_member(sn) ON DELETE RESTRICT,    -- 요청한 멤버
-    rule_sn          INTEGER REFERENCES tbl_profile_rule(sn) ON DELETE SET NULL,       -- 걸린 승인 규칙
-    action_code      TEXT NOT NULL CHECK (action_code IN ('pr_create','pr_merge','dependency_add','run_extend','external_message')),  -- 동작: pr_create(PR 생성) | pr_merge(PR 병합) | dependency_add(새 의존성 추가) | run_extend(Run 제한 시간 연장) | external_message(팀 외부로 메시지)
-    title            TEXT NOT NULL,                                 -- 제목 (예: Run 연장 요청)
-    detail           TEXT,                                          -- 상세 (예: 20분 초과 예상 · 남은 단계 2/5)
-    status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','denied','expired')),  -- 상태: pending(승인 대기) | approved(승인) | denied(거부) | expired(시간 초과로 만료)
-    deadline_at      TEXT,                                          -- 이 시각이 지나면 expired (Run은 그 자리에서 멈춘 채 · 알림)
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 처리한 사용자
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 요청 시각
     decide_at        TEXT                                           -- 처리 시각
 );
 
@@ -1069,7 +1012,7 @@ CREATE TABLE tbl_message (
 -- 첨부 파일. 메시지 · 질문 답변 · 태스크에 붙인 파일
 CREATE TABLE tbl_attachment (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 첨부 번호
-    owner_type       TEXT NOT NULL CHECK (owner_type IN ('message','decision_question','task')),  -- 붙인 곳: message(메시지) | decision_question(질문 답변) | task(태스크)
+    owner_type       TEXT NOT NULL CHECK (owner_type IN ('message','ask','task')),  -- 붙인 곳: message(메시지) | ask(요청 · 판단 답변) | task(태스크)
     owner_sn         INTEGER NOT NULL,                              -- 붙인 곳의 sn
     user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 올린 사용자
     file_name        TEXT NOT NULL,                                 -- 파일 이름
@@ -1120,7 +1063,7 @@ CREATE TABLE tbl_notification (
     member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 알린 멤버
     title            TEXT NOT NULL,                                 -- 제목
     body             TEXT,                                          -- 설명
-    ref_type         TEXT CHECK (ref_type IN ('decision','approval','run','task','connection','proposal')),  -- 바로가기 대상: decision(판단 요청) | approval(승인 요청) | run(Run) | task(태스크) | connection(연결) | proposal(Orch 제안)
+    ref_type         TEXT CHECK (ref_type IN ('ask','run','task','connection')),  -- 바로가기 대상: ask(판단 · 승인 · 제안) | run(Run) | task(태스크) | connection(연결)
     ref_sn           INTEGER,                                       -- 바로가기 대상의 sn (여러 테이블이라 FK 없음 · 대상이 지워지면 화면에 '삭제된 항목' 표시)
     is_action        INTEGER NOT NULL DEFAULT 0,                    -- 확인 필요(답하기 · 승인 버튼) 알림인지
     is_read          INTEGER NOT NULL DEFAULT 0,                    -- 읽음 여부
@@ -1141,7 +1084,7 @@ CREATE TABLE tbl_log_event (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 이벤트 번호 (전역 순서 · 재연결 커서 · 쓰기는 워크스페이스당 1개 트랜잭션씩 직렬화해야 번호 순서 = 커밋 순서가 된다)
     workspace_sn              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     project_sn       INTEGER REFERENCES tbl_project(sn) ON DELETE CASCADE,  -- 프로젝트 (워크스페이스 전체 이벤트면 NULL)
-    aggregate_type   TEXT NOT NULL CHECK (aggregate_type IN ('workspace','project','issue','task','run','session','profile','template','member','team','decision','approval','contract','connection','preset','message','proposal','skill')),  -- 대상 종류: workspace | project | issue | task | run | session | profile(에이전트 프로필 · 폴백 체인) | template | member | team | decision | approval | contract | connection | preset | message(Orch 대화 메시지) | proposal(Orch 제안) | skill
+    aggregate_type   TEXT NOT NULL CHECK (aggregate_type IN ('workspace','project','issue','task','run','session','profile','template','member','team','ask','contract','connection','preset','message','skill')),  -- 대상 종류: workspace | project | issue | task | run | session | profile(에이전트 프로필 · 폴백 체인) | template | member | team | ask(판단 · 승인 · 제안) | contract | connection | preset | message(Orch 대화 메시지) | skill
     aggregate_sn     INTEGER NOT NULL,                              -- 대상 번호 (aggregate_type 테이블의 sn · FK 없음 · 대상이 지워져도 기록은 남는다)
     seq              INTEGER NOT NULL,                              -- 대상별 순번 (1부터 · 동시 수정 충돌 감지)
     event_type       TEXT NOT NULL,                                 -- 이벤트 이름 (PascalCase · 예: TaskCreated, AgentAssigned, RunStarted, ReportReceived, ContractChanged, DecisionAnswered)
@@ -1201,7 +1144,7 @@ CREATE TABLE tbl_log_activity (
     kind             TEXT NOT NULL CHECK (kind IN ('TASK_INSTRUCTION','ASSIGN','RUN','TOOL_CALL','MESSAGE','TEST','REQUEST_VERIFICATION','REVIEW','DECISION','SYSTEM')),  -- 종류: TASK_INSTRUCTION(태스크 지시) | ASSIGN(배정) | RUN(Run 시작 · 종료) | TOOL_CALL(도구 호출) | MESSAGE(메시지) | TEST(테스트) | REQUEST_VERIFICATION(검증 요청) | REVIEW(리뷰 · 반려) | DECISION(결정) | SYSTEM(시스템 · 한도 경고 등)
     title            TEXT NOT NULL,                                 -- 한 줄 요약
     body             TEXT,                                          -- 상세
-    ref_type         TEXT CHECK (ref_type IN ('decision','review','approval','proposal','message','interaction')),  -- 펼쳐 볼 대상: decision | review | approval | proposal | message | interaction (ref_sn이 가리키는 테이블)
+    ref_type         TEXT CHECK (ref_type IN ('ask','review','message','interaction')),  -- 펼쳐 볼 대상: ask | review | message | interaction (ref_sn이 가리키는 테이블)
     ref_sn           INTEGER,                                       -- 펼쳐 볼 대상의 sn (여러 테이블이라 FK 없음 · 대상이 지워지면 화면에 '삭제된 항목' 표시)
     event_sn         INTEGER REFERENCES tbl_log_event(sn) ON DELETE SET NULL,  -- 원본 이벤트 (이 행을 만든 tbl_log_event)
     create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 기록 시각
@@ -1238,9 +1181,7 @@ CREATE INDEX idx_run_member             ON tbl_run (member_sn, create_at);
 CREATE INDEX idx_run_parent             ON tbl_run (parent_run_sn);
 CREATE INDEX idx_run_wait               ON tbl_run (wait_run_sn);
 CREATE INDEX idx_session_run            ON tbl_session (run_sn);
-CREATE INDEX idx_decision_status        ON tbl_decision (project_sn, status);
-CREATE INDEX idx_approval_status        ON tbl_approval (project_sn, status);
-CREATE INDEX idx_proposal_status        ON tbl_orch_proposal (project_sn, status);
+CREATE INDEX idx_ask_status             ON tbl_ask (project_sn, kind, status);
 CREATE INDEX idx_message_conversation   ON tbl_message (conversation_sn, create_at);
 CREATE INDEX idx_attachment_owner       ON tbl_attachment (owner_type, owner_sn);
 CREATE INDEX idx_notification_user      ON tbl_notification (user_sn, is_read, create_at);
@@ -1268,8 +1209,6 @@ CREATE INDEX idx_run_file_run           ON tbl_run_file (run_sn);
 CREATE INDEX idx_context_manifest_run   ON tbl_context_manifest (run_sn);
 CREATE INDEX idx_context_source_manifest ON tbl_context_source (manifest_sn);
 CREATE INDEX idx_context_source_hash    ON tbl_context_source (content_hash);
-CREATE INDEX idx_decision_question      ON tbl_decision_question (decision_sn, sort);
-CREATE INDEX idx_decision_option        ON tbl_decision_option (question_sn, sort);
 CREATE INDEX idx_task_criterion_task    ON tbl_task_criterion (task_sn, sort);
 CREATE INDEX idx_profile_tool           ON tbl_profile_tool (profile_sn);
 CREATE INDEX idx_profile_path           ON tbl_profile_path (profile_sn);
@@ -1305,11 +1244,11 @@ CREATE INDEX idx_fk_agent_profile_connection_sn ON tbl_agent_profile (connection
 CREATE INDEX idx_fk_agent_profile_model_sn ON tbl_agent_profile (model_sn);
 CREATE INDEX idx_fk_agent_profile_runtime_sn ON tbl_agent_profile (runtime_sn);
 CREATE INDEX idx_fk_agent_profile_workspace_sn ON tbl_agent_profile (workspace_sn);
-CREATE INDEX idx_fk_approval_member_sn ON tbl_approval (member_sn);
-CREATE INDEX idx_fk_approval_rule_sn ON tbl_approval (rule_sn);
-CREATE INDEX idx_fk_approval_run_sn ON tbl_approval (run_sn);
-CREATE INDEX idx_fk_approval_task_sn ON tbl_approval (task_sn);
-CREATE INDEX idx_fk_approval_user_sn ON tbl_approval (user_sn);
+CREATE INDEX idx_fk_ask_member_sn ON tbl_ask (member_sn);
+CREATE INDEX idx_fk_ask_run_sn ON tbl_ask (run_sn);
+CREATE INDEX idx_fk_ask_task_sn ON tbl_ask (task_sn);
+CREATE INDEX idx_fk_ask_issue_sn ON tbl_ask (issue_sn);
+CREATE INDEX idx_fk_ask_user_sn ON tbl_ask (user_sn);
 CREATE INDEX idx_fk_attachment_user_sn ON tbl_attachment (user_sn);
 CREATE INDEX idx_fk_connection_runtime_sn ON tbl_connection (runtime_sn);
 CREATE INDEX idx_fk_connection_user_sn ON tbl_connection (user_sn);
@@ -1319,10 +1258,6 @@ CREATE INDEX idx_fk_contract_update_run_sn ON tbl_contract (update_run_sn);
 CREATE INDEX idx_fk_conversation_member_sn ON tbl_conversation (member_sn);
 CREATE INDEX idx_fk_conversation_project_sn ON tbl_conversation (project_sn);
 CREATE INDEX idx_fk_conversation_user_sn ON tbl_conversation (user_sn);
-CREATE INDEX idx_fk_decision_member_sn ON tbl_decision (member_sn);
-CREATE INDEX idx_fk_decision_run_sn ON tbl_decision (run_sn);
-CREATE INDEX idx_fk_decision_task_sn ON tbl_decision (task_sn);
-CREATE INDEX idx_fk_decision_user_sn ON tbl_decision (user_sn);
 CREATE INDEX idx_fk_diagram_node_user_sn ON tbl_diagram_node (user_sn);
 CREATE INDEX idx_fk_diagram_view_user_sn ON tbl_diagram_view (user_sn);
 CREATE INDEX idx_fk_instruction_preset_copy_from_sn ON tbl_instruction_preset (copy_from_sn);
@@ -1364,12 +1299,6 @@ CREATE INDEX idx_fk_notification_member_sn ON tbl_notification (member_sn);
 CREATE INDEX idx_fk_notification_workspace_sn ON tbl_notification (workspace_sn);
 CREATE INDEX idx_fk_notify_rule_connection_sn ON tbl_notify_rule (connection_sn);
 CREATE INDEX idx_fk_orch_policy_project_sn ON tbl_orch_policy (project_sn);
-CREATE INDEX idx_fk_orch_proposal_guard_sn ON tbl_orch_proposal (guard_sn);
-CREATE INDEX idx_fk_orch_proposal_issue_sn ON tbl_orch_proposal (issue_sn);
-CREATE INDEX idx_fk_orch_proposal_member_sn ON tbl_orch_proposal (member_sn);
-CREATE INDEX idx_fk_orch_proposal_run_sn ON tbl_orch_proposal (run_sn);
-CREATE INDEX idx_fk_orch_proposal_task_sn ON tbl_orch_proposal (task_sn);
-CREATE INDEX idx_fk_orch_proposal_user_sn ON tbl_orch_proposal (user_sn);
 CREATE INDEX idx_fk_project_team_sn ON tbl_project (team_sn);
 CREATE INDEX idx_fk_project_workspace_sn ON tbl_project (workspace_sn);
 CREATE INDEX idx_fk_report_item_task_sn ON tbl_report_item (task_sn);
@@ -1381,7 +1310,6 @@ CREATE INDEX idx_fk_run_retry_run_sn ON tbl_run (retry_run_sn);
 CREATE INDEX idx_fk_run_runtime_sn ON tbl_run (runtime_sn);
 CREATE INDEX idx_fk_interaction_event_sn ON tbl_interaction (event_sn);
 CREATE INDEX idx_fk_notification_event_sn ON tbl_notification (event_sn);
-CREATE INDEX idx_fk_orch_proposal_event_sn ON tbl_orch_proposal (event_sn);
 CREATE INDEX idx_fk_report_item_criterion_sn ON tbl_report_item (criterion_sn);
 CREATE INDEX idx_fk_skill_source_sn ON tbl_skill (source_sn);
 CREATE INDEX idx_fk_skill_source_workspace_sn ON tbl_skill_source (workspace_sn);

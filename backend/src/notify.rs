@@ -1,5 +1,5 @@
 //! 알림(tbl_notification) 목록 · 읽음 + 이벤트 → 알림 projection, 알림 규칙 · 채널(tbl_notify_rule · _channel), 감사 로그(tbl_log_audit) 조회
-use crate::{entity::{tbl_approval as ap, tbl_connection as cn, tbl_decision as dc, tbl_orch_proposal as op, tbl_log_audit as au, tbl_log_event as e, tbl_notification as n, tbl_notify_channel as ch,
+use crate::{entity::{tbl_ask as ak, tbl_connection as cn, tbl_log_audit as au, tbl_log_event as e, tbl_notification as n, tbl_notify_channel as ch,
     tbl_notify_rule as nr, tbl_run as r, tbl_task as t},
     error::{Body, Error, ErrorBody, Res}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}};
@@ -40,12 +40,13 @@ pub async fn project(tx: &DatabaseTransaction, ev: &e::Model) -> Res<()> {
     let sn = ev.aggregate_sn;
     let (code, title, body, ref_type, ref_sn, action) = match ev.event_type.as_str() {
         "DecisionRequested" => {
-            let Some(m) = dc::Entity::find_by_id(ev.aggregate_sn).one(tx).await? else { return Ok(()) };
-            ("decision_request", m.title, None, "decision", sn, 1)
+            let Some(m) = ak::Entity::find_by_id(sn).one(tx).await? else { return Ok(()) };
+            ("decision_request", m.title, None, "ask", sn, 1)
         }
         "ApprovalRequested" => {
-            let Some(m) = ap::Entity::find_by_id(ev.aggregate_sn).one(tx).await? else { return Ok(()) };
-            ("approval_request", m.title, m.detail, "approval", sn, 1)
+            let Some(m) = ak::Entity::find_by_id(sn).one(tx).await? else { return Ok(()) };
+            let detail = crate::ask::detail(&m);
+            ("approval_request", m.title, detail, "ask", sn, 1)
         }
         "RunFailed" => {
             let Some(m) = r::Entity::find_by_id(ev.aggregate_sn).one(tx).await? else { return Ok(()) };
@@ -60,8 +61,8 @@ pub async fn project(tx: &DatabaseTransaction, ev: &e::Model) -> Res<()> {
         }
         // 가드 정지 (OrchProposed kind=guard_stop)
         "OrchProposed" => {
-            let Some(m) = op::Entity::find_by_id(sn).one(tx).await?.filter(|x| x.kind == "guard_stop") else { return Ok(()) };
-            ("guard_stop", m.title, m.reason, "proposal", sn, 1)
+            let Some(m) = ak::Entity::find_by_id(sn).one(tx).await?.filter(|x| x.action.as_deref() == Some("guard_stop")) else { return Ok(()) };
+            ("guard_stop", m.title, m.reason, "ask", sn, 1)
         }
         // 폴백 연결로 바꿈 (FallbackUsed): 제목 = 새 연결 이름
         "FallbackUsed" => {
@@ -94,7 +95,7 @@ pub struct Notice {
     member_sn: Option<i64>,
     title: String,
     body: Option<String>,
-    /// decision | approval | run | task | connection | proposal
+    /// ask | run | task | connection
     ref_type: Option<String>,
     ref_sn: Option<i64>,
     project_sn: Option<i64>,

@@ -3,7 +3,7 @@
 pub mod prelude;
 
 pub mod tbl_agent_profile;
-pub mod tbl_approval;
+pub mod tbl_ask;
 pub mod tbl_attachment;
 pub mod tbl_connection;
 pub mod tbl_connection_quota;
@@ -11,9 +11,6 @@ pub mod tbl_context_manifest;
 pub mod tbl_context_source;
 pub mod tbl_contract;
 pub mod tbl_conversation;
-pub mod tbl_decision;
-pub mod tbl_decision_option;
-pub mod tbl_decision_question;
 pub mod tbl_diagram_node;
 pub mod tbl_diagram_view;
 pub mod tbl_instruction_preset;
@@ -48,7 +45,6 @@ pub mod tbl_notify_rule;
 pub mod tbl_orch_guard;
 pub mod tbl_orch_policy;
 pub mod tbl_orch_policy_level;
-pub mod tbl_orch_proposal;
 pub mod tbl_profile_file;
 pub mod tbl_profile_guard;
 pub mod tbl_profile_path;

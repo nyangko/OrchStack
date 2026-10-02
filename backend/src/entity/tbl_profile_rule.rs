@@ -36,19 +36,11 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     TblAgentProfile,
-    #[sea_orm(has_many = "super::tbl_approval::Entity")]
-    TblApproval,
 }
 
 impl Related<super::tbl_agent_profile::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblAgentProfile.def()
-    }
-}
-
-impl Related<super::tbl_approval::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblApproval.def()
     }
 }
 

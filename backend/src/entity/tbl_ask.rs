@@ -3,26 +3,39 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, serde :: Serialize)]
-#[sea_orm(table_name = "tbl_approval")]
+#[sea_orm(table_name = "tbl_ask")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub sn: i64,
     pub project_sn: i64,
+    pub issue_sn: Option<i64>,
     pub task_sn: Option<i64>,
     pub run_sn: Option<i64>,
-    pub member_sn: i64,
-    pub rule_sn: Option<i64>,
+    pub member_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
-    pub action_code: String,
+    pub kind: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub action: Option<String>,
+    pub level: i64,
     #[sea_orm(column_type = "Text")]
     pub title: String,
     #[sea_orm(column_type = "Text", nullable)]
-    pub detail: Option<String>,
+    pub reason: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub option_json: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub status: String,
+    pub is_timer_pause: i64,
+    pub is_review_needed: i64,
     #[sea_orm(column_type = "Text", nullable)]
     pub deadline_at: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub decide_by: Option<String>,
     pub user_sn: Option<i64>,
+    pub streak_count: i64,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub guard_code: Option<String>,
+    pub event_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
     #[sea_orm(column_type = "Text", nullable)]
@@ -32,21 +45,29 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
+        belongs_to = "super::tbl_issue::Entity",
+        from = "Column::IssueSn",
+        to = "super::tbl_issue::Column::Sn",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    TblIssue,
+    #[sea_orm(
+        belongs_to = "super::tbl_log_event::Entity",
+        from = "Column::EventSn",
+        to = "super::tbl_log_event::Column::Sn",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    TblLogEvent,
+    #[sea_orm(
         belongs_to = "super::tbl_member::Entity",
         from = "Column::MemberSn",
         to = "super::tbl_member::Column::Sn",
         on_update = "NoAction",
-        on_delete = "Restrict"
-    )]
-    TblMember,
-    #[sea_orm(
-        belongs_to = "super::tbl_profile_rule::Entity",
-        from = "Column::RuleSn",
-        to = "super::tbl_profile_rule::Column::Sn",
-        on_update = "NoAction",
         on_delete = "SetNull"
     )]
-    TblProfileRule,
+    TblMember,
     #[sea_orm(
         belongs_to = "super::tbl_project::Entity",
         from = "Column::ProjectSn",
@@ -81,15 +102,21 @@ pub enum Relation {
     TblUser,
 }
 
-impl Related<super::tbl_member::Entity> for Entity {
+impl Related<super::tbl_issue::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TblMember.def()
+        Relation::TblIssue.def()
     }
 }
 
-impl Related<super::tbl_profile_rule::Entity> for Entity {
+impl Related<super::tbl_log_event::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::TblProfileRule.def()
+        Relation::TblLogEvent.def()
+    }
+}
+
+impl Related<super::tbl_member::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblMember.def()
     }
 }
 

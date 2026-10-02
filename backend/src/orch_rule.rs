@@ -1,14 +1,14 @@
 //! Orch 규칙 엔진 (#119 · LLM 0): 이벤트 1건 → 제안 0~1건 (`on`), 제안 실행 (`run` · 기존 command 재사용), 타이머 (`tick`), 멤버 대기열.
 //! 일상 PM 판단(다음 태스크 배정 · 재시도 · 이슈 닫기 · 폴백 · 가드 정지)을 모델 없이 처리한다. 실행기 · 모델 호출은 여기서 하지 않는다 (B-18)
-use crate::{entity::{tbl_agent_profile as ap, tbl_connection as cn, tbl_connection_quota as qt, tbl_issue as i, tbl_log_event as e, tbl_map_fallback as fb, tbl_member as mb,
-    tbl_orch_guard as og, tbl_orch_proposal as op, tbl_project as pj, tbl_review as rv, tbl_run as r, tbl_task as t},
-    decision::{self, ChoiceNew, DecisionNew, QuestionNew}, error::{Error, ErrorBody, Res, Sn}, event::{self, Ev},
-    issue::{self, IssuePatch}, orch::{self, Opt, Proposal, ProposalNew}, policy::{self, Guard, Level, Policy}, run as runs, stat, task};
-use axum::{Json, body::Bytes, extract::State};
-use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Statement, Value,
+use crate::{ask::{self, Choice, DecisionNew, Opt, ProposalNew, Question}, entity::{tbl_agent_profile as ap, tbl_connection as cn, tbl_connection_quota as qt, tbl_issue as i, tbl_log_event as e, tbl_map_fallback as fb, tbl_member as mb,
+    tbl_orch_guard as og, tbl_ask as ak, tbl_project as pj, tbl_review as rv, tbl_run as r, tbl_task as t},
+    error::{Error, ErrorBody, Res, Sn}, event::self,
+    orch, policy::{self, Guard, Level, Policy}, run as runs, stat, task};
+use axum::{Json, extract::State};
+use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Statement, Value,
     sea_query::{Expr, SimpleExpr}};
-use serde::{Deserialize, Serialize};
-use serde_json::{Value as Json_, json};
+use serde::Serialize;
+use serde_json::Value as Json_;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
@@ -16,16 +16,9 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 const LEVEL: i64 = 1;
 const STOP_LEVEL: i64 = 2;
 
-/// 제안을 처리하는 쪽: 사용자 proceed · 타이머 · 사용자가 고른 다른 선택지(label)
-pub enum By {
-    User,
-    Auto,
-    Pick(String),
-}
-
 /// orch_rule 관련 경로 묶음
 pub fn routes() -> OpenApiRouter<DatabaseConnection> {
-    OpenApiRouter::new().routes(routes!(hold)).routes(routes!(queue))
+    OpenApiRouter::new().routes(routes!(queue))
 }
 
 /// 지금(UTC) + shift("+5 seconds")의 SQLite datetime 문자열
@@ -137,10 +130,10 @@ impl Cx<'_> {
     async fn stop(&self, g: &Guard, n: i64, tk: &t::Model) -> Res<i64> {
         let nb = ProposalNew {
             project_sn: self.ps, issue_sn: tk.issue_sn, task_sn: Some(tk.sn), kind: "guard_stop".into(), level: STOP_LEVEL, title: g.name.clone(),
-            reason: Some(format!("{} {n} >= {}", g.code, g.threshold)), guard_sn: g.sn, status: Some("stopped".into()), event_sn: Some(self.ev.sn), ..Default::default()
+            reason: Some(format!("{} {n} >= {}", g.code, g.threshold)), guard_code: Some(g.code.clone()), status: Some("stopped".into()), event_sn: Some(self.ev.sn), ..Default::default()
         };
         event::run_as(self.db, "orch", Some(self.orch), async |tx| {
-            let (p, ev) = orch::add(tx, nb).await?;
+            let (p, ev) = ask::add(tx, nb).await?;
             let mut evs = vec![ev];
             if let Some(sn) = g.sn {
                 og::Entity::update_many().filter(og::Column::Sn.eq(sn)).col_expr(og::Column::TriggerAt, Expr::cust("datetime('now')")).exec(tx).await?;
@@ -219,8 +212,8 @@ impl Cx<'_> {
 
     /// 제안 만들기: 같은 제안이 대기 중이면 건너뜀 · 레벨 처리가 wait/block이면 판단 요청 · 아니면 모드대로 기한 정해 저장 (바로 실행이면 곧바로 run)
     async fn offer(&self, mut nb: ProposalNew) -> Res<Option<i64>> {
-        let dup = op::Entity::find().filter(op::Column::ProjectSn.eq(self.ps)).filter(op::Column::Kind.eq(nb.kind.as_str())).filter(op::Column::Status.eq("proposed"))
-            .filter(opt(op::Column::TaskSn, nb.task_sn)).filter(opt(op::Column::RunSn, nb.run_sn)).filter(opt(op::Column::IssueSn, nb.issue_sn)).one(self.db).await?;
+        let dup = ak::Entity::find().filter(ak::Column::ProjectSn.eq(self.ps)).filter(ak::Column::Kind.eq("proposal")).filter(ak::Column::Action.eq(nb.kind.as_str())).filter(ak::Column::Status.eq("proposed"))
+            .filter(opt(ak::Column::TaskSn, nb.task_sn)).filter(opt(ak::Column::RunSn, nb.run_sn)).filter(opt(ak::Column::IssueSn, nb.issue_sn)).one(self.db).await?;
         if dup.is_some() {
             return Ok(None);
         }
@@ -229,33 +222,33 @@ impl Cx<'_> {
         let lv = self.pol.levels.iter().find(|x| x.level == nb.level);
         let handle = lv.map_or("timer", |x| x.handle.as_str());
         if matches!(handle, "wait" | "block") {
-            self.ask(&nb, lv).await?;
+            self.wait(&nb, lv).await?;
             return Ok(None);
         }
         // 가드로 멈춘 뒤(가장 최근에 처리된 제안이 guard_stop)에는 사용자가 하나 처리할 때까지 자동 진행하지 않는다
-        let last = op::Entity::find().filter(op::Column::ProjectSn.is_in(projects_of(self.db, self.ps).await?)).filter(op::Column::Status.ne("proposed"))
-            .order_by_desc(op::Column::ResolveAt).order_by_desc(op::Column::Sn).one(self.db).await?;
-        let held = last.is_some_and(|x| x.kind == "guard_stop");
+        let last = ak::Entity::find().filter(ak::Column::ProjectSn.is_in(projects_of(self.db, self.ps).await?)).filter(ak::Column::Kind.eq("proposal")).filter(ak::Column::Status.ne("proposed"))
+            .order_by_desc(ak::Column::DecideAt).order_by_desc(ak::Column::Sn).one(self.db).await?;
+        let held = last.is_some_and(|x| x.action.as_deref() == Some("guard_stop"));
         let now = !held && self.pol.mode != "manual" && (self.pol.mode == "full_auto" || handle == "auto");
         if !held && !now && self.pol.mode == "auto" {
             nb.deadline_at = Some(at(self.db, &format!("+{} seconds", self.pol.timer_sec)).await?);
         }
         let sn = event::run_as(self.db, "orch", Some(self.orch), async |tx| {
-            let (p, ev) = orch::add(tx, nb).await?;
+            let (p, ev) = ask::add(tx, nb).await?;
             Ok((p.sn, vec![ev]))
         }).await?;
         if now {
-            run(self.db, sn, By::Auto).await?;
+            ask::run(self.db, sn, ask::By::Auto).await?;
         }
         Ok(Some(sn))
     }
 
     /// 레벨 처리가 wait/block이면 제안 대신 사용자에게 묻는다 (판단 요청 · 응답 반영은 B-18)
-    async fn ask(&self, nb: &ProposalNew, lv: Option<&Level>) -> Res<()> {
-        let c = |code: &str| ChoiceNew { code: code.into(), label: code.into(), note: None, is_recommended: code == "proceed" };
+    async fn wait(&self, nb: &ProposalNew, lv: Option<&Level>) -> Res<()> {
+        let c = |code: &str| Choice { code: code.into(), label: code.into(), note: None, is_recommended: code == "proceed", is_selected: false };
         let deadline = match lv.and_then(|x| x.wait_min) { Some(m) => Some(at(self.db, &format!("+{m} minutes")).await?), None => None };
-        let q = QuestionNew { title: nb.title.clone(), body: nb.reason.clone(), code_snippet: None, ref_json: None, options: vec![c("proceed"), c("stop")] };
-        decision::create(self.db, DecisionNew {
+        let q = Question { title: nb.title.clone(), body: nb.reason.clone(), code_snippet: None, reference: None, options: vec![c("proceed"), c("stop")], answer_text: None, is_delegate: false, answer_at: None };
+        ask::decision(self.db, DecisionNew {
             project_sn: self.ps, task_sn: nb.task_sn, run_sn: nb.run_sn, member_sn: self.orch, level: nb.level.max(2), title: nb.title.clone(), deadline_at: deadline, questions: vec![q],
         }).await?;
         Ok(())
@@ -271,21 +264,21 @@ fn opt<C: ColumnTrait>(c: C, v: Option<i64>) -> SimpleExpr {
 }
 
 /// 같은 팀 프로젝트 번호들 (팀이 없으면 자기 자신)
-async fn projects_of(db: &impl ConnectionTrait, ps: i64) -> Res<Vec<i64>> {
+pub(crate) async fn projects_of(db: &impl ConnectionTrait, ps: i64) -> Res<Vec<i64>> {
     let Some(team) = pj::Entity::find_by_id(ps).one(db).await?.and_then(|x| x.team_sn) else { return Ok(vec![ps]) };
     Ok(pj::Entity::find().filter(pj::Column::TeamSn.eq(team)).all(db).await?.into_iter().map(|x| x.sn).collect())
 }
 
 /// 프로젝트에 적용되는 정책 (팀이 없으면 None)
-async fn policy_of(db: &impl ConnectionTrait, ps: i64) -> Res<Option<Policy>> {
+pub(crate) async fn policy_of(db: &impl ConnectionTrait, ps: i64) -> Res<Option<Policy>> {
     let Some(team) = pj::Entity::find_by_id(ps).one(db).await?.and_then(|x| x.team_sn) else { return Ok(None) };
     policy::load(db, team, Some(ps)).await.map(Some)
 }
 
 /// 최근에 처리된 제안 중 끊김 없이 이어진 auto_done 수 (사용자가 처리하거나 멈추면 0으로 돌아간다)
-async fn streak(db: &impl ConnectionTrait, projects: &[i64]) -> Res<i64> {
-    let rows = op::Entity::find().filter(op::Column::ProjectSn.is_in(projects.to_vec())).filter(op::Column::Status.ne("proposed"))
-        .order_by_desc(op::Column::ResolveAt).order_by_desc(op::Column::Sn).limit(200).all(db).await?;
+pub(crate) async fn streak(db: &impl ConnectionTrait, projects: &[i64]) -> Res<i64> {
+    let rows = ak::Entity::find().filter(ak::Column::ProjectSn.is_in(projects.to_vec())).filter(ak::Column::Kind.eq("proposal")).filter(ak::Column::Status.ne("proposed"))
+        .order_by_desc(ak::Column::DecideAt).order_by_desc(ak::Column::Sn).limit(200).all(db).await?;
     Ok(rows.iter().take_while(|x| x.status == "auto_done").count() as i64)
 }
 
@@ -308,7 +301,7 @@ async fn healthy(db: &impl ConnectionTrait, cs: i64) -> Res<bool> {
 }
 
 /// Run 멤버 프로필의 폴백 체인에서 지금 연결 다음의 쓸 만한 연결 (체인에 없으면 처음부터)
-async fn next_conn(db: &impl ConnectionTrait, rn: &r::Model) -> Res<Option<cn::Model>> {
+pub(crate) async fn next_conn(db: &impl ConnectionTrait, rn: &r::Model) -> Res<Option<cn::Model>> {
     let Some(m) = mb::Entity::find_by_id(rn.member_sn).one(db).await? else { return Ok(None) };
     let chain = fb::Entity::find().filter(fb::Column::ProfileSn.eq(m.profile_sn)).order_by_asc(fb::Column::Sort).all(db).await?;
     let from = rn.connection_sn.and_then(|cur| chain.iter().position(|f| f.connection_sn == cur)).map_or(0, |p| p + 1);
@@ -320,112 +313,11 @@ async fn next_conn(db: &impl ConnectionTrait, rn: &r::Model) -> Res<Option<cn::M
     Ok(None)
 }
 
-/// 제안 실행: kind별로 기존 command를 부른다 (새 UPDATE 경로 없음). next_issue · guard_stop · 선택지만 있는 것은 확인만
-async fn act(tx: &DatabaseTransaction, kind: &str, tk: Option<i64>, member: Option<i64>, run_sn: Option<i64>, issue_sn: Option<i64>) -> Res<Vec<Ev>> {
-    let need = |v: Option<i64>| v.ok_or_else(|| Error::invalid(format!("{kind} needs a target")));
-    Ok(match kind {
-        "assign" => {
-            let (ts, ms) = (need(tk)?, need(member)?);
-            let cur = t::Entity::find_by_id(ts).one(tx).await?.ok_or_else(Error::not_found)?;
-            if cur.status != "todo" || cur.member_sn.is_some() {
-                return Err(Error::conflict(format!("task {ts} is no longer an open todo")));
-            }
-            vec![task::put_member(tx, ts, Some(ms), "orch_auto").await?.1]
-        }
-        "retry" => vec![runs::redo(tx, need(run_sn)?).await?.1],
-        "close_issue" => vec![issue::patch(tx, need(issue_sn)?, &IssuePatch { title: None, body: None, status: Some("closed".into()) }).await?.1],
-        "fallback" => {
-            let rn = r::Entity::find_by_id(need(run_sn)?).one(tx).await?.ok_or_else(Error::not_found)?;
-            let next = next_conn(tx, &rn).await?.ok_or_else(|| Error::conflict("no fallback connection".into()))?;
-            vec![runs::switch(tx, rn.sn, next.sn).await?]
-        }
-        _ => vec![],
-    })
-}
-
-/// 제안 상태를 `to`로 마무리 (proposed에서만 · 아니면 409) + OrchProposalResolved. why가 있으면 근거에 덧붙인다
-async fn settle(tx: &DatabaseTransaction, cur: &op::Model, to: &str, user: bool, streak: i64, why: Option<String>, option: Option<&str>) -> Res<(Proposal, Ev)> {
-    let reason = match (&cur.reason, why) { (Some(a), Some(b)) => Some(format!("{a} | {b}")), (a, b) => b.or(a.clone()) };
-    let mut q = op::Entity::update_many().filter(op::Column::Sn.eq(cur.sn)).filter(op::Column::Status.eq("proposed")).col_expr(op::Column::Status, to.to_owned().into())
-        .col_expr(op::Column::StreakCount, streak.into()).col_expr(op::Column::Reason, reason.into()).col_expr(op::Column::ResolveAt, Expr::cust("datetime('now')"));
-    if user {
-        q = q.col_expr(op::Column::UserSn, crate::USER.into());
-    }
-    if q.exec(tx).await?.rows_affected == 0 {
-        return Err(Error::conflict(format!("proposal {} is not proposed", cur.sn)));
-    }
-    let out = Proposal::from(op::Entity::find_by_id(cur.sn).one(tx).await?.ok_or_else(Error::not_found)?);
-    let ev = Ev::new(Some(cur.project_sn), "proposal", cur.sn, "OrchProposalResolved", &json!({ "proposal_sn": cur.sn, "status": to, "option": option }));
-    Ok((out, ev))
-}
-
-/// 제안 하나를 실행하고 마무리하는 트랜잭션 본문
-async fn go(tx: &DatabaseTransaction, sn: i64, by: &By) -> Res<(Proposal, Vec<Ev>)> {
-    let cur = op::Entity::find_by_id(sn).one(tx).await?.ok_or_else(Error::not_found)?;
-    if cur.status != "proposed" {
-        return Err(Error::conflict(format!("proposal is {}", cur.status)));
-    }
-    let (kind, tk, member, label) = match by {
-        By::Pick(label) => {
-            let opts: Vec<Opt> = cur.option_json.as_deref().and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default();
-            let o = opts.into_iter().find(|o| &o.label == label).ok_or_else(|| Error::invalid(format!("unknown option {label}")))?;
-            (o.kind.unwrap_or_default(), o.task_sn.or(cur.task_sn), o.member_sn.or(cur.member_sn), Some(label.as_str()))
-        }
-        _ => (cur.kind.clone(), cur.task_sn, cur.member_sn, None),
-    };
-    let mut evs = act(tx, &kind, tk, member, cur.run_sn, cur.issue_sn).await?;
-    let (to, n) = match by {
-        By::User => ("user_done", 0),
-        By::Pick(_) => ("changed", 0),
-        By::Auto => ("auto_done", 1 + streak(tx, &projects_of(tx, cur.project_sn).await?).await?),
-    };
-    let (out, ev) = settle(tx, &cur, to, !matches!(by, By::Auto), n, None, label).await?;
-    evs.push(ev);
-    Ok((out, evs))
-}
-
-/// 제안 실행 (user_done · auto_done · changed). 자동(by = Auto)은 행위자 orch, 사용자는 user.
-/// 자동 실행이 실패하면(409 등) dismissed + 사유로 닫고, 사용자 실행은 오류를 그대로 돌려주며 제안은 proposed로 남는다
-pub async fn run(db: &DatabaseConnection, sn: i64, by: By) -> Res<Proposal> {
-    let cur = op::Entity::find_by_id(sn).one(db).await?.ok_or_else(Error::not_found)?;
-    let auto = matches!(by, By::Auto);
-    let (actor, member) = if auto { ("orch", orch::orch_of(db, cur.project_sn).await?) } else { ("user", None) };
-    match event::run_as(db, actor, member, async |tx| go(tx, sn, &by).await).await {
-        Err(err) if auto => {
-            let why = format!("failed: {}", err.message());
-            event::run_as(db, "orch", member, async |tx| settle(tx, &cur, "dismissed", false, 0, Some(why), None).await.map(|(out, ev)| (out, vec![ev]))).await
-        }
-        res => res,
-    }
-}
-
-/// 실행 없이 닫기 (cancel → stopped · dismiss → dismissed). proposed에서만 409
-pub async fn end(db: &DatabaseConnection, sn: i64, to: &str) -> Res<Proposal> {
-    event::run(db, async |tx| {
-        let cur = op::Entity::find_by_id(sn).one(tx).await?.ok_or_else(Error::not_found)?;
-        settle(tx, &cur, to, true, 0, None, None).await.map(|(out, ev)| (out, vec![ev]))
-    }).await
-}
-
-/// 기한이 지난 proposed 제안을 자동 실행한다 (manual 정책은 건너뜀). 처리한 수를 돌려준다
-pub async fn tick(db: &DatabaseConnection) -> Res<u32> {
-    let due = op::Entity::find().filter(op::Column::Status.eq("proposed")).filter(Expr::cust("deadline_at IS NOT NULL AND datetime(deadline_at) <= datetime('now')"))
-        .order_by_asc(op::Column::Sn).all(db).await?;
-    let mut n = 0;
-    for p in due {
-        if policy_of(db, p.project_sn).await?.is_some_and(|x| x.mode == "manual") {
-            continue;
-        }
-        n += run(db, p.sn, By::Auto).await.is_ok() as u32;
-    }
-    Ok(n)
-}
-
 /// 1초마다 `tick` (main이 spawn)
 pub async fn ticker(db: DatabaseConnection) {
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        if let Err(err) = tick(&db).await {
+        if let Err(err) = ask::tick(&db).await {
             eprintln!("orch timer: {}", err.message());
         }
     }
@@ -446,37 +338,6 @@ pub async fn listen(db: DatabaseConnection) {
             Err(RecvError::Closed) => break,
         }
     }
-}
-
-/// 제안 대기 연장 요청 본문
-#[derive(Deserialize, ToSchema)]
-struct HoldBody {
-    /// 새 대기(초) · 없으면 정책의 timer_sec
-    sec: Option<i64>,
-}
-
-/// 자동 진행 대기 연장 (사용자가 카드를 보고 있을 때 · is_pause_on_view). 기한이 있는 proposed 제안만 (아니면 409). 이벤트는 남기지 않는다 (화면 타이머 상태)
-#[utoipa::path(operation_id = "orch_hold", post, path = "/proposals/{sn}/hold", params(("sn" = i64, Path, description = "제안 번호")), request_body = Option<HoldBody>, responses((status = 200, body = Proposal), (status = "default", body = ErrorBody)))]
-async fn hold(State(db): State<DatabaseConnection>, Sn(sn): Sn, raw: Bytes) -> Res<Json<Proposal>> {
-    let sec = if raw.is_empty() { None } else { serde_json::from_slice::<HoldBody>(&raw).map_err(|x| Error::invalid(x.to_string()))?.sec };
-    let cur = op::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
-    if cur.status != "proposed" || cur.deadline_at.is_none() {
-        return Err(Error::conflict("nothing to hold".into()));
-    }
-    let sec = match sec {
-        Some(s) => s,
-        None => policy_of(&db, cur.project_sn).await?.map_or(5, |p| p.timer_sec),
-    };
-    if !(1..=86_400).contains(&sec) {
-        return Err(Error::invalid("sec must be 1..=86400".into()));
-    }
-    let to = at(&db, &format!("+{sec} seconds")).await?;
-    let out = event::run(&db, async |tx| {
-        op::Entity::update_many().filter(op::Column::Sn.eq(sn)).filter(op::Column::Status.eq("proposed")).col_expr(op::Column::DeadlineAt, to.into()).exec(tx).await?;
-        let m = op::Entity::find_by_id(sn).one(tx).await?.ok_or_else(Error::not_found)?;
-        Ok((Proposal::from(m), vec![]))
-    }).await?;
-    Ok(Json(out))
 }
 
 /// 대기열 항목

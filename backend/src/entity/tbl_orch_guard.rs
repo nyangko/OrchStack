@@ -37,19 +37,11 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     TblOrchPolicy,
-    #[sea_orm(has_many = "super::tbl_orch_proposal::Entity")]
-    TblOrchProposal,
 }
 
 impl Related<super::tbl_orch_policy::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblOrchPolicy.def()
-    }
-}
-
-impl Related<super::tbl_orch_proposal::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblOrchProposal.def()
     }
 }
 

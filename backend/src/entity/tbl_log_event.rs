@@ -33,6 +33,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::tbl_ask::Entity")]
+    TblAsk,
     #[sea_orm(has_many = "super::tbl_interaction::Entity")]
     TblInteraction,
     #[sea_orm(has_many = "super::tbl_log_activity::Entity")]
@@ -47,8 +49,6 @@ pub enum Relation {
     TblMember,
     #[sea_orm(has_many = "super::tbl_notification::Entity")]
     TblNotification,
-    #[sea_orm(has_many = "super::tbl_orch_proposal::Entity")]
-    TblOrchProposal,
     #[sea_orm(
         belongs_to = "super::tbl_project::Entity",
         from = "Column::ProjectSn",
@@ -83,6 +83,12 @@ pub enum Relation {
     TblWorkspace,
 }
 
+impl Related<super::tbl_ask::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblAsk.def()
+    }
+}
+
 impl Related<super::tbl_interaction::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblInteraction.def()
@@ -104,12 +110,6 @@ impl Related<super::tbl_member::Entity> for Entity {
 impl Related<super::tbl_notification::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblNotification.def()
-    }
-}
-
-impl Related<super::tbl_orch_proposal::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblOrchProposal.def()
     }
 }
 
