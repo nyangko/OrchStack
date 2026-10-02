@@ -21,6 +21,7 @@
 	import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 	import { Badge } from '$lib/components/ui/badge';
 	import UsersRound from '@lucide/svelte/icons/users-round';
+	import Star from '@lucide/svelte/icons/star';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$lib/api/client';
 	import { useMock } from '$lib/api/env';
@@ -89,7 +90,16 @@
 	const shown = $derived(store.crew.filter((t) => t.name.toLowerCase().includes(query.trim().toLowerCase())));
 	let tplQuery = $state('');
 	const tplGroups = $derived(
-		[...new Set(store.templates.map((t) => t.group))].map((g) => ({ g, list: store.templates.filter((t) => t.group === g && t.name.toLowerCase().includes(tplQuery.trim().toLowerCase())) }))
+		// 즐겨찾기 → 묶음별 → 보관 순. 즐겨찾기 · 보관한 템플릿은 묶음에서 빼고 따로 보인다.
+		(() => {
+			const hit = (t: (typeof store.templates)[number]) => t.name.toLowerCase().includes(tplQuery.trim().toLowerCase());
+			const live = store.templates.filter((t) => !t.archived && hit(t));
+			return [
+				{ g: '즐겨찾기', list: live.filter((t) => t.favorite) },
+				...[...new Set(store.templates.map((t) => t.group))].map((g) => ({ g, list: live.filter((t) => !t.favorite && t.group === g) })),
+				{ g: '보관', list: store.templates.filter((t) => t.archived && hit(t)) }
+			];
+		})()
 	);
 </script>
 
@@ -124,7 +134,7 @@
 						>
 							<RoleAvatar role={t.role} />
 							<span class="flex min-w-0 flex-1 flex-col gap-1">
-								<span class="truncate text-xs font-semibold">{t.name}</span>
+								<span class={['flex items-center gap-1 truncate text-xs font-semibold', t.archived && 'text-muted-foreground']}>{t.name}{#if t.favorite}<Star class="size-3 shrink-0 fill-current text-warning" aria-label="즐겨찾기" />{/if}</span>
 								<span class="text-caption text-muted-foreground">v{t.version} · {n ? `멤버 ${n}` : '미사용'}{t.draft ? ' · 초안' : ''}</span>
 							</span>
 						</a>

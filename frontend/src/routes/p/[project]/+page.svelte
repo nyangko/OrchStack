@@ -336,14 +336,17 @@
 		detail = false;
 		inspect = undefined;
 	}
-	// 공유 링크(?task= · ?issue=)로 오면 상세를 연다 (Copy link · Tasks 화면).
+	// 공유 링크(?task= · ?issue= · ?agent=)로 오면 상세를 연다 (Copy link · Tasks 화면).
 	$effect(() => {
 		const t = Number(page.url.searchParams.get('task'));
 		const i = Number(page.url.searchParams.get('issue'));
 		// 알림(상단 벨)의 결정 답하기 → 그 태스크의 결정 패널
 		const d = Number(page.url.searchParams.get('decide'));
+		// 멤버 상세 … "Workbench에서 보기" → 그 에이전트 카드
+		const ag = Number(page.url.searchParams.get('agent'));
 		untrack(() => {
 			if (d) openDecisions(d);
+			else if (ag && agentOf(ag)) openAgent(ag);
 			else if (t && list.some((x) => x.num === t)) open(t);
 			else if (i && issueOf(i)) openIssue(i);
 		});

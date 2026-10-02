@@ -78,6 +78,15 @@
 	import Zap from '@lucide/svelte/icons/zap';
 	import Repeat from '@lucide/svelte/icons/repeat';
 	import ListPlus from '@lucide/svelte/icons/list-plus';
+	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import RotateCw from '@lucide/svelte/icons/rotate-cw';
+	import UserMinus from '@lucide/svelte/icons/user-minus';
+	import Send from '@lucide/svelte/icons/send';
+	import { Popover, PopoverTrigger, PopoverContent } from '$lib/components/ui/popover';
+	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuEntries, type MenuEntry } from '$lib/components/ui/dropdown-menu';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import Moon from '@lucide/svelte/icons/moon';
 	import { untrack, type Component } from 'svelte';
 	import { DecisionRecord } from '$lib/components/orch/decision-record';
@@ -253,7 +262,8 @@
 	let pick = $state<number | null>(recommend.template);
 	const tpl = $derived(store.templates.find((t) => t.sn === pick));
 	const tplShown = $derived(
-		store.templates.filter((t) => `${t.name} ${t.focus} ${t.config.skills.join(' ')}`.toLowerCase().includes(tq.trim().toLowerCase()))
+		// 보관한 템플릿은 숨기고, 즐겨찾기를 맨 위로
+		store.templates.filter((t) => !t.archived).toSorted((a, b) => Number(!!b.favorite) - Number(!!a.favorite)).filter((t) => `${t.name} ${t.focus} ${t.config.skills.join(' ')}`.toLowerCase().includes(tq.trim().toLowerCase()))
 	);
 	// 2단계에서 복사한 템플릿. 같은 템플릿으로 다시 오면 고친 내용을 유지한다.
 	let copied = $state<number | null>();
@@ -301,18 +311,23 @@
 	}
 	// 다른 화면에서 여는 주소 — 쓰고 나면 주소에서 뗀다.
 	// ?add=템플릿 → 멤버 추가 시트 (템플릿 화면 "팀에 추가" · 값이 비면 추천 템플릿, Workbench Menu / Add)
-	// ?member=멤버 → 멤버 상세 (Workbench 에이전트 메뉴 "멤버 상세 열기")
+	// ?member=멤버 → 멤버 상세 (Workbench 에이전트 메뉴 "멤버 상세 열기") · &tab=탭 (템플릿 … "멤버와 비교" → instructions)
 	$effect(() => {
 		const add = page.url.searchParams.get('add');
 		const member = Number(page.url.searchParams.get('member'));
+		const memberTab = page.url.searchParams.get('tab');
 		if (add === null && !member) return;
 		untrack(() => {
 			if (add !== null) startAdd(Number(add) || undefined);
-			else openMember(member);
+			else {
+				openMember(member);
+				if (memberTab) tab = memberTab;
+			}
 		});
 		const url = new URL(page.url);
 		url.searchParams.delete('add');
 		url.searchParams.delete('member');
+		url.searchParams.delete('tab');
 		goto(url, { replaceState: true, noScroll: true, keepFocus: true });
 	});
 	/// 2단계로 — 템플릿이 바뀌었으면 Instructions · 런타임을 다시 복사한다.
@@ -370,7 +385,9 @@
 	let viewing = $state<number>();
 	let tab = $state('overview');
 	const viewed = $derived(team.members.find((m) => m.sn === viewing));
-	const det = $derived(viewing === undefined ? undefined : memberDetails[viewing]);
+	// 멤버 상세 기록 — 지시 · 배정이 바로 보이도록 화면 상태로 둔다 (목데이터).
+	const details = $state(structuredClone(memberDetails));
+	const det = $derived(viewing === undefined ? undefined : details[viewing]);
 	const origin = $derived(det ? store.templates.find((t) => t.sn === det.template) : store.templates.find((t) => t.name === viewed?.title));
 	const memberFiles = $derived(viewed?.files ?? []);
 	let memberFile = $state(0);
@@ -398,18 +415,98 @@
 		viewing = sn;
 		// 지침 파일이 없는 멤버는 원본 템플릿을 복사해 멤버 것으로 만든다.
 		const m = team.members.find((x) => x.sn === sn);
-		const o = store.templates.find((t) => t.sn === memberDetails[sn]?.template) ?? store.templates.find((t) => t.name === m?.title);
+		const o = store.templates.find((t) => t.sn === details[sn]?.template) ?? store.templates.find((t) => t.name === m?.title);
 		if (m && !m.files) m.files = structuredClone($state.snapshot(o?.files ?? []));
 		if (m && !m.config && o) m.config = structuredClone($state.snapshot(o.config));
 		tab = 'overview';
 		taskFilter = 'all';
 		taskQuery = '';
 		actFilter = 'all';
-		runSel = memberDetails[sn]?.failure?.run;
+		runSel = details[sn]?.failure?.run;
 		memberFile = 0;
 		memberMode = 'diff';
 		proposed = undefined;
 	}
+	// ── 멤버 머리글 (.pen Teams · 머리글 메뉴) — 지시 · … ─────────
+	/// 지시 — Workbench 실행 중 지시와 같은 값. 지금 Run(다음 단계부터) 또는 다음 태스크부터. Activity '지시'에 남는다.
+	let order = $state({ open: false, to: 'now', text: '' });
+	function sendOrder(e?: SubmitEvent) {
+		e?.preventDefault();
+		const m = viewed;
+		const text = order.text.trim();
+		if (!m || !text) return;
+		const d = det;
+		if (d) {
+			if (d.activity[0]?.day !== '오늘') d.activity.unshift({ day: '오늘', items: [] });
+			d.activity[0].items.unshift({ type: 'event', who: `나 → ${m.name}`, role: m.role, kind: '지시', title: text, time: new Date().toTimeString().slice(0, 5), note: order.to === 'now' && d.now ? `Run #${d.now.run} · 다음 단계부터` : '다음 태스크부터' });
+		}
+		order = { open: false, to: 'now', text: '' };
+		toast.success(`${m.name}에게 지시를 보냈어요`);
+	}
+	/// 이름 · 캐릭터 편집 창.
+	let persona = $state<{ name: string; glyph: number }>();
+	function savePersona() {
+		const m = viewed;
+		if (!m || !persona?.name.trim()) return;
+		m.name = persona.name.trim();
+		m.glyph = persona.glyph;
+		persona = undefined;
+	}
+	/// 템플릿으로 되돌리기 — 지침 파일 · 스킬 · 런타임 기본값을 원본 템플릿 값으로.
+	function revertAll() {
+		const m = viewed;
+		if (!m || !origin) return;
+		const before = $state.snapshot({ files: m.files, config: m.config, runtime: m.runtime });
+		m.files = structuredClone($state.snapshot(origin.files));
+		m.config = structuredClone($state.snapshot(origin.config));
+		m.runtime = origin.runtime;
+		toast(`${m.name}을 ${origin.name} v${origin.version}로 되돌렸어요`, { action: { label: '되돌리기', onClick: () => Object.assign(m, before) } });
+	}
+	/// 다른 팀으로 옮기기 · 팀에서 빼기 (목데이터 — 서버는 멤버 API #47).
+	function moveTo(to: (typeof store.crew)[number]) {
+		const m = viewed;
+		if (!m) return;
+		team.members.splice(team.members.indexOf(m), 1);
+		to.members.push(m);
+		viewing = undefined;
+		toast.success(`${m.name}을 ${to.name}(으)로 옮겼어요`);
+	}
+	function dropMember() {
+		const m = viewed;
+		if (!m) return;
+		const from = team;
+		const i = from.members.indexOf(m);
+		from.members.splice(i, 1);
+		viewing = undefined;
+		toast(`${m.name}을 ${from.name}에서 뺐어요`, { action: { label: '되돌리기', onClick: () => from.members.splice(i, 0, m) } });
+	}
+	/// Workbench에서 보기 — 팀이 붙은 프로젝트의 다이어그램에서 이 멤버 카드를 연다.
+	const projectSn = $derived(store.projects.find((p) => p.name === team.project)?.sn ?? store.projects[0]?.sn ?? 1);
+	const memberMenu = $derived<MenuEntry[]>(
+		viewed
+			? [
+					{
+						label: '태스크 배정', icon: ListPlus,
+						sub: tasks.filter((t) => t.agent === undefined && !['done', 'cancelled'].includes(t.status)).map((t) => ({
+							label: `#${t.num} ${t.title}`,
+							onSelect: () => {
+								det?.queue.push({ num: t.num, title: t.title, note: '바로 시작 가능', issue: `#${t.issue}`, est: '', priority: t.priority });
+								toast.success(`#${t.num}을 ${viewed!.name}에게 맡겼어요 · 대기열 ${det?.queue.length ?? 1}번째`);
+							}
+						}))
+					},
+					{ label: 'Workbench에서 보기', icon: ExternalLink, onSelect: () => goto(`/p/${projectSn}?view=diagram&agent=${viewed!.sn}`) },
+					'sep',
+					{ label: '이름 · 캐릭터 편집', icon: Pencil, onSelect: () => (persona = { name: viewed!.name, glyph: viewed!.glyph ?? 0 }) },
+					{ label: `템플릿과 비교${memberChanged.length ? ` · 변경 ${memberChanged.length}` : ''}`, icon: GitCompare, disabled: !origin, onSelect: () => ((tab = 'instructions'), (memberMode = 'diff')) },
+					{ label: origin ? `템플릿 v${origin.version}로 되돌리기` : '템플릿으로 되돌리기', icon: RotateCcw, disabled: !origin, onSelect: revertAll },
+					{ label: '다른 팀으로 옮기기', icon: ArrowRightLeft, disabled: store.crew.filter((c) => !c.orch && c.sn !== team.sn).length === 0, sub: store.crew.filter((c) => !c.orch && c.sn !== team.sn).map((c) => ({ label: c.name, onSelect: () => moveTo(c) })) },
+					'sep',
+					{ label: '세션 다시 시작', icon: RotateCw, onSelect: () => toast(`${viewed!.name} 세션을 다시 시작했어요`) },
+					{ label: '팀에서 빼기', icon: UserMinus, tone: 'text-destructive', onSelect: dropMember }
+				]
+			: []
+	);
 	function togglePause(sn: number) {
 		paused = paused.includes(sn) ? paused.filter((n) => n !== sn) : [...paused, sn];
 	}
@@ -1043,6 +1140,7 @@
 	</SheetContent>
 </Sheet>
 
+
 <!-- .pen BarChart — 요일별 막대. b가 있으면 위에 실패색으로 쌓는다 -->
 {#snippet mini(label: string, value: string, sub: string, tone?: string)}
 	<div class="stat-card">
@@ -1096,9 +1194,39 @@
 						{/if}
 					</div>
 				{#snippet actions()}
+					<Popover bind:open={order.open}>
+						<PopoverTrigger>
+							{#snippet child({ props })}<Button {...props} variant="outline" size="sm"><MessageSquarePlus />지시</Button>{/snippet}
+						</PopoverTrigger>
+						<PopoverContent align="end" class="w-100 gap-3 p-3.5">
+							<form class="flex flex-col gap-3" onsubmit={sendOrder}>
+								<p class="flex items-center gap-2 text-body font-semibold"><MessageSquarePlus class="size-4 text-primary" />{m.name}에게 지시</p>
+								<Segmented
+									aria-label="지시 대상"
+									options={[{ value: 'now', label: det?.now ? `지금 Run #${det.now.run} · 다음 단계부터` : '지금 Run · 실행 중 아님', disabled: !det?.now }, { value: 'next', label: '다음 태스크부터' }]}
+									bind:value={() => (det?.now ? order.to : 'next'), (v) => (order.to = v ?? 'next')}
+								/>
+								<Textarea bind:value={order.text} rows={3} placeholder="예: DB 변경은 하지 말고 현재 UI만 수정해." aria-label="{m.name}에게 지시" onkeydown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.currentTarget.form?.requestSubmit()} />
+								<div class="flex items-center gap-2">
+									<span class="flex-1 text-caption text-muted-foreground">Activity에 '지시'로 남아요 · ⌘↵ 보내기</span>
+									<Button type="submit" size="sm" disabled={!order.text.trim()}><Send />보내기</Button>
+								</div>
+							</form>
+						</PopoverContent>
+					</Popover>
 					<Button variant="outline" size="sm" onclick={() => togglePause(m.sn)}>
 						{#if isPaused}<Play />Resume{:else}<Pause />Pause{/if}
 					</Button>
+					<DropdownMenu>
+						<DropdownMenuTrigger>
+							{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-sm" aria-label="멤버 메뉴"><Ellipsis /></Button>{/snippet}
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" class="w-63">
+							<DropdownMenuLabel class="truncate">{m.name} · {m.title}</DropdownMenuLabel>
+							<DropdownMenuSeparator />
+							<DropdownMenuEntries entries={memberMenu} subClass="w-64" />
+						</DropdownMenuContent>
+					</DropdownMenu>
 				{/snippet}
 			</SheetHeader>
 
@@ -1533,6 +1661,42 @@
 				</div>
 			</SheetBody>
 		{/if}
+		<!-- 이름 · 캐릭터 편집 (멤버 … 메뉴) — 시트 안에 두어야 시트 위로 뜬다 -->
+		<Dialog bind:open={() => persona !== undefined, (v) => !v && (persona = undefined)}>
+			<DialogContent size="sm">
+				{#if persona && viewed}
+					{@const f = persona}
+					{@const role = viewed.role}
+					<DialogHeader icon={Pencil}>
+						<DialogTitle>이름 · 캐릭터 편집</DialogTitle>
+						<DialogDescription>대화 · 활동 기록에 보이는 이름과 아바타예요. 지침은 Instructions에서 바꿔요.</DialogDescription>
+					</DialogHeader>
+					<DialogBody>
+						<FieldRow label="이름" as="label"><Input bind:value={f.name} /></FieldRow>
+						<FieldRow label="아바타">
+							<div role="radiogroup" aria-label="아바타" class="flex gap-2">
+								{#each glyphs[role] as g, i (i)}
+									<button
+										type="button"
+										role="radio"
+										aria-checked={f.glyph === i}
+										aria-label="아이콘 {i + 1}"
+										onclick={() => (f.glyph = i)}
+										class={['rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50', f.glyph === i ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'opacity-50 hover:opacity-100']}
+									>
+										<RoleAvatar {role} icon={g} />
+									</button>
+								{/each}
+							</div>
+						</FieldRow>
+					</DialogBody>
+					<DialogFooter>
+						<Button variant="ghost" size="sm" onclick={() => (persona = undefined)}>취소</Button>
+						<Button size="sm" disabled={!f.name.trim()} onclick={savePersona}>저장</Button>
+					</DialogFooter>
+				{/if}
+			</DialogContent>
+		</Dialog>
 	</SheetContent>
 </Sheet>
 

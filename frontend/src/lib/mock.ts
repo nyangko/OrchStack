@@ -1152,6 +1152,10 @@ export type Template = Pick<ApiTemplate, "sn" | "name"> & {
 	/** 게시 전 새 버전 초안. */
 	draft?: { name: string; body: string }[];
 	revisions: { v: number; state: "draft" | "live" | "old"; who: string; when: string; note: string }[];
+	/** 즐겨찾기 — Agents 목록 · 멤버 추가 1단계 맨 위. */
+	favorite?: boolean;
+	/** 보관 — 새 멤버 추가에서 숨긴다 (이미 만든 멤버는 그대로). */
+	archived?: boolean;
 };
 
 const agentMd = (title: string, lines: string[]) =>

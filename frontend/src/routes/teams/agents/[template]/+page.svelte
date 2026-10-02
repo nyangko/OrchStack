@@ -23,6 +23,31 @@
 	import Upload from '@lucide/svelte/icons/upload';
 	import PencilLine from '@lucide/svelte/icons/pencil-line';
 	import BadgeCheck from '@lucide/svelte/icons/badge-check';
+	import Star from '@lucide/svelte/icons/star';
+	import FlaskConical from '@lucide/svelte/icons/flask-conical';
+	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import GitCompare from '@lucide/svelte/icons/git-compare';
+	import Download from '@lucide/svelte/icons/download';
+	import Archive from '@lucide/svelte/icons/archive';
+	import ArchiveRestore from '@lucide/svelte/icons/archive-restore';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
+	import CircleCheck from '@lucide/svelte/icons/circle-check';
+	import ListChecks from '@lucide/svelte/icons/list-checks';
+	import Coins from '@lucide/svelte/icons/coins';
+	import FileDiff from '@lucide/svelte/icons/file-diff';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import { toast } from 'svelte-sonner';
+	import { useMock } from '$lib/api/env';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '$lib/components/ui/dialog';
+	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuEntries, type MenuEntry } from '$lib/components/ui/dropdown-menu';
+	import { FieldRow } from '$lib/components/ui/field';
+	import { Input } from '$lib/components/ui/input';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { Progress } from '$lib/components/ui/progress';
+	import { ChoiceCards, ChoiceCard } from '$lib/components/orch/choice-cards';
 	import { Card, CardHeader, CardTitle, CardContent, CardAction, CardDescription } from '$lib/components/ui/card';
 	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '$lib/components/ui/empty';
 	import { Button } from '$lib/components/ui/button';
@@ -111,6 +136,68 @@
 		store.templates.push({ ...structuredClone(s), sn, name: `${s.name} 복사본`, version: 1, members: 0, draft: undefined, created: '나 · 방금', revisions: [{ v: 1, state: 'live', who: '나', when: '방금', note: `${s.name} v${s.version}에서 복제` }] });
 		goto(`/teams/agents/${sn}`);
 	}
+	// ── 머리글 메뉴 (.pen Teams · 머리글 메뉴) — ☆ · 테스트 Run · … ─────────
+	/// 이름 · 설명 편집 창.
+	let rename = $state<{ name: string; desc: string }>();
+	function saveRename() {
+		if (!rename?.name.trim()) return;
+		t.name = rename.name.trim();
+		t.desc = rename.desc.trim();
+		rename = undefined;
+		toast.success('템플릿 이름 · 설명을 바꿨어요');
+	}
+	/// JSON 내보내기 — 지침 파일 · 기본값 · 버전 기록을 한 파일로.
+	function exportJson() {
+		const blob = new Blob([JSON.stringify($state.snapshot(t), null, 2)], { type: 'application/json' });
+		const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `template-${t.name.replace(/\s+/g, '-').toLowerCase()}-v${t.version}.json` });
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
+	/// 삭제 — 이 템플릿으로 만든 멤버가 없을 때만. 알림에서 되돌릴 수 있다.
+	function remove() {
+		const i = store.templates.indexOf(t);
+		const gone = store.templates.splice(i, 1)[0];
+		goto(`/teams/agents/${store.templates[Math.max(0, i - 1)].sn}`);
+		toast(`${gone.name} 템플릿을 삭제했어요`, { action: { label: '되돌리기', onClick: () => (store.templates.splice(i, 0, gone), goto(`/teams/agents/${gone.sn}`)) } });
+	}
+	const tplMenu: MenuEntry[] = $derived([
+		{ label: '이름 · 설명 편집', icon: Pencil, onSelect: () => (rename = { name: t.name, desc: t.desc }) },
+		{ label: '버전 기록', icon: History, onSelect: () => (tplTab = 'revisions') },
+		{ label: `멤버와 비교 · ${used.length}명`, icon: GitCompare, disabled: !used.length, sub: used.map(({ m, team: tn }) => ({ label: `${m.name} · ${tn}`, onSelect: () => goto(`/teams?team=${store.crew.find((c) => c.name === tn)?.sn}&member=${m.sn}&tab=instructions`) })) },
+		{ label: 'JSON으로 내보내기', icon: Download, onSelect: exportJson },
+		'sep',
+		t.archived
+			? { label: '보관 해제', icon: ArchiveRestore, onSelect: () => ((t.archived = false), toast('보관을 풀었어요 · 멤버 추가에 다시 보여요')) }
+			: { label: '보관 · 새 멤버에 숨김', icon: Archive, onSelect: () => ((t.archived = true), toast('보관했어요 · 이미 만든 멤버는 그대로예요')) },
+		{ label: '삭제', icon: Trash2, tone: 'text-destructive', disabled: used.length > 0, onSelect: remove }
+	]);
+
+	/// 테스트 Run (.pen 테스트 Run 다이얼로그) — 팀에 넣지 않고 샘플 태스크로 한 번 실행. 임시 worktree에서 돌고 끝나면 지운다.
+	/// 목데이터: 실행은 흉내만 낸다(실행기 연동 #13 전). 서버 모드에서는 막는다.
+	const samples = [
+		{ v: 'a11y', t: '로그인 폼 접근성 점검', d: '라벨 · 대비 · 키보드 이동을 고치고 테스트 통과', criteria: 3, tok: 18 },
+		{ v: 'variant', t: '버튼 컴포넌트 variant 추가', d: 'shadcn-svelte 규칙대로', criteria: 2, tok: 11 },
+		{ v: 'custom', t: '직접 입력', d: '제목과 완료 조건을 적어서 실행', criteria: 0, tok: 15 }
+	];
+	let test = $state<{ sample: string; title: string; criteria: string; phase: 'setup' | 'running' | 'done'; pct: number }>();
+	let testTimer: ReturnType<typeof setInterval> | undefined;
+	const testSample = $derived(samples.find((x) => x.v === test?.sample) ?? samples[0]);
+	function startTest() {
+		if (!test) return;
+		test.phase = 'running';
+		test.pct = 0;
+		clearInterval(testTimer);
+		testTimer = setInterval(() => {
+			if (!test) return clearInterval(testTimer);
+			test.pct = Math.min(100, test.pct + 20);
+			if (test.pct >= 100) (clearInterval(testTimer), (test.phase = 'done'));
+		}, 400);
+	}
+	function closeTest() {
+		clearInterval(testTimer);
+		test = undefined;
+	}
+
 	const revChanged = $derived(t.draft ? t.draft.filter((f) => t.files.find((o) => o.name === f.name)?.body !== f.body) : []);
 </script>
 
@@ -159,8 +246,26 @@
 						<Badge variant="secondary" class="gap-1"><Users class="size-3" />이 템플릿으로 만든 멤버 {used.length}</Badge>
 					</div>
 				</div>
-				<Button variant="outline" size="sm" href="/teams?team={team.sn}&add={t.sn}"><UserPlus />{team.name}에 추가</Button>
+				{#if t.archived}<Badge variant="outline" class="gap-1 text-muted-foreground"><Archive class="size-3" />보관됨</Badge>{/if}
+				<Button variant="ghost" size="icon-sm" class={t.favorite ? 'bg-warning-soft text-warning hover:bg-warning-soft hover:text-warning' : 'text-muted-foreground'} aria-pressed={!!t.favorite} aria-label="즐겨찾기" title={t.favorite ? '즐겨찾기 해제' : '즐겨찾기 · 목록 맨 위에 고정'} onclick={() => (t.favorite = !t.favorite)}>
+					<Star class={t.favorite ? 'fill-current' : undefined} />
+				</Button>
+				<Button variant="outline" size="sm" href="/teams?team={team.sn}&add={t.sn}" disabled={t.archived}><UserPlus />{team.name}에 추가</Button>
 				<Button variant="outline" size="sm" onclick={duplicate}><Copy />복제</Button>
+				<Button variant="outline" size="sm" disabled={!useMock} title={useMock ? undefined : '실행기 연동(#13) 후 쓸 수 있어요'} onclick={() => (test = { sample: samples[0].v, title: '', criteria: '', phase: 'setup', pct: 0 })}><FlaskConical />테스트 Run</Button>
+				<DropdownMenu>
+					<DropdownMenuTrigger>
+						{#snippet child({ props })}<Button {...props} variant="ghost" size="icon-sm" aria-label="템플릿 메뉴"><Ellipsis /></Button>{/snippet}
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" class="w-63">
+						<DropdownMenuLabel class="truncate">{t.name} · 템플릿 v{t.version}</DropdownMenuLabel>
+						<DropdownMenuSeparator />
+						<DropdownMenuEntries entries={tplMenu} />
+						{#if used.length}
+							<p class="px-2 pt-1 pb-1.5 text-caption text-muted-foreground">이 템플릿으로 만든 멤버 {used.length}명이 있어 삭제할 수 없어요. 보관하면 새 멤버 추가에서만 숨겨져요.</p>
+						{/if}
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</header>
 
 			<div class="flex flex-col gap-4 bg-muted px-7 py-5 *:shrink-0">
@@ -414,3 +519,97 @@
 		</div>
 	</div>
 </main>
+
+<!-- 이름 · 설명 편집 (템플릿 … 메뉴) -->
+<Dialog bind:open={() => rename !== undefined, (v) => !v && (rename = undefined)}>
+	<DialogContent size="sm">
+		{#if rename}
+			{@const f = rename}
+			<DialogHeader icon={Pencil}>
+				<DialogTitle>이름 · 설명 편집</DialogTitle>
+				<DialogDescription>바꿔도 이미 만든 멤버의 이름은 그대로예요.</DialogDescription>
+			</DialogHeader>
+			<DialogBody>
+				<FieldRow label="이름" as="label"><Input bind:value={f.name} /></FieldRow>
+				<FieldRow label="설명" as="label"><Textarea bind:value={f.desc} rows={3} /></FieldRow>
+			</DialogBody>
+			<DialogFooter>
+				<Button variant="ghost" size="sm" onclick={() => (rename = undefined)}>취소</Button>
+				<Button size="sm" disabled={!f.name.trim()} onclick={saveRename}>저장</Button>
+			</DialogFooter>
+		{/if}
+	</DialogContent>
+</Dialog>
+
+<!-- 테스트 Run (.pen Teams · 머리글 메뉴 · 테스트 Run 다이얼로그) — 실행 전 / 실행 중 / 결과 -->
+<Dialog bind:open={() => test !== undefined, (v) => !v && closeTest()}>
+	<DialogContent size="md">
+		{#if test}
+			{@const f = test}
+			{@const acc = accountOf(t.runtime)}
+			<DialogHeader icon={FlaskConical}>
+				<DialogTitle>테스트 Run · {t.name} v{t.version}</DialogTitle>
+				<DialogDescription>팀에 넣지 않고 샘플 태스크로 한 번 실행해 봐요</DialogDescription>
+			</DialogHeader>
+			{#if f.phase === 'setup'}
+				<DialogBody>
+					<FieldRow label="샘플 태스크" hint="템플릿 역할에 맞는 예시 · 완료 조건까지 함께 실행">
+						<ChoiceCards aria-label="샘플 태스크" class="flex flex-col gap-2" bind:value={() => f.sample, (v) => (f.sample = v)}>
+							{#each samples as o, i (o.v)}
+								<ChoiceCard value={o.v} class="gap-1 rounded-lg px-3.5 py-3">
+									<span class="row-title-strong"><span class="font-mono text-caption text-muted-foreground">{'ABC'[i]}</span>{o.t}</span>
+									<span class="text-caption text-muted-foreground">{o.d}{o.criteria ? ` · 완료 조건 ${o.criteria}` : ''}</span>
+								</ChoiceCard>
+							{/each}
+						</ChoiceCards>
+					</FieldRow>
+					{#if f.sample === 'custom'}
+						<FieldRow label="제목" as="label"><Input bind:value={f.title} placeholder="예: 검색 입력에 지우기 버튼 추가" /></FieldRow>
+						<FieldRow label="완료 조건" hint="한 줄에 하나" as="label"><Textarea bind:value={f.criteria} rows={3} placeholder="버튼을 누르면 입력이 비워진다" /></FieldRow>
+					{/if}
+					<FieldRow label="실행 환경">
+						<span class="flex h-9 items-center gap-2 rounded-md border px-3 text-body"><Terminal class="size-3.5 text-muted-foreground" />{runtimeName(t.runtime)} · {t.model} · Auto<span class="ml-auto text-caption text-muted-foreground">템플릿 기본값</span></span>
+					</FieldRow>
+					<FieldRow label="작업 폴더">
+						<span class="flex items-center gap-2 rounded-md bg-muted px-2.5 py-2 text-xs"><FolderGit2 class="size-3.5 text-muted-foreground" />임시 worktree · 끝나면 삭제 · 커밋 · PR 없음</span>
+					</FieldRow>
+					<div class="flex flex-col">
+						<KeyValueRow label="예상 토큰" value="~{testSample.tok}K tok" />
+						<KeyValueRow label="{acc.plan} 주간 잔량" value="{acc.week}% 남음" />
+						<KeyValueRow label="호환성" value="{runtimeName(t.runtime)} · 모두 호환" />
+					</div>
+				</DialogBody>
+				<DialogFooter note="토큰은 워크스페이스 한도에 포함돼요">
+					<Button variant="ghost" size="sm" onclick={closeTest}>취소</Button>
+					<Button size="sm" disabled={f.sample === 'custom' && (!f.title.trim() || !f.criteria.trim())} onclick={startTest}><FlaskConical />테스트 시작</Button>
+				</DialogFooter>
+			{:else}
+				{@const name = f.sample === 'custom' ? f.title : testSample.t}
+				{@const total = f.sample === 'custom' ? f.criteria.split('\n').filter((x) => x.trim()).length : testSample.criteria}
+				<DialogBody>
+					{#if f.phase === 'running'}
+						<p class="flex items-center gap-2 text-body font-semibold"><LoaderCircle class="size-4 animate-spin text-status-in-progress" />{name} 실행 중</p>
+						<Progress value={f.pct} class="h-1.5" aria-label="테스트 Run 진행" tip={`테스트 Run\n${f.pct}% · 임시 worktree`} />
+						<p class="text-caption text-muted-foreground">임시 worktree에서 실행 중이에요. 닫으면 멈추고 worktree를 지워요.</p>
+					{:else}
+						<p class="flex items-center gap-2 text-body font-semibold"><CircleCheck class="size-4 text-success" /><span class="flex-1">테스트 통과 · {name}</span><span class="font-mono text-xs font-normal text-muted-foreground">4m 12s</span></p>
+						<div class="flex flex-col">
+							<KeyValueRow label="완료 조건"><span class="flex items-center gap-1.5 font-medium text-success"><ListChecks class="size-3.5" />{total} / {total} 통과</span></KeyValueRow>
+							<KeyValueRow label="토큰"><span class="flex items-center gap-1.5 font-medium"><Coins class="size-3.5 text-muted-foreground" />{(testSample.tok * 0.9).toFixed(1)}K tok</span></KeyValueRow>
+							<KeyValueRow label="변경 파일"><span class="flex items-center gap-1.5 font-medium"><FileDiff class="size-3.5 text-muted-foreground" />4개 · worktree와 함께 삭제됨</span></KeyValueRow>
+						</div>
+					{/if}
+				</DialogBody>
+				<DialogFooter>
+					{#if f.phase === 'done'}
+						<Button variant="outline" size="sm" disabled title="실행기 연동(#13) 후 로그를 볼 수 있어요"><Terminal />로그 보기</Button>
+						<Button variant="outline" size="sm" onclick={startTest}><RotateCcw />다시 실행</Button>
+						<Button size="sm" onclick={closeTest}>닫기</Button>
+					{:else}
+						<Button variant="ghost" size="sm" onclick={closeTest}>멈추고 닫기</Button>
+					{/if}
+				</DialogFooter>
+			{/if}
+		{/if}
+	</DialogContent>
+</Dialog>
