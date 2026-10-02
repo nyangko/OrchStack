@@ -89,6 +89,8 @@
 	import { SvelteFlow, SvelteFlowProvider, Background, BackgroundVariant, Panel, MarkerType, type Node, type Edge } from '@xyflow/svelte';
 	import DiagramToolbar from '$lib/components/orch/diagram/diagram-toolbar.svelte';
 	import Spline from '@lucide/svelte/icons/spline';
+	import Puzzle from '@lucide/svelte/icons/puzzle';
+	import Plug from '@lucide/svelte/icons/plug';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import Maximize from '@lucide/svelte/icons/maximize';
 	import '@xyflow/svelte/dist/style.css';
@@ -128,7 +130,7 @@
 	import { RuntimeLogo } from '$lib/components/orch/runtime-logo';
 	import { statuses, statusOrder, type TaskStatus } from '$lib/status';
 	import { roles } from '$lib/roles';
-	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, agentQueues, type Issue, type Chat, type DockCard, type SubRun, type SpawnMode } from '$lib/mock';
+	import { tasks, agents, logs, issues, taskDetails, agentActivity, decisions, thread, subRuns, leadRuns, agentQueues, agentUsage, type Issue, type Chat, type DockCard, type SubRun, type SpawnMode } from '$lib/mock';
 	import { store, defaultTeam } from '$lib/teams.svelte';
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { Pill } from '$lib/components/orch/pill';
@@ -496,6 +498,30 @@
 			const pos = new Map(nodes.map((n) => [n.id, n.position]));
 			nodes = liveNodes().map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }));
 			edges = liveEdges();
+		});
+	});
+	/// 에이전트가 쓰는 스킬 · MCP · 도구 묶음 (.pen Node/Skill · MCP · Tools). 목데이터에만 있다.
+	function capsOf(sn: number): DiagramNodeData['caps'] {
+		const u = useMock ? agentUsage[sn] : undefined;
+		if (!u) return undefined;
+		const calls = u.skills.reduce((n, x) => n + x.calls, 0);
+		return [
+			...(u.skills.length ? [{ kind: 'skill' as const, title: `${u.skills[0].name} Skills ×${u.skills.length}`, sub: `${u.skills[1]?.name ?? u.skills[0].name} · ${calls} calls` }] : []),
+			...(u.mcp.length ? [{ kind: 'mcp' as const, title: `MCP ×${u.mcp.length}`, sub: u.mcp.map((m) => m.name.replace(' MCP', '')).join(' · ') }] : []),
+			...(u.tools.length ? [{ kind: 'tools' as const, title: `Tools ×${u.tools.length}`, sub: `${u.tools.slice(0, 4).join(', ')}${u.tools.length > 4 ? '…' : ''}` }] : [])
+		];
+	}
+	// 에이전트 카드를 열면 그 노드 옆에 쓰는 스킬 · MCP · 도구를 붙이고, 다른 노드 위로 올린다.
+	$effect(() => {
+		const sn = inspect;
+		untrack(() => {
+			nodes = nodes.map((n) => {
+				if (!n.id.startsWith('agent-')) return n;
+				const on = n.id === `agent-${sn}`;
+				const d = n.data as DiagramNodeData;
+				if (!on && !d.caps) return n;
+				return { ...n, zIndex: on ? 10 : undefined, data: { ...d, caps: on ? capsOf(sn!) : undefined } };
+			}) as typeof nodes;
 		});
 	});
 	// 태스크 상태 · 선택이 바뀌면 노드에 반영한다 (위치는 유지).
@@ -1918,6 +1944,62 @@
 										<div class="flex items-center gap-1.5 py-2 text-caption font-medium text-muted-foreground">
 											<ChevronsDown class="size-3" />+{q.length - 3}개 더{#if q.slice(3).some((x) => x.stuck)} · 막힘 {q.slice(3).filter((x) => x.stuck).length}{/if}
 											<span class="flex-1"></span><a href="/teams?member={a.sn}" class="text-primary hover:underline">전체 대기열</a>
+										</div>
+									{/if}
+								</section>
+							{/if}
+							{#if useMock && agentUsage[a.sn]}
+								{@const u = agentUsage[a.sn]}
+								{@const used = u.tokens.input + u.tokens.cached + u.tokens.output}
+								{@const k = (n: number) => `${Math.round(n * 10) / 10}K`}
+								<!-- .pen InspectorSection · Skills & MCP — 이 Run에서 쓰는 스킬(호출 수) · MCP(연결 상태). 편집은 멤버 상세 -->
+								<section class="-mx-4 mb-3 flex flex-col border-b px-4 pb-2.5" aria-label="쓰는 스킬 · MCP">
+									<div class="flex items-center justify-between pb-1">
+										<h3 class="text-body font-semibold">Active Skills & MCPs ({u.skills.length + u.mcp.length})</h3>
+										<Button variant="outline" size="xs" href="/teams?member={a.sn}"><PanelRightOpen />편집</Button>
+									</div>
+									{#each u.skills as x (x.name)}
+										<div class="flex h-7 items-center gap-2">
+											<span class="kind-mark size-5 bg-node-skill"><Puzzle class="size-3" /></span>
+											<span class="flex-1 truncate text-body">{x.name}</span>
+											<span class="font-mono text-xs text-muted-foreground">{x.calls} calls</span>
+										</div>
+									{/each}
+									{#each u.mcp as x (x.name)}
+										<div class="flex h-7 items-center gap-2">
+											<span class="kind-mark size-5 bg-node-mcp"><Plug class="size-3" /></span>
+											<span class="flex-1 truncate text-body">{x.name}</span>
+											<span class={['text-xs font-medium', x.state === 'Connected' ? 'text-success' : 'text-warning']}>{x.state}</span>
+										</div>
+									{/each}
+								</section>
+								<!-- .pen InspectorSection · Token & Context — 지금 컨텍스트 = 새 입력 + 캐시 + 출력, 컨텍스트 창 대비 -->
+								<section class="-mx-4 mb-3 flex flex-col border-b px-4 pb-3" aria-label="토큰 · 컨텍스트">
+									<div class="flex items-center justify-between pb-1">
+										<h3 class="text-body font-semibold">Token & Context</h3>
+										<Button variant="outline" size="xs" onclick={() => (now ? open(now.num) : (inspectTab = 'runs'))}>View Details</Button>
+									</div>
+									{#each [['Input (new)', 'bg-token-input', u.tokens.input], ['Cached input', 'bg-token-cached', u.tokens.cached], ['Output', 'bg-token-output', u.tokens.output]] as [l, bg, v] (l)}
+										<div class="flex h-6 items-center gap-2 text-body">
+											<span class={['size-2 shrink-0 rounded-xs', bg]}></span>
+											<span class="flex-1 text-muted-foreground">{l}</span>
+											<span class="font-mono">{k(v as number)}</span>
+										</div>
+									{/each}
+									<div class="flex h-6 items-center gap-2 text-body font-medium">
+										<span class="size-2 shrink-0"></span>
+										<span class="flex-1">Total</span>
+										<span class="font-mono">{k(used)} / {u.tokens.limit}K</span>
+									</div>
+									<div class="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label="컨텍스트 {Math.round((used / u.tokens.limit) * 100)}% 사용 · 입력 {k(u.tokens.input)} · 캐시 {k(u.tokens.cached)} · 출력 {k(u.tokens.output)}" title="컨텍스트 {k(used)} / {u.tokens.limit}K · {Math.round((used / u.tokens.limit) * 100)}%">
+										<span class="bg-token-input" style="width: {(u.tokens.input / u.tokens.limit) * 100}%"></span>
+										<span class="bg-token-cached" style="width: {(u.tokens.cached / u.tokens.limit) * 100}%"></span>
+										<span class="bg-token-output" style="width: {(u.tokens.output / u.tokens.limit) * 100}%"></span>
+									</div>
+									{#if u.repeat}
+										<div class="mt-3 flex gap-2.5 rounded-md border border-warning/40 bg-warning-soft p-3" role="status">
+											<TriangleAlert class="size-4 shrink-0 text-warning" />
+											<p class="flex flex-col gap-0.5"><span class="text-body font-semibold text-warning">Repeated context detected</span><span class="text-xs">{u.repeat}</span></p>
 										</div>
 									{/if}
 								</section>

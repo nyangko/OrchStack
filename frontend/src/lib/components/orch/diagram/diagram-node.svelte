@@ -26,6 +26,8 @@
 		menuLabel?: string;
 		/** 에이전트 대기열 (.pen AgentQueueTray) — 있으면 카드 아래 받침에 다음 1개 + 남은 수. 빈 배열이면 '대기열 비어 있음'. */
 		queue?: { num: number; title: string; stuck?: boolean }[];
+		/** 선택한 에이전트가 쓰는 스킬 · MCP · 도구 (.pen Node/Skill · MCP · Tools) — 카드 오른쪽에 붙는다. */
+		caps?: { kind: "skill" | "mcp" | "tools"; title: string; sub: string }[];
 	};
 
 	/// 왼쪽 목록에서 끌어 온 태스크 (.pen 드래그로 배정). 캔버스를 그리는 쪽이 setContext로 넘긴다 — 에이전트 노드만 받는다.
@@ -46,6 +48,9 @@
 	import OctagonAlert from "@lucide/svelte/icons/octagon-alert";
 	import Inbox from "@lucide/svelte/icons/inbox";
 	import UserPlus from "@lucide/svelte/icons/user-plus";
+	import Puzzle from "@lucide/svelte/icons/puzzle";
+	import Plug from "@lucide/svelte/icons/plug";
+	import Wrench from "@lucide/svelte/icons/wrench";
 	import { getContext } from "svelte";
 	import { mergeProps } from "bits-ui";
 	import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
@@ -75,6 +80,7 @@
 		agent: { icon: Bot, bg: "bg-node-agent" },
 	};
 	const kind = $derived(kinds[data.kind]);
+	const capKinds = { skill: { icon: Puzzle, bg: "bg-node-skill" }, mcp: { icon: Plug, bg: "bg-node-mcp" }, tools: { icon: Wrench, bg: "bg-node-git" } };
 	// 받침이 있으면 위아래 연결선은 노드 오른쪽 끝으로 — 받침 글자를 가리지 않게 (.pen Diagram)
 	const side = $derived(data.queue ? "left: 92%" : undefined);
 	// 놓기 전 미리보기: 끄는 태스크가 대기열 맨 뒤에 붙은 모양
@@ -167,4 +173,20 @@
 		{#if rest >= 1}<div class="h-1 w-44 rounded-b-sm border border-t-0 bg-card"></div>{/if}
 		{#if rest >= 2}<div class="h-1 w-41 rounded-b-sm border border-t-0 bg-card"></div>{/if}
 	</div>
+{/if}
+{#if data.caps?.length}
+	<!-- 쓰는 스킬 · MCP · 도구: 카드 오른쪽 위에 세로로 붙고, 연결 줄은 스킬 색 (.pen Edge/capability) -->
+	<ul class="absolute top-3 left-full ml-8 flex w-35 flex-col gap-2" aria-label="{data.title}이 쓰는 스킬 · MCP · 도구">
+		{#each data.caps as c (c.kind)}
+			{@const k = capKinds[c.kind]}
+			<li class="relative flex items-center gap-2 rounded-md border bg-card px-2.5 py-2 shadow-sm">
+				<span class="absolute top-1/2 right-full h-px w-8 bg-node-skill"></span>
+				<span class={["kind-mark size-5", k.bg]}><k.icon class="size-3" /></span>
+				<span class="flex min-w-0 flex-col gap-0.5">
+					<span class="truncate text-xs font-semibold">{c.title}</span>
+					<span class="truncate text-caption text-muted-foreground">{c.sub}</span>
+				</span>
+			</li>
+		{/each}
+	</ul>
 {/if}

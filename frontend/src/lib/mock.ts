@@ -199,6 +199,39 @@ export const agentActivity: Record<number, { type: string; who: string; time: st
 	],
 };
 
+/// 에이전트가 지금 Run에서 쓰는 스킬 · MCP · 도구와 컨텍스트 (.pen Agent Inspector · Skills & MCP · Token & Context, Diagram capability 노드).
+/// tokens는 K 단위 — input(새로 보냄) · cached(캐시 재사용) · output, limit = 컨텍스트 창. repeat = 반복 전송 경고.
+export type AgentUsage = {
+	skills: { name: string; calls: number }[];
+	mcp: { name: string; state: "Connected" | "인증 필요" }[];
+	tools: string[];
+	tokens: { input: number; cached: number; output: number; limit: number };
+	repeat?: string;
+};
+export const agentUsage: Record<number, AgentUsage> = {
+	1: {
+		skills: [{ name: "Svelte UI", calls: 12 }, { name: "shadcn-svelte", calls: 7 }, { name: "a11y-check", calls: 2 }],
+		mcp: [{ name: "Playwright MCP", state: "Connected" }, { name: "GitHub MCP", state: "Connected" }],
+		tools: ["read", "edit", "run", "test", "search"],
+		tokens: { input: 28.4, cached: 9.1, output: 3.7, limit: 128 },
+		repeat: "최근 4번 호출에서 같은 소스 3개를 다시 보냈어요.",
+	},
+	2: {
+		skills: [{ name: "rust-api", calls: 18 }, { name: "sql-review", calls: 4 }],
+		mcp: [{ name: "GitHub MCP", state: "Connected" }],
+		tools: ["read", "edit", "run", "test"],
+		tokens: { input: 82.1, cached: 31.6, output: 4.2, limit: 128 },
+	},
+	3: {
+		skills: [{ name: "playwright", calls: 3 }, { name: "test-plan", calls: 1 }],
+		mcp: [{ name: "Playwright MCP", state: "Connected" }],
+		tools: ["read", "run", "test"],
+		tokens: { input: 11.2, cached: 3.4, output: 0.8, limit: 128 },
+	},
+	4: { skills: [{ name: "code-review", calls: 0 }], mcp: [{ name: "GitHub MCP", state: "인증 필요" }], tools: ["read", "search"], tokens: { input: 5.9, cached: 1.2, output: 0.6, limit: 200 } },
+	5: { skills: [{ name: "design-tokens", calls: 5 }], mcp: [], tools: ["read", "edit"], tokens: { input: 19.3, cached: 4.8, output: 2.1, limit: 128 } },
+};
+
 /// 판단 대기 (.pen DecisionPanel). 스키마 tbl_decision · tbl_decision_question · tbl_decision_option 요약.
 export type Decision = {
 	id: number;
