@@ -27,6 +27,10 @@
 		/** 에이전트 대기열 (.pen AgentQueueTray) — 있으면 카드 아래 받침에 다음 1개 + 남은 수. 빈 배열이면 '대기열 비어 있음'. */
 		queue?: { num: number; title: string; stuck?: boolean }[];
 	};
+
+	/// 왼쪽 목록에서 끌어 온 태스크 (.pen 드래그로 배정). 캔버스를 그리는 쪽이 setContext로 넘긴다 — 에이전트 노드만 받는다.
+	export type DiagramDrag = { task?: { num: number; title: string }; assign: (nodeId: string) => void };
+	export const DIAGRAM_DRAG = Symbol("diagram-drag");
 </script>
 
 <script lang="ts">
@@ -41,6 +45,8 @@
 	import ListStart from "@lucide/svelte/icons/list-start";
 	import OctagonAlert from "@lucide/svelte/icons/octagon-alert";
 	import Inbox from "@lucide/svelte/icons/inbox";
+	import UserPlus from "@lucide/svelte/icons/user-plus";
+	import { getContext } from "svelte";
 	import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
 	import Ellipsis from "@lucide/svelte/icons/ellipsis";
 	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuEntries } from "$lib/components/ui/dropdown-menu";
@@ -53,7 +59,11 @@
 	import { RuntimeLogo } from "$lib/components/orch/runtime-logo";
 	import TokenMeter from "./token-meter.svelte";
 	
-	let { data, selected }: NodeProps<Node<DiagramNodeData>> = $props();
+	let { id, data, selected }: NodeProps<Node<DiagramNodeData>> = $props();
+	const drag = getContext<DiagramDrag | undefined>(DIAGRAM_DRAG);
+	// 끄는 동안 에이전트 노드만 받고, 나머지는 흐리게
+	const target = $derived(!!drag?.task && data.kind === "agent");
+	let over = $state(false);
 
 	// 종류별 아이콘 · 색 (.pen KindIcon)
 	const kinds = {
@@ -66,8 +76,10 @@
 	const kind = $derived(kinds[data.kind]);
 	// 받침이 있으면 위아래 연결선은 노드 오른쪽 끝으로 — 받침 글자를 가리지 않게 (.pen Diagram)
 	const side = $derived(data.queue ? "left: 92%" : undefined);
-	const next = $derived(data.queue?.[0]);
-	const rest = $derived(Math.max(0, (data.queue?.length ?? 0) - 1));
+	// 놓기 전 미리보기: 끄는 태스크가 대기열 맨 뒤에 붙은 모양
+	const queue = $derived<DiagramNodeData["queue"]>(over && drag?.task ? [...(data.queue ?? []), drag.task] : data.queue);
+	const next = $derived(queue?.[0]);
+	const rest = $derived(Math.max(0, (queue?.length ?? 0) - 1));
 </script>
 
 <!-- 연결선은 좌우(열 사이)와 위아래(같은 열) 양쪽을 쓴다. 손잡이는 보이지 않게 둔다. -->
@@ -76,7 +88,23 @@
 <Handle type="target" position={Position.Top} id="t" class="opacity-0" style={side} />
 <Handle type="source" position={Position.Bottom} id="b" class="opacity-0" style={side} />
 
-<NodeCard {selected} class="relative z-1">
+<NodeCard
+	{selected}
+	class={["relative z-1 transition-opacity", drag?.task && !target && "opacity-40", over && "ring-2 ring-primary"]}
+	ondragover={(e) => target && (e.preventDefault(), (over = true))}
+	ondragleave={(e) => !e.currentTarget.contains(e.relatedTarget as globalThis.Node | null) && (over = false)}
+	ondrop={(e) => {
+		if (!target) return;
+		e.preventDefault();
+		over = false;
+		drag!.assign(id);
+	}}
+>
+	{#if over && drag?.task}
+		<span class="absolute -top-8 left-0 flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-caption font-semibold whitespace-nowrap text-primary-foreground">
+			<UserPlus class="size-3" />#{drag.task.num} → {data.title}에게 배정 · 대기열 {(data.queue?.length ?? 0) + 1}번째
+		</span>
+	{/if}
 	<NodeCardHeader>
 		<NodeCardKind class={kind.bg}><kind.icon /></NodeCardKind>
 		<NodeCardRef>{data.ref}</NodeCardRef>

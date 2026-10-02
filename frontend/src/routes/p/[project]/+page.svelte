@@ -79,7 +79,7 @@
 	import { Bubble, BubbleContent } from '$lib/components/orch/bubble';
 	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from '$lib/components/ui/dialog';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { untrack, onDestroy, tick, type Component } from 'svelte';
+	import { untrack, onDestroy, tick, setContext, type Component } from 'svelte';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { toast } from 'svelte-sonner';
 	import { useMock } from '$lib/api/env';
@@ -88,7 +88,7 @@
 	import { project as wb, openProject, closeProject, viewTasks, viewIssues, viewAgents, moveTask, runsOf, stopRun } from '$lib/project.svelte';
 	import { SvelteFlow, Background, BackgroundVariant, Controls, Panel, MarkerType, type Node, type Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
-	import DiagramNode, { type DiagramNodeData } from '$lib/components/orch/diagram/diagram-node.svelte';
+	import DiagramNode, { DIAGRAM_DRAG, type DiagramDrag, type DiagramNodeData } from '$lib/components/orch/diagram/diagram-node.svelte';
 	import type { MenuEntry } from '$lib/components/ui/dropdown-menu';
 	import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuLabel, ContextMenuSeparator, ContextMenuEntries } from '$lib/components/ui/context-menu';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
@@ -233,7 +233,66 @@
 
 	// Kanban (.pen #26 Workbench / Kanban Board) — 상태별 열. Failed 열은 해당 태스크가 있을 때만.
 	const agentOf = (sn?: number) => agentList.find((a) => a.sn === sn);
+	/// 에이전트 대기열 (목데이터 · 화면 상태) — 끌어서 배정하면 늘어난다. Diagram 받침 · Agent 카드 NEXT가 본다.
+	let queues = $state(structuredClone(agentQueues));
 	const task = (num: number) => list.find((t) => t.num === num)!;
+
+	// ── 드래그로 배정 · 상태 변경 (.pen 드래그로 배정) — 왼쪽 Tasks의 Backlog · Todo 줄만 끈다 ─────────
+	const movable = (t: { status: TaskStatus }) => t.status === 'backlog' || t.status === 'todo';
+	const drag: DiagramDrag = $state({ task: undefined, assign: (nodeId: string) => dropOnAgent(Number(nodeId.replace('agent-', ''))) });
+	setContext(DIAGRAM_DRAG, drag);
+	/// Agents 탭 줄 · Kanban 열 중 지금 커서가 올라간 곳.
+	let dropAgent = $state<number>();
+	let dropLane = $state<TaskStatus>();
+	function startDrag(e: DragEvent, t: { num: number; title: string }) {
+		drag.task = { num: t.num, title: t.title };
+		e.dataTransfer?.setData('text/plain', `#${t.num} ${t.title}`);
+		if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+	}
+	function endDrag() {
+		drag.task = undefined;
+		dropAgent = undefined;
+		dropLane = undefined;
+	}
+	/// 에이전트에 놓기 = Assign Agent와 같은 동작 + 대기열 맨 뒤. 되돌리기는 알림에서.
+	function dropOnAgent(sn: number) {
+		const num = drag.task?.num;
+		endDrag();
+		if (num === undefined) return;
+		const t = task(num);
+		const prev = t.agent;
+		if (prev === sn) return;
+		t.agent = sn;
+		if (useMock) {
+			if (prev !== undefined) queues[prev] = (queues[prev] ?? []).filter((x) => x.num !== num);
+			const q = (queues[sn] ??= []);
+			if (!q.some((x) => x.num === num && x.title === t.title)) q.push({ num, title: t.title, note: '바로 시작 가능', issue: `#${t.issue}`, est: '', priority: t.priority });
+			refreshQueue(sn, prev);
+		}
+		const at = (queues[sn] ?? []).findIndex((x) => x.num === num && x.title === t.title) + 1;
+		toast.success(`#${num} → ${agentName(sn)} 배정${at ? ` · 대기 ${at}번째` : ''}`, {
+			action: {
+				label: '되돌리기',
+				onClick: () => {
+					t.agent = prev;
+					if (useMock) {
+						queues[sn] = queues[sn].filter((x) => !(x.num === num && x.title === t.title));
+						refreshQueue(sn, prev);
+					}
+				}
+			}
+		});
+	}
+	/// Kanban 열에 놓기 = 상태 변경. Backlog ↔ Todo만 받는다 — 실행 상태는 Orch · 담당자가 연다.
+	function dropOnLane(status: TaskStatus) {
+		const num = drag.task?.num;
+		endDrag();
+		if (num !== undefined && movable({ status })) void setStatus(num, status);
+	}
+	/// 대기열이 바뀐 에이전트 노드의 받침을 다시 그린다 (노드 위치는 그대로).
+	function refreshQueue(...sns: (number | undefined)[]) {
+		nodes = nodes.map((n) => (sns.some((sn) => sn !== undefined && n.id === `agent-${sn}`) ? { ...n, data: { ...n.data, queue: [...(queues[Number(n.id.slice(6))] ?? [])] } } : n)) as typeof nodes;
+	}
 	const lanes = $derived(statusOrder.filter((s) => s !== 'failed' || count(s) > 0));
 	// 드래그 중 열 배치는 따로 두고, 놓을 때 태스크 상태에 반영한다.
 	let board = $state<KanbanValue>({});
@@ -344,7 +403,7 @@
 			menu: agentMenu(sn),
 			meta: lead.length ? `sub-run ${lead.length} · ctx ${ctx}` : `ctx ${ctx}`,
 			// 대기열 받침 — 서버 큐 API 전에는 목데이터에서만 (#88)
-			...(useMock && { queue: agentQueues[sn] ?? [] })
+			...(useMock && { queue: [...(queues[sn] ?? [])] })
 		};
 	}
 	const diagramTasks = $derived(useMock ? [128, 129, 130, 131] : list.map((t) => t.num));
@@ -780,7 +839,9 @@
 </script>
 
 <svelte:head><title>{project?.name ?? '프로젝트'} · OrchStack</title></svelte:head>
+<!-- onmousemove: 끄던 줄이 탭 전환으로 사라지면 dragend가 오지 않는다 — 드래그가 끝난 뒤 첫 마우스 이동에서 정리 -->
 <svelte:window
+	onmousemove={() => drag.task && endDrag()}
 	onkeydown={(e) => {
 		// 편집기 · 다이얼로그가 열려 있으면 그쪽이 키를 처리한다
 		if (editorOpen || panel) return;
@@ -922,7 +983,8 @@
 						<div class="flex items-center gap-0.5">
 							<TabsList>
 								<TabsTrigger value="tasks">Tasks</TabsTrigger>
-								<TabsTrigger value="agents">Agents</TabsTrigger>
+								<!-- 끄는 중 Agents 탭 위에 오면 탭을 연다 -->
+								<TabsTrigger value="agents" ondragenter={() => drag.task && (panelTab = 'agents')}>Agents</TabsTrigger>
 							</TabsList>
 							<span class="flex-1"></span>
 							{#if panelTab === 'agents'}
@@ -989,10 +1051,11 @@
 								size="sm"
 								aria-pressed={selected === t.num}
 								onclick={() => open(t.num)}
-								class={['w-full px-3 text-left', selected === t.num ? 'bg-primary-soft hover:bg-primary-soft' : 'hover:bg-muted']}
+								class={['w-full px-3 text-left', selected === t.num ? 'bg-primary-soft hover:bg-primary-soft' : 'hover:bg-muted', drag.task?.num === t.num && 'bg-primary-soft opacity-40', drag.task && !movable(t) && 'opacity-50']}
 							>
 								{#snippet child({ props })}
-									<button type="button" {...props}>
+									<!-- Backlog · Todo만 끌 수 있다 (.pen 드래그로 배정 ①) -->
+									<button type="button" {...props} draggable={movable(t)} ondragstart={(e) => startDrag(e, t)} ondragend={endDrag}>
 										<ItemContent class="gap-1.5">
 											<span class="flex items-center justify-between">
 												<span class="font-mono text-xs font-medium text-muted-foreground">#{t.num}</span>
@@ -1019,7 +1082,15 @@
 								<ContextMenuTrigger>
 									{#snippet child({ props })}
 										<div {...props} class="group relative">
-											<button type="button" aria-pressed={inspect === a.sn} onclick={() => openAgent(a.sn)} class={['flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left outline-none focus-visible:bg-muted', inspect === a.sn ? 'bg-primary-soft hover:bg-primary-soft' : 'hover:bg-muted']}>
+											<button
+												type="button"
+												aria-pressed={inspect === a.sn}
+												onclick={() => openAgent(a.sn)}
+												ondragover={(e) => drag.task && (e.preventDefault(), (dropAgent = a.sn))}
+												ondragleave={(e) => !e.currentTarget.contains(e.relatedTarget as globalThis.Node | null) && dropAgent === a.sn && (dropAgent = undefined)}
+												ondrop={(e) => (e.preventDefault(), dropOnAgent(a.sn))}
+												class={['flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left outline-none focus-visible:bg-muted', inspect === a.sn || dropAgent === a.sn ? 'bg-primary-soft hover:bg-primary-soft' : 'hover:bg-muted', dropAgent === a.sn && 'ring-2 ring-primary ring-inset']}
+											>
 												<RoleAvatar role={a.role}>
 													<AvatarBadge class={a.online ? 'bg-success' : 'bg-subtle-foreground'} aria-label={a.online ? '온라인' : '오프라인'} />
 												</RoleAvatar>
@@ -1028,7 +1099,7 @@
 														<span class="text-sm font-medium">{a.name}</span>
 														<span class="font-mono text-xs text-muted-foreground">{a.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'}</span>
 													</span>
-													<span class="truncate text-xs text-muted-foreground">{a.activity}</span>
+													<span class={['truncate text-xs', dropAgent === a.sn ? 'font-medium text-primary' : 'text-muted-foreground']}>{dropAgent === a.sn ? `놓으면 ${a.name}에게 배정` : a.activity}</span>
 												</span>
 												<span class="font-mono text-xs font-medium text-muted-foreground">{a.tokens}</span>
 											</button>
@@ -1094,7 +1165,14 @@
 					<KanbanBoard bind:value={board} onDragEnd={drop}>
 						{#each lanes as s (s)}
 							{@const meta = statuses[s]}
-							<KanbanColumn value={s}>
+							<!-- 왼쪽 목록에서 끌어 오면 Backlog · Todo 열만 받는다 (.pen 드래그로 배정 ④) -->
+							<KanbanColumn
+								value={s}
+								class={[drag.task && !movable({ status: s }) && 'cursor-not-allowed opacity-50', dropLane === s && 'bg-primary-soft ring-2 ring-primary']}
+								ondragover={(e) => drag.task && movable({ status: s }) && (e.preventDefault(), (dropLane = s))}
+								ondragleave={(e) => !e.currentTarget.contains(e.relatedTarget as globalThis.Node | null) && dropLane === s && (dropLane = undefined)}
+								ondrop={(e) => (e.preventDefault(), dropOnLane(s))}
+							>
 								<KanbanColumnHeader>
 									<meta.icon class={meta.text} />
 									<KanbanColumnTitle>{meta.label}</KanbanColumnTitle>
@@ -1684,7 +1762,7 @@
 							{#each [['overview', 'Overview'], ['activity', 'Activity'], ['runs', 'Runs'], ['config', 'Config']] as [v, l] (v)}<TabsTrigger value={v}>{l}</TabsTrigger>{/each}
 						</TabsList>
 						<TabsContent value="overview" class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3">
-							{@const q = agentQueues[a.sn] ?? []}
+							{@const q = queues[a.sn] ?? []}
 							{@const now = mine.find((t) => t.status === 'in_progress')}
 							<!-- NOW (.pen InspectorSection · Now) — 지금 실행 중인 태스크 -->
 							<section class="-mx-4 mb-3 flex flex-col gap-2 border-b px-4 pb-3" aria-label="지금 하는 작업">
@@ -1712,7 +1790,7 @@
 										<span class="flex-1"></span>
 										<a href="/teams?member={a.sn}" class="text-caption font-medium text-primary hover:underline">Tasks 탭 →</a>
 									</div>
-									{#each q.slice(0, 3) as item, i (item.num)}
+									{#each q.slice(0, 3) as item, i (`${item.num}·${item.title}`)}
 										<div class="flex items-center gap-2 border-b py-2 last:border-b-0">
 											<span class="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-2xs font-semibold text-muted-foreground">{i + 1}</span>
 											{#if item.stuck}<OctagonAlert class="size-3.5 shrink-0 text-status-blocked" />{:else if item.blocked}<CircleDashed class="size-3.5 shrink-0 text-status-waiting" />{:else}<Circle class="size-3.5 shrink-0 text-status-todo" />{/if}
