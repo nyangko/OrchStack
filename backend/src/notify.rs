@@ -1,5 +1,5 @@
-//! 알림(tbl_notification) 목록 · 읽음 + 이벤트 → 알림 projection, 알림 규칙(워크스페이스 · 연결의 notify_json) · 채널 테스트(workspace.channel_json), 감사 로그(tbl_log_audit) 조회
-use crate::{entity::{tbl_ask as ak, tbl_connection as cn, tbl_log_audit as au, tbl_log_event as e, tbl_notification as n, tbl_run as r, tbl_task as t, tbl_workspace as ws},
+//! 알림(tbl_notification) 목록 · 읽음 + 이벤트 → 알림 projection, 알림 규칙(워크스페이스 · 연결의 notify_json) · 채널 테스트(workspace.channel_json), 감사 로그(tbl_log_event 중 키 · 정책 · 연결 · 업데이트 · 차단 이벤트) 조회
+use crate::{entity::{tbl_ask as ak, tbl_connection as cn, tbl_log_event as e, tbl_notification as n, tbl_run as r, tbl_task as t, tbl_workspace as ws},
     error::{Body, Error, ErrorBody, Res}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Statement, sea_query::Expr};
@@ -19,6 +19,11 @@ const RUN_TAB: [&str; 6] = ["run_failed", "guard_stop", "context_warn", "orch_de
 const QUOTA_TAB: [&str; 5] = ["quota_low", "budget_80", "budget_over", "connection_error", "fallback_used"];
 /// 감사 로그 종류
 const AUDITS: [&str; 6] = ["KEY", "POLICY", "CONNECTION", "INSTALL", "UPDATE", "BLOCK"];
+/// 감사 로그가 되는 이벤트 → 종류 (별도 감사 테이블 없이 tbl_log_event를 조회한다 · 차단 이벤트는 차단을 만드는 쪽이 ActionBlocked로 남긴다)
+const AUDIT: [(&str, &str); 7] = [
+    ("ConnectionCreated", "KEY"), ("ConnectionDeleted", "KEY"), ("ConnectionUpdated", "CONNECTION"),
+    ("ProfileUpdated", "POLICY"), ("OrchPolicyUpdated", "POLICY"), ("SkillUpdated", "UPDATE"), ("ActionBlocked", "BLOCK"),
+];
 
 /// notify 관련 경로 묶음
 pub fn routes() -> OpenApiRouter<DatabaseConnection> {
@@ -310,17 +315,22 @@ async fn test(State(db): State<DatabaseConnection>, Body(b): Body<TestBody>) -> 
     Ok(Json(TestOut { kind: b.kind, ready, delivered: false }))
 }
 
-/// 감사 로그 (최신순). kind로 거르고 limit 기본 100 · 최대 1000. 모르는 종류는 422
+/// 감사 로그 (최신순). 키 · 정책 · 연결 · 업데이트 · 차단 이벤트(tbl_log_event)를 종류로 거르고 limit 기본 100 · 최대 1000. 모르는 종류는 422.
+/// title = payload의 title · name(없으면 이벤트 이름), detail = payload
 #[utoipa::path(operation_id = "notify_audit", get, path = "/audit", params(AuditQuery), responses((status = 200, body = Vec<Audit>), (status = "default", body = ErrorBody)))]
 async fn audit(State(db): State<DatabaseConnection>, Query(q): Query<AuditQuery>) -> Res<Json<Vec<Audit>>> {
-    let mut f = au::Entity::find();
-    if let Some(k) = q.kind {
-        if !AUDITS.contains(&k.as_str()) {
-            return Err(Error::invalid(format!("kind in {AUDITS:?}")));
-        }
-        f = f.filter(au::Column::Kind.eq(k));
+    let kind = q.kind.as_deref();
+    if kind.is_some_and(|k| !AUDITS.contains(&k)) {
+        return Err(Error::invalid(format!("kind in {AUDITS:?}")));
     }
-    Ok(Json(f.order_by_desc(au::Column::Sn).limit(q.limit.unwrap_or(100).min(1000)).all(&db).await?.into_iter().map(|m| Audit {
-        sn: m.sn, actor_type: m.actor_type, user_sn: m.user_sn, member_sn: m.member_sn, run_sn: m.run_sn, kind: m.kind, title: m.title, detail: m.detail, create_at: m.create_at,
+    let names: Vec<&str> = AUDIT.iter().filter(|(_, k)| kind.is_none_or(|w| w == *k)).map(|(n, _)| *n).collect();
+    let rows = e::Entity::find().filter(e::Column::EventType.is_in(names)).order_by_desc(e::Column::Sn).limit(q.limit.unwrap_or(100).min(1000)).all(&db).await?;
+    Ok(Json(rows.into_iter().map(|m| {
+        let p: serde_json::Value = serde_json::from_str(&m.payload_json).unwrap_or_default();
+        Audit {
+            kind: AUDIT.iter().find(|(n, _)| *n == m.event_type).map_or_else(String::new, |(_, k)| (*k).into()),
+            title: p["title"].as_str().or(p["name"].as_str()).map_or_else(|| m.event_type.clone(), str::to_owned),
+            detail: Some(m.payload_json), sn: m.sn, actor_type: m.actor_type, user_sn: m.user_sn, member_sn: m.member_sn, run_sn: m.run_sn, create_at: m.create_at,
+        }
     }).collect()))
 }

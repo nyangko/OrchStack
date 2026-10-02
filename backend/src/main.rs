@@ -741,7 +741,8 @@ mod tests {
         }
 
         // 감사 로그: 최신순 · 종류 · limit · 모르는 종류 422
-        db.execute_unprepared("INSERT INTO tbl_log_audit (workspace_sn, actor_type, kind, title) VALUES (1, 'user', 'KEY', 'k'), (1, 'member', 'BLOCK', 'git reset'), (1, 'user', 'BLOCK', 'git stash');").await.unwrap();
+        db.execute_unprepared("INSERT INTO tbl_log_event (workspace_sn, aggregate_type, aggregate_sn, seq, event_type, payload_json, actor_type) VALUES \
+            (1, 'connection', 99, 1, 'ConnectionCreated', '{\"name\":\"k\"}', 'user'), (1, 'run', 99, 1, 'ActionBlocked', '{\"title\":\"git reset\"}', 'member'), (1, 'run', 99, 2, 'ActionBlocked', '{\"title\":\"git stash\"}', 'user');").await.unwrap();
         let v = call(&app, "GET", "/audit?kind=BLOCK&limit=1", None).await.1;
         assert_eq!((v.as_array().unwrap().len(), v[0]["title"].as_str()), (1, Some("git stash")));
         assert_eq!(call(&app, "GET", "/audit", None).await.1.as_array().unwrap().len(), 3);

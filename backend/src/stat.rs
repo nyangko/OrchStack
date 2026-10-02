@@ -20,7 +20,7 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
 struct Load {
     member_sn: i64,
     name: String,
-    /// running | waiting | idle | paused
+    /// active | paused | archived (일하는 중 · 대기 중은 active_run_count로)
     status: String,
     /// 담당 중인 열린 태스크 (done · cancelled 아님)
     open_task_count: i64,

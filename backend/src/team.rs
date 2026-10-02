@@ -11,7 +11,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 /// 허용되는 팀 종류
 const KINDS: [&str; 2] = ["orch", "project"];
 /// 허용되는 멤버 상태
-const STATUS: [&str; 5] = ["running", "waiting", "idle", "paused", "archived"];
+const STATUS: [&str; 3] = ["active", "paused", "archived"];
 /// 허용되는 하위 작업 방식 (#67)
 pub(crate) const SPAWN: [&str; 3] = ["sub", "fork", "runner"];
 
@@ -86,7 +86,7 @@ pub struct Member {
     icon: Option<String>,
     color: Option<String>,
     is_orch: i64,
-    /// running | waiting | idle | paused | archived
+    /// active | paused | archived (일하는 중 · 대기 중은 Run으로 계산)
     status: String,
     /// orch | task | wait
     first_task_mode: String,
@@ -181,7 +181,7 @@ struct MemberPatch {
     icon: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     color: Option<String>,
-    /// running | waiting | idle | paused | archived
+    /// active | paused | archived (일하는 중 · 대기 중은 Run으로 계산)
     #[serde(skip_serializing_if = "Option::is_none")]
     status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

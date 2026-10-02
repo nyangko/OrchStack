@@ -1,6 +1,6 @@
 //! PM Dock: 프로젝트 Orch 대화(tbl_message · 첨부 조회) · 작업 제안(WorkProposal 메시지) 진행 → 이슈 · 태스크 생성,
-//! 실행 중 지시(tbl_log_activity). Orch가 답 · 제안을 만드는 것은 실행기 Task(#13 #14) — 여기서는 저장 · 조회 · 진행만
-use crate::{entity::{tbl_attachment as at, tbl_issue as i, tbl_log_activity as la, tbl_member as mb, tbl_message as ms,
+//! 실행 중 지시(InstructionSent 이벤트). Orch가 답 · 제안을 만드는 것은 실행기 Task(#13 #14) — 여기서는 저장 · 조회 · 진행만
+use crate::{entity::{tbl_attachment as at, tbl_issue as i, tbl_member as mb, tbl_message as ms,
     tbl_project as pj, tbl_run as r, tbl_task as t},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::{Issue, next_num}, run, task::Task};
 use axum::{Json, extract::State, http::StatusCode};
@@ -120,7 +120,6 @@ struct InstructBody {
 /// 실행 중 지시 결과 (활동 기록 1건)
 #[derive(Serialize, ToSchema)]
 struct Instruction {
-    activity_sn: i64,
     run_sn: i64,
     member_sn: i64,
     text: String,
@@ -273,7 +272,7 @@ async fn cancel(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Me
     Ok(Json(out))
 }
 
-/// 실행 중 지시 (InstructionSent). 활동 기록(TASK_INSTRUCTION · 사용자 → Run 멤버)을 남긴다. 세션 전달은 실행기(#13).
+/// 실행 중 지시 (InstructionSent 이벤트 · 사용자 → Run 멤버). 세션 전달은 실행기(#13).
 /// 끝난 Run 409 · 빈 지시 422 · 없는 Run 404
 #[utoipa::path(operation_id = "orch_instruct", post, path = "/runs/{sn}/instruct", params(("sn" = i64, Path, description = "Run 번호")), request_body = InstructBody, responses((status = 201, body = Instruction), (status = "default", body = ErrorBody)))]
 async fn instruct(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<InstructBody>) -> Res<(StatusCode, Json<Instruction>)> {
@@ -285,12 +284,9 @@ async fn instruct(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Bod
         if !run::ACTIVE.contains(&run.status.as_str()) {
             return Err(Error::conflict(format!("run is {}", run.status)));
         }
-        let a = la::ActiveModel {
-            project_sn: Set(Some(run.project_sn)), task_sn: Set(Some(run.task_sn)), run_sn: Set(Some(sn)), actor_type: Set("user".into()), user_sn: Set(Some(crate::USER)),
-            target_member_sn: Set(Some(run.member_sn)), kind: Set("TASK_INSTRUCTION".into()), title: Set(b.text.clone()), ..Default::default()
-        }.insert(tx).await?;
-        let out = Instruction { activity_sn: a.sn, run_sn: sn, member_sn: run.member_sn, text: b.text.clone(), create_at: a.create_at };
-        let ev = Ev::new(Some(run.project_sn), "run", sn, "InstructionSent", &json!({ "activity_sn": a.sn, "member_sn": run.member_sn, "text": b.text }));
+        // 활동 기록 테이블 없이 이벤트가 곧 기록이다 (Activity는 tbl_log_event 조회)
+        let out = Instruction { run_sn: sn, member_sn: run.member_sn, text: b.text.clone(), create_at: crate::orch_rule::at(tx, "+0 seconds").await? };
+        let ev = Ev::new(Some(run.project_sn), "run", sn, "InstructionSent", &json!({ "task_sn": run.task_sn, "member_sn": run.member_sn, "text": b.text }));
         Ok((out, vec![ev]))
     }).await?;
     Ok((StatusCode::CREATED, Json(out)))

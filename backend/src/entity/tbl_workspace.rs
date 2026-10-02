@@ -75,8 +75,6 @@ pub enum Relation {
     TblConnection,
     #[sea_orm(has_many = "super::tbl_instruction_preset::Entity")]
     TblInstructionPreset,
-    #[sea_orm(has_many = "super::tbl_log_audit::Entity")]
-    TblLogAudit,
     #[sea_orm(has_many = "super::tbl_log_event::Entity")]
     TblLogEvent,
     #[sea_orm(has_many = "super::tbl_mcp::Entity")]
@@ -122,12 +120,6 @@ impl Related<super::tbl_connection::Entity> for Entity {
 impl Related<super::tbl_instruction_preset::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblInstructionPreset.def()
-    }
-}
-
-impl Related<super::tbl_log_audit::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblLogAudit.def()
     }
 }
 

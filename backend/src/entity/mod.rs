@@ -12,8 +12,6 @@ pub mod tbl_diagram;
 pub mod tbl_instruction_preset;
 pub mod tbl_interaction;
 pub mod tbl_issue;
-pub mod tbl_log_activity;
-pub mod tbl_log_audit;
 pub mod tbl_log_event;
 pub mod tbl_log_run;
 pub mod tbl_log_token;

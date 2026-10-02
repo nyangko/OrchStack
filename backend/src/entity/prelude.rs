@@ -10,8 +10,6 @@ pub use super::tbl_diagram::Entity as TblDiagram;
 pub use super::tbl_instruction_preset::Entity as TblInstructionPreset;
 pub use super::tbl_interaction::Entity as TblInteraction;
 pub use super::tbl_issue::Entity as TblIssue;
-pub use super::tbl_log_activity::Entity as TblLogActivity;
-pub use super::tbl_log_audit::Entity as TblLogAudit;
 pub use super::tbl_log_event::Entity as TblLogEvent;
 pub use super::tbl_log_run::Entity as TblLogRun;
 pub use super::tbl_log_token::Entity as TblLogToken;

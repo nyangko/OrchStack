@@ -44,8 +44,6 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::tbl_log_activity::Entity")]
-    TblLogActivity,
     #[sea_orm(has_many = "super::tbl_member::Entity")]
     TblMember,
     #[sea_orm(has_many = "super::tbl_project::Entity")]
@@ -58,12 +56,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     TblWorkspace,
-}
-
-impl Related<super::tbl_log_activity::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblLogActivity.def()
-    }
 }
 
 impl Related<super::tbl_member::Entity> for Entity {

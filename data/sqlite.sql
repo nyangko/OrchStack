@@ -368,7 +368,7 @@ CREATE TABLE tbl_member (
     icon              TEXT,                                         -- 아바타 아이콘
     color             TEXT,                                         -- 역할 색 토큰
     is_orch           INTEGER NOT NULL DEFAULT 0,                   -- Orch(PM) 여부
-    status            TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('running','waiting','idle','paused','archived')),  -- 상태 (projection · Run 이벤트 핸들러가 갱신 · 직접 UPDATE 금지): running(Run 실행 중) | waiting(의존 · 판단 · 승인 대기) | idle(할 일 없음) | paused(사용자가 멈춤) | archived(보관 · 삭제 대신 · 기록 유지, Run이 있으면 삭제 불가)
+    status            TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','archived')),  -- 상태: active(사용 중) | paused(사용자가 멈춤) | archived(보관 · 삭제 대신 · 기록 유지, Run이 있으면 삭제 불가) · 일하는 중 · 대기 중 · 놀고 있음은 Run으로 계산한다 (tbl_member 상태 컬럼에 두지 않는다)
     first_task_mode   TEXT NOT NULL DEFAULT 'orch' CHECK (first_task_mode IN ('orch','task','wait')),  -- 추가 직후: orch(Orch에게 맡김 · 팀 진행 정책대로 배정) | task(지정한 태스크로 시작) | wait(추가만 하고 대기)
     sort              INTEGER NOT NULL DEFAULT 0,                   -- 목록 순서
     create_at         TEXT NOT NULL DEFAULT (datetime('now')),      -- 생성 시각
@@ -785,7 +785,7 @@ CREATE TABLE tbl_notification (
 -- =====================================================================
 
 -- 이벤트 저장소 (#10 Command → Event → Projection · 초안, #10에서 확정). 상태 변경의 원본 · 쌓이기만 한다
---   화면용 테이블(tbl_task.status, tbl_log_activity, tbl_interaction …)은 이 기록에서 만든 projection
+--   화면용 테이블(tbl_task.status, tbl_interaction …)과 Activity 타임라인 · 감사 로그는 이 기록에서 만든다 (조회 때 event_type · payload로 거른다)
 --   @TASK · @REPORT · @ASK 블록 원문은 payload_json 에 저장 (모델에 다시 보내지 않음)
 CREATE TABLE tbl_log_event (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 이벤트 번호 (전역 순서 · 재연결 커서 · 쓰기는 워크스페이스당 1개 트랜잭션씩 직렬화해야 번호 순서 = 커밋 순서가 된다)
@@ -837,40 +837,6 @@ CREATE TABLE tbl_log_token (
     create_at          TEXT NOT NULL DEFAULT (datetime('now'))      -- 호출 시각
 );
 
--- 활동 기록. Activity 타임라인 (배정 · 지시 · 리뷰 · 메시지 · 결정 · 시스템) · tbl_log_event에서 만든 화면용 기록(projection)
-CREATE TABLE tbl_log_activity (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 기록 번호
-    project_sn       INTEGER REFERENCES tbl_project(sn) ON DELETE SET NULL,            -- 프로젝트
-    team_sn          INTEGER REFERENCES tbl_team(sn) ON DELETE SET NULL,               -- 팀
-    task_sn          INTEGER REFERENCES tbl_task(sn) ON DELETE SET NULL,               -- 관련 태스크
-    run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,                -- 관련 Run
-    actor_type       TEXT NOT NULL CHECK (actor_type IN ('user','orch','member','system')),  -- 한 쪽: user(사용자) | orch(Orch) | member(멤버) | system(시스템)
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 한 사용자
-    member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 한 멤버
-    target_member_sn INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 받은 멤버 (예: Orch → 진)
-    kind             TEXT NOT NULL CHECK (kind IN ('TASK_INSTRUCTION','ASSIGN','RUN','TOOL_CALL','MESSAGE','TEST','REQUEST_VERIFICATION','REVIEW','DECISION','SYSTEM')),  -- 종류: TASK_INSTRUCTION(태스크 지시) | ASSIGN(배정) | RUN(Run 시작 · 종료) | TOOL_CALL(도구 호출) | MESSAGE(메시지) | TEST(테스트) | REQUEST_VERIFICATION(검증 요청) | REVIEW(리뷰 · 반려) | DECISION(결정) | SYSTEM(시스템 · 한도 경고 등)
-    title            TEXT NOT NULL,                                 -- 한 줄 요약
-    body             TEXT,                                          -- 상세
-    ref_type         TEXT CHECK (ref_type IN ('ask','review','message','interaction')),  -- 펼쳐 볼 대상: ask | review | message | interaction (ref_sn이 가리키는 테이블)
-    ref_sn           INTEGER,                                       -- 펼쳐 볼 대상의 sn (여러 테이블이라 FK 없음 · 대상이 지워지면 화면에 '삭제된 항목' 표시)
-    event_sn         INTEGER REFERENCES tbl_log_event(sn) ON DELETE SET NULL,  -- 원본 이벤트 (이 행을 만든 tbl_log_event)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 기록 시각
-);
-
--- 감사 기록. 키 · 정책 · 연결 · 스킬 변경과 차단 내역
-CREATE TABLE tbl_log_audit (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 기록 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
-    actor_type       TEXT NOT NULL CHECK (actor_type IN ('user','orch','member','system')),  -- 한 쪽: user(사용자) | orch(Orch) | member(멤버) | system(시스템)
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 한 사용자
-    member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 한 멤버 (차단된 멤버 포함)
-    run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,                -- 관련 Run
-    kind             TEXT NOT NULL CHECK (kind IN ('KEY','POLICY','CONNECTION','INSTALL','UPDATE','BLOCK')),  -- 종류: KEY(키 추가 · 삭제) | POLICY(권한 · 정책 변경) | CONNECTION(연결 변경) | INSTALL(스킬 · MCP 설치) | UPDATE(업데이트) | BLOCK(차단된 동작)
-    title            TEXT NOT NULL,                                 -- 내용 (예: git reset --hard origin/main 차단)
-    detail           TEXT,                                          -- 사유 · 상세 (예: Destructive git)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 기록 시각
-);
-
 
 -- =====================================================================
 -- 11. 인덱스 (목록 · 필터에 자주 쓰는 조회)
@@ -896,8 +862,6 @@ CREATE INDEX idx_log_run_run            ON tbl_log_run (run_sn, create_at);
 CREATE INDEX idx_log_token_run          ON tbl_log_token (run_sn);
 CREATE INDEX idx_log_token_create       ON tbl_log_token (create_at);                  -- 보관 기간(retention_token_day) 정리
 CREATE INDEX idx_log_run_create         ON tbl_log_run (create_at);                    -- 보관 기간(retention_run_log_day) 정리
-CREATE INDEX idx_log_activity_task      ON tbl_log_activity (task_sn, create_at);
-CREATE INDEX idx_log_activity_member    ON tbl_log_activity (member_sn, create_at);
 CREATE INDEX idx_interaction_task       ON tbl_interaction (task_sn, status);
 CREATE INDEX idx_interaction_project    ON tbl_interaction (project_sn, status);
 CREATE INDEX idx_report_item_run       ON tbl_report_item (run_sn, kind);
@@ -905,7 +869,6 @@ CREATE INDEX idx_report_item_target    ON tbl_report_item (target_task_sn, is_ro
 CREATE INDEX idx_map_task_contract     ON tbl_map_task_contract (contract_sn, role);
 CREATE INDEX idx_map_profile_preset    ON tbl_map_profile_preset (preset_sn);
 CREATE INDEX idx_preset_latest         ON tbl_instruction_preset (kind, preset_key, is_latest);
-CREATE INDEX idx_log_audit_workspace    ON tbl_log_audit (workspace_sn, create_at);
 
 -- 외래 키 조회 · CASCADE 삭제용 (SQLite는 FK 인덱스를 자동으로 만들지 않음)
 CREATE INDEX idx_task_dependency_depend ON tbl_map_task_dependency (depend_task_sn);
@@ -951,15 +914,6 @@ CREATE INDEX idx_fk_interaction_issue_sn ON tbl_interaction (issue_sn);
 CREATE INDEX idx_fk_interaction_to_member_sn ON tbl_interaction (to_member_sn);
 CREATE INDEX idx_fk_interaction_user_sn ON tbl_interaction (user_sn);
 CREATE INDEX idx_fk_issue_user_sn ON tbl_issue (user_sn);
-CREATE INDEX idx_fk_log_activity_event_sn ON tbl_log_activity (event_sn);
-CREATE INDEX idx_fk_log_activity_project_sn ON tbl_log_activity (project_sn);
-CREATE INDEX idx_fk_log_activity_run_sn ON tbl_log_activity (run_sn);
-CREATE INDEX idx_fk_log_activity_target_member_sn ON tbl_log_activity (target_member_sn);
-CREATE INDEX idx_fk_log_activity_team_sn ON tbl_log_activity (team_sn);
-CREATE INDEX idx_fk_log_activity_user_sn ON tbl_log_activity (user_sn);
-CREATE INDEX idx_fk_log_audit_member_sn ON tbl_log_audit (member_sn);
-CREATE INDEX idx_fk_log_audit_run_sn ON tbl_log_audit (run_sn);
-CREATE INDEX idx_fk_log_audit_user_sn ON tbl_log_audit (user_sn);
 CREATE INDEX idx_fk_log_event_member_sn ON tbl_log_event (member_sn);
 CREATE INDEX idx_fk_log_event_run_sn ON tbl_log_event (run_sn);
 CREATE INDEX idx_fk_log_event_user_sn ON tbl_log_event (user_sn);

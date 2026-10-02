@@ -37,8 +37,6 @@ pub enum Relation {
     TblAsk,
     #[sea_orm(has_many = "super::tbl_interaction::Entity")]
     TblInteraction,
-    #[sea_orm(has_many = "super::tbl_log_activity::Entity")]
-    TblLogActivity,
     #[sea_orm(
         belongs_to = "super::tbl_member::Entity",
         from = "Column::MemberSn",
@@ -92,12 +90,6 @@ impl Related<super::tbl_ask::Entity> for Entity {
 impl Related<super::tbl_interaction::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblInteraction.def()
-    }
-}
-
-impl Related<super::tbl_log_activity::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblLogActivity.def()
     }
 }
 

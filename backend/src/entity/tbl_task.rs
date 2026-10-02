@@ -65,8 +65,6 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     TblIssue,
-    #[sea_orm(has_many = "super::tbl_log_activity::Entity")]
-    TblLogActivity,
     #[sea_orm(has_many = "super::tbl_map_task_contract::Entity")]
     TblMapTaskContract,
     #[sea_orm(
@@ -122,12 +120,6 @@ impl Related<super::tbl_interaction::Entity> for Entity {
 impl Related<super::tbl_issue::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblIssue.def()
-    }
-}
-
-impl Related<super::tbl_log_activity::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblLogActivity.def()
     }
 }
 

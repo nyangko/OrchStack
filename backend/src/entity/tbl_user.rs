@@ -45,10 +45,6 @@ pub enum Relation {
     TblInteraction,
     #[sea_orm(has_many = "super::tbl_issue::Entity")]
     TblIssue,
-    #[sea_orm(has_many = "super::tbl_log_activity::Entity")]
-    TblLogActivity,
-    #[sea_orm(has_many = "super::tbl_log_audit::Entity")]
-    TblLogAudit,
     #[sea_orm(has_many = "super::tbl_log_event::Entity")]
     TblLogEvent,
     #[sea_orm(has_many = "super::tbl_notification::Entity")]
@@ -100,18 +96,6 @@ impl Related<super::tbl_interaction::Entity> for Entity {
 impl Related<super::tbl_issue::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblIssue.def()
-    }
-}
-
-impl Related<super::tbl_log_activity::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblLogActivity.def()
-    }
-}
-
-impl Related<super::tbl_log_audit::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblLogAudit.def()
     }
 }
 
