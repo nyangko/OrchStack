@@ -33,7 +33,24 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { RuntimeLogo, type Runtime } from '$lib/components/orch/runtime-logo';
 	import { AddConnectionDialog, providerMark, type AddedConnection } from '$lib/components/orch/connection';
-	import { connections, fallbackChains, monthCost, type Connection, type ProviderKind, type Quota, type SubRunTier } from '$lib/mock';
+	import { connections, fallbackChains, monthCost, costDays, memberCost, providers, type Connection, type ProviderKind, type Quota, type SubRunTier } from '$lib/mock';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '$lib/components/ui/dialog';
+	import { FieldRow } from '$lib/components/ui/field';
+	import { Input } from '$lib/components/ui/input';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
+	import { Segmented } from '$lib/components/orch/segmented';
+	import { KeyValueRow } from '$lib/components/orch/key-value-row';
+	import { LimitRow } from '$lib/components/orch/limit-row';
+	import { BarChart } from '$lib/components/orch/bar-chart';
+	import ChartColumn from '@lucide/svelte/icons/chart-column';
+	import Users from '@lucide/svelte/icons/users';
+	import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+	import Unplug from '@lucide/svelte/icons/unplug';
+	import Gauge from '@lucide/svelte/icons/gauge';
+	import Download from '@lucide/svelte/icons/download';
+	import { goto } from '$app/navigation';
+	import { toast } from 'svelte-sonner';
+	import { store } from '$lib/teams.svelte';
 	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '$lib/components/ui/empty';
 	import { api } from '$lib/api/client';
 	import { useMock } from '$lib/api/env';
@@ -188,6 +205,71 @@
 		notices = notices.filter((n) => n.key !== a.provider.key);
 	}
 
+	// ── 연결 관리 (.pen Settings · 연결 관리) — 카드 '관리' ─────────
+	let manage = $state<Connection>();
+	let manageForm = $state({ name: '', scope: 'team', warn: '20', lang: 'default' });
+	const manageProvider = $derived(providers.find((p) => p.key === manage?.key));
+	/// 이 연결을 쓰는 곳 — 폴백 체인 순위 · 같은 실행기를 쓰는 멤버 · 템플릿 (목데이터 추정).
+	const manageUses = $derived.by(() => {
+		const c = manage;
+		if (!c) return { chain: [] as string[], members: 0, templates: 0 };
+		const chain = (Object.keys(chains) as Runtime[]).flatMap((r) => chains[r].flatMap((st, i) => (st.key === c.key ? [`${r === 'claude' ? 'Claude Code' : 'Codex CLI'} ${i + 1}순위${st.tier ? ` · ${st.tier}` : ''}`] : [])));
+		const rt = providerMark[c.key];
+		const members = typeof rt === 'string' ? store.crew.flatMap((t) => t.members).filter((m) => m.runtime === rt).length : 0;
+		const templates = typeof rt === 'string' ? store.templates.filter((t) => t.runtime === rt).length : 0;
+		return { chain, members, templates };
+	});
+	function openManage(c: Connection) {
+		manage = c;
+		manageForm = { name: c.name, scope: 'team', warn: '20', lang: 'default' };
+	}
+	async function saveManage() {
+		const c = manage;
+		if (!c || !manageForm.name.trim()) return;
+		if (!useMock && c.sn) {
+			const scope = { workspace: 'workspace', team: 'team', me: 'me' }[manageForm.scope] ?? 'team';
+			const res = await api.PATCH('/connections/{sn}', { params: { path: { sn: c.sn } }, body: { name: manageForm.name.trim(), scope, ...(manageForm.lang !== 'default' && { report_language: manageForm.lang }) } }).catch(() => undefined);
+			if (!res || res.error) return;
+		}
+		c.name = manageForm.name.trim();
+		manage = undefined;
+		toast.success(`${c.name} 설정을 저장했어요`);
+	}
+	/// 연결 해제 — 폴백 체인에 쓰이면 막는다(서버도 409). 목데이터는 목록에서 뺀다.
+	async function unplug() {
+		const c = manage;
+		if (!c || manageUses.chain.length) return;
+		if (!useMock && c.sn) {
+			const res = await api.DELETE('/connections/{sn}', { params: { path: { sn: c.sn } } }).catch(() => undefined);
+			if (!res || res.error) return;
+		}
+		list = list.filter((x) => x !== c);
+		manage = undefined;
+		toast.success(`${c.name} 연결을 해제했어요`);
+	}
+
+	// ── 비용 상세 (.pen 비용 상세) — 이번 달 비용 '상세' ─────────
+	let costOpen = $state(false);
+	const usd = (v: number) => `$${Number(v.toFixed(1))}`;
+	const costRows = $derived(
+		list.flatMap((c) => {
+			const money = c.quotas.find((q) => q.limit !== undefined);
+			if (money) return [{ name: c.name, kind: c.kind, amount: `${usd(money.used ?? 0)} / ${usd(money.limit!)}`, ratio: (money.used ?? 0) / money.limit!, tone: c.kind === '게이트웨이' ? 'bg-status-review' : 'bg-primary' }];
+			return isOn(c) && (c.kind === '구독' || c.kind === '플랜') ? [{ name: c.name, kind: `${c.kind} · 고정`, amount: '고정', ratio: 1, tone: 'bg-muted-foreground' }] : [];
+		})
+	);
+
+	/// 비용 표를 CSV로 내려받는다 (지금 보이는 값 그대로 · 엑셀이 한글을 읽도록 BOM).
+	function downloadCost() {
+		const rows = [['구분', '이름', '종류', '금액'], ...costRows.map((r) => ['연결', r.name, r.kind, r.amount]), ...memberCost.map((m) => ['멤버', m.name, m.runtime, usd(m.used)]), ...costDays.map((d) => ['날짜', d.date, 'API 키 · 게이트웨이', `${usd(d.values[0])} · ${usd(d.values[1])}`])];
+		const csv = '\ufeff' + rows.map((r) => r.map((v) => `"${v.replaceAll('"', '""')}"`).join(',')).join('\n');
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+		a.download = 'orchstack-cost.csv';
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
+
 	/// 폴백 순서 바꾸기 (끌기 · 방향키 공용).
 	function move(from: number, to: number) {
 		const steps = chains[chainOf];
@@ -278,8 +360,7 @@
 							{:else if c.state === 'open'}
 								<Button variant="ghost" size="sm" onclick={() => openAdd(c.key, c.sn)}><Plus />{c.action ?? '연결'}</Button>
 							{:else}
-								<!-- 연결 관리 화면은 .pen에 아직 없음 -->
-								<Button variant="ghost" size="sm"><Settings2 />관리</Button>
+								<Button variant="ghost" size="sm" onclick={() => openManage(c)}><Settings2 />관리</Button>
 							{/if}
 						</div>
 					{/each}
@@ -356,8 +437,7 @@
 		<Card size="sm" class="w-105 shrink-0">
 			<CardHeader>
 				<CardTitle>이번 달 비용</CardTitle>
-				<!-- 비용 상세 화면은 .pen에 아직 없음 -->
-				<CardAction><span class="text-xs font-medium text-primary">상세</span></CardAction>
+				<CardAction><Button variant="link" size="xs" onclick={() => (costOpen = true)}>상세</Button></CardAction>
 			</CardHeader>
 			<CardContent class="flex flex-col gap-1.5">
 				{#each monthCost as c, i (c.label)}
@@ -388,3 +468,151 @@
 </main>
 
 <AddConnectionDialog bind:open={addOpen} provider={addKey} onadd={onAdded} />
+
+<!-- 연결 관리 (.pen Settings · 연결 관리) -->
+<Dialog bind:open={() => manage !== undefined, (v) => !v && (manage = undefined)}>
+	<DialogContent size="md" tall>
+		{#if manage}
+			{@const c = manage}
+			{@const st = stateMeta[c.state]}
+			<DialogHeader icon={Settings2}>
+				<DialogTitle>{c.name}</DialogTitle>
+				<DialogDescription>{c.kind}{manageProvider?.cli ? ` · ${manageProvider.cli} 로그인` : ''}</DialogDescription>
+			</DialogHeader>
+			<DialogBody class="gap-6">
+				<section class="flex flex-col gap-2.5">
+					{@render heading('1 · 상태 · 한도', '한도는 실행기가 주기적으로 읽어 와요')}
+					<div class="flex items-center gap-2">
+						<span class={['flex items-center gap-1.5 text-xs font-medium', st.tone]}><st.icon class="size-3.5" />{c.note}</span>
+						<span class="flex-1"></span>
+						<Button variant="outline" size="sm" onclick={() => (useMock ? toast.info(`${c.name} 다시 확인했어요`) : load())}><RefreshCw />지금 확인</Button>
+					</div>
+					{#each c.quotas as q (q.label)}
+						{#if q.limit !== undefined}
+							<LimitRow icon={Gauge} label={q.label} used={usd(q.used ?? 0)} max="/ {usd(q.limit)}" value={((q.used ?? 0) / q.limit) * 100} />
+						{:else}
+							<LimitRow icon={Gauge} label={q.label} used="{q.pct ?? 0}%" max="남음" value={q.pct ?? 0} warn={(q.pct ?? 0) < 20} />
+						{/if}
+					{:else}
+						<p class="text-xs text-muted-foreground">이 연결은 한도를 표시하지 않아요.</p>
+					{/each}
+				</section>
+				<section class="flex flex-col">
+					{@render heading('2 · 정보', '')}
+					<KeyValueRow label="종류" value="{c.kind}{manageProvider?.plan ? ` · ${manageProvider.plan}` : ''}" />
+					{#if manageProvider?.cli}<KeyValueRow label="실행기" value={manageProvider.cli} />{/if}
+					{#if manageProvider?.baseUrl}<KeyValueRow label="엔드포인트" value={manageProvider.baseUrl} />{/if}
+					<KeyValueRow label="모델" value="{manageProvider?.models ?? '—'}개" />
+				</section>
+				<section class="flex flex-col">
+					{@render heading('3 · 사용 설정', '')}
+					<FieldRow label="이름" hint="멤버 · 템플릿 화면에 보여요" as="label"><Input bind:value={manageForm.name} /></FieldRow>
+					<FieldRow label="사용 범위" hint="누가 이 연결을 쓸 수 있는지">
+						<Segmented aria-label="사용 범위" options={[{ value: 'workspace', label: '워크스페이스' }, { value: 'team', label: '팀만' }, { value: 'me', label: '나만' }]} bind:value={() => manageForm.scope, (v) => (manageForm.scope = v ?? 'team')} />
+					</FieldRow>
+					<FieldRow label="잔량 경고" hint="이 아래로 내려가면 알림 · 폴백 준비">
+						<Segmented aria-label="잔량 경고" options={['10', '20', '30'].map((v) => ({ value: v, label: `${v}%` }))} bind:value={() => manageForm.warn, (v) => (manageForm.warn = v ?? '20')} />
+					</FieldRow>
+					<FieldRow label="보고 언어" hint="이 연결로 도는 에이전트의 보고 · 질문 언어">
+						<Select type="single" bind:value={manageForm.lang}>
+							<SelectTrigger class="w-full" aria-label="보고 언어">{{ default: '워크스페이스 기본', ko: '한국어', en: 'English' }[manageForm.lang]}</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="default" label="워크스페이스 기본" />
+								<SelectItem value="ko" label="한국어" />
+								<SelectItem value="en" label="English" />
+							</SelectContent>
+						</Select>
+					</FieldRow>
+				</section>
+				<section class="flex flex-col gap-2.5">
+					{@render heading('4 · 이 연결을 쓰는 곳', '해제하기 전에 확인하세요')}
+					<div class="flex flex-col rounded-md border">
+						{#each manageUses.chain as u (u)}
+							<div class="flex items-center gap-2.5 border-b px-3.5 py-2.5 text-xs"><Route class="size-3.5 text-muted-foreground" /><span class="flex-1">폴백 체인 · {u}</span><Button variant="link" size="xs" onclick={() => (manage = undefined)}>체인 보기</Button></div>
+						{/each}
+						<div class="flex items-center gap-2.5 border-b px-3.5 py-2.5 text-xs"><Users class="size-3.5 text-muted-foreground" /><span class="flex-1">같은 실행기를 쓰는 멤버 {manageUses.members}명</span><Button variant="link" size="xs" onclick={() => goto('/teams')}>멤버 보기</Button></div>
+						<div class="flex items-center gap-2.5 px-3.5 py-2.5 text-xs"><LayoutTemplate class="size-3.5 text-muted-foreground" /><span class="flex-1">기본값으로 쓰는 템플릿 {manageUses.templates}개</span><Button variant="link" size="xs" onclick={() => goto('/teams/agents/1')}>템플릿 보기</Button></div>
+					</div>
+				</section>
+				<section class="flex flex-col gap-2.5">
+					{@render heading('5 · 위험 구역', '')}
+					<div class="flex flex-col rounded-md border border-destructive">
+						<div class="flex items-center gap-3 border-b px-3.5 py-3">
+							<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">다시 로그인</span><span class="text-caption text-muted-foreground">로그인이 만료됐거나 다른 계정 · 키로 바꿀 때.</span></span>
+							<Button variant="outline" size="sm" onclick={() => { const k = c.key, sn = c.sn; manage = undefined; openAdd(k, sn); }}><LogIn />다시 로그인</Button>
+						</div>
+						<div class="flex items-center gap-3 px-3.5 py-3">
+							<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">연결 해제</span><span class="text-caption text-muted-foreground">{manageUses.chain.length ? '폴백 체인에 쓰이고 있어 지금은 해제할 수 없어요 — 먼저 체인에서 빼세요.' : '멤버 · 템플릿은 다음 순위 연결로 바뀌어요.'}</span></span>
+							<Button variant="destructive" size="sm" disabled={manageUses.chain.length > 0} onclick={unplug}><Unplug />연결 해제</Button>
+						</div>
+					</div>
+				</section>
+			</DialogBody>
+			<DialogFooter note="키 · 토큰 원문은 이 기기 키체인에만 있어요" noteIcon={KeyRound}>
+				<Button variant="ghost" size="sm" onclick={() => (manage = undefined)}>닫기</Button>
+				<Button size="sm" disabled={!manageForm.name.trim()} onclick={saveManage}>저장</Button>
+			</DialogFooter>
+		{/if}
+	</DialogContent>
+</Dialog>
+
+<!-- 비용 상세 (.pen 비용 상세) -->
+<Dialog bind:open={costOpen}>
+	<DialogContent size="lg" tall>
+		<DialogHeader icon={ChartColumn}>
+			<DialogTitle>이번 달 비용</DialogTitle>
+			<DialogDescription>연결 · 멤버별 · 매일 0시 집계 · 구독은 월정액</DialogDescription>
+		</DialogHeader>
+		<DialogBody class="gap-5">
+			<div class="grid grid-cols-4 gap-3">
+				<div class="stat-card"><span class="text-xs text-muted-foreground">이번 달 합계</span><span class="font-mono text-xl font-semibold">${total.toFixed(1)}</span><span class="text-caption text-subtle-foreground">구독 · 사용량 과금 합계</span></div>
+				{#each monthCost as m (m.label)}
+					<div class="stat-card"><span class="text-xs text-muted-foreground">{m.label.replace(' (고정)', '')}</span><span class="font-mono text-xl font-semibold">{usd(m.used)}</span><span class="truncate text-caption text-subtle-foreground">{m.limit ? `예산 ${usd(m.limit)} · ${Math.round((m.used / m.limit) * 100)}%` : '고정 · 월정액'}</span></div>
+				{/each}
+			</div>
+			<BarChart
+				series={[{ label: 'API 키', class: 'bg-primary' }, { label: '게이트웨이', class: 'bg-status-review' }]}
+				columns={costDays.map((d) => ({ label: d.label, title: `${d.label} · ${d.date}`, values: d.values, note: `가장 많이 쓴 멤버 · ${d.top}` }))}
+				format={usd}
+				total="최근 7일 · 사용량 과금 {usd(costDays.reduce((n, d) => n + d.values[0] + d.values[1], 0))}"
+			/>
+			<section class="flex flex-col gap-2">
+				<h3 class="text-sm font-semibold">연결별</h3>
+				<div class="flex flex-col rounded-md border">
+					{#each costRows as r (r.name)}
+						<div class="flex items-center gap-3 border-b px-3.5 py-2.5 last:border-b-0">
+							<span class="w-55 truncate text-xs font-medium">{r.name}</span>
+							<span class="w-28 text-caption text-muted-foreground">{r.kind}</span>
+							<Progress value={r.ratio * 100} class="h-1.5 flex-1 bg-muted" indicator={r.tone} aria-label="{r.name} 사용" />
+							<span class="w-30 text-right font-mono text-xs font-semibold">{r.amount}</span>
+						</div>
+					{/each}
+				</div>
+			</section>
+			<section class="flex flex-col gap-2">
+				<h3 class="text-sm font-semibold">멤버별 · 사용량 과금만</h3>
+				<div class="flex flex-col rounded-md border">
+					{#each memberCost as m (m.name)}
+						<div class="flex items-center gap-3 border-b px-3.5 py-2.5 last:border-b-0">
+							<span class="w-55 text-xs font-medium">{m.name}</span>
+							<span class="w-28 text-caption text-muted-foreground">{m.runtime}</span>
+							<Progress value={(m.used / memberCost[0].used) * 56} class="h-1.5 flex-1 bg-muted" aria-label="{m.name} 사용" />
+							<span class="w-30 text-right font-mono text-xs font-semibold">{usd(m.used)}</span>
+						</div>
+					{/each}
+				</div>
+			</section>
+		</DialogBody>
+		<DialogFooter note="구독 · 플랜은 사용량과 무관한 월정액 · 멤버별은 API · 게이트웨이 사용만">
+			<Button variant="ghost" size="sm" onclick={() => (costOpen = false)}>닫기</Button>
+			<Button size="sm" onclick={downloadCost}><Download />CSV 내보내기</Button>
+		</DialogFooter>
+	</DialogContent>
+</Dialog>
+
+{#snippet heading(title: string, desc: string)}
+	<div class="flex flex-col gap-0.5">
+		<h3 class="text-sm font-semibold">{title}</h3>
+		{#if desc}<p class="text-xs text-muted-foreground">{desc}</p>{/if}
+	</div>
+{/snippet}

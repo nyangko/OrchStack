@@ -871,6 +871,24 @@ export const monthCost = [
 	{ label: "게이트웨이", used: 16.4, limit: 50, note: "OmniRoute $12.4 · OpenRouter $4.0" },
 ];
 
+/// 비용 상세 (.pen 비용 상세) — 최근 7일 [API 키, 게이트웨이] $ · 그날 가장 많이 쓴 멤버, 멤버별 사용량 과금 $.
+export const costDays: { label: string; date: string; values: [number, number]; top: string }[] = [
+	{ label: "월", date: "9월 26일", values: [6.2, 1.1], top: "민수 $2.9" },
+	{ label: "화", date: "9월 27일", values: [8.4, 0], top: "진 $3.6" },
+	{ label: "수", date: "9월 28일", values: [5.6, 1.5], top: "민수 $2.4" },
+	{ label: "목", date: "9월 29일", values: [9.8, 0.8], top: "민수 $4.2" },
+	{ label: "금", date: "9월 30일", values: [7.9, 0], top: "하린 $3.1" },
+	{ label: "토", date: "10월 1일", values: [2.6, 0], top: "진 $1.5" },
+	{ label: "일", date: "10월 2일", values: [4.8, 0.6], top: "민수 $2.0" },
+];
+export const memberCost = [
+	{ name: "민수 · Backend", runtime: "Claude Code", used: 21.6 },
+	{ name: "진 · Frontend", runtime: "Codex CLI", used: 14.9 },
+	{ name: "하린 · QA", runtime: "Claude Code", used: 9.8 },
+	{ name: "유나 · Designer", runtime: "Codex CLI", used: 5.1 },
+	{ name: "소라 · Reviewer", runtime: "Claude Code", used: 3.2 },
+];
+
 /// 종량제 연결 (폴백 · 게이트웨이). 이번 달 사용액 $.
 export const meters = [
 	{ name: "Anthropic API · 폴백", kind: "key", used: 38.2, limit: 100, note: "이번 달 · 폴백 12회" },

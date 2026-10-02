@@ -69,6 +69,7 @@
 	import { MdEditor, estimateTokens, type MdFile } from '$lib/components/orch/md-editor';
 	import Upload from '@lucide/svelte/icons/upload';
 	import { Segmented } from '$lib/components/orch/segmented';
+	import { BarChart } from '$lib/components/orch/bar-chart';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import CircleAlert from '@lucide/svelte/icons/circle-alert';
 	import GitFork from '@lucide/svelte/icons/git-fork';
@@ -1043,29 +1044,6 @@
 </Sheet>
 
 <!-- .pen BarChart — 요일별 막대. b가 있으면 위에 실패색으로 쌓는다 -->
-{#snippet chart(cols: [number, number?][], legend: [string, string?], total: string)}
-	{@const max = Math.max(1, ...cols.map(([a, b]) => a + (b ?? 0)))}
-	<div class="flex flex-col gap-2.5">
-		<div class="meta-line gap-3.5">
-			<span class="flex items-center gap-1.5"><span class="size-2 rounded-xs bg-primary"></span>{legend[0]}</span>
-			{#if legend[1]}<span class="flex items-center gap-1.5"><span class="size-2 rounded-xs bg-status-blocked"></span>{legend[1]}</span>{/if}
-			<span class="flex-1"></span>
-			<span>{total}</span>
-		</div>
-		<div class="flex h-25 gap-2 border-b" role="img" aria-label="{legend[0]} {total}">
-			{#each cols as [a, b], i (i)}
-				<div class="flex flex-1 flex-col items-center justify-end gap-0.5">
-					{#if b}<span class="w-4 rounded-t-sm bg-status-blocked" style="height: {(b / max) * 88}px"></span>{/if}
-					{#if a}<span class={['w-4 bg-primary', !b && 'rounded-t-sm']} style="height: {(a / max) * 88}px"></span>{/if}
-				</div>
-			{/each}
-		</div>
-		<div class="flex gap-2 text-center text-caption text-muted-foreground">
-			{#each days as d (d)}<span class="flex-1">{d}</span>{/each}
-		</div>
-	</div>
-{/snippet}
-
 {#snippet mini(label: string, value: string, sub: string, tone?: string)}
 	<div class="stat-card">
 		<span class="text-xs text-muted-foreground">{label}</span>
@@ -1168,7 +1146,7 @@
 								<CardTitle>이번 주 토큰 사용</CardTitle>
 								<CardAction><Button variant="link" size="xs" onclick={() => (tab = 'runs')}>Runs 보기</Button></CardAction>
 							</CardHeader>
-							<CardContent>{@render chart(det.week.days.map((d) => [d]), ['토큰 (K)'], `이번 주 · ${det.week.tokens}K · 하루 평균 ${Math.round(det.week.tokens / 7)}K`)}</CardContent>
+							<CardContent><BarChart series={[{ label: '토큰 (K)', class: 'bg-primary' }]} columns={det.week.days.map((d, i) => ({ label: days[i], values: [d] }))} format={(v) => `${v}K`} total={`이번 주 · ${det.week.tokens}K · 하루 평균 ${Math.round(det.week.tokens / 7)}K`} /></CardContent>
 						</Card>
 						{#if det.now && now}
 							<Card size="sm">
@@ -1331,7 +1309,7 @@
 						</div>
 						<Card size="sm">
 							<CardHeader><CardTitle>최근 7일 Run</CardTitle></CardHeader>
-							<CardContent>{@render chart(det.runDays, ['성공', '실패'], `7일 · ${det.runs.length} runs · 성공 ${ok} · 실패 ${fail}`)}</CardContent>
+							<CardContent><BarChart series={[{ label: '성공', class: 'bg-primary' }, { label: '실패', class: 'bg-status-blocked' }]} columns={det.runDays.map(([a, b], i) => ({ label: days[i], values: [a, b ?? 0] }))} format={(v) => `${v} Run`} total={`7일 · ${det.runs.length} runs · 성공 ${ok} · 실패 ${fail}`} /></CardContent>
 						</Card>
 						<div class="card overflow-hidden rounded-lg">
 							<Table class="table-fixed">
@@ -1473,7 +1451,7 @@
 						</div>
 						<Card size="sm">
 							<CardHeader><CardTitle>이번 주 토큰 사용</CardTitle></CardHeader>
-							<CardContent>{@render chart(det.week.days.map((d) => [d]), ['토큰 (K)'], `이번 주 · ${det.week.tokens}K · 하루 평균 ${Math.round(det.week.tokens / 7)}K`)}</CardContent>
+							<CardContent><BarChart series={[{ label: '토큰 (K)', class: 'bg-primary' }]} columns={det.week.days.map((d, i) => ({ label: days[i], values: [d] }))} format={(v) => `${v}K`} total={`이번 주 · ${det.week.tokens}K · 하루 평균 ${Math.round(det.week.tokens / 7)}K`} /></CardContent>
 						</Card>
 						<div class="grid grid-cols-2 gap-3.5">
 							{#each [acc, ...accounts.filter((a) => a !== acc)] as a (a.runtime)}
