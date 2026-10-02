@@ -79,7 +79,9 @@
 	import { Bubble, BubbleContent } from '$lib/components/orch/bubble';
 	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from '$lib/components/ui/dialog';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { untrack, onDestroy, tick, setContext, type Component } from 'svelte';
+	import { untrack, onDestroy, tick, setContext, flushSync, type Component } from 'svelte';
+	import GripVertical from '@lucide/svelte/icons/grip-vertical';
+	import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { toast } from 'svelte-sonner';
 	import { useMock } from '$lib/api/env';
@@ -250,10 +252,16 @@
 	/// Agents 탭 줄 · Kanban 열 중 지금 커서가 올라간 곳.
 	let dropAgent = $state<number>();
 	let dropLane = $state<TaskStatus>();
+	/// 커서를 따라오는 카드 (.pen Drag Ghost) — 화면 밖에 그려 두고 끌기 이미지로 쓴다.
+	let ghost = $state<HTMLElement>();
 	function startDrag(e: DragEvent, t: { num: number; title: string }) {
-		drag.task = { num: t.num, title: t.title };
+		// 끌기 이미지는 이 순간의 모양을 찍으므로 카드 내용을 먼저 그린다
+		flushSync(() => (drag.task = { num: t.num, title: t.title }));
 		e.dataTransfer?.setData('text/plain', `#${t.num} ${t.title}`);
-		if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			if (ghost) e.dataTransfer.setDragImage(ghost, 20, 24);
+		}
 	}
 	function endDrag() {
 		drag.task = undefined;
@@ -975,6 +983,18 @@
 		}
 	}}
 />
+
+<!-- .pen Drag Ghost — 화면 밖에 두고 끌기 이미지로만 쓴다 (기울기 -2°, primary 테두리) -->
+<div class="pointer-events-none fixed -top-50 -left-100 p-4" aria-hidden="true">
+	<div bind:this={ghost} class="flex w-63 -rotate-2 flex-col gap-1.5 rounded-md border border-primary bg-card px-3 py-2.5 shadow-lg">
+		<span class="flex items-center gap-1.5">
+			<GripVertical class="size-3.5 shrink-0 text-muted-foreground" />
+			<span class="font-mono text-caption font-semibold text-muted-foreground">#{drag.task?.num}</span>
+			<span class="truncate text-body font-semibold">{drag.task?.title}</span>
+		</span>
+		<span class="flex items-center gap-1 text-caption font-medium text-primary"><MousePointer2 class="size-3" />에이전트 · 열 위에 놓으세요 · Esc 취소</span>
+	</div>
+</div>
 
 <!-- 속성 칩 (.pen TaskEditor · Properties · QuickAdd · Options) — 선택 창 트리거 -->
 {#snippet propChip(props: Record<string, unknown>, Icon: Component, label: string, tone = 'text-muted-foreground')}
