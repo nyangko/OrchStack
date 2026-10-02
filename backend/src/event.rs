@@ -1,5 +1,5 @@
 //! 명령 실행 틀: 상태 변경 + tbl_log_event append + seq 발급 + 알림 projection을 한 트랜잭션에서 하고, 커밋한 뒤 broadcast로 내보낸다
-use crate::{entity::tbl_log_event as e, error::Res};
+use crate::{entity::{tbl_log_event as e, tbl_member as mb}, error::Res};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, TransactionTrait};
 use serde::Serialize;
 use serde_json::Value;
@@ -32,9 +32,20 @@ impl Ev {
     }
 }
 
-/// 쓰기 직렬화 락 → 트랜잭션 → `f`(상태 변경 + 만든 이벤트 목록) → 이벤트 append → 커밋 → 발행.
-/// `f`가 실패하면 롤백되어 상태도 이벤트도 남지 않는다
+/// 사용자가 낸 명령으로 `run_as`를 부른다
 pub async fn run<T>(db: &DatabaseConnection, f: impl AsyncFnOnce(&DatabaseTransaction) -> Res<(T, Vec<Ev>)>) -> Res<T> {
+    run_as(db, "user", None, f).await
+}
+
+/// 멤버가 Orch면 "orch", 아니면 "member" (이벤트 행위자 종류)
+pub async fn who(db: &DatabaseConnection, member_sn: i64) -> Res<&'static str> {
+    Ok(if mb::Entity::find_by_id(member_sn).one(db).await?.is_some_and(|x| x.is_orch == 1) { "orch" } else { "member" })
+}
+
+/// 쓰기 직렬화 락 → 트랜잭션 → `f`(상태 변경 + 만든 이벤트 목록) → 이벤트 append → 커밋 → 발행.
+/// 이벤트 행에는 행위자(actor: user | orch | member | system) · 멤버를 남긴다 (uid는 user일 때만).
+/// `f`가 실패하면 롤백되어 상태도 이벤트도 남지 않는다
+pub async fn run_as<T>(db: &DatabaseConnection, actor: &str, member_sn: Option<i64>, f: impl AsyncFnOnce(&DatabaseTransaction) -> Res<(T, Vec<Ev>)>) -> Res<T> {
     let _guard = LOCK.lock().await;
     let tx = db.begin().await?;
     let (out, evs) = f(&tx).await?;
@@ -52,8 +63,9 @@ pub async fn run<T>(db: &DatabaseConnection, f: impl AsyncFnOnce(&DatabaseTransa
             event_type: Set(ev.kind.into()),
             payload_json: Set(ev.payload.to_string()),
             command_idx: Set(idx as i64),
-            actor_type: Set("user".into()),
-            uid: Set(Some(crate::UID)),
+            actor_type: Set(actor.into()),
+            uid: Set((actor == "user").then_some(crate::UID)),
+            member_sn: Set(member_sn),
             ..Default::default()
         }.insert(&tx).await?;
         crate::notify::project(&tx, &m).await?; // 알림 projection — 이벤트와 같은 트랜잭션

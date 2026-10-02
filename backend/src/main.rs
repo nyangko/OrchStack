@@ -257,6 +257,14 @@ mod tests {
             .all(db).await.unwrap().into_iter().map(|r| (r.event_type, r.seq)).collect()
     }
 
+    /// 대상 번호가 sn인 이벤트(kind)의 (actor_type, member_sn, uid)
+    async fn actor(db: &DatabaseConnection, kind: &str, sn: i64) -> (String, Option<i64>, Option<i64>) {
+        use crate::entity::tbl_log_event as ev;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+        let e = ev::Entity::find().filter(ev::Column::EventType.eq(kind)).filter(ev::Column::AggregateSn.eq(sn)).one(db).await.unwrap().unwrap();
+        (e.actor_type, e.member_sn, e.uid)
+    }
+
     /// StartRun → Review → Approve: 이벤트 3행(seq 1·2·3)이 쌓이고 태스크는 최종 done
     #[tokio::test]
     async fn run_flow() {
@@ -635,7 +643,7 @@ mod tests {
         assert_eq!((st, s["is_enabled"].as_i64(), s["is_blocked"].as_i64()), (StatusCode::OK, Some(0), Some(0)));
         assert_eq!(call(&app, "PATCH", "/skills/1", Some(json!({"is_blocked": 2}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(call(&app, "PATCH", "/skills/2", Some(json!({"is_blocked": 0}))).await.0, StatusCode::CONFLICT);
-        assert_eq!(events(&db, "workspace", WID).await, [("SkillUpdated".into(), 1)]);
+        assert_eq!(events(&db, "skill", 1).await, [("SkillUpdated".into(), 1)]); // 대상 종류 skill
 
         // 프로필 연결: 통과 스킬만. 차단 · 검사 실패 · 검사 전은 422, 연결은 그대로
         assert_eq!(call(&app, "PUT", "/profiles/1/skills", Some(json!([{"skill_sn": 1, "is_enabled": 1}]))).await.0, StatusCode::OK);
@@ -721,6 +729,16 @@ mod tests {
         assert_eq!((v.as_array().unwrap().len(), v[0]["title"].as_str()), (1, Some("git stash")));
         assert_eq!(call(&app, "GET", "/audit", None).await.1.as_array().unwrap().len(), 3);
         assert_eq!(call(&app, "GET", "/audit?kind=x", None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+
+        // 행위자: 알림 actor_type · member_sn은 이벤트 행에서 — 멤버가 만든 판단 요청(1) · Run 실패는 member, Orch 멤버가 만든 판단 요청은 orch
+        let v = call(&app, "GET", "/notifications", None).await.1;
+        assert_eq!((v[0]["actor_type"].as_str(), v[0]["member_sn"].as_i64(), v[1]["actor_type"].as_str()), (Some("member"), Some(1), Some("member")));
+        db.execute_unprepared("INSERT INTO tbl_member (sn, team_sn, profile_sn, name, role_name, is_orch) VALUES (2, 1, 1, 'Orch', 'PM', 1);").await.unwrap();
+        let q = QuestionNew { title: "Q".into(), body: None, code_snippet: None, ref_json: None, options: vec![ChoiceNew { code: "A".into(), label: "a".into(), note: None, is_recommended: false }] };
+        decision::create(&db, DecisionNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 2, level: 3, title: "배포 시점".into(), deadline_at: None, questions: vec![q] }).await.unwrap();
+        let v = call(&app, "GET", "/notifications", None).await.1;
+        assert_eq!((v[0]["event_code"].as_str(), v[0]["actor_type"].as_str(), v[0]["member_sn"].as_i64()), (Some("decision_request"), Some("orch"), Some(2)));
+        assert_eq!(actor(&db, "DecisionRequested", 2).await, ("orch".into(), Some(2), None));
     }
 
     /// B-11: Orch 없으면 409 → 대화 열기 · 메시지 저장, 작업 제안 수정 · 진행(이슈 · 태스크 생성 · 배정 · 결과 카드 · 이벤트) · 재진행 409 · 취소,
@@ -759,8 +777,15 @@ mod tests {
         assert_eq!(call(&app, "POST", &format!("/messages/{ws}/proceed"), None).await.0, StatusCode::CONFLICT);
         assert_eq!(call(&app, "POST", &format!("/messages/{ws}/cancel"), None).await.0, StatusCode::CONFLICT);
         assert_eq!(call(&app, "PATCH", &format!("/messages/{}", m["sn"]), Some(serde_json::to_value(plan(1)).unwrap())).await.0, StatusCode::CONFLICT); // 일반 메시지
-        let kinds: Vec<String> = events(&db, "project", 1).await.into_iter().map(|e| e.0).collect();
-        assert_eq!(kinds, ["MessagePosted", "MessagePosted", "ProposalEdited", "ProposalProceeded"]);
+        // 이벤트 대상 = 메시지 (project 대상에는 남지 않는다) · Orch가 올린 제안은 행위자 orch + Orch 멤버
+        let kinds: Vec<String> = events(&db, "message", ws).await.into_iter().map(|e| e.0).collect();
+        assert_eq!(kinds, ["MessagePosted", "ProposalEdited", "ProposalProceeded"]);
+        assert_eq!(events(&db, "message", m["sn"].as_i64().unwrap()).await, [("MessagePosted".into(), 1)]);
+        assert!(events(&db, "project", 1).await.is_empty());
+        let a = actor(&db, "MessagePosted", ws).await;
+        assert_eq!((a.0.as_str(), a.1, a.2), ("orch", Some(2), None));
+        let a = actor(&db, "MessagePosted", m["sn"].as_i64().unwrap()).await;
+        assert_eq!((a.0.as_str(), a.1, a.2), ("user", None, Some(1)));
         orch::propose(&db, 1, None, plan(1)).await.unwrap();
         let ws2 = call(&app, "GET", "/projects/1/conversation", None).await.1["messages"][3]["sn"].as_i64().unwrap();
         assert_eq!(call(&app, "POST", &format!("/messages/{ws2}/cancel"), None).await.1["proposal_status"], "cancelled");
@@ -779,6 +804,8 @@ mod tests {
         assert_eq!(call(&app, "POST", "/proposals/2/cancel", None).await.0, StatusCode::CONFLICT);
         assert_eq!(call(&app, "POST", "/proposals/2/zzz", None).await.0, StatusCode::NOT_FOUND);
         assert_eq!(call(&app, "GET", "/proposals?status=proposed", None).await.1.as_array().unwrap().len(), 0);
+        assert_eq!(events(&db, "proposal", 2).await, [("OrchProposed".into(), 1), ("OrchProposalResolved".into(), 2)]); // 대상 종류 proposal
+        assert_eq!(actor(&db, "OrchProposed", 2).await.0, "orch");
 
         // 실행 중 지시: 활동 기록 + 이벤트, 끝난 Run 409 · 빈 지시 422
         let rs = call(&app, "POST", &format!("/tasks/{ts}/runs"), None).await.1["sn"].as_i64().unwrap();
@@ -843,8 +870,18 @@ mod tests {
         let c = call(&app, "GET", "/workspace/cost", None).await.1;
         assert_eq!((c["items"].as_array().unwrap().len(), c["items"][0]["kind"].as_str(), c["items"][0]["cost_usd_micro"].as_i64(), c["total_usd_micro"].as_i64()), (2, Some("api_key"), Some(500), Some(500)));
         assert_eq!(c["items"][1]["token"].as_i64(), Some(1030)); // 구독: 3(30) + 5(1000)
+
+        // 구독 정액: 구독 · 요금제 연결의 monthly_fee 합이 subscription_fixed로 total에 들어간다 (API 키 정액은 무시 · 그 달 이후 만든 연결 제외)
+        let (st, n) = call(&app, "POST", "/connections", Some(json!({"kind": "plan", "provider_code": "cursor", "provider_name": "Cursor", "name": "pro", "monthly_fee_usd_micro": 20_000_000}))).await;
+        assert_eq!((st, n["monthly_fee_usd_micro"].as_i64()), (StatusCode::CREATED, Some(20_000_000)));
+        let p = call(&app, "PATCH", "/connections/2", Some(json!({"monthly_fee_usd_micro": 100_000_000}))).await.1;
+        assert_eq!(p["monthly_fee_usd_micro"].as_i64(), Some(100_000_000));
+        call(&app, "PATCH", "/connections/1", Some(json!({"monthly_fee_usd_micro": 7_000_000}))).await; // api_key
+        let c = call(&app, "GET", "/workspace/cost", None).await.1;
+        assert_eq!((c["items"].as_array().unwrap().len(), c["items"][2]["kind"].as_str(), c["items"][2]["cost_usd_micro"].as_i64(), c["items"][2]["token"].as_i64(), c["total_usd_micro"].as_i64()),
+            (3, Some("subscription_fixed"), Some(120_000_000), Some(0), Some(120_000_500)));
         let c = call(&app, "GET", "/workspace/cost?month=2000-01", None).await.1;
-        assert_eq!((c["items"][0]["kind"].as_str(), c["items"][0]["token"].as_i64()), (Some("unknown"), Some(7)));
+        assert_eq!((c["items"].as_array().unwrap().len(), c["items"][0]["kind"].as_str(), c["items"][0]["token"].as_i64()), (1, Some("unknown"), Some(7)));
         assert_eq!(call(&app, "GET", "/workspace/cost?month=2000-13", None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
     }
 
@@ -954,6 +991,9 @@ mod tests {
         let long = "x".repeat(500);
         let (st, e) = call(&app, "PUT", &format!("/presets/{ps}"), Some(json!({"content": long}))).await;
         assert!(st == StatusCode::UNPROCESSABLE_ENTITY && e["message"].as_str().unwrap().contains("token limit"), "{e}");
+        // 한글은 글자당 1.5토큰: 70자 = 105 > 100 (글자/4면 18이라 통과했을 길이)
+        let (st, e) = call(&app, "PUT", &format!("/presets/{ps}"), Some(json!({"content": "가".repeat(70)}))).await;
+        assert!(st == StatusCode::UNPROCESSABLE_ENTITY && e["message"].as_str().unwrap().contains("token limit: 105 > 100"), "{e}");
         let (_, e) = call(&app, "PUT", &format!("/presets/{ps}"), Some(json!({"content": "key sk-abcdefghijklmnop1234"}))).await;
         assert!(e["message"].as_str().unwrap().contains("secret pattern: sk-"), "{e}");
         let (_, e) = call(&app, "PUT", &format!("/presets/{ps}"), Some(json!({"content": "- a\n- a"}))).await;

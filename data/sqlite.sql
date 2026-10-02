@@ -133,6 +133,7 @@ CREATE TABLE tbl_connection (
     status               TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('connected','checking','login_required','expired','error','available')),  -- 상태: connected(연결됨 · 사용 가능) | checking(연결 확인 중) | login_required(로그인 필요) | expired(키 · 토큰 만료 · 폴백에서 제외) | error(연결 오류 · 폴백에서 제외) | available(추가 가능 · 아직 연결 안 함)
     status_message       TEXT,                                      -- 상태 설명 (예: 키 만료 · 401)
     monthly_budget_usd_micro INTEGER,                              -- 월 예산 (1달러 = 1,000,000) · API 키 · 게이트웨이
+    monthly_fee_usd_micro INTEGER,                                 -- 월 정액 요금 (1달러 = 1,000,000 · NULL = 없음) · 구독 · 요금제 · 월 비용 집계의 subscription_fixed
     budget_warn_percent  INTEGER NOT NULL DEFAULT 80,               -- 예산 경고 기준(%)
     is_budget_exclude    INTEGER NOT NULL DEFAULT 1,                -- 예산 초과 시 폴백에서 자동 제외
     scope                TEXT NOT NULL DEFAULT 'workspace' CHECK (scope IN ('workspace','team','me')),  -- 사용 범위: workspace(워크스페이스 전체) | team(선택한 팀만 · tbl_map_connection_team) | me(추가한 사용자만)
@@ -1140,7 +1141,7 @@ CREATE TABLE tbl_log_event (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 이벤트 번호 (전역 순서 · 재연결 커서 · 쓰기는 워크스페이스당 1개 트랜잭션씩 직렬화해야 번호 순서 = 커밋 순서가 된다)
     wid              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     project_sn       INTEGER REFERENCES tbl_project(sn) ON DELETE CASCADE,  -- 프로젝트 (워크스페이스 전체 이벤트면 NULL)
-    aggregate_type   TEXT NOT NULL CHECK (aggregate_type IN ('workspace','project','issue','task','run','session','profile','template','member','team','decision','approval','contract','connection','preset')),  -- 대상 종류: workspace | project | issue | task | run | session | profile(에이전트 프로필 · 폴백 체인) | template | member | team | decision | approval | contract | connection | preset
+    aggregate_type   TEXT NOT NULL CHECK (aggregate_type IN ('workspace','project','issue','task','run','session','profile','template','member','team','decision','approval','contract','connection','preset','message','proposal','skill')),  -- 대상 종류: workspace | project | issue | task | run | session | profile(에이전트 프로필 · 폴백 체인) | template | member | team | decision | approval | contract | connection | preset | message(Orch 대화 메시지) | proposal(Orch 제안) | skill
     aggregate_sn     INTEGER NOT NULL,                              -- 대상 번호 (aggregate_type 테이블의 sn · FK 없음 · 대상이 지워져도 기록은 남는다)
     seq              INTEGER NOT NULL,                              -- 대상별 순번 (1부터 · 동시 수정 충돌 감지)
     event_type       TEXT NOT NULL,                                 -- 이벤트 이름 (PascalCase · 예: TaskCreated, AgentAssigned, RunStarted, ReportReceived, ContractChanged, DecisionAnswered)

@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, serde :: Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, serde :: Serialize)]
 #[sea_orm(table_name = "tbl_connection")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -35,6 +35,7 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub status_message: Option<String>,
     pub monthly_budget_usd_micro: Option<i64>,
+    pub monthly_fee_usd_micro: Option<i64>,
     pub budget_warn_percent: i64,
     pub is_budget_exclude: i64,
     #[sea_orm(column_type = "Text")]

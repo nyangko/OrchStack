@@ -124,7 +124,8 @@ pub async fn spawn(db: &DatabaseConnection, lead_sn: i64, text: &str) -> Res<Spa
         Ok(b) => b,
         Err(s) => return Ok(Spawn::Stop(s)),
     };
-    event::run(db, async |tx| {
+    let lead_member = r::Entity::find_by_id(lead_sn).one(db).await?.ok_or_else(Error::not_found)?.member_sn;
+    event::run_as(db, "member", Some(lead_member), async |tx| {
         let lead = r::Entity::find_by_id(lead_sn).one(tx).await?.ok_or_else(Error::not_found)?;
         if lead.parent_run_sn.is_some() {
             return Ok((Spawn::Stop(Stop::Lead("sub-task runs cannot spawn".into())), vec![]));

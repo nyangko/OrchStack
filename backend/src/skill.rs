@@ -177,8 +177,7 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
         if let Some(v) = b.is_enabled { u = u.col_expr(sk::Column::IsEnabled, v.into()); }
         if let Some(v) = b.is_blocked { u = u.col_expr(sk::Column::IsBlocked, v.into()); }
         u.exec(tx).await?;
-        // 이벤트 대상 종류에 skill이 없어(스키마 CHECK) 워크스페이스 라이브러리 변경으로 남긴다
-        let ev = Ev::new(None, "workspace", crate::WID, "SkillUpdated", &json!({ "skill_sn": sn, "name": cur.name, "patch": &b }));
+        let ev = Ev::new(None, "skill", sn, "SkillUpdated", &json!({ "skill_sn": sn, "name": cur.name, "patch": &b }));
         Ok((Skill::from(get(tx, sn).await?), vec![ev]))
     }).await?;
     Ok(Json(out))

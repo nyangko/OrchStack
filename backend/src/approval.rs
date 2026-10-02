@@ -77,7 +77,8 @@ pub async fn create(db: &DatabaseConnection, b: ApprovalNew) -> Res<Approval> {
     if !ACTIONS.contains(&b.action_code.as_str()) {
         return Err(Error::invalid(format!("action_code in {ACTIONS:?}")));
     }
-    event::run(db, async |tx| {
+    let actor = event::who(db, b.member_sn).await?;
+    event::run_as(db, actor, Some(b.member_sn), async |tx| {
         let m = a::ActiveModel {
             project_sn: Set(b.project_sn), task_sn: Set(b.task_sn), run_sn: Set(b.run_sn), member_sn: Set(b.member_sn), rule_sn: Set(b.rule_sn),
             action_code: Set(b.action_code), title: Set(b.title), detail: Set(b.detail), deadline_at: Set(b.deadline_at), ..Default::default()

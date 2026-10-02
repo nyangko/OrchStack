@@ -362,7 +362,8 @@ pub async fn run_to(db: &DatabaseConnection, sn: i64, to: &str) -> Res<()> {
         "failed" => "RunFailed",
         _ => return Err(Error::conflict(format!("run_to cannot target {to}"))),
     };
-    event::run(db, async |tx| {
+    let member = get(db, sn).await?.member_sn;
+    event::run_as(db, "member", Some(member), async |tx| {
         let from = get(tx, sn).await?.status;
         let m = step(tx, sn, to).await?;
         Ok(((), vec![Ev::new(Some(m.project_sn), "run", sn, kind, &json!({ "from": from, "to": to }))]))
@@ -372,7 +373,7 @@ pub async fn run_to(db: &DatabaseConnection, sn: i64, to: &str) -> Res<()> {
 /// 실행기용: Session 상태를 옮긴다 (starting → active → stopped · failed). 표에 없으면 409
 #[allow(dead_code)] // #13 실행기가 호출한다
 pub async fn session_to(db: &DatabaseConnection, sn: i64, to: &str) -> Res<()> {
-    event::run(db, async |tx| {
+    event::run_as(db, "system", None, async |tx| {
         let cur = s::Entity::find_by_id(sn).one(tx).await?.ok_or_else(Error::not_found)?;
         if !SESSION_MOVES.contains(&(cur.status.as_str(), to)) {
             return Err(Error::conflict(format!("cannot move session {} -> {to}", cur.status)));

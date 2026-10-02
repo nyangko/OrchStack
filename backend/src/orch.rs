@@ -257,13 +257,13 @@ fn check(p: &Plan) -> Res<()> {
 #[allow(dead_code)] // Orch · 실행기(#13 #14)가 호출한다
 pub async fn propose(db: &DatabaseConnection, project_sn: i64, content: Option<String>, plan: Plan) -> Res<Message> {
     check(&plan)?;
-    event::run(db, async |tx| {
-        let orch = orch_of(tx, project_sn).await?;
+    let orch = orch_of(db, project_sn).await?;
+    event::run_as(db, "orch", orch, async |tx| {
         let out = append(tx, project_sn, ms::ActiveModel {
             sender_type: Set("orch".into()), member_sn: Set(orch), kind: Set("work_proposal".into()), content: Set(content),
             payload_json: Set(Some(json!(plan).to_string())), proposal_status: Set(Some("draft".into())), ..Default::default()
         }).await?;
-        let ev = Ev::new(Some(project_sn), "project", project_sn, "MessagePosted", &json!({ "message_sn": out.sn, "kind": out.kind }));
+        let ev = Ev::new(Some(project_sn), "message", out.sn, "MessagePosted", &json!({ "message_sn": out.sn, "kind": out.kind }));
         Ok((out, vec![ev]))
     }).await
 }
@@ -274,13 +274,14 @@ pub async fn suggest(db: &DatabaseConnection, b: ProposalNew) -> Res<Proposal> {
     if !["assign", "retry", "close_issue", "next_issue", "fallback", "guard_stop"].contains(&b.kind.as_str()) || !(0..=4).contains(&b.level) {
         return Err(Error::invalid("unknown kind or level out of 0..=4".into()));
     }
-    event::run(db, async |tx| {
+    let orch = orch_of(db, b.project_sn).await?;
+    event::run_as(db, "orch", orch, async |tx| {
         let out = Proposal::from(op::ActiveModel {
             project_sn: Set(b.project_sn), issue_sn: Set(b.issue_sn), task_sn: Set(b.task_sn), run_sn: Set(b.run_sn), member_sn: Set(b.member_sn),
             kind: Set(b.kind), level: Set(b.level), title: Set(b.title), reason: Set(b.reason), option_json: Set(b.options.map(|o| json!(o).to_string())),
             streak_count: Set(b.streak_count), deadline_at: Set(b.deadline_at), event_sn: Set(b.event_sn), ..Default::default()
         }.insert(tx).await?);
-        let ev = Ev::new(Some(out.project_sn), "project", out.project_sn, "OrchProposed", &json!({ "proposal_sn": out.sn, "kind": out.kind, "title": out.title }));
+        let ev = Ev::new(Some(out.project_sn), "proposal", out.sn, "OrchProposed", &json!({ "proposal_sn": out.sn, "kind": out.kind, "title": out.title }));
         Ok((out, vec![ev]))
     }).await
 }
@@ -310,7 +311,7 @@ async fn post(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Me
         let out = append(tx, sn, ms::ActiveModel {
             sender_type: Set("user".into()), content: Set(Some(b.content)), task_sn: Set(b.task_sn), run_sn: Set(b.run_sn), ..Default::default()
         }).await?;
-        let ev = Ev::new(Some(sn), "project", sn, "MessagePosted", &json!({ "message_sn": out.sn, "kind": out.kind }));
+        let ev = Ev::new(Some(sn), "message", out.sn, "MessagePosted", &json!({ "message_sn": out.sn, "kind": out.kind }));
         Ok((out, vec![ev]))
     }).await?;
     Ok((StatusCode::CREATED, Json(out)))
@@ -325,7 +326,7 @@ async fn edit(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Pl
         draft(&m)?;
         ms::Entity::update_many().filter(ms::Column::Sn.eq(sn)).col_expr(ms::Column::PayloadJson, json!(b).to_string().into()).exec(tx).await?;
         let out = Message::from(message(tx, sn).await?.1);
-        Ok((out, vec![Ev::new(Some(ps), "project", ps, "ProposalEdited", &json!({ "message_sn": sn }))]))
+        Ok((out, vec![Ev::new(Some(ps), "message", sn, "ProposalEdited", &json!({ "message_sn": sn }))]))
     }).await?;
     Ok(Json(out))
 }
@@ -362,7 +363,7 @@ async fn proceed(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<P
         let result = append(tx, ps, ms::ActiveModel {
             sender_type: Set("orch".into()), member_sn: Set(m.member_sn), kind: Set("command_result".into()), payload_json: Set(Some(created.to_string())), ..Default::default()
         }).await?;
-        evs.push(Ev::new(Some(ps), "project", ps, "ProposalProceeded", &json!({ "message_sn": sn, "result_sn": result.sn, "created": created })));
+        evs.push(Ev::new(Some(ps), "message", sn, "ProposalProceeded", &json!({ "message_sn": sn, "result_sn": result.sn, "created": created })));
         Ok((ProceedOut { issue, tasks, result }, evs))
     }).await?;
     Ok(Json(out))
@@ -376,7 +377,7 @@ async fn cancel(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Me
         draft(&m)?;
         ms::Entity::update_many().filter(ms::Column::Sn.eq(sn)).col_expr(ms::Column::ProposalStatus, "cancelled".into()).exec(tx).await?;
         let out = Message::from(message(tx, sn).await?.1);
-        Ok((out, vec![Ev::new(Some(ps), "project", ps, "ProposalCancelled", &json!({ "message_sn": sn }))]))
+        Ok((out, vec![Ev::new(Some(ps), "message", sn, "ProposalCancelled", &json!({ "message_sn": sn }))]))
     }).await?;
     Ok(Json(out))
 }
@@ -410,7 +411,7 @@ async fn resolve(State(db): State<DatabaseConnection>, axum::extract::Path((sn, 
         op::Entity::update_many().filter(op::Column::Sn.eq(sn)).col_expr(op::Column::Status, to.into()).col_expr(op::Column::Uid, crate::UID.into())
             .col_expr(op::Column::ResolveAt, Expr::cust("datetime('now')")).exec(tx).await?;
         let out = Proposal::from(op::Entity::find_by_id(sn).one(tx).await?.ok_or_else(Error::not_found)?);
-        let ev = Ev::new(Some(cur.project_sn), "project", cur.project_sn, "OrchProposalResolved", &json!({ "proposal_sn": sn, "status": to, "option": option }));
+        let ev = Ev::new(Some(cur.project_sn), "proposal", sn, "OrchProposalResolved", &json!({ "proposal_sn": sn, "status": to, "option": option }));
         Ok((out, vec![ev]))
     }).await?;
     Ok(Json(out))

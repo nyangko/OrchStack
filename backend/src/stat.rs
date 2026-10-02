@@ -69,7 +69,7 @@ struct Month {
 /// 연결 종류별 비용 1줄
 #[derive(Serialize, ToSchema)]
 struct CostLine {
-    /// subscription(구독 · plan 포함) | api_key | gateway | local | unknown(연결 기록 없음)
+    /// subscription(구독 · plan 포함) | api_key | gateway | local | unknown(연결 기록 없음) | subscription_fixed(구독 · 요금제 월 정액 합 · 토큰 없음)
     kind: String,
     cost_usd_micro: i64,
     token: i64,
@@ -142,7 +142,7 @@ async fn quota(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec
     Ok(Json(out))
 }
 
-/// 워크스페이스 월 비용: tbl_log_token 비용 · 토큰을 연결 종류별로 합친다 (UTC 월). 구독 정액 요금은 스키마에 없어 사용 기록 비용만. YYYY-MM이 아니면 422
+/// 워크스페이스 월 비용: tbl_log_token 비용 · 토큰을 연결 종류별로 합친다 (UTC 월) + 구독 · 요금제 연결의 월 정액 합(subscription_fixed · 그 달까지 만든 연결). YYYY-MM이 아니면 422
 #[utoipa::path(operation_id = "stat_cost", get, path = "/workspace/cost", params(Month), responses((status = 200, body = Cost), (status = "default", body = ErrorBody)))]
 async fn cost(State(db): State<DatabaseConnection>, Query(q): Query<Month>) -> Res<Json<Cost>> {
     let month = match q.month {
@@ -156,8 +156,12 @@ async fn cost(State(db): State<DatabaseConnection>, Query(q): Query<Month>) -> R
          SUM(t.cost_usd_micro) cost, SUM(t.token_input + t.token_cache_read + t.token_cache_write + t.token_output) tok \
          FROM tbl_log_token t LEFT JOIN tbl_connection c ON c.sn = t.connection_sn WHERE strftime('%Y-%m', t.create_at) = ? GROUP BY k ORDER BY k",
         vec![Value::from(month.clone())])).await?;
-    let items: Vec<CostLine> = rows.into_iter().map(|r| CostLine {
+    let mut items: Vec<CostLine> = rows.into_iter().map(|r| CostLine {
         kind: r.try_get("", "k").unwrap_or_default(), cost_usd_micro: r.try_get("", "cost").unwrap_or(0), token: r.try_get("", "tok").unwrap_or(0),
     }).collect();
+    let fee = one(&db, "SELECT SUM(monthly_fee_usd_micro) FROM tbl_connection WHERE kind IN ('subscription','plan') AND strftime('%Y-%m', create_at) <= ?", vec![Value::from(month.clone())]).await?;
+    if let Some(v) = fee {
+        items.push(CostLine { kind: "subscription_fixed".into(), cost_usd_micro: v, token: 0 });
+    }
     Ok(Json(Cost { total_usd_micro: items.iter().map(|i| i.cost_usd_micro).sum(), month, items }))
 }

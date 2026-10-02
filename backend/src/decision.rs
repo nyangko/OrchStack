@@ -188,7 +188,8 @@ pub async fn create(db: &DatabaseConnection, b: DecisionNew) -> Res<Decision> {
     if !(2..=4).contains(&b.level) || b.questions.is_empty() {
         return Err(Error::invalid("level must be 2..=4 and questions non-empty".into()));
     }
-    event::run(db, async |tx| {
+    let actor = event::who(db, b.member_sn).await?;
+    event::run_as(db, actor, Some(b.member_sn), async |tx| {
         let m = d::ActiveModel {
             project_sn: Set(b.project_sn), task_sn: Set(b.task_sn), run_sn: Set(b.run_sn), member_sn: Set(b.member_sn),
             level: Set(b.level), title: Set(b.title), deadline_at: Set(b.deadline_at), ..Default::default()

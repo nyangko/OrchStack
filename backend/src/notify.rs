@@ -35,20 +35,21 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
 /// 이벤트 1건 → 알림 0~1건. event::run 트랜잭션 안에서 불린다 (이벤트와 알림이 함께 커밋 · 롤백).
 /// 워크스페이스 기본 규칙에서 그 이벤트의 앱 알림을 끈 경우는 만들지 않는다
 pub async fn project(tx: &DatabaseTransaction, ev: &e::Model) -> Res<()> {
-    // (이벤트 코드, 알린 쪽, 멤버, 제목, 설명, 바로가기 종류, 확인 필요)
-    let (code, actor, member, title, body, ref_type, action) = match ev.event_type.as_str() {
+    // 알린 쪽 · 멤버는 이벤트 행의 행위자에서 가져온다
+    // (이벤트 코드, 제목, 설명, 바로가기 종류, 확인 필요)
+    let (code, title, body, ref_type, action) = match ev.event_type.as_str() {
         "DecisionRequested" => {
             let Some(m) = dc::Entity::find_by_id(ev.aggregate_sn).one(tx).await? else { return Ok(()) };
-            ("decision_request", "member", Some(m.member_sn), m.title, None, "decision", 1)
+            ("decision_request", m.title, None, "decision", 1)
         }
         "ApprovalRequested" => {
             let Some(m) = ap::Entity::find_by_id(ev.aggregate_sn).one(tx).await? else { return Ok(()) };
-            ("approval_request", "member", Some(m.member_sn), m.title, m.detail, "approval", 1)
+            ("approval_request", m.title, m.detail, "approval", 1)
         }
         "RunFailed" => {
             let Some(m) = r::Entity::find_by_id(ev.aggregate_sn).one(tx).await? else { return Ok(()) };
             let title = t::Entity::find_by_id(m.task_sn).one(tx).await?.map_or_else(String::new, |x| x.title);
-            ("run_failed", "member", Some(m.member_sn), title, m.fail_detail, "run", 0)
+            ("run_failed", title, m.fail_detail, "run", 0)
         }
         _ => return Ok(()),
     };
@@ -58,7 +59,7 @@ pub async fn project(tx: &DatabaseTransaction, ev: &e::Model) -> Res<()> {
         return Ok(());
     }
     n::ActiveModel {
-        wid: Set(crate::WID), uid: Set(crate::UID), event_code: Set(code.into()), actor_type: Set(actor.into()), member_sn: Set(member),
+        wid: Set(crate::WID), uid: Set(crate::UID), event_code: Set(code.into()), actor_type: Set(ev.actor_type.clone()), member_sn: Set(ev.member_sn),
         title: Set(title), body: Set(body), ref_type: Set(Some(ref_type.into())), ref_sn: Set(Some(ev.aggregate_sn)), is_action: Set(action),
         event_sn: Set(Some(ev.sn)), ..Default::default()
     }.insert(tx).await?;

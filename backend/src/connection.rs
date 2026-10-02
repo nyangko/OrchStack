@@ -43,6 +43,8 @@ pub struct Connection {
     status: String,
     status_message: Option<String>,
     monthly_budget_usd_micro: Option<i64>,
+    /// 월 정액 요금 (구독 · 요금제 · 없으면 null)
+    monthly_fee_usd_micro: Option<i64>,
     budget_warn_percent: i64,
     is_budget_exclude: i64,
     /// workspace | team | me
@@ -63,7 +65,7 @@ impl From<c::Model> for Connection {
             sn: m.sn, kind: m.kind, provider_code: m.provider_code, provider_name: m.provider_name, name: m.name,
             account_label: m.account_label, plan_name: m.plan_name, runtime_sn: m.runtime_sn, login_method: m.login_method,
             base_url: m.base_url, key_hint: m.key_hint, status: m.status, status_message: m.status_message,
-            monthly_budget_usd_micro: m.monthly_budget_usd_micro, budget_warn_percent: m.budget_warn_percent, is_budget_exclude: m.is_budget_exclude,
+            monthly_budget_usd_micro: m.monthly_budget_usd_micro, monthly_fee_usd_micro: m.monthly_fee_usd_micro, budget_warn_percent: m.budget_warn_percent, is_budget_exclude: m.is_budget_exclude,
             scope: m.scope, report_language: m.report_language, commit_language: m.commit_language, latency_ms: m.latency_ms,
             cache_hit_percent: m.cache_hit_percent, test_at: m.test_at, sync_at: m.sync_at, create_at: m.create_at, update_at: m.update_at,
         }
@@ -108,6 +110,7 @@ struct ConnectionNew {
     key_ref: Option<String>,
     key_hint: Option<String>,
     monthly_budget_usd_micro: Option<i64>,
+    monthly_fee_usd_micro: Option<i64>,
     budget_warn_percent: Option<i64>,
     is_budget_exclude: Option<i64>,
     scope: Option<String>,
@@ -139,6 +142,8 @@ struct ConnectionPatch {
     key_hint: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     monthly_budget_usd_micro: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    monthly_fee_usd_micro: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     budget_warn_percent: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -180,7 +185,7 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ConnectionNe
             wid: Set(crate::WID), uid: Set(Some(crate::UID)), kind: Set(b.kind), provider_code: Set(b.provider_code), provider_name: Set(b.provider_name),
             name: Set(b.name), account_label: Set(b.account_label), plan_name: Set(b.plan_name), runtime_sn: Set(b.runtime_sn),
             login_method: Set(b.login_method), base_url: Set(b.base_url), key_ref: Set(b.key_ref), key_hint: Set(b.key_hint),
-            monthly_budget_usd_micro: Set(b.monthly_budget_usd_micro), budget_warn_percent: b.budget_warn_percent.map_or(NotSet, Set),
+            monthly_budget_usd_micro: Set(b.monthly_budget_usd_micro), monthly_fee_usd_micro: Set(b.monthly_fee_usd_micro), budget_warn_percent: b.budget_warn_percent.map_or(NotSet, Set),
             is_budget_exclude: b.is_budget_exclude.map_or(NotSet, Set), scope: b.scope.map_or(NotSet, Set),
             report_language: Set(b.report_language), commit_language: Set(b.commit_language), ..Default::default()
         };
@@ -214,6 +219,7 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
         if let Some(v) = &b.key_ref { u = u.col_expr(C::KeyRef, v.clone().into()); }
         if let Some(v) = &b.key_hint { u = u.col_expr(C::KeyHint, v.clone().into()); }
         if let Some(v) = b.monthly_budget_usd_micro { u = u.col_expr(C::MonthlyBudgetUsdMicro, v.into()); }
+        if let Some(v) = b.monthly_fee_usd_micro { u = u.col_expr(C::MonthlyFeeUsdMicro, v.into()); }
         if let Some(v) = b.budget_warn_percent { u = u.col_expr(C::BudgetWarnPercent, v.into()); }
         if let Some(v) = b.is_budget_exclude { u = u.col_expr(C::IsBudgetExclude, v.into()); }
         if let Some(v) = &b.scope { u = u.col_expr(C::Scope, v.clone().into()); }
