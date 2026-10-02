@@ -55,7 +55,7 @@ CREATE TABLE tbl_user (
 -- 워크스페이스. Settings › 일반 · 실행기 공통 설정 · 스킬 설치 정책 · 알림 시간대
 CREATE TABLE tbl_workspace (
     sn                       INTEGER PRIMARY KEY AUTOINCREMENT,     -- 워크스페이스 번호
-    user_sn                      INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE RESTRICT,  -- 소유자
+    user_sn                  INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE RESTRICT,  -- 소유자
     name                     TEXT NOT NULL,                         -- 워크스페이스 이름 (예: OrchStack)
     default_repo             TEXT,                                  -- 기본 저장소 (예: orchstack/app)
     timezone                 TEXT NOT NULL DEFAULT 'Asia/Seoul',    -- 시간대 (리셋 시각 · 타이머 · 일일 요약 기준)
@@ -102,7 +102,7 @@ CREATE TABLE tbl_workspace (
 -- 실행기(CLI). 에이전트가 실제로 도는 프로그램 · Settings › 실행기
 CREATE TABLE tbl_runtime (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 실행기 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     code             TEXT NOT NULL,                                 -- 식별 코드: codex(Codex CLI) | claude_code(Claude Code) | gemini(Gemini CLI) | opencode(OpenCode) | cursor(Cursor Agent) | kiro(Kiro CLI)
     name             TEXT NOT NULL,                                 -- 표시 이름 (예: Codex CLI)
     version          TEXT,                                          -- 설치된 버전 (예: 0.41)
@@ -121,7 +121,7 @@ CREATE TABLE tbl_runtime (
 CREATE TABLE tbl_connection (
     sn                   INTEGER PRIMARY KEY AUTOINCREMENT,         -- 연결 번호
     workspace_sn         INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
-    user_sn                  INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,          -- 연결을 추가한 사용자
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,           -- 연결을 추가한 사용자
     kind                 TEXT NOT NULL CHECK (kind IN ('subscription','plan','api_key','gateway','local')),  -- 종류: subscription(구독 · CLI 로그인 · 남은 비율로 한도 표시) | plan(코딩 도구 요금제 · 월 사용량) | api_key(API 키 · 사용한 만큼 과금) | gateway(OpenAI 호환 게이트웨이 · 비용 + 폴백 횟수) | local(로컬 모델 · 한도 없음)
     provider_code        TEXT NOT NULL,                             -- 제공자 코드: anthropic | openai | google | github_copilot | cursor | kimi | zai | omniroute | openrouter | vercel | ollama | lmstudio | openai_compatible(직접 입력) …
     provider_name        TEXT NOT NULL,                             -- 제공자 표시 이름 (예: Anthropic · Max)
@@ -183,7 +183,7 @@ CREATE TABLE tbl_model (
 -- 스킬 소스. 스킬을 찾고 설치하는 곳 · Settings › 스킬 소스
 CREATE TABLE tbl_skill_source (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 소스 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     kind             TEXT NOT NULL CHECK (kind IN ('skills_sh','github','local','marketplace','builtin')),  -- 종류: skills_sh(skills.sh 공개 디렉터리) | github(GitHub 저장소) | local(로컬 폴더) | marketplace(마켓플레이스) | builtin(기본 내장)
     name             TEXT NOT NULL,                                 -- 표시 이름 (예: orchstack/team-skills)
     location         TEXT,                                          -- 주소 또는 폴더 경로
@@ -197,7 +197,7 @@ CREATE TABLE tbl_skill_source (
 -- 스킬. 워크스페이스에 설치된 스킬 · Skills & MCP
 CREATE TABLE tbl_skill (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 스킬 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     source_sn        INTEGER REFERENCES tbl_skill_source(sn) ON DELETE SET NULL,       -- 가져온 소스
     name             TEXT NOT NULL,                                 -- 스킬 이름 (예: svelte-ui)
     description      TEXT,                                          -- 설명
@@ -218,7 +218,7 @@ CREATE TABLE tbl_skill (
 -- MCP 서버. 에이전트에게 도구를 주는 서버 · Tools & MCP
 CREATE TABLE tbl_mcp (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- MCP 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     name             TEXT NOT NULL,                                 -- 서버 이름 (예: playwright-mcp)
     description      TEXT,                                          -- 설명
     tool_count       INTEGER NOT NULL DEFAULT 0,                    -- 제공 도구 수
@@ -313,8 +313,8 @@ CREATE TABLE tbl_map_profile_mcp (
 -- 템플릿. 역할별 에이전트 기본값 · Agents 탭
 CREATE TABLE tbl_template (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 템플릿 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    user_sn          INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,  -- 만든 사용자
     name             TEXT NOT NULL,                                 -- 이름 (예: Frontend Developer)
     role_name        TEXT,                                          -- 역할 설명 (예: 프론트엔드 개발)
     category         TEXT NOT NULL DEFAULT 'dev' CHECK (category IN ('dev','verify','design_pm','orch')),  -- 분류: dev(개발) | verify(검증 · QA · 리뷰) | design_pm(디자인 · PM) | orch(Orch · 모든 팀)
@@ -407,9 +407,10 @@ CREATE TABLE tbl_project (
 -- (Instruction preset · 보고서 양식: 프로젝트 범위 프리셋이 tbl_project 를 참조하므로 프로젝트 다음에 둔다)
 -- Instruction preset. 모델 컨텍스트에 들어가는 재사용 지침 (Settings › Instruction presets에서 추가 · 수정 · 삭제)
 --   종류별로 역할 템플릿 · 멤버 프로필에 연결만 한다 (tbl_map_profile_preset). 도구 · 권한 정책은 여기 두지 않는다
+--   한 행 = 한 버전. status · is_default · name · limit_tok · description은 최신 행(is_latest = 1) 기준이다 (지난 버전 행의 값은 그때의 사본)
 CREATE TABLE tbl_instruction_preset (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 프리셋 번호
-    workspace_sn              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     project_sn       INTEGER REFERENCES tbl_project(sn) ON DELETE CASCADE,  -- 프로젝트 전용이면 지정 (NULL = 워크스페이스 전체)
     kind             TEXT NOT NULL CHECK (kind IN ('protocol','role','style','rule','report')),  -- 종류: protocol(내부 블록 규격 · 시스템 소유) | role(역할 · 책임 · 범위) | style(말투 · 출력 태도) | rule(공통 규칙 · 여러 개 연결) | report(태스크 보고서 사람 칸 작성법)
     preset_key       TEXT NOT NULL,                                 -- 식별 키 (예: frontend, token-economy)
@@ -428,7 +429,7 @@ CREATE TABLE tbl_instruction_preset (
     is_default       INTEGER NOT NULL DEFAULT 0,                    -- 새 역할 템플릿에 기본으로 연결
     copy_from_sn     INTEGER REFERENCES tbl_instruction_preset(sn) ON DELETE SET NULL,  -- 복제 원본
     status           TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),  -- 상태: active(사용 가능) | archived(보관 · 새로 연결 불가, 기존 연결은 유지)
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자 (기본 제공이면 NULL)
+    user_sn          INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,    -- 만든 사용자 (기본 제공이면 NULL)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
     UNIQUE (workspace_sn, kind, preset_key, version)
@@ -450,7 +451,7 @@ CREATE TABLE tbl_map_profile_preset (
 -- 보고서 양식. 시스템이 조립하는 화면 양식 (모델 호출 없음 · 0 tok) · Settings › 보고서 양식
 CREATE TABLE tbl_report_form (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 양식 번호
-    workspace_sn              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     kind             TEXT NOT NULL CHECK (kind IN ('task_report','issue_report','pr_body','daily_summary')),  -- 종류: task_report(태스크 보고서) | issue_report(이슈 보고서 · 태스크 합산) | pr_body(PR 본문) | daily_summary(일일 요약 알림)
     form_key         TEXT NOT NULL,                                 -- 식별 키
     name             TEXT NOT NULL,                                 -- 표시 이름
@@ -477,7 +478,7 @@ CREATE TABLE tbl_issue (
     github_number    INTEGER,                                       -- 연결된 GitHub 이슈 번호
     github_url       TEXT,                                          -- GitHub 이슈 주소
     label_json       TEXT,                                          -- 라벨 이름 JSON 배열 (Issue Board 라벨 · GitHub 이슈 라벨 가져오기)
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자 (Orch가 만들면 NULL)
+    user_sn          INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자 (Orch가 만들면 NULL)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
     close_at         TEXT,                                          -- 닫은 시각
@@ -507,7 +508,7 @@ CREATE TABLE tbl_task (
     pr_number         INTEGER,                                      -- PR 번호
     pr_status         TEXT CHECK (pr_status IN ('draft','open','merged','closed')),  -- PR 상태: draft(초안) | open(열림 · 리뷰 대기) | merged(병합) | closed(병합 없이 닫힘)
     create_by         TEXT NOT NULL DEFAULT 'user' CHECK (create_by IN ('user','orch')),  -- 만든 쪽: user(사용자) | orch(Orch)
-    user_sn               INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,             -- 만든 사용자
+    user_sn           INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자
     create_at         TEXT NOT NULL DEFAULT (datetime('now')),      -- 생성 시각
     update_at         TEXT NOT NULL DEFAULT (datetime('now')),      -- 수정 시각
     start_at          TEXT,                                         -- 작업 시작 시각
@@ -665,7 +666,7 @@ CREATE TABLE tbl_interaction (
     kind             TEXT NOT NULL CHECK (kind IN ('request_verification','request_review','completion_report','delegate')),  -- 종류: request_verification(검증 요청 · 예: 진 → 하린) | request_review(리뷰 요청 · → Reviewer) | completion_report(완료 보고 · → Orch) | delegate(위임 · Orch → 이슈)
     status           TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','live','done','cancelled')),  -- 상태: open(대기 · 상대가 아직 시작 안 함) | live(처리 중 · 연결선 강조 표시) | done(완료) | cancelled(취소)
     create_by        TEXT NOT NULL DEFAULT 'member' CHECK (create_by IN ('member','orch','user')),  -- 만든 쪽: member(멤버) | orch(Orch) | user(사용자 · 연결하기 메뉴)
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자
+    user_sn          INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,               -- 만든 사용자
     note             TEXT,                                          -- 요청 내용 (예: Task #130 QA 대기 해제 요청)
     event_sn         INTEGER REFERENCES tbl_log_event(sn) ON DELETE SET NULL,  -- 이 행을 만든 이벤트 (projection 재구축 · 중복 방지)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
@@ -677,7 +678,7 @@ CREATE TABLE tbl_interaction (
 CREATE TABLE tbl_diagram (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 보기 설정 번호
     project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE, -- 프로젝트
-    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 사용자
+    user_sn          INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,    -- 사용자
     layout_mode      TEXT NOT NULL DEFAULT 'auto' CHECK (layout_mode IN ('auto','grid','manual')),  -- 배치: auto(자동 배치) | grid(격자 정렬) | manual(사용자가 옮긴 위치 유지)
     zoom_percent     INTEGER NOT NULL DEFAULT 100,                  -- 확대 비율(%)
     is_show_capability INTEGER NOT NULL DEFAULT 1,                  -- 스킬 · MCP · 도구 노드 표시
@@ -712,12 +713,12 @@ CREATE TABLE tbl_ask (
     title            TEXT NOT NULL,                                 -- 요약 제목 (예: 재전송 제한 · #130 QA를 하린에게 배정)
     reason           TEXT,                                          -- 근거 (제안 · 가드 정지의 이유 · Orch가 대신 결정한 근거)
     option_json      TEXT,                                          -- 질문 · 선택지 · 답 / 승인 내용 / 다른 선택지 (위 구조)
-    status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','writing','answered','orch_decided','cancelled','approved','denied','expired','proposed','auto_done','user_done','changed','stopped','dismissed')),  -- 상태 (kind마다 쓰는 값이 다르다): decision = pending(답변 대기 · 타이머 진행) | writing(사용자가 작성 중 · 타이머 멈춤) | answered(사용자가 답함) | orch_decided(시간 초과로 Orch가 대신 결정) | cancelled(취소) · approval = pending(승인 대기) | approved(승인) | denied(거부) | expired(시간 초과로 만료) · proposal = proposed(제안 · 타이머 진행 중) | auto_done(타이머 후 자동 진행) | user_done(사용자가 바로 진행) | changed(다른 선택으로 변경) | stopped(사용자가 멈춤 · 가드 정지) | dismissed(무시 · 나중에)
+    status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','writing','answered','orch_decided','cancelled','approved','denied','expired','proposed','auto_done','user_done','changed','stopped','dismissed')),  -- 상태 (CHECK는 세 종류 값의 합집합 · kind별 허용 값 · 전이는 backend/src/ask.rs의 MOVES 표가 원본): decision = pending(답변 대기 · 타이머 진행) | writing(사용자가 작성 중 · 타이머 멈춤) | answered(사용자가 답함) | orch_decided(시간 초과로 Orch가 대신 결정) | cancelled(취소) · approval = pending(승인 대기) | approved(승인) | denied(거부) | expired(시간 초과로 만료) · proposal = proposed(제안 · 타이머 진행 중) | auto_done(타이머 후 자동 진행) | user_done(사용자가 바로 진행) | changed(다른 선택으로 변경) | stopped(사용자가 멈춤 · 가드 정지) | dismissed(무시 · 나중에)
     is_timer_pause   INTEGER NOT NULL DEFAULT 0,                    -- 타이머 멈춤 (작성 중)
     is_review_needed INTEGER NOT NULL DEFAULT 0,                    -- 사용자가 재검토하기로 표시 (판단 요청)
     deadline_at      TEXT,                                          -- 이 시각이 지나면 판단 = Orch가 결정 · 승인 = 만료 · 제안 = 자동 진행
     decide_by        TEXT CHECK (decide_by IN ('user','orch')),     -- 결정한 쪽: user(사용자) | orch(사용자 대신 Orch)
-    user_sn          INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 처리한 사용자 (자동 진행이면 NULL)
+    user_sn          INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,               -- 처리한 사용자 (자동 진행이면 NULL)
     streak_count     INTEGER NOT NULL DEFAULT 0,                    -- 연속 자동 진행 횟수 (제안 · 예: 3 / 10)
     guard_code       TEXT,                                          -- 걸린 루프 가드 코드 (가드 정지 제안 · auto_streak · reject_loop …)
     event_sn         INTEGER REFERENCES tbl_log_event(sn) ON DELETE SET NULL,  -- 이 요청을 만든 이벤트
@@ -746,7 +747,7 @@ CREATE TABLE tbl_attachment (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 첨부 번호
     owner_type       TEXT NOT NULL CHECK (owner_type IN ('message','ask','task')),  -- 붙인 곳: message(메시지) | ask(요청 · 판단 답변) | task(태스크)
     owner_sn         INTEGER NOT NULL,                              -- 붙인 곳의 sn
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 올린 사용자
+    user_sn          INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,  -- 올린 사용자
     file_name        TEXT NOT NULL,                                 -- 파일 이름
     mime_type        TEXT,                                          -- 파일 형식 (예: image/png)
     file_size        INTEGER NOT NULL DEFAULT 0,                    -- 크기(바이트)
@@ -763,8 +764,8 @@ CREATE TABLE tbl_attachment (
 -- 알림 목록. 상단 벨에 쌓이는 알림
 CREATE TABLE tbl_notification (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 알림 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
-    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 받는 사용자
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    user_sn          INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,       -- 받는 사용자
     event_code       TEXT NOT NULL CHECK (event_code IN ('decision_request','approval_request','orch_decided','run_failed','guard_stop','context_warn','quota_low','budget_80','budget_over','connection_error','fallback_used','pr','task_done','daily_summary')),  -- 이벤트 (tbl_workspace.notify_json 의 event_code 와 같음)
     actor_type       TEXT NOT NULL DEFAULT 'system' CHECK (actor_type IN ('orch','member','system')),  -- 알린 쪽: orch(Orch) | member(멤버) | system(시스템)
     member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 알린 멤버
@@ -789,7 +790,7 @@ CREATE TABLE tbl_notification (
 --   @TASK · @REPORT · @ASK 블록 원문은 payload_json 에 저장 (모델에 다시 보내지 않음)
 CREATE TABLE tbl_log_event (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 이벤트 번호 (전역 순서 · 재연결 커서 · 쓰기는 워크스페이스당 1개 트랜잭션씩 직렬화해야 번호 순서 = 커밋 순서가 된다)
-    workspace_sn              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     project_sn       INTEGER REFERENCES tbl_project(sn) ON DELETE CASCADE,  -- 프로젝트 (워크스페이스 전체 이벤트면 NULL)
     aggregate_type   TEXT NOT NULL CHECK (aggregate_type IN ('workspace','project','issue','task','run','session','profile','template','member','team','ask','contract','connection','preset','message','skill')),  -- 대상 종류: workspace | project | issue | task | run | session | profile(에이전트 프로필 · 폴백 체인) | template | member | team | ask(판단 · 승인 · 제안) | contract | connection | preset | message(Orch 대화 메시지) | skill
     aggregate_sn     INTEGER NOT NULL,                              -- 대상 번호 (aggregate_type 테이블의 sn · FK 없음 · 대상이 지워져도 기록은 남는다)
@@ -800,7 +801,7 @@ CREATE TABLE tbl_log_event (
     command_id       TEXT,                                          -- 이 이벤트를 만든 명령 ID (같은 명령 재전송 시 중복 방지)
     command_idx      INTEGER NOT NULL DEFAULT 0,                    -- 한 명령이 만든 이벤트 중 순서 (0부터 · 예: MoveTask → TaskMoved 0, AgentAssigned 1)
     actor_type       TEXT NOT NULL CHECK (actor_type IN ('user','orch','member','system')),  -- 발생시킨 쪽: user(사용자) | orch(Orch) | member(멤버) | system(시스템 · 규칙 엔진)
-    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,     -- 발생시킨 사용자
+    user_sn          INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,      -- 발생시킨 사용자
     member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,    -- 발생시킨 멤버
     run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,       -- 관련 Run
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 발생 시각

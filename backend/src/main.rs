@@ -1449,6 +1449,52 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         assert_eq!((s["avg_input_token"].as_i64(), s["cache_hit_percent"].as_i64()), (Some(250), Some(60)));
     }
 
+    /// #121 후속: 멤버 작업 상태 work(계산값) — 진행 Run → running · 열린 판단 요청 → waiting · 담당 todo가 의존 대기뿐 → waiting · 없음 → idle · paused PATCH → paused.
+    /// 멤버 목록(/teams/{sn}/members) · 단건 · 스냅샷에서 같은 값
+    #[tokio::test]
+    async fn member_work() {
+        use crate::ask::{self, Choice, DecisionNew, Question};
+        let db = mem().await;
+        let app = app(db.clone());
+        let a = task_of(&app, &db, true).await; // 프로젝트 1 · 팀 1 · 멤버 1(m) · 태스크 a(멤버 1)
+        db.execute_unprepared("UPDATE tbl_project SET team_sn = 1; INSERT INTO tbl_member (sn, team_sn, profile_sn, name, role_name) VALUES (2, 1, 1, 'm2', 'Dev'), (3, 1, 1, 'm3', 'Dev'), (4, 1, 1, 'm4', 'Dev');").await.unwrap();
+        let work = |v: &Value| v.as_array().unwrap().iter().map(|m| m["work"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        let both = || { let app = app.clone(); async move {
+            let t = work(&call(&app, "GET", "/teams/1/members", None).await.1);
+            let s = work(&call(&app, "GET", "/projects/1/snapshot", None).await.1["members"]);
+            assert_eq!(t, s);
+            t
+        }};
+        assert_eq!(both().await, ["idle", "idle", "idle", "idle"]);
+
+        // 1: 진행 Run(queued) → running / 2: 열린 판단 요청 → waiting / 3: 담당 todo가 의존 대기뿐 → waiting / 4: 없음 → idle
+        call(&app, "POST", &format!("/tasks/{a}/runs"), None).await;
+        let q = Question { title: "Q".into(), body: None, code_snippet: None, reference: None, options: vec![Choice { code: "A".into(), label: "a".into(), note: None, is_recommended: false, is_selected: false }], answer_text: None, is_delegate: false, answer_at: None };
+        ask::decision(&db, DecisionNew { project_sn: 1, task_sn: None, run_sn: None, member_sn: 2, level: 2, title: "D".into(), deadline_at: None, questions: vec![q] }).await.unwrap();
+        let (_, b) = call(&app, "POST", "/issues/1/tasks", Some(json!({"title": "B"}))).await;
+        let (_, c) = call(&app, "POST", "/issues/1/tasks", Some(json!({"title": "C"}))).await;
+        let (b, c) = (b["sn"].as_i64().unwrap(), c["sn"].as_i64().unwrap());
+        call(&app, "POST", &format!("/tasks/{b}/assign"), Some(json!({"member_sn": 3}))).await;
+        call(&app, "POST", &format!("/tasks/{b}/deps"), Some(json!({"depend_task_sn": c}))).await; // b는 아직 담당 없는 c를 기다린다
+        assert_eq!(both().await, ["running", "waiting", "waiting", "idle"]);
+        // 의존이 풀리면(c 완료) 3은 일감이 있고 Run은 없는 상태 → idle · 판단에 답하면 2도 idle · Run이 waiting이면 1은 waiting
+        for to in ["in_progress", "done"] { call(&app, "POST", &format!("/tasks/{c}/move"), Some(json!({"status": to}))).await; }
+        call(&app, "POST", "/asks/1/answer", Some(json!({"answers": [{"question": 0, "option": "A"}]}))).await;
+        db.execute_unprepared("UPDATE tbl_run SET status = 'waiting' WHERE sn = 1").await.unwrap();
+        assert_eq!(both().await, ["waiting", "idle", "idle", "idle"]);
+        db.execute_unprepared("UPDATE tbl_run SET status = 'review' WHERE sn = 1").await.unwrap();
+        assert_eq!(both().await[0], "running");
+
+        // paused · archived는 저장값 그대로 (진행 중 Run이 있어도) · 단건 · 응답에도 work
+        let (st, m) = call(&app, "PATCH", "/members/1", Some(json!({"status": "paused"}))).await;
+        assert_eq!((st, m["work"].as_str(), m["status"].as_str()), (StatusCode::OK, Some("paused"), Some("paused")));
+        call(&app, "PATCH", "/members/4", Some(json!({"status": "archived"}))).await;
+        assert_eq!(both().await, ["paused", "idle", "idle", "archived"]);
+        assert_eq!(call(&app, "GET", "/members/4", None).await.1["work"], "archived");
+        call(&app, "PATCH", "/members/1", Some(json!({"status": "active"}))).await;
+        assert_eq!(call(&app, "GET", "/members/1", None).await.1["work"], "running");
+    }
+
     /// B-13: 완료 조건 교체(sn 유지 · 체크 이벤트) · 라벨(PATCH 이름 → 생성 · 목록) · 의존(대기 계산 · 순환 · 중복 · 삭제) · 저장 보기 · 전체 목록 필터 · Diagram 배치
     #[tokio::test]
     async fn meta() {

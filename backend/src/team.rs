@@ -1,9 +1,10 @@
 //! tbl_team · tbl_member CRUD. 쓰기는 event::run 경유 (Team* · Member* 이벤트). 멤버는 템플릿의 live 버전 프로필을 복사해 만든다
-use crate::{agent, policy::{self, Guard, Level}, entity::{tbl_agent_profile as ap, tbl_member as mb, tbl_team::{self as tm, Entity as Tbl}, tbl_template as tp},
+use crate::{agent, policy::{self, Guard, Level}, run, task, entity::{tbl_agent_profile as ap, tbl_ask as ak, tbl_member as mb, tbl_run as rn, tbl_task as tk, tbl_team::{self as tm, Entity as Tbl}, tbl_template as tp},
     error::{Body, Error, ErrorBody, Res, Sn, in_use}, event::{self, Ev}};
 use axum::{Json, extract::State, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::{NotSet, Set}, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect, sea_query::Expr};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use serde_json::json;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -86,8 +87,10 @@ pub struct Member {
     icon: Option<String>,
     color: Option<String>,
     is_orch: i64,
-    /// active | paused | archived (일하는 중 · 대기 중은 Run으로 계산)
+    /// active | paused | archived (저장값)
     status: String,
+    /// 작업 상태 (계산값): running | waiting | idle | paused | archived — `work_of` 기준
+    work: String,
     /// orch | task | wait
     first_task_mode: String,
     sort: i64,
@@ -99,7 +102,7 @@ impl From<mb::Model> for Member {
     fn from(m: mb::Model) -> Self {
         Self {
             sn: m.sn, team_sn: m.team_sn, profile_sn: m.profile_sn, template_sn: m.template_sn, template_version: m.template_version,
-            name: m.name, role_name: m.role_name, icon: m.icon, color: m.color, is_orch: m.is_orch, status: m.status,
+            name: m.name, role_name: m.role_name, icon: m.icon, color: m.color, is_orch: m.is_orch, work: if m.status == "active" { "idle".into() } else { m.status.clone() }, status: m.status,
             first_task_mode: m.first_task_mode, sort: m.sort, create_at: m.create_at, update_at: m.update_at,
         }
     }
@@ -195,9 +198,39 @@ async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<Team> {
     Tbl::find_by_id(sn).one(db).await?.map(Team::from).ok_or_else(Error::not_found)
 }
 
+/// 멤버들의 작업 상태 (저장하지 않고 계산 · §19). 멤버 수와 상관없이 Run · 요청 · 태스크를 IN 조건으로 한 번씩만 읽는다.
+/// archived · paused = 저장값 · running = 리드 Run이 queued · starting · running · review ·
+/// waiting = 리드 Run이 waiting이거나, 열린 판단 · 승인 요청이 있거나, 담당 todo가 전부 의존 대기 · idle = 나머지
+pub(crate) async fn work_of(db: &impl ConnectionTrait, ms: &[mb::Model]) -> Res<HashMap<i64, &'static str>> {
+    let sns: Vec<i64> = ms.iter().filter(|m| m.status == "active").map(|m| m.sn).collect();
+    let runs = rn::Entity::find().filter(rn::Column::MemberSn.is_in(sns.clone())).filter(rn::Column::ParentRunSn.is_null()).filter(rn::Column::Status.is_in(run::ACTIVE)).all(db).await?;
+    let asks = ak::Entity::find().filter(ak::Column::MemberSn.is_in(sns.clone())).filter(ak::Column::Kind.is_in(["decision", "approval"])).filter(ak::Column::Status.is_in(["pending", "writing"])).all(db).await?;
+    let todo = tk::Entity::find().filter(tk::Column::MemberSn.is_in(sns)).filter(tk::Column::Status.eq("todo")).all(db).await?;
+    let blocked = task::waiting(db, todo.iter().map(|t| t.sn).collect()).await?;
+    Ok(ms.iter().map(|m| {
+        let mine = || runs.iter().filter(|r| r.member_sn == m.sn);
+        let work = match m.status.as_str() {
+            "active" if mine().any(|r| r.status != "waiting") => "running",
+            "active" if mine().next().is_some() || asks.iter().any(|a| a.member_sn == Some(m.sn))
+                || { let t: Vec<_> = todo.iter().filter(|t| t.member_sn == Some(m.sn)).collect(); !t.is_empty() && t.iter().all(|t| blocked.contains(&t.sn)) } => "waiting",
+            "active" => "idle",
+            "paused" => "paused",
+            _ => "archived",
+        };
+        (m.sn, work)
+    }).collect())
+}
+
+/// 멤버 행들 → 응답 (작업 상태 포함 · 입력 순서 유지)
+pub(crate) async fn with_work(db: &impl ConnectionTrait, ms: Vec<mb::Model>) -> Res<Vec<Member>> {
+    let work = work_of(db, &ms).await?;
+    Ok(ms.into_iter().map(|m| { let w = work[&m.sn]; Member { work: w.into(), ..Member::from(m) } }).collect())
+}
+
 /// 멤버 1건 읽기. 없으면 404
 async fn one(db: &impl ConnectionTrait, sn: i64) -> Res<Member> {
-    mb::Entity::find_by_id(sn).one(db).await?.map(Member::from).ok_or_else(Error::not_found)
+    let m = mb::Entity::find_by_id(sn).one(db).await?.ok_or_else(Error::not_found)?;
+    with_work(db, vec![m]).await?.pop().ok_or_else(Error::not_found)
 }
 
 /// 팀 목록 (sort → 번호순)
@@ -290,8 +323,7 @@ async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusC
 #[utoipa::path(operation_id = "team_members", get, path = "/teams/{sn}/members", params(("sn" = i64, Path, description = "팀 번호")), responses((status = 200, body = Vec<Member>), (status = "default", body = ErrorBody)))]
 async fn members(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Member>>> {
     get(&db, sn).await?;
-    Ok(Json(mb::Entity::find().filter(mb::Column::TeamSn.eq(sn)).order_by_asc(mb::Column::Sort).order_by_asc(mb::Column::Sn)
-        .all(&db).await?.into_iter().map(Member::from).collect()))
+    with_work(&db, mb::Entity::find().filter(mb::Column::TeamSn.eq(sn)).order_by_asc(mb::Column::Sort).order_by_asc(mb::Column::Sn).all(&db).await?).await.map(Json)
 }
 
 /// 멤버 추가 (MemberCreated). 템플릿이 없으면 422, draft · 보관 · live 버전 없음은 409, 템플릿 없이 role_name도 없으면 422

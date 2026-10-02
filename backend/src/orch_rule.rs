@@ -164,12 +164,8 @@ impl Cx<'_> {
         let mut pool = vec![dm.clone()];
         pool.extend(mb::Entity::find().filter(mb::Column::TeamSn.eq(dm.team_sn)).filter(mb::Column::RoleName.eq(dm.role_name.as_str())).filter(mb::Column::IsOrch.eq(0))
             .filter(mb::Column::Sn.ne(dm.sn)).order_by_asc(mb::Column::Sn).all(self.db).await?);
-        let mut free = Vec::new();
-        for m in pool {
-            if idle(self.db, &m).await? {
-                free.push(m);
-            }
-        }
+        let work = crate::team::work_of(self.db, &pool).await?;
+        let free: Vec<mb::Model> = pool.into_iter().filter(|m| work[&m.sn] == "idle").collect();
         let Some(first) = free.first() else { return Ok(None) };
         let opts: Vec<Opt> = free.iter().skip(1).take(3).map(|m| Opt { label: m.name.clone(), kind: Some("assign".into()), member_sn: Some(m.sn), task_sn: Some(next.sn) }).collect();
         let nb = ProposalNew {
@@ -271,15 +267,6 @@ pub(crate) async fn streak(db: &impl ConnectionTrait, projects: &[i64]) -> Res<i
     let rows = ak::Entity::find().filter(ak::Column::ProjectSn.is_in(projects.to_vec())).filter(ak::Column::Kind.eq("proposal")).filter(ak::Column::Status.ne("proposed"))
         .order_by_desc(ak::Column::DecideAt).order_by_desc(ak::Column::Sn).limit(200).all(db).await?;
     Ok(rows.iter().take_while(|x| x.status == "auto_done").count() as i64)
-}
-
-/// 멤버가 노는 중: 보관 · 멈춤이 아니고 진행 중 리드 Run이 없다
-async fn idle(db: &impl ConnectionTrait, m: &mb::Model) -> Res<bool> {
-    if matches!(m.status.as_str(), "archived" | "paused") {
-        return Ok(false);
-    }
-    let busy = r::Entity::find().filter(r::Column::MemberSn.eq(m.sn)).filter(r::Column::ParentRunSn.is_null()).filter(r::Column::Status.is_in(runs::ACTIVE)).count(db).await?;
-    Ok(busy == 0)
 }
 
 /// 연결이 쓸 만하다: 상태가 error · expired · login_required가 아니고 남은 한도 0인 칸이 없다

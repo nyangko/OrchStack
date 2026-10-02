@@ -77,7 +77,7 @@ async fn snapshot(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<
     let issues = i::Entity::find().filter(i::Column::ProjectSn.eq(sn)).order_by_asc(i::Column::Num).all(&db).await?.into_iter().map(Issue::from).collect();
     let tasks = crate::task::enrich(&db, t::Entity::find().filter(t::Column::ProjectSn.eq(sn)).order_by_asc(t::Column::Num).all(&db).await?.into_iter().map(Task::from).collect()).await?;
     let members = match project.team_sn {
-        Some(team) => mb::Entity::find().filter(mb::Column::TeamSn.eq(team)).order_by_asc(mb::Column::Sort).order_by_asc(mb::Column::Sn).all(&db).await?.into_iter().map(Member::from).collect(),
+        Some(team) => crate::team::with_work(&db, mb::Entity::find().filter(mb::Column::TeamSn.eq(team)).order_by_asc(mb::Column::Sort).order_by_asc(mb::Column::Sn).all(&db).await?).await?,
         None => Vec::new(),
     };
     Ok(Json(Snapshot { issues, tasks, members, last_event_sn: last }))
