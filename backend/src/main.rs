@@ -13,7 +13,7 @@ mod context; // 컨텍스트 조립기 (고정 접두 · 반복 · 상한 · 견
 mod orch_rule; // Orch 규칙 엔진 (LLM 0): 이벤트 → 제안 · 제안 실행 · 타이머 · 가드 · 멤버 대기열
 mod orch; // PM Dock: /projects/{sn}/conversation · messages · /messages/* · /runs/{sn}/instruct
 mod meta; // 완료 조건 · 의존 · 라벨 목록 · 저장 보기 · Diagram 배치
-mod policy; // /teams/{sn}/policy Orch 진행 정책 (모드 · 타이머 · 레벨 · 가드)
+mod policy; // Orch 진행 정책 (팀 · 프로젝트의 orch_mode · timer_sec · level_json · guard_json 해석 · 검사)
 mod notify; // /notifications · /notify/* · /audit + 이벤트 → 알림 projection
 mod preset; // 프리셋 편집 · 가져오기 · 사용처 · 보고서 양식 · 미리보기
 mod project; // /projects CRUD
@@ -67,7 +67,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(ask::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(orch_rule::routes()).merge(policy::routes()).merge(context::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(ask::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(orch_rule::routes()).merge(context::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -921,11 +921,12 @@ mod tests {
         ev::Entity::find().filter(ev::Column::EventType.eq(kind)).order_by_desc(ev::Column::Sn).one(db).await.unwrap().unwrap()
     }
 
-    /// 팀 1 정책을 읽어 고친 뒤 저장한다
+    /// 팀 1의 Orch 정책(모드 · 타이머 · 레벨 · 가드)을 읽어 고친 뒤 PATCH한다
     async fn set_policy(app: &Router, edit: impl FnOnce(&mut Value)) -> (StatusCode, Value) {
-        let mut p = call(app, "GET", "/teams/1/policy", None).await.1;
+        let t = call(app, "GET", "/teams/1", None).await.1;
+        let mut p = json!({"orch_mode": t["orch_mode"], "timer_sec": t["timer_sec"], "is_pause_on_view": t["is_pause_on_view"], "levels": t["levels"], "guards": t["guards"]});
         edit(&mut p);
-        call(app, "PUT", "/teams/1/policy", Some(p)).await
+        call(app, "PATCH", "/teams/1", Some(p)).await
     }
 
     /// 태스크를 in_progress → done으로 옮기고 그 TaskMoved 이벤트를 돌려준다
@@ -973,7 +974,7 @@ mod tests {
         assert_eq!(calls(), 0); // 모델 · 실행기 호출 0
 
         // manual: 기한 없음 · 타이머가 실행하지 않음 · proceed로만 (다음 태스크 c = 3)
-        assert_eq!(set_policy(&app, |p| p["mode"] = json!("manual")).await.0, StatusCode::OK);
+        assert_eq!(set_policy(&app, |p| p["orch_mode"] = json!("manual")).await.0, StatusCode::OK);
         let sn = rule::on(&db, &ev).await.unwrap().unwrap();
         let v = call(&app, "GET", "/asks?kind=proposal&status=proposed", None).await.1;
         assert_eq!((v[0]["task_sn"].as_i64(), v[0]["deadline_at"].is_null()), (Some(3), true));
@@ -998,7 +999,7 @@ mod tests {
         call(&app, "POST", "/issues/1/tasks", Some(json!({"title": "D"}))).await; // d = 4
         let ev = finish(&app, &db, a).await;
         let on = |db: DatabaseConnection, ev: crate::entity::tbl_log_event::Model| async move { rule::on(&db, &ev).await.unwrap() };
-        assert_eq!(set_policy(&app, |p| { p["mode"] = json!("full_auto"); p["guards"][0]["threshold"] = json!(2); }).await.0, StatusCode::OK);
+        assert_eq!(set_policy(&app, |p| { p["orch_mode"] = json!("full_auto"); p["guards"][0]["threshold"] = json!(2); }).await.0, StatusCode::OK);
 
         // full_auto: 바로 실행 → auto_done 2번 (streak 1 · 2)
         for (k, streak) in [(2, 1), (3, 2)] {
@@ -1015,7 +1016,7 @@ mod tests {
         let n = call(&app, "GET", "/notifications", None).await.1;
         assert_eq!((n[0]["event_code"].as_str(), n[0]["actor_type"].as_str(), n[0]["member_sn"].as_i64(), n[0]["ref_type"].as_str(), n[0]["ref_sn"].as_i64(), n[0]["is_action"].as_i64()),
             (Some("guard_stop"), Some("orch"), Some(2), Some("ask"), Some(sn), Some(1)));
-        assert!(call(&app, "GET", "/teams/1/policy", None).await.1["guards"][0]["trigger_at"].is_string());
+        assert!(call(&app, "GET", "/teams/1", None).await.1["guards"][0]["trigger_at"].is_string());
 
         // 멈춘 뒤: 제안은 만들되 기한 없이 대기 (full_auto여도 실행하지 않음) → 사용자가 처리하면 재개
         let sn = on(db.clone(), ev.clone()).await.unwrap();
@@ -1031,7 +1032,7 @@ mod tests {
         assert!(on(db.clone(), ev.clone()).await.is_some()); // e 자동 배정
         let sn = on(db.clone(), ev.clone()).await.unwrap(); // 걸림
         assert_eq!(call(&app, "GET", "/asks?kind=proposal&status=stopped", None).await.1[0]["sn"].as_i64(), Some(sn));
-        assert_eq!(call(&app, "GET", "/teams/1/policy", None).await.1["mode"], "manual");
+        assert_eq!(call(&app, "GET", "/teams/1", None).await.1["orch_mode"], "manual");
         assert_eq!(events(&db, "team", 1).await.last().unwrap().0, "OrchPolicyUpdated");
     }
 
@@ -1041,29 +1042,38 @@ mod tests {
         let db = mem().await;
         let app = app(db.clone());
         rig(&app, &db).await;
-        let p = call(&app, "GET", "/teams/1/policy", None).await.1;
-        assert_eq!((p["is_saved"].as_i64(), p["mode"].as_str(), p["timer_sec"].as_i64(), p["levels"].as_array().unwrap().len(), p["guards"].as_array().unwrap().len()), (Some(0), Some("auto"), Some(5), 5, 4));
-        assert_eq!((p["levels"][1]["handle"].as_str(), p["levels"][2]["wait_min"].as_i64(), p["levels"][2]["no_reply"].as_str(), p["levels"][4]["is_locked"].as_i64()), (Some("timer"), Some(10), Some("orch_decide"), Some(1)));
-        assert_eq!(db_count(&db, "tbl_orch_policy").await, 0); // 저장은 PUT 때
+        let t = call(&app, "GET", "/teams/1", None).await.1;
+        assert_eq!((t["orch_mode"].as_str(), t["timer_sec"].as_i64(), t["is_pause_on_view"].as_i64(), t["levels"].as_array().unwrap().len(), t["guards"].as_array().unwrap().len()), (Some("auto"), Some(5), Some(1), 5, 4));
+        assert_eq!((t["levels"][1]["handle"].as_str(), t["levels"][2]["wait_min"].as_i64(), t["levels"][2]["no_reply"].as_str(), t["levels"][4]["is_locked"].as_i64()), (Some("timer"), Some(10), Some("orch_decide"), Some(1)));
+        assert_eq!(scalar(&db, "SELECT COUNT(*) FROM tbl_team WHERE level_json IS NOT NULL OR guard_json IS NOT NULL").await, 0); // 기본값은 응답으로만 · 저장은 PATCH 때
+        let p = call(&app, "GET", "/projects/1", None).await.1;
+        assert_eq!((p["orch_mode"].is_null(), p["levels"].is_null(), p["guards"].is_null()), (true, true, true)); // 프로젝트 값 없음 = 팀 값
 
         // 저장 → 다시 읽기 유지 (레벨 · 가드 전체 교체)
-        let (st, v) = set_policy(&app, |p| { p["mode"] = json!("full_auto"); p["timer_sec"] = json!(10); p["levels"][1]["handle"] = json!("auto"); p["guards"].as_array_mut().unwrap().remove(1); }).await;
-        assert_eq!((st, v["is_saved"].as_i64()), (StatusCode::OK, Some(1)));
-        let v = call(&app, "GET", "/teams/1/policy", None).await.1;
-        assert_eq!((v["mode"].as_str(), v["timer_sec"].as_i64(), v["levels"][1]["handle"].as_str(), v["guards"].as_array().unwrap().len(), v["guards"][1]["code"].as_str()), (Some("full_auto"), Some(10), Some("auto"), 3, Some("same_failure")));
-        assert_eq!((db_count(&db, "tbl_orch_policy_level").await, db_count(&db, "tbl_orch_guard").await), (5, 3));
+        let (st, v) = set_policy(&app, |p| { p["orch_mode"] = json!("full_auto"); p["timer_sec"] = json!(10); p["levels"][1]["handle"] = json!("auto"); p["guards"].as_array_mut().unwrap().remove(1); }).await;
+        assert_eq!((st, v["orch_mode"].as_str()), (StatusCode::OK, Some("full_auto")));
+        let v = call(&app, "GET", "/teams/1", None).await.1;
+        assert_eq!((v["orch_mode"].as_str(), v["timer_sec"].as_i64(), v["levels"][1]["handle"].as_str(), v["guards"].as_array().unwrap().len(), v["guards"][1]["code"].as_str()), (Some("full_auto"), Some(10), Some("auto"), 3, Some("same_failure")));
+        assert_eq!(scalar(&db, "SELECT COUNT(*) FROM tbl_team WHERE level_json IS NOT NULL AND guard_json IS NOT NULL").await, 1);
 
-        // 프로젝트별: 따로 저장 · 팀 기본은 그대로
-        let mut pj = call(&app, "GET", "/teams/1/policy?project=1", None).await.1;
-        pj["mode"] = json!("manual");
-        assert_eq!(call(&app, "PUT", "/teams/1/policy?project=1", Some(pj)).await.1["project_sn"].as_i64(), Some(1));
-        assert_eq!(call(&app, "GET", "/teams/1/policy?project=1", None).await.1["mode"], "manual");
-        assert_eq!(call(&app, "GET", "/teams/1/policy", None).await.1["mode"], "full_auto");
+        // 프로젝트별: 따로 정한 값만 팀 값을 덮는다 · 팀은 그대로 · 효과는 policy::load가 합친다
+        let (st, p) = call(&app, "PATCH", "/projects/1", Some(json!({"orch_mode": "manual", "timer_sec": 30}))).await;
+        assert_eq!((st, p["orch_mode"].as_str(), p["timer_sec"].as_i64(), p["levels"].is_null()), (StatusCode::OK, Some("manual"), Some(30), true));
+        assert_eq!(call(&app, "GET", "/teams/1", None).await.1["orch_mode"], "full_auto");
+        let pol = crate::policy::load(&db, 1).await.unwrap().unwrap();
+        assert_eq!((pol.mode.as_str(), pol.timer_sec, pol.levels[1].handle.as_str(), pol.guards.len()), ("manual", 30, "auto", 3));
+        let mut lv = v["levels"].clone();
+        lv[2]["handle"] = json!("timer");
+        let p = call(&app, "PATCH", "/projects/1", Some(json!({"levels": lv, "guards": []}))).await.1;
+        assert_eq!((p["levels"][2]["handle"].as_str(), p["guards"].as_array().unwrap().len()), (Some("timer"), 0));
+        let pol = crate::policy::load(&db, 1).await.unwrap().unwrap();
+        assert_eq!((pol.levels[2].handle.as_str(), pol.guards.len()), ("timer", 0));
+        assert_eq!(call(&app, "GET", "/teams/1", None).await.1["levels"][2]["handle"], "wait"); // 팀 값은 그대로
 
-        // 422: L4 handle 바꿈 · 모르는 mode · 레벨 모자람 · 가드 중복 · 모르는 가드 코드 · timer 0 / 404: 없는 팀 · 프로젝트
+        // 422: L4 handle 바꿈 · 모르는 mode · 레벨 모자람 · 가드 중복 · 모르는 가드 코드 · timer 0 (프로젝트도 같은 검사) / 404: 없는 팀 · 프로젝트
         for edit in [
             (|p: &mut Value| p["levels"][4]["handle"] = json!("wait")) as fn(&mut Value),
-            |p| p["mode"] = json!("x"),
+            |p| p["orch_mode"] = json!("x"),
             |p| { p["levels"].as_array_mut().unwrap().pop(); },
             |p| { let g = p["guards"][0].clone(); p["guards"].as_array_mut().unwrap().push(g); },
             |p| p["guards"][0]["code"] = json!("nope"),
@@ -1071,9 +1081,10 @@ mod tests {
         ] {
             assert_eq!(set_policy(&app, edit).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         }
-        assert_eq!(call(&app, "GET", "/teams/99/policy", None).await.0, StatusCode::NOT_FOUND);
-        assert_eq!(call(&app, "GET", "/teams/1/policy?project=99", None).await.0, StatusCode::NOT_FOUND);
-        assert_eq!(events(&db, "team", 1).await, [("OrchPolicyUpdated".into(), 1), ("OrchPolicyUpdated".into(), 2)]);
+        assert_eq!(call(&app, "PATCH", "/projects/1", Some(json!({"orch_mode": "x"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "PATCH", "/projects/1", Some(json!({"timer_sec": 0}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "PATCH", "/teams/99", Some(json!({"orch_mode": "manual"}))).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(events(&db, "team", 1).await, [("TeamUpdated".into(), 1)]);
     }
 
     /// 테이블 행 수

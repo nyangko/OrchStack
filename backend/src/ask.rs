@@ -1,7 +1,7 @@
 //! tbl_ask: Orch가 사람에게 묻거나 알리는 요청 하나. 판단 요청(decision · 질문 · 선택지 · 답) · 승인 요청(approval) · Orch 제안(proposal)을
 //! 같은 테이블 · 같은 경로(/asks)로 다룬다. kind에 안 맞는 동작은 409. 쓰기는 event::run_as 경유 (Decision* · Approval* · OrchPropos* 이벤트 · 대상 ask).
 //! 제안 실행(`run`)은 기존 command(배정 · 재시도 · 이슈 닫기 · 폴백 표시)를 그대로 부른다 — 새 UPDATE 경로 없음
-use crate::{entity::{tbl_ask as a, tbl_run as r, tbl_task as t},
+use crate::{policy, entity::{tbl_ask as a, tbl_run as r, tbl_task as t},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::{self, IssuePatch}, orch, orch_rule::{self, at}, run as runs, task};
 use axum::{Json, body::Bytes, extract::{Query, State}};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
@@ -457,7 +457,7 @@ async fn hold(State(db): State<DatabaseConnection>, Sn(sn): Sn, raw: Bytes) -> R
     }
     let sec = match sec {
         Some(s) => s,
-        None => orch_rule::policy_of(&db, cur.project_sn).await?.map_or(5, |p| p.timer_sec),
+        None => policy::load(&db, cur.project_sn).await?.map_or(5, |p| p.timer_sec),
     };
     if !(1..=86_400).contains(&sec) {
         return Err(Error::invalid("sec must be 1..=86400".into()));
@@ -563,7 +563,7 @@ pub async fn tick(db: &DatabaseConnection) -> Res<u32> {
         .filter(Expr::cust("deadline_at IS NOT NULL AND datetime(deadline_at) <= datetime('now')")).order_by_asc(a::Column::Sn).all(db).await?;
     let mut n = 0;
     for p in due {
-        if orch_rule::policy_of(db, p.project_sn).await?.is_some_and(|x| x.mode == "manual") {
+        if policy::load(db, p.project_sn).await?.is_some_and(|x| x.mode == "manual") {
             continue;
         }
         n += run(db, p.sn, By::Auto).await.is_ok() as u32;

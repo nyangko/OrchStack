@@ -366,7 +366,7 @@ CREATE TABLE tbl_template_revision (
     UNIQUE (template_sn, version)
 );
 
--- 팀. Teams 탭 · 팀 정책
+-- 팀. Teams 탭 · 팀 정책 · Orch 진행 정책(모드 · 타이머 · 레벨 · 가드)
 CREATE TABLE tbl_team (
     sn                    INTEGER PRIMARY KEY AUTOINCREMENT,        -- 팀 번호
     workspace_sn          INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
@@ -382,6 +382,11 @@ CREATE TABLE tbl_team (
     review_stage          TEXT NOT NULL DEFAULT 'before_merge' CHECK (review_stage IN ('before_merge','before_done')),  -- 리뷰 시점: before_merge(PR 병합 전) | before_done(태스크 완료 처리 전)
     repo_scope            TEXT,                                     -- 저장소 권한 범위 (예: orchstack/*)
     repo_permission       TEXT NOT NULL DEFAULT 'branch' CHECK (repo_permission IN ('read','branch','push')),  -- 저장소 권한 수준: read(읽기) | branch(브랜치 생성 · push) | push(기본 브랜치 push 포함)
+    orch_mode             TEXT NOT NULL DEFAULT 'auto' CHECK (orch_mode IN ('manual','auto','full_auto')),  -- Orch 진행 모드: manual(매번 사용자 확인) | auto(제안 후 타이머 · 개입 없으면 진행) | full_auto(대기 없이 바로 진행 · 가드는 항상 적용) · 프로젝트가 따로 정하면 그 값이 이긴다 (tbl_project.orch_mode)
+    timer_sec             INTEGER NOT NULL DEFAULT 5,               -- 자동 진행 전 대기(초): 3 | 5 | 10 | 30 | 그 밖의 값 = 직접 입력
+    is_pause_on_view      INTEGER NOT NULL DEFAULT 1,               -- 사용자가 카드를 보고 있으면 타이머 멈춤
+    level_json            TEXT,                                     -- 작업 레벨별 처리 JSON 배열 L0 ~ L4 [{level, name, example, handle, wait_min, no_reply, is_locked}] · handle = auto(바로 자동 진행) | timer(타이머 후 진행) | wait(사용자 응답 대기) | block(항상 차단 · L4 고정) · no_reply = proceed(그대로 진행) | orch_decide(Orch가 근거를 남기고 대신 결정) | keep_wait(계속 대기) | none · NULL = 기본값(앱)
+    guard_json            TEXT,                                     -- 루프 가드 JSON 배열 [{code, name, threshold, threshold_unit, scope, sub_threshold, on_trigger, is_enabled, trigger_at}] · code = auto_streak(연속 자동 진행) | reject_loop(반려 → 재작업 반복) | same_failure(같은 실패 반복) | issue_budget(이슈 토큰 · 시간 예산) | orch_new_task(Orch가 만든 새 태스크 수) | user_absent(사용자 부재 감지) · threshold_unit = count | token | minute · scope = issue | task | team · on_trigger = stop(자동 진행 멈춤 · 알림) | to_manual(Manual 모드로 전환) · trigger_at = 마지막으로 걸린 시각 · NULL = 기본값(앱)
     sort                  INTEGER NOT NULL DEFAULT 0,               -- 목록 순서
     create_at             TEXT NOT NULL DEFAULT (datetime('now')),  -- 생성 시각
     update_at             TEXT NOT NULL DEFAULT (datetime('now'))   -- 수정 시각
@@ -420,7 +425,7 @@ CREATE TABLE tbl_map_connection_team (
 -- 5. 프로젝트 · 이슈 · 태스크
 -- =====================================================================
 
--- 프로젝트. 상단 프로젝트 탭 · 저장소 1개
+-- 프로젝트. 상단 프로젝트 탭 · 저장소 1개 · Orch 진행 정책을 따로 정하면 그 값이 팀 값을 덮는다
 CREATE TABLE tbl_project (
     sn                 INTEGER PRIMARY KEY AUTOINCREMENT,           -- 프로젝트 번호
     workspace_sn       INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
@@ -432,6 +437,11 @@ CREATE TABLE tbl_project (
     next_num           INTEGER NOT NULL DEFAULT 1,                  -- 다음 이슈 · 태스크 표시 번호 (둘이 함께 쓰는 번호 발급기)
     is_github_import   INTEGER NOT NULL DEFAULT 0,                  -- GitHub 이슈 가져오기 사용
     import_label       TEXT,                                        -- 가져올 라벨 (예: bug,feature)
+    orch_mode          TEXT CHECK (orch_mode IN ('manual','auto','full_auto')),  -- Orch 진행 모드 (NULL = 팀 값) · 값은 tbl_team.orch_mode 와 같다
+    timer_sec          INTEGER,                                     -- 자동 진행 전 대기(초) (NULL = 팀 값)
+    is_pause_on_view   INTEGER,                                     -- 카드를 보고 있으면 타이머 멈춤 (NULL = 팀 값)
+    level_json         TEXT,                                        -- 작업 레벨별 처리 JSON (NULL = 팀 값 · 구조는 tbl_team.level_json)
+    guard_json         TEXT,                                        -- 루프 가드 JSON (NULL = 팀 값 · 구조는 tbl_team.guard_json)
     status             TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),  -- 상태: active(진행 중) | archived(보관 · 읽기 전용)
     sort               INTEGER NOT NULL DEFAULT 0,                  -- 탭 순서
     create_at          TEXT NOT NULL DEFAULT (datetime('now')),     -- 생성 시각
@@ -610,55 +620,6 @@ CREATE TABLE tbl_task_view (
     filter_json      TEXT NOT NULL,                                 -- 필터 조건 JSON (프로젝트 · 담당 · 상태 · 우선순위 · 정렬)
     sort             INTEGER NOT NULL DEFAULT 0,                    -- 목록 순서
     create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 생성 시각
-);
-
-
--- =====================================================================
--- 6. Orch 진행 정책
--- =====================================================================
-
--- 진행 정책. 팀 기본값 · 프로젝트가 따로 정하면 project_sn을 채운다
-CREATE TABLE tbl_orch_policy (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 정책 번호
-    team_sn          INTEGER NOT NULL REFERENCES tbl_team(sn) ON DELETE CASCADE,      -- 팀
-    project_sn       INTEGER REFERENCES tbl_project(sn) ON DELETE SET NULL,            -- 프로젝트 (NULL = 팀 기본)
-    mode             TEXT NOT NULL DEFAULT 'auto' CHECK (mode IN ('manual','auto','full_auto')),  -- 진행 모드: manual(매번 사용자 확인) | auto(제안 후 타이머 · 개입 없으면 진행) | full_auto(대기 없이 바로 진행 · 가드는 항상 적용)
-    timer_sec        INTEGER NOT NULL DEFAULT 5,                    -- 자동 진행 전 대기(초): 3 | 5 | 10 | 30 | 그 밖의 값 = 직접 입력
-    is_pause_on_view INTEGER NOT NULL DEFAULT 1,                    -- 사용자가 카드를 보고 있으면 타이머 멈춤
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    update_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 수정 시각
-);
-
--- 작업 레벨별 처리. L0 내부 작업 ~ L4 위험
-CREATE TABLE tbl_orch_policy_level (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 레벨 설정 번호
-    policy_sn        INTEGER NOT NULL REFERENCES tbl_orch_policy(sn) ON DELETE CASCADE,  -- 정책
-    level            INTEGER NOT NULL CHECK (level BETWEEN 0 AND 4),  -- 레벨: 0 ~ 4
-    name             TEXT NOT NULL,                                 -- 이름 (예: 모호한 판단)
-    example          TEXT,                                          -- 예시 (예: 요구사항 해석 · 설계 선택지)
-    handle           TEXT NOT NULL CHECK (handle IN ('auto','timer','wait','block')),  -- 처리: auto(바로 자동 진행) | timer(타이머 후 진행) | wait(사용자 응답 대기) | block(항상 차단 · 변경 불가)
-    wait_min         INTEGER,                                       -- 응답 대기(분) · 지나면 no_reply 대로 (L2 = 10)
-    no_reply         TEXT CHECK (no_reply IN ('proceed','orch_decide','keep_wait','none')),  -- 응답 없으면: proceed(그대로 진행) | orch_decide(Orch가 근거를 남기고 대신 결정) | keep_wait(계속 대기) | none(해당 없음)
-    is_locked        INTEGER NOT NULL DEFAULT 0,                    -- 변경 불가 (L4)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (policy_sn, level)
-);
-
--- 루프 가드. 조건에 걸리면 자동 진행을 멈춘다
-CREATE TABLE tbl_orch_guard (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 가드 번호
-    policy_sn        INTEGER NOT NULL REFERENCES tbl_orch_policy(sn) ON DELETE CASCADE,  -- 정책
-    code             TEXT NOT NULL CHECK (code IN ('auto_streak','reject_loop','same_failure','issue_budget','orch_new_task','user_absent')),  -- 종류: auto_streak(연속 자동 진행) | reject_loop(반려 → 재작업 반복) | same_failure(같은 실패 반복) | issue_budget(이슈 토큰 · 시간 예산) | orch_new_task(Orch가 만든 새 태스크 수) | user_absent(사용자 부재 감지)
-    name             TEXT NOT NULL,                                 -- 표시 이름 (예: 반려 → 재작업 반복)
-    threshold        INTEGER NOT NULL,                              -- 기준 값 (예: 3)
-    threshold_unit   TEXT NOT NULL CHECK (threshold_unit IN ('count','token','minute')),  -- 기준 단위: count(횟수) | token(토큰) | minute(분)
-    scope            TEXT NOT NULL DEFAULT 'task' CHECK (scope IN ('issue','task','team')),  -- 세는 범위: issue(이슈마다) | task(태스크마다) | team(팀 전체)
-    sub_threshold    INTEGER,                                       -- 보조 기준 (이슈 예산의 시간 4h → 240)
-    on_trigger       TEXT NOT NULL DEFAULT 'stop' CHECK (on_trigger IN ('stop','to_manual')),  -- 걸렸을 때: stop(자동 진행 멈춤 · 알림) | to_manual(Manual 모드로 전환)
-    is_enabled       INTEGER NOT NULL DEFAULT 1,                    -- 활성 여부
-    trigger_at       TEXT,                                          -- 마지막으로 걸린 시각
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (policy_sn, code)
 );
 
 
@@ -1155,8 +1116,6 @@ CREATE INDEX idx_context_source_hash    ON tbl_context_source (content_hash);
 CREATE INDEX idx_task_criterion_task    ON tbl_task_criterion (task_sn, sort);
 CREATE INDEX idx_review_task            ON tbl_review (task_sn);
 CREATE INDEX idx_issue_parent           ON tbl_issue (parent_sn);
-CREATE INDEX idx_orch_policy_level      ON tbl_orch_policy_level (policy_sn);
-CREATE INDEX idx_orch_guard_policy      ON tbl_orch_guard (policy_sn);
 CREATE INDEX idx_map_task_label_label   ON tbl_map_task_label (label_sn);
 CREATE INDEX idx_map_issue_label_label  ON tbl_map_issue_label (label_sn);
 CREATE INDEX idx_map_connection_team    ON tbl_map_connection_team (team_sn);
@@ -1170,7 +1129,6 @@ CREATE INDEX idx_template_revision      ON tbl_template_revision (template_sn);
 -- 12. 유일 제약 (NULL이 끼면 UNIQUE가 막지 못해서 COALESCE 식 인덱스로 건다)
 -- =====================================================================
 
-CREATE UNIQUE INDEX ux_orch_policy      ON tbl_orch_policy (team_sn, COALESCE(project_sn, 0));  -- 팀 기본(NULL) 1개 · 프로젝트별 1개
 CREATE UNIQUE INDEX ux_session_num      ON tbl_session (member_sn, num);                     -- 멤버별 세션 번호
 CREATE UNIQUE INDEX ux_notify_rule      ON tbl_notify_rule (workspace_sn, COALESCE(connection_sn, 0), event_code, channel_kind);
 CREATE UNIQUE INDEX ux_run_child        ON tbl_run (parent_run_sn, child_seq);        -- 리드 Run 안 하위 순번 (NULL 여러 개 허용)
@@ -1233,7 +1191,6 @@ CREATE INDEX idx_fk_message_task_sn ON tbl_message (task_sn);
 CREATE INDEX idx_fk_notification_member_sn ON tbl_notification (member_sn);
 CREATE INDEX idx_fk_notification_workspace_sn ON tbl_notification (workspace_sn);
 CREATE INDEX idx_fk_notify_rule_connection_sn ON tbl_notify_rule (connection_sn);
-CREATE INDEX idx_fk_orch_policy_project_sn ON tbl_orch_policy (project_sn);
 CREATE INDEX idx_fk_project_team_sn ON tbl_project (team_sn);
 CREATE INDEX idx_fk_project_workspace_sn ON tbl_project (workspace_sn);
 CREATE INDEX idx_fk_report_item_task_sn ON tbl_report_item (task_sn);

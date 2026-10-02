@@ -27,6 +27,14 @@ pub struct Model {
     pub repo_scope: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub repo_permission: String,
+    #[sea_orm(column_type = "Text")]
+    pub orch_mode: String,
+    pub timer_sec: i64,
+    pub is_pause_on_view: i64,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub level_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub guard_json: Option<String>,
     pub sort: i64,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
@@ -42,8 +50,6 @@ pub enum Relation {
     TblMapConnectionTeam,
     #[sea_orm(has_many = "super::tbl_member::Entity")]
     TblMember,
-    #[sea_orm(has_many = "super::tbl_orch_policy::Entity")]
-    TblOrchPolicy,
     #[sea_orm(has_many = "super::tbl_project::Entity")]
     TblProject,
     #[sea_orm(
@@ -71,12 +77,6 @@ impl Related<super::tbl_map_connection_team::Entity> for Entity {
 impl Related<super::tbl_member::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblMember.def()
-    }
-}
-
-impl Related<super::tbl_orch_policy::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblOrchPolicy.def()
     }
 }
 

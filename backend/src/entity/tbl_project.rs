@@ -21,6 +21,14 @@ pub struct Model {
     pub is_github_import: i64,
     #[sea_orm(column_type = "Text", nullable)]
     pub import_label: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub orch_mode: Option<String>,
+    pub timer_sec: Option<i64>,
+    pub is_pause_on_view: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub level_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub guard_json: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub status: String,
     pub sort: i64,
@@ -54,8 +62,6 @@ pub enum Relation {
     TblLogActivity,
     #[sea_orm(has_many = "super::tbl_log_event::Entity")]
     TblLogEvent,
-    #[sea_orm(has_many = "super::tbl_orch_policy::Entity")]
-    TblOrchPolicy,
     #[sea_orm(has_many = "super::tbl_run::Entity")]
     TblRun,
     #[sea_orm(has_many = "super::tbl_task::Entity")]
@@ -141,12 +147,6 @@ impl Related<super::tbl_log_activity::Entity> for Entity {
 impl Related<super::tbl_log_event::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblLogEvent.def()
-    }
-}
-
-impl Related<super::tbl_orch_policy::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblOrchPolicy.def()
     }
 }
 

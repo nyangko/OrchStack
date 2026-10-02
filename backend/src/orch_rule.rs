@@ -1,7 +1,7 @@
 //! Orch 규칙 엔진 (#119 · LLM 0): 이벤트 1건 → 제안 0~1건 (`on`), 제안 실행 (`run` · 기존 command 재사용), 타이머 (`tick`), 멤버 대기열.
 //! 일상 PM 판단(다음 태스크 배정 · 재시도 · 이슈 닫기 · 폴백 · 가드 정지)을 모델 없이 처리한다. 실행기 · 모델 호출은 여기서 하지 않는다 (B-18)
 use crate::{ask::{self, Choice, DecisionNew, Opt, ProposalNew, Question}, entity::{tbl_agent_profile as ap, tbl_connection as cn, tbl_connection_quota as qt, tbl_issue as i, tbl_log_event as e, tbl_member as mb,
-    tbl_orch_guard as og, tbl_ask as ak, tbl_project as pj, tbl_review as rv, tbl_run as r, tbl_task as t},
+    tbl_ask as ak, tbl_project as pj, tbl_review as rv, tbl_run as r, tbl_task as t},
     error::{Error, ErrorBody, Res, Sn}, event::self,
     orch, policy::{self, Guard, Level, Policy}, run as runs, stat, task};
 use axum::{Json, extract::State};
@@ -77,9 +77,8 @@ struct Cx<'a> {
 pub async fn on(db: &DatabaseConnection, ev: &e::Model) -> Res<Option<i64>> {
     let Some(flow) = flow(ev) else { return Ok(None) };
     let Some(ps) = ev.project_sn else { return Ok(None) };
-    let Some(team) = pj::Entity::find_by_id(ps).one(db).await?.and_then(|x| x.team_sn) else { return Ok(None) };
     let Some(orch) = orch::orch_of(db, ps).await? else { return Ok(None) };
-    let pol = policy::load(db, team, Some(ps)).await?;
+    let Some(pol) = policy::load(db, ps).await? else { return Ok(None) };
     let cx = Cx { db, ev, ps, orch, pol: &pol };
     let (codes, cand): (&[&str], Option<Pick>) = match flow {
         Flow::Done(tsn) => (&["auto_streak", "issue_budget"], cx.done(tsn).await?),
@@ -135,11 +134,9 @@ impl Cx<'_> {
         event::run_as(self.db, "orch", Some(self.orch), async |tx| {
             let (p, ev) = ask::add(tx, nb).await?;
             let mut evs = vec![ev];
-            if let Some(sn) = g.sn {
-                og::Entity::update_many().filter(og::Column::Sn.eq(sn)).col_expr(og::Column::TriggerAt, Expr::cust("datetime('now')")).exec(tx).await?;
-            }
+            policy::guard_hit(tx, self.ps, &g.code).await?;
             if g.on_trigger == "to_manual" {
-                evs.push(policy::set(tx, self.pol.team_sn, self.pol.project_sn, &Policy { mode: "manual".into(), ..self.pol.clone() }).await?.1);
+                evs.extend(policy::to_manual(tx, self.ps).await?);
             }
             Ok((p.sn, evs))
         }).await
@@ -267,12 +264,6 @@ fn opt<C: ColumnTrait>(c: C, v: Option<i64>) -> SimpleExpr {
 pub(crate) async fn projects_of(db: &impl ConnectionTrait, ps: i64) -> Res<Vec<i64>> {
     let Some(team) = pj::Entity::find_by_id(ps).one(db).await?.and_then(|x| x.team_sn) else { return Ok(vec![ps]) };
     Ok(pj::Entity::find().filter(pj::Column::TeamSn.eq(team)).all(db).await?.into_iter().map(|x| x.sn).collect())
-}
-
-/// 프로젝트에 적용되는 정책 (팀이 없으면 None)
-pub(crate) async fn policy_of(db: &impl ConnectionTrait, ps: i64) -> Res<Option<Policy>> {
-    let Some(team) = pj::Entity::find_by_id(ps).one(db).await?.and_then(|x| x.team_sn) else { return Ok(None) };
-    policy::load(db, team, Some(ps)).await.map(Some)
 }
 
 /// 최근에 처리된 제안 중 끊김 없이 이어진 auto_done 수 (사용자가 처리하거나 멈추면 0으로 돌아간다)

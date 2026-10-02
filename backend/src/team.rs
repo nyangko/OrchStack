@@ -1,5 +1,5 @@
 //! tbl_team · tbl_member CRUD. 쓰기는 event::run 경유 (Team* · Member* 이벤트). 멤버는 템플릿의 live 버전 프로필을 복사해 만든다
-use crate::{agent, entity::{tbl_agent_profile as ap, tbl_member as mb, tbl_team::{self as tm, Entity as Tbl}, tbl_template as tp, tbl_template_revision as tr},
+use crate::{agent, policy::{self, Guard, Level}, entity::{tbl_agent_profile as ap, tbl_member as mb, tbl_team::{self as tm, Entity as Tbl}, tbl_template as tp, tbl_template_revision as tr},
     error::{Body, Error, ErrorBody, Res, Sn, in_use}, event::{self, Ev}};
 use axum::{Json, extract::State, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::{NotSet, Set}, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect, sea_query::Expr};
@@ -46,6 +46,16 @@ pub struct Team {
     repo_scope: Option<String>,
     /// read | branch | push
     repo_permission: String,
+    /// Orch 진행 모드: manual | auto | full_auto (프로젝트가 따로 정하면 프로젝트 값이 이긴다)
+    orch_mode: String,
+    /// 자동 진행 전 대기(초)
+    timer_sec: i64,
+    /// 카드를 보고 있으면 타이머 멈춤
+    is_pause_on_view: i64,
+    /// 작업 레벨별 처리 L0 ~ L4 (저장 전이면 기본값)
+    levels: Vec<Level>,
+    /// 루프 가드 (저장 전이면 기본값)
+    guards: Vec<Guard>,
     sort: i64,
     create_at: String,
     update_at: String,
@@ -54,6 +64,7 @@ pub struct Team {
 impl From<tm::Model> for Team {
     fn from(m: tm::Model) -> Self {
         Self {
+            levels: policy::team_levels(&m), guards: policy::team_guards(&m), orch_mode: m.orch_mode, timer_sec: m.timer_sec, is_pause_on_view: m.is_pause_on_view,
             sn: m.sn, name: m.name, kind: m.kind, daily_token_budget: m.daily_token_budget, context_warn_percent: m.context_warn_percent,
             max_concurrent_run: m.max_concurrent_run, spawn_mode: m.spawn_mode, spawn_allow: m.spawn_allow, max_child_run: m.max_child_run,
             is_review_required: m.is_review_required, review_stage: m.review_stage,
@@ -129,6 +140,19 @@ struct TeamPatch {
     repo_scope: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     repo_permission: Option<String>,
+    /// manual | auto | full_auto
+    #[serde(skip_serializing_if = "Option::is_none")]
+    orch_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    timer_sec: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    is_pause_on_view: Option<i64>,
+    /// 작업 레벨별 처리 전체 교체 (L0 ~ L4 모두 · L4는 block 고정)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    levels: Option<Vec<Level>>,
+    /// 루프 가드 전체 교체 (마지막으로 걸린 시각은 유지)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    guards: Option<Vec<Guard>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sort: Option<i64>,
 }
@@ -211,6 +235,9 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
         || b.max_child_run.is_some_and(|n| n < 1) {
         return Err(Error::invalid(format!("spawn_mode · spawn_allow must be in {SPAWN:?}, max_child_run >= 1")));
     }
+    policy::check_basic(b.orch_mode.as_deref(), b.timer_sec, b.is_pause_on_view)?;
+    if let Some(ls) = &b.levels { policy::check_levels(ls)?; }
+    if let Some(gs) = &b.guards { policy::check_guards(gs)?; }
     let out = event::run(&db, async |tx| {
         let t = get(tx, sn).await?;
         // 기본 방식은 허용 방식 안에 있어야 한다
@@ -231,6 +258,11 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
         if let Some(v) = &b.review_stage { q = q.col_expr(C::ReviewStage, v.clone().into()); }
         if let Some(v) = &b.repo_scope { q = q.col_expr(C::RepoScope, v.clone().into()); }
         if let Some(v) = &b.repo_permission { q = q.col_expr(C::RepoPermission, v.clone().into()); }
+        if let Some(v) = &b.orch_mode { q = q.col_expr(C::OrchMode, v.clone().into()); }
+        if let Some(v) = b.timer_sec { q = q.col_expr(C::TimerSec, v.into()); }
+        if let Some(v) = b.is_pause_on_view { q = q.col_expr(C::IsPauseOnView, v.into()); }
+        if let Some(v) = &b.levels { q = q.col_expr(C::LevelJson, policy::save_levels(v.clone()).into()); }
+        if let Some(v) = &b.guards { q = q.col_expr(C::GuardJson, policy::save_guards(v.clone(), &t.guards).into()); }
         if let Some(v) = b.sort { q = q.col_expr(C::Sort, v.into()); }
         if q.exec(tx).await?.rows_affected == 0 {
             return Err(Error::not_found());

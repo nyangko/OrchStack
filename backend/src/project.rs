@@ -1,5 +1,5 @@
 //! tbl_project 기본 CRUD (첫 리소스 · 나머지 테이블도 같은 모양으로 추가)
-use crate::{entity::tbl_project::{self as p, Entity as Tbl}, error::{Body, Error, ErrorBody, Res, Sn}};
+use crate::{entity::tbl_project::{self as p, Entity as Tbl}, policy::{self, Guard, Level}, error::{Body, Error, ErrorBody, Res, Sn}};
 use axum::{Json, extract::State, http::StatusCode};
 use sea_orm::{ColumnTrait, QueryFilter, ActiveValue::{NotSet, Set}, DatabaseConnection, EntityTrait, QueryOrder, sea_query::Expr};
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,14 @@ pub struct Project {
     next_num: i64,
     is_github_import: i64,
     import_label: Option<String>,
+    /// Orch 진행 모드 · null = 팀 값 (manual | auto | full_auto)
+    orch_mode: Option<String>,
+    timer_sec: Option<i64>,
+    is_pause_on_view: Option<i64>,
+    /// 작업 레벨별 처리 · null = 팀 값
+    levels: Option<Vec<Level>>,
+    /// 루프 가드 · null = 팀 값
+    guards: Option<Vec<Guard>>,
     /// active(진행 중) | archived(보관 · 읽기 전용)
     status: String,
     sort: i64,
@@ -36,6 +44,7 @@ pub struct Project {
 impl From<p::Model> for Project {
     fn from(m: p::Model) -> Self {
         Self {
+            levels: policy::project_levels(&m), guards: policy::project_guards(&m), orch_mode: m.orch_mode, timer_sec: m.timer_sec, is_pause_on_view: m.is_pause_on_view,
             sn: m.sn, workspace_sn: m.workspace_sn, team_sn: m.team_sn, name: m.name, repo_name: m.repo_name, repo_path: m.repo_path,
             default_branch: m.default_branch, next_num: m.next_num, is_github_import: m.is_github_import,
             import_label: m.import_label, status: m.status, sort: m.sort, create_at: m.create_at, update_at: m.update_at,
@@ -62,6 +71,14 @@ struct ProjectPatch {
     default_branch: Option<String>,
     status: Option<String>,
     sort: Option<i64>,
+    /// 이 프로젝트만의 Orch 진행 모드 (manual | auto | full_auto) · 팀 값을 덮는다
+    orch_mode: Option<String>,
+    timer_sec: Option<i64>,
+    is_pause_on_view: Option<i64>,
+    /// 작업 레벨별 처리 전체 교체 (L0 ~ L4 모두)
+    levels: Option<Vec<Level>>,
+    /// 루프 가드 전체 교체
+    guards: Option<Vec<Guard>>,
 }
 
 /// 목록 (탭 순서 sort, 같으면 번호순)
@@ -96,6 +113,9 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ProjectNew>)
 /// 부분 수정 후 최신 행을 돌려준다. 없으면 404
 #[utoipa::path(operation_id = "project_update", patch, path = "/projects/{sn}", params(("sn" = i64, Path, description = "프로젝트 번호")), request_body = ProjectPatch, responses((status = 200, body = Project), (status = "default", body = ErrorBody)))]
 async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<ProjectPatch>) -> Res<Json<Project>> {
+    policy::check_basic(b.orch_mode.as_deref(), b.timer_sec, b.is_pause_on_view)?;
+    if let Some(ls) = &b.levels { policy::check_levels(ls)?; }
+    if let Some(gs) = &b.guards { policy::check_guards(gs)?; }
     // update_at은 항상 갱신하고, 나머지는 요청에 있는 필드만 SET에 추가한다
     let mut q = Tbl::update_many().filter(p::Column::Sn.eq(sn)).col_expr(p::Column::UpdateAt, Expr::cust("datetime('now')"));
     if let Some(v) = b.name { q = q.col_expr(p::Column::Name, v.into()); }
@@ -104,6 +124,14 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
     if let Some(v) = b.default_branch { q = q.col_expr(p::Column::DefaultBranch, v.into()); }
     if let Some(v) = b.status { q = q.col_expr(p::Column::Status, v.into()); }
     if let Some(v) = b.sort { q = q.col_expr(p::Column::Sort, v.into()); }
+    if let Some(v) = b.orch_mode { q = q.col_expr(p::Column::OrchMode, v.into()); }
+    if let Some(v) = b.timer_sec { q = q.col_expr(p::Column::TimerSec, v.into()); }
+    if let Some(v) = b.is_pause_on_view { q = q.col_expr(p::Column::IsPauseOnView, v.into()); }
+    if let Some(v) = b.levels { q = q.col_expr(p::Column::LevelJson, policy::save_levels(v).into()); }
+    if let Some(v) = b.guards {
+        let old = Tbl::find_by_id(sn).one(&db).await?.and_then(|m| policy::project_guards(&m)).unwrap_or_default();
+        q = q.col_expr(p::Column::GuardJson, policy::save_guards(v, &old).into());
+    }
     // 바뀐 행이 없으면 대상이 없는 것
     if q.exec(&db).await?.rows_affected == 0 {
         return Err(Error::not_found());
