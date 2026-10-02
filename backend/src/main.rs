@@ -225,7 +225,7 @@ mod tests {
         // 커밋된 이벤트만 broadcast로 나간다 (409로 막힌 것은 없다)
         let mut moved = 0;
         while let Ok(m) = rx.try_recv() {
-            moved += (m.event_type == "TaskMoved") as i32;
+            moved += (m.event_type == "TaskMoved" && !m.payload_json.contains(r#""to":"blocked""#)) as i32; // blocked = stream_live 것
         }
         assert_eq!(moved, 2);
     }
@@ -730,6 +730,11 @@ mod tests {
         let s = got.last().unwrap();
         assert!(s.starts_with(&format!("id: {}\nevent: IssueCreated\n", last + 2)) && s.contains(&format!(r#""aggregate_sn":{}"#, m["sn"])), "{s}");
         assert!(!got.iter().any(|c| c.contains("zz-other-project")), "{got:?}");
+
+        // DoD: Task move → 연결된 클라이언트가 TaskMoved 수신. blocked는 이 테스트만 쓴다 (move_task가 버스의 TaskMoved를 센다)
+        call(&app, "POST", &format!("/tasks/{ts}/move"), Some(json!({"status": "blocked"}))).await;
+        let s = until(&mut body, r#""to":"blocked""#).await.pop().unwrap();
+        assert!(s.contains("event: TaskMoved\n") && s.contains(&format!(r#""aggregate_sn":{ts}"#)), "{s}");
     }
 
     /// B-5: 스트림이 끊긴 사이 이벤트 2개 → events?after= 로 2개 모두 순서대로, Last-Event-ID 재연결도 같은 2개를 먼저 보낸 뒤 실시간으로 잇는다. 재연결은 이벤트를 만들지 않는다
