@@ -164,7 +164,7 @@ impl Cx<'_> {
         let mut pool = vec![dm.clone()];
         pool.extend(mb::Entity::find().filter(mb::Column::TeamSn.eq(dm.team_sn)).filter(mb::Column::RoleName.eq(dm.role_name.as_str())).filter(mb::Column::IsOrch.eq(0))
             .filter(mb::Column::Sn.ne(dm.sn)).order_by_asc(mb::Column::Sn).all(self.db).await?);
-        let work = crate::team::work_of(self.db, &pool).await?;
+        let work = crate::team::work_of(self.db, &pool, false).await?;
         let free: Vec<mb::Model> = pool.into_iter().filter(|m| work[&m.sn] == "idle").collect();
         let Some(first) = free.first() else { return Ok(None) };
         let opts: Vec<Opt> = free.iter().skip(1).take(3).map(|m| Opt { label: m.name.clone(), kind: Some("assign".into()), member_sn: Some(m.sn), task_sn: Some(next.sn) }).collect();

@@ -1477,8 +1477,13 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         call(&app, "POST", &format!("/tasks/{b}/assign"), Some(json!({"member_sn": 3}))).await;
         call(&app, "POST", &format!("/tasks/{b}/deps"), Some(json!({"depend_task_sn": c}))).await; // b는 아직 담당 없는 c를 기다린다
         assert_eq!(both().await, ["running", "waiting", "waiting", "idle"]);
+        // 배정 후보(deps = false)는 의존 대기만인 3을 idle로 본다 — 의존이 풀릴 때까지 다른 태스크를 맡을 수 있다
+        let ms: Vec<_> = { use crate::entity::tbl_member as mb; use sea_orm::{EntityTrait, QueryOrder}; mb::Entity::find().order_by_asc(mb::Column::Sn).all(&db).await.unwrap() };
+        let free = crate::team::work_of(&db, &ms, false).await.unwrap();
+        assert_eq!((free[&2], free[&3]), ("waiting", "idle"));
         // 의존이 풀리면(c 완료) 3은 일감이 있고 Run은 없는 상태 → idle · 판단에 답하면 2도 idle · Run이 waiting이면 1은 waiting
-        for to in ["in_progress", "done"] { call(&app, "POST", &format!("/tasks/{c}/move"), Some(json!({"status": to}))).await; }
+        // 이동 API 대신 SQL로 — move_task가 전역 버스의 TaskMoved 수를 센다
+        db.execute_unprepared(&format!("UPDATE tbl_task SET status = 'done' WHERE sn = {c}")).await.unwrap();
         call(&app, "POST", "/asks/1/answer", Some(json!({"answers": [{"question": 0, "option": "A"}]}))).await;
         db.execute_unprepared("UPDATE tbl_run SET status = 'waiting' WHERE sn = 1").await.unwrap();
         assert_eq!(both().await, ["waiting", "idle", "idle", "idle"]);

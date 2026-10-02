@@ -201,7 +201,8 @@ async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<Team> {
 /// 멤버들의 작업 상태 (저장하지 않고 계산 · §19). 멤버 수와 상관없이 Run · 요청 · 태스크를 IN 조건으로 한 번씩만 읽는다.
 /// archived · paused = 저장값 · running = 리드 Run이 queued · starting · running · review ·
 /// waiting = 리드 Run이 waiting이거나, 열린 판단 · 승인 요청이 있거나, 담당 todo가 전부 의존 대기 · idle = 나머지
-pub(crate) async fn work_of(db: &impl ConnectionTrait, ms: &[mb::Model]) -> Res<HashMap<i64, &'static str>> {
+/// deps = false면 의존 대기만인 멤버를 idle로 본다 (배정 후보 — 의존이 풀릴 때까지 다른 태스크를 맡을 수 있다)
+pub(crate) async fn work_of(db: &impl ConnectionTrait, ms: &[mb::Model], deps: bool) -> Res<HashMap<i64, &'static str>> {
     let sns: Vec<i64> = ms.iter().filter(|m| m.status == "active").map(|m| m.sn).collect();
     let runs = rn::Entity::find().filter(rn::Column::MemberSn.is_in(sns.clone())).filter(rn::Column::ParentRunSn.is_null()).filter(rn::Column::Status.is_in(run::ACTIVE)).all(db).await?;
     let asks = ak::Entity::find().filter(ak::Column::MemberSn.is_in(sns.clone())).filter(ak::Column::Kind.is_in(["decision", "approval"])).filter(ak::Column::Status.is_in(["pending", "writing"])).all(db).await?;
@@ -212,7 +213,7 @@ pub(crate) async fn work_of(db: &impl ConnectionTrait, ms: &[mb::Model]) -> Res<
         let work = match m.status.as_str() {
             "active" if mine().any(|r| r.status != "waiting") => "running",
             "active" if mine().next().is_some() || asks.iter().any(|a| a.member_sn == Some(m.sn))
-                || { let t: Vec<_> = todo.iter().filter(|t| t.member_sn == Some(m.sn)).collect(); !t.is_empty() && t.iter().all(|t| blocked.contains(&t.sn)) } => "waiting",
+                || deps && { let t: Vec<_> = todo.iter().filter(|t| t.member_sn == Some(m.sn)).collect(); !t.is_empty() && t.iter().all(|t| blocked.contains(&t.sn)) } => "waiting",
             "active" => "idle",
             "paused" => "paused",
             _ => "archived",
@@ -223,7 +224,7 @@ pub(crate) async fn work_of(db: &impl ConnectionTrait, ms: &[mb::Model]) -> Res<
 
 /// 멤버 행들 → 응답 (작업 상태 포함 · 입력 순서 유지)
 pub(crate) async fn with_work(db: &impl ConnectionTrait, ms: Vec<mb::Model>) -> Res<Vec<Member>> {
-    let work = work_of(db, &ms).await?;
+    let work = work_of(db, &ms, true).await?;
     Ok(ms.into_iter().map(|m| { let w = work[&m.sn]; Member { work: w.into(), ..Member::from(m) } }).collect())
 }
 
