@@ -4307,7 +4307,7 @@
                           "x": 0,
                           "y": 0,
                           "name": "Edge/검증 요청 진→하린 (live)",
-                          "geometry": "M646 443l0 38",
+                          "geometry": "M740 443l0 38",
                           "viewBox": [
                             0,
                             0,
@@ -4326,7 +4326,7 @@
                           "x": 0,
                           "y": 0,
                           "name": "Edge/리뷰 요청 하린→소라",
-                          "geometry": "M646 651l0 33",
+                          "geometry": "M740 651l0 33",
                           "viewBox": [
                             0,
                             0,
@@ -4892,6 +4892,34 @@
                           }
                         },
                         {
+                          "id": "nSUoR",
+                          "type": "ref",
+                          "ref": "L4MVP",
+                          "name": "Queue/Agent 유나",
+                          "x": 544,
+                          "y": 1035,
+                          "descendants": {
+                            "cbmyo": {
+                              "icon": "inbox"
+                            },
+                            "GB2Pf": {
+                              "content": "대기열 비어 있음"
+                            },
+                            "dtpzN": {
+                              "enabled": false
+                            },
+                            "F8Z9WP": {
+                              "enabled": false
+                            },
+                            "Ho5Yj": {
+                              "enabled": false
+                            },
+                            "I9AZdb": {
+                              "enabled": false
+                            }
+                          }
+                        },
+                        {
                           "id": "eM5U3",
                           "type": "ref",
                           "ref": "slKo0",
@@ -4965,6 +4993,27 @@
                             },
                             "h9qCJU": {
                               "content": "#126 리뷰 대기"
+                            }
+                          }
+                        },
+                        {
+                          "id": "tlY5l",
+                          "type": "ref",
+                          "ref": "L4MVP",
+                          "name": "Queue/Agent 민수",
+                          "x": 544,
+                          "y": 188,
+                          "descendants": {
+                            "cbmyo": {
+                              "icon": "octagon-alert",
+                              "fill": "$status-blocked"
+                            },
+                            "dtpzN": {
+                              "content": "#124 Rate limit",
+                              "fill": "$status-blocked"
+                            },
+                            "M3NvVA": {
+                              "content": "+2"
                             }
                           }
                         },
@@ -5046,6 +5095,28 @@
                           }
                         },
                         {
+                          "id": "TQnHY",
+                          "type": "ref",
+                          "ref": "L4MVP",
+                          "name": "Queue/Agent 하린",
+                          "x": 544,
+                          "y": 645,
+                          "descendants": {
+                            "dtpzN": {
+                              "content": "#132 Session toast"
+                            },
+                            "F8Z9WP": {
+                              "enabled": false
+                            },
+                            "Ho5Yj": {
+                              "enabled": false
+                            },
+                            "I9AZdb": {
+                              "enabled": false
+                            }
+                          }
+                        },
+                        {
                           "id": "qKsB8",
                           "type": "ref",
                           "ref": "slKo0",
@@ -5123,6 +5194,28 @@
                           }
                         },
                         {
+                          "id": "LagGB",
+                          "type": "ref",
+                          "ref": "L4MVP",
+                          "name": "Queue/Agent 소라",
+                          "x": 544,
+                          "y": 848,
+                          "descendants": {
+                            "dtpzN": {
+                              "content": "#131 Review · Auth"
+                            },
+                            "F8Z9WP": {
+                              "enabled": false
+                            },
+                            "Ho5Yj": {
+                              "enabled": false
+                            },
+                            "I9AZdb": {
+                              "enabled": false
+                            }
+                          }
+                        },
+                        {
                           "id": "x1AkIs",
                           "type": "ref",
                           "ref": "slKo0",
@@ -5196,6 +5289,25 @@
                             },
                             "h9qCJU": {
                               "content": "다음: #131"
+                            }
+                          }
+                        },
+                        {
+                          "id": "SOodu",
+                          "type": "ref",
+                          "ref": "L4MVP",
+                          "name": "Queue/Agent 진 (selected, LOD)",
+                          "x": 544,
+                          "y": 437,
+                          "descendants": {
+                            "dtpzN": {
+                              "content": "#133 Signup 폼"
+                            },
+                            "M3NvVA": {
+                              "content": "+1"
+                            },
+                            "I9AZdb": {
+                              "enabled": false
                             }
                           }
                         },
@@ -5414,7 +5526,7 @@
                           "ref": "ldKdP",
                           "name": "Edge Legend",
                           "x": 16,
-                          "y": 1064
+                          "y": 1078
                         },
                         {
                           "type": "rectangle",
@@ -5945,6 +6057,130 @@
                                               "fontWeight": "$fw-regular"
                                             }
                                           ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "dsAhh",
+                                  "name": "InspectorSection · Queue",
+                                  "width": "fill_container",
+                                  "stroke": "$border",
+                                  "strokeWidth": {
+                                    "bottom": 1
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "padding": [
+                                    12,
+                                    16,
+                                    10,
+                                    16
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "LfzSe",
+                                      "name": "Head",
+                                      "width": "fill_container",
+                                      "gap": 6,
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "SLIUU",
+                                          "name": "Label",
+                                          "fill": "$muted-foreground",
+                                          "content": "NEXT",
+                                          "fontFamily": "$font-mono",
+                                          "fontSize": "$text-2xs",
+                                          "fontWeight": "$fw-semibold",
+                                          "letterSpacing": 0.6
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "cUJuW",
+                                          "name": "Count",
+                                          "fill": "$muted",
+                                          "cornerRadius": "$radius-xs",
+                                          "padding": [
+                                            1,
+                                            6
+                                          ],
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "BjlBK",
+                                              "name": "n",
+                                              "fill": "$muted-foreground",
+                                              "content": "대기 2",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": "$text-2xs",
+                                              "fontWeight": "$fw-semibold"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "Gk7cD",
+                                          "name": "Spacer",
+                                          "width": "fill_container",
+                                          "height": 1
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "L9qckX",
+                                          "name": "Link",
+                                          "fill": "$primary",
+                                          "content": "Tasks 탭 →",
+                                          "fontFamily": "$font-sans",
+                                          "fontSize": "$text-caption",
+                                          "fontWeight": "$fw-medium"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "pq83L",
+                                      "name": "Queue",
+                                      "width": "fill_container",
+                                      "layout": "vertical",
+                                      "children": [
+                                        {
+                                          "id": "xoCJy",
+                                          "type": "ref",
+                                          "ref": "J3lNi4",
+                                          "name": "#133",
+                                          "width": "fill_container"
+                                        },
+                                        {
+                                          "id": "BbwBw",
+                                          "type": "ref",
+                                          "ref": "J3lNi4",
+                                          "name": "#136",
+                                          "width": "fill_container",
+                                          "strokeWidth": 0,
+                                          "descendants": {
+                                            "k1KUE": {
+                                              "content": "2"
+                                            },
+                                            "C58pvk": {
+                                              "icon": "circle",
+                                              "fill": "$status-todo"
+                                            },
+                                            "bwOLb": {
+                                              "content": "#136 · Password reset 화면"
+                                            },
+                                            "XCqb9": {
+                                              "content": "바로 시작 가능",
+                                              "fill": "$status-done"
+                                            },
+                                            "Z9XyFo": {
+                                              "content": "P3"
+                                            }
+                                          }
                                         }
                                       ]
                                     }
@@ -6727,7 +6963,7 @@
                           "type": "ref",
                           "ref": "B11Rx",
                           "name": "EdgeLabel/검증 요청 · 진행 중",
-                          "x": 656,
+                          "x": 748,
                           "y": 453,
                           "descendants": {
                             "o00JV4": {
@@ -6740,7 +6976,7 @@
                           "type": "ref",
                           "ref": "h3BPv",
                           "name": "EdgeLabel/리뷰 요청",
-                          "x": 656,
+                          "x": 748,
                           "y": 659,
                           "descendants": {
                             "gWb5C": {
@@ -6766,7 +7002,7 @@
                         {
                           "type": "ellipse",
                           "id": "AjFPa",
-                          "x": 638,
+                          "x": 732,
                           "y": 455,
                           "name": "Pulse/Glow",
                           "fill": "#0E9F8E33",
@@ -6776,7 +7012,7 @@
                         {
                           "type": "ellipse",
                           "id": "Sr1bQ",
-                          "x": 642,
+                          "x": 736,
                           "y": 459,
                           "name": "Pulse/Beam",
                           "fill": "$primary",
@@ -75586,6 +75822,199 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "type": "frame",
+                  "id": "G2yY8",
+                  "name": "Spec · Workbench/AgentQueueTray",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "poR2B",
+                      "name": "Caption",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "LYBIx",
+                          "name": "Title",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Y5LsQ",
+                              "name": "n",
+                              "fill": "$foreground",
+                              "content": "Workbench/AgentQueueTray",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-xs",
+                              "fontWeight": "$fw-semibold"
+                            },
+                            {
+                              "type": "text",
+                              "id": "iJ5ZT",
+                              "name": "u",
+                              "fill": "$subtle-foreground",
+                              "content": "다음 1개 · 밀린 수 · 노드 아래에 겹쳐 붙임",
+                              "fontFamily": "$font-mono",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-regular"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "l3gFl",
+                          "name": "c",
+                          "fill": "$primary",
+                          "content": "orch/diagram/agent-queue-tray",
+                          "fontFamily": "$font-mono",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-medium"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "L4MVP",
+                      "name": "Workbench/AgentQueueTray",
+                      "reusable": true,
+                      "width": 188,
+                      "layout": "vertical",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "k2kan",
+                          "name": "Card",
+                          "width": "fill_container",
+                          "fill": "$card",
+                          "cornerRadius": [
+                            0,
+                            0,
+                            8,
+                            8
+                          ],
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "gap": 6,
+                          "padding": [
+                            11,
+                            10,
+                            5,
+                            10
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "cbmyo",
+                              "name": "Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "list-start",
+                              "library": "lucide",
+                              "fill": "$muted-foreground"
+                            },
+                            {
+                              "type": "text",
+                              "id": "GB2Pf",
+                              "name": "Label",
+                              "fill": "$muted-foreground",
+                              "content": "다음",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-semibold"
+                            },
+                            {
+                              "type": "text",
+                              "id": "dtpzN",
+                              "name": "Task",
+                              "fill": "$foreground",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "#133 Signup 폼",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-medium"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "F8Z9WP",
+                              "name": "Count",
+                              "fill": "$muted",
+                              "cornerRadius": "$radius-xs",
+                              "padding": [
+                                1,
+                                5
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "M3NvVA",
+                                  "name": "n",
+                                  "fill": "$muted-foreground",
+                                  "content": "+1",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": "$text-2xs",
+                                  "fontWeight": "$fw-semibold"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": [
+                            0,
+                            0,
+                            4,
+                            4
+                          ],
+                          "id": "Ho5Yj",
+                          "name": "Stack 1",
+                          "fill": "$card",
+                          "width": 176,
+                          "height": 3,
+                          "stroke": "$border",
+                          "strokeWidth": 1
+                        },
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": [
+                            0,
+                            0,
+                            4,
+                            4
+                          ],
+                          "id": "I9AZdb",
+                          "name": "Stack 2",
+                          "fill": "$card",
+                          "width": 164,
+                          "height": 3,
+                          "stroke": "$border",
+                          "strokeWidth": 1
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "zQdmB",
+                      "name": "Rule",
+                      "fill": "$muted-foreground",
+                      "textGrowth": "fixed-width",
+                      "width": 308,
+                      "content": "Diagram 에이전트 노드 바로 아래, 노드 뒤에 6px 겹쳐 붙인다. 다음 1개만 이름으로, 나머지는 +N. 뒤 받침 줄 = 남은 개수(1개 1줄 · 2개 이상 2줄). 다음이 막혀 있으면 아이콘 · 이름 빨강. 비면 ‘대기열 비어 있음’. 에이전트 사이 연결선은 노드 오른쪽(받침 밖)으로.",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-caption",
+                      "fontWeight": "normal"
+                    }
+                  ]
                 }
               ]
             },
@@ -79652,6 +80081,223 @@
                           "content": "가득 참 · 다음 태스크 대기 2"
                         }
                       }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "AkaOh",
+                  "name": "Spec · Inspector/QueueRow",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "fsWC8",
+                      "name": "Caption",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "gtSGa",
+                          "name": "Title",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "DMoUm",
+                              "name": "n",
+                              "fill": "$foreground",
+                              "content": "Inspector/QueueRow",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-xs",
+                              "fontWeight": "$fw-semibold"
+                            },
+                            {
+                              "type": "text",
+                              "id": "tfcdl",
+                              "name": "u",
+                              "fill": "$subtle-foreground",
+                              "content": "순번 · 상태 · 막힘 사유",
+                              "fontFamily": "$font-mono",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-regular"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "TGcGT",
+                          "name": "c",
+                          "fill": "$primary",
+                          "content": "orch/inspector/queue-row",
+                          "fontFamily": "$font-mono",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-medium"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "J3lNi4",
+                      "name": "Inspector/QueueRow",
+                      "reusable": true,
+                      "width": 308,
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 8,
+                      "padding": [
+                        8,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "v1EBHR",
+                          "name": "Pos",
+                          "width": 18,
+                          "height": 18,
+                          "fill": "$muted",
+                          "cornerRadius": "$radius-full",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "k1KUE",
+                              "name": "n",
+                              "fill": "$muted-foreground",
+                              "content": "1",
+                              "fontFamily": "$font-mono",
+                              "fontSize": "$text-2xs",
+                              "fontWeight": "$fw-semibold"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "icon",
+                          "id": "C58pvk",
+                          "name": "State",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "circle-dashed",
+                          "library": "lucide",
+                          "fill": "$status-waiting"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "CpHlA",
+                          "name": "Body",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 2,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "bwOLb",
+                              "name": "Title",
+                              "fill": "$foreground",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "#133 · Signup 폼 접근성 개선",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-body",
+                              "fontWeight": "$fw-medium"
+                            },
+                            {
+                              "type": "text",
+                              "id": "XCqb9",
+                              "name": "Meta",
+                              "fill": "$status-waiting",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "#128 완료 대기 · 민수 진행 중",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-regular"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "Z9XyFo",
+                          "name": "Priority",
+                          "fill": "$muted-foreground",
+                          "content": "P2",
+                          "fontFamily": "$font-mono",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "mtPiU",
+                      "name": "More (3개 넘을 때)",
+                      "width": 308,
+                      "gap": 6,
+                      "padding": [
+                        8,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "RYH7f",
+                          "name": "i",
+                          "width": 12,
+                          "height": 12,
+                          "icon": "chevrons-down",
+                          "library": "lucide",
+                          "fill": "$muted-foreground"
+                        },
+                        {
+                          "type": "text",
+                          "id": "MCWj1",
+                          "name": "t",
+                          "fill": "$muted-foreground",
+                          "content": "+3개 더 · 막힘 1",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-medium"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "qDYJX",
+                          "name": "Spacer",
+                          "width": "fill_container",
+                          "height": 1
+                        },
+                        {
+                          "type": "text",
+                          "id": "bzWdD",
+                          "name": "link",
+                          "fill": "$primary",
+                          "content": "전체 대기열",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-medium"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "PtYNK",
+                      "name": "Rule",
+                      "fill": "$muted-foreground",
+                      "textGrowth": "fixed-width",
+                      "width": 308,
+                      "content": "Agent Inspector · NEXT 구역에 쓴다. 대기열 순서 = Orch가 꺼낼 순서(우선순위 → 의존 해소). 최대 3줄, 넘으면 아래 ‘+N개 더 · 막힘 n’ 줄과 ‘전체 대기열’(멤버 상세 Tasks 탭). 상태: 점선 원 = 다른 태스크 대기(사유 노랑), 빈 원 = 바로 시작(초록), 막힘 = 빨강.",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-caption",
+                      "fontWeight": "normal"
                     }
                   ]
                 }
