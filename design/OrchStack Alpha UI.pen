@@ -141499,6 +141499,1077 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "Xknl2",
+      "x": 14637,
+      "y": 180,
+      "name": "Workbench · 드래그로 배정 (왼쪽 Tasks → Diagram 에이전트 · Agents 탭 · Kanban 열)",
+      "width": 1720,
+      "fill": "$background",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 32,
+      "children": [
+        {
+          "type": "text",
+          "id": "Jm0gU",
+          "name": "Title",
+          "fill": "$foreground",
+          "content": "드래그로 배정 · 상태 변경",
+          "fontFamily": "$font-sans",
+          "fontSize": "$text-2xl",
+          "fontWeight": "$fw-bold"
+        },
+        {
+          "type": "text",
+          "id": "DliUZ",
+          "name": "Sub",
+          "fill": "$muted-foreground",
+          "content": "왼쪽 Tasks 목록의 Backlog · Todo 태스크를 끌어 Diagram 에이전트 · Agents 탭 줄에 놓으면 배정, Kanban 열에 놓으면 상태 변경. 평소 배정은 Orch가 하고, 이건 사람이 직접 고르는 예외 경로.",
+          "fontFamily": "$font-sans",
+          "fontSize": "$text-body",
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "G1uvAa",
+          "name": "Steps",
+          "width": "fill_container",
+          "gap": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "Sf4Jo",
+              "name": "① 끌기 시작 · 왼쪽 Tasks",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "KoHWu",
+                  "name": "t",
+                  "fill": "$foreground",
+                  "content": "① 끌기 시작 · 왼쪽 Tasks",
+                  "fontFamily": "$font-sans",
+                  "fontSize": "$text-sm",
+                  "fontWeight": "$fw-semibold"
+                },
+                {
+                  "type": "text",
+                  "id": "FSVuJ",
+                  "name": "s",
+                  "fill": "$muted-foreground",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Backlog · Todo 줄만 끌 수 있어요. 끄는 동안 원래 자리는 연파랑으로 비워 두고, 커서 옆에 카드가 따라와요.",
+                  "lineHeight": 1.5,
+                  "fontFamily": "$font-sans",
+                  "fontSize": "$text-caption",
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "GzLw6",
+                  "name": "Left Tasks",
+                  "clip": true,
+                  "width": 280,
+                  "fill": "$card",
+                  "cornerRadius": "$radius-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "id": "L4Xru",
+                      "type": "ref",
+                      "ref": "iL1lM",
+                      "name": "#131 (hover · 손잡이)",
+                      "width": "fill_container",
+                      "descendants": {
+                        "bZPP5": {
+                          "content": "#131"
+                        },
+                        "dfsxb": {
+                          "fill": "$muted"
+                        },
+                        "dfsxb/bGy8l": {
+                          "icon": "circle-dashed",
+                          "fill": "$status-backlog"
+                        },
+                        "dfsxb/V8KaR": {
+                          "content": "Backlog",
+                          "fill": "$status-backlog"
+                        },
+                        "AnkVH": {
+                          "content": "Review · Auth"
+                        },
+                        "LtZHY": {
+                          "content": "소라"
+                        },
+                        "uuwU2": {
+                          "content": "P2"
+                        }
+                      }
+                    },
+                    {
+                      "type": "frame",
+                      "id": "g99Oz",
+                      "name": "#139 (끄는 중 · 빈 자리)",
+                      "width": "fill_container",
+                      "height": 76,
+                      "padding": 6,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "jbz4S",
+                          "name": "Slot",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "fill": "$primary-soft",
+                          "cornerRadius": "$radius-sm",
+                          "stroke": "$primary",
+                          "strokeWidth": 1,
+                          "justifyContent": "center",
+                          "alignItems": "center"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "T1Xt4a",
+                      "type": "ref",
+                      "ref": "iL1lM",
+                      "name": "#129 (실행 중 · 못 끔)",
+                      "width": "fill_container",
+                      "opacity": 0.55,
+                      "descendants": {
+                        "bZPP5": {
+                          "content": "#129"
+                        },
+                        "dfsxb": {
+                          "fill": "$primary-soft"
+                        },
+                        "dfsxb/bGy8l": {
+                          "icon": "circle-dot",
+                          "fill": "$status-in-progress"
+                        },
+                        "dfsxb/V8KaR": {
+                          "content": "In Progress",
+                          "fill": "$status-in-progress"
+                        },
+                        "AnkVH": {
+                          "content": "Login UI 구현"
+                        },
+                        "LtZHY": {
+                          "content": "진"
+                        },
+                        "uuwU2": {
+                          "content": "P1"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "m9D9X",
+                  "name": "Drag Ghost",
+                  "rotation": -2,
+                  "width": 252,
+                  "fill": "$card",
+                  "cornerRadius": "$radius-md",
+                  "stroke": "$primary",
+                  "strokeWidth": 1,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#0F172A29",
+                    "offset": {
+                      "x": 0,
+                      "y": 12
+                    },
+                    "blur": 28
+                  },
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "KFZ09",
+                      "name": "Top",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "vmf5f",
+                          "name": "Grip",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "grip-vertical",
+                          "library": "lucide",
+                          "fill": "$muted-foreground"
+                        },
+                        {
+                          "type": "text",
+                          "id": "BoHWX",
+                          "name": "Id",
+                          "fill": "$muted-foreground",
+                          "content": "#139",
+                          "fontFamily": "$font-mono",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-semibold"
+                        },
+                        {
+                          "type": "text",
+                          "id": "q7rOu",
+                          "name": "Title",
+                          "fill": "$foreground",
+                          "content": "Password reset 이메일",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-body",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "v6oCev",
+                      "name": "Hint",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "Zp88J",
+                          "name": "i",
+                          "width": 12,
+                          "height": 12,
+                          "icon": "mouse-pointer-2",
+                          "library": "lucide",
+                          "fill": "$primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "iEbZA",
+                          "name": "t",
+                          "fill": "$primary",
+                          "content": "에이전트 · 열 위에 놓으세요 · Esc 취소",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-medium"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "G2WBT",
+              "name": "② Diagram 에이전트에 놓기",
+              "width": 500,
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "xP1Tc",
+                  "name": "t",
+                  "fill": "$foreground",
+                  "content": "② Diagram 에이전트에 놓기",
+                  "fontFamily": "$font-sans",
+                  "fontSize": "$text-sm",
+                  "fontWeight": "$fw-semibold"
+                },
+                {
+                  "type": "text",
+                  "id": "h0n8wF",
+                  "name": "s",
+                  "fill": "$muted-foreground",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "놓을 수 있는 에이전트 노드는 파란 테두리로 감싸고, 위에 결과를 미리 보여줘요. 받침의 +N도 미리 늘어나요. 다른 노드는 흐려져요.",
+                  "lineHeight": 1.5,
+                  "fontFamily": "$font-sans",
+                  "fontSize": "$text-caption",
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "wV1We",
+                  "name": "Canvas",
+                  "width": "fill_container",
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "gap": 20,
+                  "padding": 20,
+                  "children": [
+                    {
+                      "id": "vyvrr",
+                      "type": "ref",
+                      "ref": "slKo0",
+                      "name": "Task #128 (놓을 수 없음 · 흐림)",
+                      "opacity": 0.35,
+                      "x": 20,
+                      "y": 20,
+                      "width": 220,
+                      "descendants": {
+                        "cQkEY": {
+                          "fill": "$node-task"
+                        },
+                        "GdWKX": {
+                          "icon": "square-check"
+                        },
+                        "sTt8O": {
+                          "content": "TASK #128"
+                        },
+                        "b6yyPR": {
+                          "content": "Auth API (refresh token)"
+                        },
+                        "NkMmH": {
+                          "content": "Auth API",
+                          "enabled": false
+                        },
+                        "o8wl4": {
+                          "enabled": true
+                        },
+                        "u9r7Z": {
+                          "fill": "$role-backend",
+                          "enabled": true
+                        },
+                        "u9r7Z/TO93j": {
+                          "icon": "server"
+                        },
+                        "DSKOM": {
+                          "content": "민수",
+                          "enabled": true
+                        },
+                        "Imo2D": {
+                          "enabled": false
+                        },
+                        "XaAPu": {
+                          "enabled": true
+                        },
+                        "U4P1yx": {
+                          "content": "claude-sonnet-5"
+                        },
+                        "Pbp32": {
+                          "enabled": true
+                        },
+                        "JUEGB/FXgpA": {
+                          "width": 87,
+                          "fill": "$primary"
+                        },
+                        "YLJ9R": {
+                          "content": "4/6 · 67%"
+                        },
+                        "o2wIz": {
+                          "enabled": true,
+                          "fill": "$destructive-soft"
+                        },
+                        "lHH3k": {
+                          "icon": "gauge",
+                          "fill": "$destructive"
+                        },
+                        "lCmtp": {
+                          "content": "컨텍스트 92% · 경고",
+                          "fill": "$destructive"
+                        },
+                        "KlCmT": {
+                          "fill": "$primary-soft"
+                        },
+                        "KlCmT/bGy8l": {
+                          "icon": "circle-dot",
+                          "fill": "$status-in-progress"
+                        },
+                        "KlCmT/V8KaR": {
+                          "content": "In Progress",
+                          "fill": "$status-in-progress"
+                        },
+                        "h9qCJU": {
+                          "content": "Run #80 · 32m"
+                        }
+                      }
+                    },
+                    {
+                      "type": "frame",
+                      "id": "e1gOOz",
+                      "name": "Target",
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "x6MvV",
+                          "name": "Drop Hint",
+                          "fill": "$primary",
+                          "cornerRadius": "$radius-full",
+                          "gap": 6,
+                          "padding": [
+                            4,
+                            10
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "jyLWU",
+                              "name": "i",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "user-plus",
+                              "library": "lucide",
+                              "fill": "$primary-foreground"
+                            },
+                            {
+                              "type": "text",
+                              "id": "GUCGi",
+                              "name": "t",
+                              "fill": "$primary-foreground",
+                              "content": "#139 → 진에게 배정 · 대기열 3번째",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-semibold"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "NaVAS",
+                          "name": "Node + Tray",
+                          "width": 220,
+                          "height": 226,
+                          "layout": "none",
+                          "children": [
+                            {
+                              "id": "i5Xhv3",
+                              "type": "ref",
+                              "ref": "L4MVP",
+                              "name": "Queue (+2 미리보기)",
+                              "x": 8,
+                              "y": 185,
+                              "descendants": {
+                                "dtpzN": {
+                                  "content": "#133 Signup 폼"
+                                },
+                                "M3NvVA": {
+                                  "content": "+2"
+                                }
+                              }
+                            },
+                            {
+                              "id": "lUGd5",
+                              "type": "ref",
+                              "ref": "slKo0",
+                              "name": "Agent 진 (놓을 곳)",
+                              "x": 0,
+                              "y": 0,
+                              "width": 220,
+                              "stroke": "$primary",
+                              "strokeWidth": 2,
+                              "descendants": {
+                                "cQkEY": {
+                                  "fill": "$node-agent"
+                                },
+                                "GdWKX": {
+                                  "icon": "bot"
+                                },
+                                "sTt8O": {
+                                  "content": "FRONTEND DEVELOPER"
+                                },
+                                "b6yyPR": {
+                                  "content": "진"
+                                },
+                                "NkMmH": {
+                                  "content": "Frontend Developer · #129",
+                                  "enabled": false
+                                },
+                                "o8wl4": {
+                                  "enabled": true
+                                },
+                                "u9r7Z": {
+                                  "fill": "$role-frontend",
+                                  "enabled": false
+                                },
+                                "u9r7Z/TO93j": {
+                                  "icon": "monitor"
+                                },
+                                "DSKOM": {
+                                  "content": "",
+                                  "enabled": false
+                                },
+                                "Imo2D": {
+                                  "enabled": true
+                                },
+                                "XaAPu": {
+                                  "enabled": false
+                                },
+                                "U4P1yx": {
+                                  "content": "Codex CLI · gpt-5"
+                                },
+                                "Pbp32": {
+                                  "enabled": true
+                                },
+                                "JUEGB/FXgpA": {
+                                  "width": 42,
+                                  "fill": "$status-done"
+                                },
+                                "YLJ9R": {
+                                  "content": "ctx 32%"
+                                },
+                                "o2wIz": {
+                                  "enabled": true,
+                                  "fill": "$warning-soft"
+                                },
+                                "lHH3k": {
+                                  "icon": "battery-low",
+                                  "fill": "$warning"
+                                },
+                                "lCmtp": {
+                                  "content": "Codex 주간 잔량 18%",
+                                  "fill": "$warning"
+                                },
+                                "KlCmT": {
+                                  "fill": "$primary-soft"
+                                },
+                                "KlCmT/bGy8l": {
+                                  "icon": "loader-circle",
+                                  "fill": "$status-in-progress"
+                                },
+                                "KlCmT/V8KaR": {
+                                  "content": "Running",
+                                  "fill": "$status-in-progress"
+                                },
+                                "h9qCJU": {
+                                  "type": "frame",
+                                  "id": "SS6cY",
+                                  "name": "Capabilities",
+                                  "gap": 4,
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "qGrmf",
+                                      "name": "3",
+                                      "fill": "$muted",
+                                      "cornerRadius": 4,
+                                      "gap": 4,
+                                      "padding": [
+                                        1,
+                                        5
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "icon",
+                                          "id": "SxzlZ",
+                                          "name": "i",
+                                          "width": 10,
+                                          "height": 10,
+                                          "icon": "puzzle",
+                                          "library": "lucide",
+                                          "fill": "$muted-foreground"
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "UxtW5",
+                                          "name": "n",
+                                          "fill": "$muted-foreground",
+                                          "content": "3",
+                                          "fontFamily": "$font-mono",
+                                          "fontSize": 11,
+                                          "fontWeight": "500"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "upnil",
+                                      "name": "2",
+                                      "fill": "$muted",
+                                      "cornerRadius": 4,
+                                      "gap": 4,
+                                      "padding": [
+                                        1,
+                                        5
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "icon",
+                                          "id": "cVjHt",
+                                          "name": "i",
+                                          "width": 10,
+                                          "height": 10,
+                                          "icon": "plug",
+                                          "library": "lucide",
+                                          "fill": "$muted-foreground"
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "Zkvi7",
+                                          "name": "n",
+                                          "fill": "$muted-foreground",
+                                          "content": "2",
+                                          "fontFamily": "$font-mono",
+                                          "fontSize": 11,
+                                          "fontWeight": "500"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "SFd18",
+                                      "name": "5",
+                                      "fill": "$muted",
+                                      "cornerRadius": 4,
+                                      "gap": 4,
+                                      "padding": [
+                                        1,
+                                        5
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "icon",
+                                          "id": "GaYKE",
+                                          "name": "i",
+                                          "width": 10,
+                                          "height": 10,
+                                          "icon": "wrench",
+                                          "library": "lucide",
+                                          "fill": "$muted-foreground"
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "cpnvJ",
+                                          "name": "n",
+                                          "fill": "$muted-foreground",
+                                          "content": "5",
+                                          "fontFamily": "$font-mono",
+                                          "fontSize": 11,
+                                          "fontWeight": "500"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "icon",
+                                      "id": "EhUK3",
+                                      "name": "Expand",
+                                      "width": 14,
+                                      "height": 14,
+                                      "icon": "chevron-up",
+                                      "library": "lucide",
+                                      "fill": "$primary"
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "kLcON",
+              "name": "③ Agents 탭 줄에 놓기",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "jjxtH",
+                  "name": "t",
+                  "fill": "$foreground",
+                  "content": "③ Agents 탭 줄에 놓기",
+                  "fontFamily": "$font-sans",
+                  "fontSize": "$text-sm",
+                  "fontWeight": "$fw-semibold"
+                },
+                {
+                  "type": "text",
+                  "id": "mc1Fo",
+                  "name": "s",
+                  "fill": "$muted-foreground",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Quick Panel의 Agents 탭으로 끌어 넣어도 같아요. 줄 위에 오면 연파랑 · 파란 테두리.",
+                  "lineHeight": 1.5,
+                  "fontFamily": "$font-sans",
+                  "fontSize": "$text-caption",
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "G4zGe",
+                  "name": "Left Agents",
+                  "clip": true,
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": "$radius-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "id": "Y2uoXa",
+                      "type": "ref",
+                      "ref": "MvbWC",
+                      "name": "민수",
+                      "width": "fill_container",
+                      "descendants": {
+                        "DgFBn": {
+                          "content": "민수"
+                        },
+                        "vhg7D": {
+                          "content": "Backend"
+                        },
+                        "edcG5": {
+                          "content": "Running · #128 Auth API"
+                        },
+                        "DvPxP": {
+                          "content": "18.2K"
+                        }
+                      }
+                    },
+                    {
+                      "id": "f81Ndb",
+                      "type": "ref",
+                      "ref": "MvbWC",
+                      "name": "진 (놓을 곳)",
+                      "width": "fill_container",
+                      "fill": "$primary-soft",
+                      "stroke": "$primary",
+                      "strokeWidth": 2,
+                      "descendants": {
+                        "DgFBn": {
+                          "content": "진"
+                        },
+                        "vhg7D": {
+                          "content": "Frontend"
+                        },
+                        "edcG5": {
+                          "content": "Running · #129 · 대기 2 → 3"
+                        },
+                        "DvPxP": {
+                          "content": "24.7K"
+                        }
+                      }
+                    },
+                    {
+                      "id": "qifyz",
+                      "type": "ref",
+                      "ref": "MvbWC",
+                      "name": "하린",
+                      "width": "fill_container",
+                      "descendants": {
+                        "DgFBn": {
+                          "content": "하린"
+                        },
+                        "vhg7D": {
+                          "content": "QA"
+                        },
+                        "edcG5": {
+                          "content": "Waiting · #130"
+                        },
+                        "DvPxP": {
+                          "content": "5.0K"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "X9Xwl",
+                  "name": "Drop Hint",
+                  "fill": "$primary",
+                  "cornerRadius": "$radius-full",
+                  "gap": 6,
+                  "padding": [
+                    4,
+                    10
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "H2yz4",
+                      "name": "i",
+                      "width": 12,
+                      "height": 12,
+                      "icon": "user-plus",
+                      "library": "lucide",
+                      "fill": "$primary-foreground"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ddLZb",
+                      "name": "t",
+                      "fill": "$primary-foreground",
+                      "content": "놓으면 진에게 배정",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-caption",
+                      "fontWeight": "$fw-semibold"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "m1qc9W",
+              "name": "④ Kanban 열에 놓기",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "qBAha",
+                  "name": "t",
+                  "fill": "$foreground",
+                  "content": "④ Kanban 열에 놓기",
+                  "fontFamily": "$font-sans",
+                  "fontSize": "$text-sm",
+                  "fontWeight": "$fw-semibold"
+                },
+                {
+                  "type": "text",
+                  "id": "Dcg0I",
+                  "name": "s",
+                  "fill": "$muted-foreground",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "열에 놓으면 상태가 바뀌어요. Backlog · Todo 열만 받아요 — 실행 상태 열은 막힘 표시.",
+                  "lineHeight": 1.5,
+                  "fontFamily": "$font-sans",
+                  "fontSize": "$text-caption",
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "BkqPz",
+                  "name": "Columns",
+                  "width": "fill_container",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "AhZMH",
+                      "name": "Todo (받음)",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "id": "nOFif",
+                          "type": "ref",
+                          "ref": "NE5qQ",
+                          "name": "Header",
+                          "width": "fill_container",
+                          "descendants": {
+                            "GoJ3o": {
+                              "icon": "circle",
+                              "fill": "$status-todo"
+                            },
+                            "UEOVv": {
+                              "content": "Todo"
+                            },
+                            "Rfq0Q": {
+                              "content": "2"
+                            }
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "on6iS",
+                          "name": "Drop Zone",
+                          "width": "fill_container",
+                          "height": 120,
+                          "fill": "$primary-soft",
+                          "cornerRadius": "$radius-md",
+                          "stroke": "$primary",
+                          "strokeWidth": 2,
+                          "layout": "vertical",
+                          "gap": 4,
+                          "padding": 12,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "wjYIz",
+                              "name": "i",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "arrow-down-to-line",
+                              "library": "lucide",
+                              "fill": "$primary"
+                            },
+                            {
+                              "type": "text",
+                              "id": "CXYZQ",
+                              "name": "t",
+                              "fill": "$primary",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "놓으면 Todo로",
+                              "textAlign": "center",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-semibold"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "wpGhi",
+                      "name": "In Progress (못 받음)",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "id": "g0Tfd",
+                          "type": "ref",
+                          "ref": "NE5qQ",
+                          "name": "Header",
+                          "width": "fill_container",
+                          "descendants": {
+                            "GoJ3o": {
+                              "icon": "circle-dot",
+                              "fill": "$status-in-progress"
+                            },
+                            "UEOVv": {
+                              "content": "In Progress"
+                            },
+                            "Rfq0Q": {
+                              "content": "3"
+                            }
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "RZve0",
+                          "name": "Drop Zone",
+                          "opacity": 0.7,
+                          "width": "fill_container",
+                          "height": 120,
+                          "fill": "$muted",
+                          "cornerRadius": "$radius-md",
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "gap": 4,
+                          "padding": 12,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "gGbgl",
+                              "name": "i",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "ban",
+                              "library": "lucide",
+                              "fill": "$muted-foreground"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Y7Hzoo",
+                              "name": "t",
+                              "fill": "$muted-foreground",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "실행 상태로는 못 옮겨요",
+                              "textAlign": "center",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-semibold"
+                            },
+                            {
+                              "type": "text",
+                              "id": "vJM8V",
+                              "name": "s",
+                              "fill": "$muted-foreground",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "시작은 Orch · 담당자가",
+                              "textAlign": "center",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-2xs",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "gKrMj",
+          "name": "Note · 규칙",
+          "width": "fill_container",
+          "fill": "$warning-soft",
+          "cornerRadius": "$radius-lg",
+          "stroke": "$warning",
+          "strokeWidth": 1,
+          "layout": "vertical",
+          "gap": 6,
+          "padding": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "o5PoSQ",
+              "name": "t",
+              "fill": "$foreground",
+              "content": "규칙",
+              "fontFamily": "$font-sans",
+              "fontSize": "$text-sm",
+              "fontWeight": "$fw-bold"
+            },
+            {
+              "type": "text",
+              "id": "n5HdSl",
+              "name": "b",
+              "fill": "$foreground",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 끌 수 있는 것: 왼쪽 Tasks의 Backlog · Todo 줄 (Kanban 카드도 같은 규칙). In Progress 이후는 흐리고 끌리지 않아요.\n• 에이전트에 놓기 = 우클릭 Assign Agent와 같은 동작: 그 멤버에 배정되고 대기열 맨 뒤에 들어가요(이후 Orch가 우선순위 · 의존으로 다시 정렬). Diagram 받침 +N · Agent 카드 NEXT가 바로 늘어나요.\n• Kanban 열에 놓기 = 상태 변경. Backlog ↔ Todo만 받아요. 실행 상태 열(In Progress · Waiting · Review · Done …)은 막힘 표시.\n• 놓을 수 없는 곳(프로젝트 · 이슈 · Orch · 태스크 노드)은 끄는 동안 흐려지고, 놓으면 제자리로 돌아가요. Esc로 취소.\n• 놓은 뒤 토스트: ‘#139 → 진 배정 · 대기 3번째’ + 되돌리기.\n• 키보드 · 스크린리더: 드래그 대신 우클릭(또는 Shift+F10) 메뉴의 Assign Agent · Change status를 써요.",
+              "lineHeight": 1.6,
+              "fontFamily": "$font-sans",
+              "fontSize": "$text-xs",
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
     }
   ],
   "themes": {
