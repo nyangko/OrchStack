@@ -18,6 +18,7 @@ mod rule; // 하위 작업 규칙 엔진 (#67 · LLM 0)
 mod runner; // runner 하위 Run 실행 · @REPORT 회수 (#67)
 mod setting; // /workspace · /runtimes · /presets
 mod skill; // /skills · /mcps · /skill-sources 조회 · 스킬 허용/차단
+mod stat; // /teams/{sn}/stats · /teams/{sn}/quota · /workspace/cost 집계
 mod stream; // /projects/{sn}/snapshot · events · stream (SSE)
 mod task; // /tasks CRUD + MoveTask + 배정
 mod team; // /teams · /members CRUD
@@ -62,7 +63,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(stat::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -787,11 +788,69 @@ mod tests {
         assert_eq!(call(&app, "POST", &format!("/runs/{rs}/instruct"), Some(json!({"text": "x"}))).await.0, StatusCode::CONFLICT);
     }
 
+    /// B-12: Run 토큰 합 · 리드 합계 = 자기 + runner 하위 Run(재시도 전 Run 포함 · sub 제외 · 모름은 unknown_count), 하위 Run 목록 · children=0,
+    /// 팀 통계 · 팀 한도 요약 · 월 비용(종류별)
+    #[tokio::test]
+    async fn stat() {
+        let db = mem().await;
+        let app = app(db.clone());
+        let ts = task_of(&app, &db, true).await;
+        let lead = call(&app, "POST", &format!("/tasks/{ts}/runs"), None).await.1["sn"].as_i64().unwrap();
+        // 하위: 2 runner 실패 → 3 runner 재시도(2의 재시도) · 4 runner 토큰 기록 없음 · 5 sub(runner 합계에서 빠짐)
+        db.execute_unprepared(&format!(
+            "INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name) VALUES (1, 1, 'api_key', 'openai', 'OpenAI', 'work'), (2, 1, 'subscription', 'anthropic', 'Anthropic', 'max'); \
+             INSERT INTO tbl_run (sn, project_sn, task_sn, member_sn, num, status, start_by, parent_run_sn, spawn_mode, tier, kind, child_seq, paths, retry_run_sn) VALUES \
+               (2, 1, {ts}, 1, 2, 'failed', 'lead', {lead}, 'runner', 'S', 'test', 1, '[{{\"path\":\"src/a\",\"source\":\"brief\",\"at\":null}}]', NULL), \
+               (3, 1, {ts}, 1, 3, 'completed', 'retry', {lead}, 'runner', 'S', 'test', 2, NULL, 2), \
+               (4, 1, {ts}, 1, 4, 'running', 'lead', {lead}, 'runner', 'M', 'fix', 3, NULL, NULL), \
+               (5, 1, {ts}, 1, 5, 'completed', 'lead', {lead}, 'sub', NULL, 'explore', 4, NULL, NULL); \
+             INSERT INTO tbl_log_token (run_sn, connection_sn, token_input, token_output, cost_usd_micro, usage_source) VALUES \
+               ({lead}, 1, 60, 40, 500, 'provider'), (2, 1, 30, 20, 0, 'estimated'), (3, 2, 20, 10, 0, 'provider'), (5, 2, 900, 100, 0, 'provider'); \
+             INSERT INTO tbl_log_token (run_sn, token_input, create_at) VALUES (3, 7, '2000-01-05 10:00:00');"
+        )).await.unwrap();
+
+        // DoD: 리드 = 100 + 50 + 37(3의 지난 기록 7 포함) — 4는 모름 · 5는 sub
+        let r = call(&app, "GET", &format!("/runs/{lead}"), None).await.1;
+        assert_eq!((r["tokens"]["total"].as_i64(), r["tokens"]["sources"][0].as_str()), (Some(100), Some("provider")));
+        let t = &r["runner_total"];
+        assert_eq!((t["value"].as_i64(), t["run_count"].as_i64(), t["unknown_count"].as_i64(), t["cost_usd_micro"].as_i64()), (Some(187), Some(4), Some(1), Some(500)));
+
+        // 하위 Run: 순번순 · 하위 필드 · 토큰 없으면 null · 하위에는 runner_total 없음
+        let v = call(&app, "GET", &format!("/runs/{lead}/children"), None).await.1;
+        assert_eq!(v.as_array().unwrap().len(), 4);
+        assert_eq!((v[0]["spawn_mode"].as_str(), v[0]["tier"].as_str(), v[0]["paths"][0]["path"].as_str(), v[0]["tokens"]["sources"][0].as_str()), (Some("runner"), Some("S"), Some("src/a"), Some("estimated")));
+        assert_eq!((v[1]["retry_run_sn"].as_i64(), v[2]["tokens"].is_null(), v[0]["runner_total"].is_null()), (Some(2), true, true));
+        assert_eq!(call(&app, "GET", &format!("/tasks/{ts}/runs"), None).await.1.as_array().unwrap().len(), 5);
+        assert_eq!(call(&app, "GET", &format!("/tasks/{ts}/runs?children=0"), None).await.1.as_array().unwrap().len(), 1);
+        assert_eq!(call(&app, "GET", "/runs/99/children", None).await.0, StatusCode::NOT_FOUND);
+
+        // 팀 통계: 멤버 1 · 열린 태스크 1 · 진행 리드 Run 1 · 오늘 토큰 1180(sub 포함 · 2000년 기록 7 제외)
+        let s = call(&app, "GET", "/teams/1/stats", None).await.1;
+        assert_eq!((s["member_count"].as_i64(), s["open_task_count"].as_i64(), s["today_token"].as_i64(), s["done_week_count"].as_i64(), s["avg_cycle_minute"].is_null()), (Some(1), Some(1), Some(1180), Some(0), true));
+        assert_eq!((s["members"][0]["name"].as_str(), s["members"][0]["active_run_count"].as_i64()), (Some("m"), Some(1)));
+        assert_eq!(call(&app, "GET", "/teams/99/stats", None).await.0, StatusCode::NOT_FOUND);
+
+        // 팀 한도: 프로필 연결(1) + 폴백(2) → 연결별 한도 · 가장 적게 남은 비율
+        db.execute_unprepared("UPDATE tbl_agent_profile SET connection_sn = 1 WHERE sn = 1; INSERT INTO tbl_runtime (sn, wid, code, name) VALUES (1, 1, 'codex', 'Codex'); \
+            INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort) VALUES (1, 1, 2, 1); \
+            INSERT INTO tbl_connection_quota (connection_sn, period, unit, used_value, remain_percent) VALUES (2, '5h', 'percent', 70, 30), (2, 'week', 'percent', 88, 12);").await.unwrap();
+        let v = call(&app, "GET", "/teams/1/quota", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[1]["kind"].as_str(), v[1]["min_remain_percent"].as_i64(), v[1]["quotas"].as_array().unwrap().len(), v[0]["min_remain_percent"].is_null()), (2, Some("subscription"), Some(12), 2, true));
+
+        // 월 비용: 이번 달 종류별(구독 · API 키) · 2000-01은 연결 없는 기록(unknown) · 형식 422
+        let c = call(&app, "GET", "/workspace/cost", None).await.1;
+        assert_eq!((c["items"].as_array().unwrap().len(), c["items"][0]["kind"].as_str(), c["items"][0]["cost_usd_micro"].as_i64(), c["total_usd_micro"].as_i64()), (2, Some("api_key"), Some(500), Some(500)));
+        assert_eq!(c["items"][1]["token"].as_i64(), Some(1030)); // 구독: 3(30) + 5(1000)
+        let c = call(&app, "GET", "/workspace/cost?month=2000-01", None).await.1;
+        assert_eq!((c["items"][0]["kind"].as_str(), c["items"][0]["token"].as_i64()), (Some("unknown"), Some(7)));
+        assert_eq!(call(&app, "GET", "/workspace/cost?month=2000-13", None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
     #[tokio::test]
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/proposals", "/proposals/{sn}/{action}", "/runs/{sn}/instruct"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/proposals", "/proposals/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

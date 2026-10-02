@@ -1,7 +1,7 @@
 //! tbl_run · tbl_session 조회 + Run 명령 (Start · Stop · Retry · Review · Approve · Reject) + 실행기(#13)용 전이 함수
 use crate::{entity::{tbl_review as rv, tbl_run as r, tbl_session as s, tbl_task}, error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, task};
-use axum::{Json, extract::State, http::StatusCode};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, sea_query::Expr};
+use axum::{Json, extract::{Query, State}, http::StatusCode};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Statement, sea_query::Expr};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
@@ -27,6 +27,7 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
     OpenApiRouter::new()
         .routes(routes!(list, start))
         .routes(routes!(read))
+        .routes(routes!(children))
         .routes(routes!(sessions))
         .routes(routes!(stop))
         .routes(routes!(retry))
@@ -54,19 +55,109 @@ pub struct Run {
     fail_code: Option<String>,
     fail_detail: Option<String>,
     branch: Option<String>,
+    /// 상위(리드) Run · 하위 작업일 때 (#67)
+    parent_run_sn: Option<i64>,
+    /// sub | fork | runner · 일반 Run이면 null
+    spawn_mode: Option<String>,
+    /// S | M | L
+    tier: Option<String>,
+    /// 하위 작업 종류 (explore · search · format · test · implement · fix · design · review · debug)
+    kind: Option<String>,
+    /// 리드 Run 안의 하위 순번 (화면 T{task.num}.{child_seq})
+    child_seq: Option<i64>,
+    /// 받은 @TASK 원문
+    brief: Option<String>,
+    /// 허용 경로 [{path, source, at}]
+    paths: Option<serde_json::Value>,
+    /// paths가 겹쳐 기다리는 하위 Run
+    wait_run_sn: Option<i64>,
+    /// 겹친 경로
+    wait_glob: Option<String>,
     start_at: Option<String>,
     end_at: Option<String>,
     create_at: String,
+    /// tbl_log_token 합 · 기록이 없으면 null(모름). 조회 응답에서만 채운다
+    tokens: Option<Tokens>,
+    /// 리드 Run만: 자기 + runner 하위 Run(재시도 전 Run 포함) 토큰 합
+    runner_total: Option<Total>,
 }
 
 impl From<r::Model> for Run {
     fn from(m: r::Model) -> Self {
         Self {
+            paths: m.paths.as_deref().and_then(|p| serde_json::from_str(p).ok()),
             sn: m.sn, project_sn: m.project_sn, task_sn: m.task_sn, member_sn: m.member_sn, num: m.num, status: m.status,
             start_by: m.start_by, retry_run_sn: m.retry_run_sn, result_summary: m.result_summary, fail_code: m.fail_code,
-            fail_detail: m.fail_detail, branch: m.branch, start_at: m.start_at, end_at: m.end_at, create_at: m.create_at,
+            fail_detail: m.fail_detail, branch: m.branch, parent_run_sn: m.parent_run_sn, spawn_mode: m.spawn_mode, tier: m.tier, kind: m.kind,
+            child_seq: m.child_seq, brief: m.brief, wait_run_sn: m.wait_run_sn, wait_glob: m.wait_glob,
+            start_at: m.start_at, end_at: m.end_at, create_at: m.create_at, tokens: None, runner_total: None,
         }
     }
+}
+
+/// Run 1개의 토큰 합 (tbl_log_token)
+#[derive(Serialize, ToSchema, Clone, Default)]
+pub struct Tokens {
+    input: i64,
+    cache_read: i64,
+    cache_write: i64,
+    output: i64,
+    /// input + cache_read + cache_write + output
+    total: i64,
+    cost_usd_micro: i64,
+    /// 값 출처 목록: provider(실측) | estimated(추정)
+    sources: Vec<String>,
+}
+
+/// 여러 Run 합계. 토큰 기록이 없는 Run은 더하지 않고 unknown_count로 센다 (#100)
+#[derive(Serialize, ToSchema)]
+pub struct Total {
+    value: i64,
+    cost_usd_micro: i64,
+    /// 더한 Run 수 (자기 포함)
+    run_count: i64,
+    /// 토큰 기록이 없어 모르는 Run 수
+    unknown_count: i64,
+}
+
+/// Run 번호들 → 토큰 합 (기록 없는 Run은 빠짐)
+pub(crate) async fn tokens_of(db: &impl ConnectionTrait, sns: &[i64]) -> Res<std::collections::HashMap<i64, Tokens>> {
+    if sns.is_empty() {
+        return Ok(Default::default());
+    }
+    let ids = sns.iter().map(i64::to_string).collect::<Vec<_>>().join(","); // 정수만이라 그대로 넣는다
+    let rows = db.query_all_raw(Statement::from_string(DbBackend::Sqlite, format!(
+        "SELECT run_sn, SUM(token_input) i, SUM(token_cache_read) cr, SUM(token_cache_write) cw, SUM(token_output) o, SUM(cost_usd_micro) c, \
+         GROUP_CONCAT(DISTINCT usage_source) src FROM tbl_log_token WHERE run_sn IN ({ids}) GROUP BY run_sn"))).await?;
+    let mut out = std::collections::HashMap::new();
+    for row in rows {
+        let g = |c: &str| row.try_get::<i64>("", c).unwrap_or(0);
+        let (input, cache_read, cache_write, output) = (g("i"), g("cr"), g("cw"), g("o"));
+        let mut sources: Vec<String> = row.try_get::<String>("", "src").unwrap_or_default().split(',').filter(|s| !s.is_empty()).map(str::to_owned).collect();
+        sources.sort();
+        out.insert(g("run_sn"), Tokens { input, cache_read, cache_write, output, total: input + cache_read + cache_write + output, cost_usd_micro: g("c"), sources });
+    }
+    Ok(out)
+}
+
+/// 조회 응답용: 토큰 합을 채우고, 리드 Run(parent 없음)에는 runner 하위 Run 포함 합계를 붙인다
+pub(crate) async fn enrich(db: &impl ConnectionTrait, mut runs: Vec<Run>) -> Res<Vec<Run>> {
+    let leads: Vec<i64> = runs.iter().filter(|x| x.parent_run_sn.is_none()).map(|x| x.sn).collect();
+    let kids = r::Entity::find().filter(r::Column::ParentRunSn.is_in(leads.clone())).filter(r::Column::SpawnMode.eq("runner")).all(db).await?;
+    let all: Vec<i64> = runs.iter().map(|x| x.sn).chain(kids.iter().map(|k| k.sn)).collect();
+    let tok = tokens_of(db, &all).await?;
+    for x in &mut runs {
+        x.tokens = tok.get(&x.sn).cloned();
+        if x.parent_run_sn.is_none() {
+            let group: Vec<i64> = std::iter::once(x.sn).chain(kids.iter().filter(|k| k.parent_run_sn == Some(x.sn)).map(|k| k.sn)).collect();
+            let known: Vec<&Tokens> = group.iter().filter_map(|s| tok.get(s)).collect();
+            x.runner_total = Some(Total {
+                value: known.iter().map(|t| t.total).sum(), cost_usd_micro: known.iter().map(|t| t.cost_usd_micro).sum(),
+                run_count: group.len() as i64, unknown_count: (group.len() - known.len()) as i64,
+            });
+        }
+    }
+    Ok(runs)
 }
 
 /// Session (API 응답 형태)
@@ -153,10 +244,21 @@ async fn begin(tx: &DatabaseTransaction, task_sn: i64, retry: Option<i64>) -> Re
     Ok((out, ev))
 }
 
-/// 태스크의 Run 목록 (번호순)
-#[utoipa::path(operation_id = "run_list", get, path = "/tasks/{sn}/runs", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 200, body = Vec<Run>), (status = "default", body = ErrorBody)))]
-async fn list(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Run>>> {
-    Ok(Json(r::Entity::find().filter(r::Column::TaskSn.eq(sn)).order_by_asc(r::Column::Num).all(&db).await?.into_iter().map(Run::from).collect()))
+/// 태스크의 Run 목록 (번호순 · 토큰 합 포함). `children=0`이면 하위 Run을 뺀다 (기본: 포함)
+#[utoipa::path(operation_id = "run_list", get, path = "/tasks/{sn}/runs", params(("sn" = i64, Path, description = "태스크 번호"), ("children" = Option<i64>, Query, description = "0 = 리드 Run만")), responses((status = 200, body = Vec<Run>), (status = "default", body = ErrorBody)))]
+async fn list(State(db): State<DatabaseConnection>, Sn(sn): Sn, Query(q): Query<std::collections::HashMap<String, String>>) -> Res<Json<Vec<Run>>> {
+    let mut f = r::Entity::find().filter(r::Column::TaskSn.eq(sn));
+    if q.get("children").map(String::as_str) == Some("0") { f = f.filter(r::Column::ParentRunSn.is_null()); }
+    let runs = f.order_by_asc(r::Column::Num).all(&db).await?.into_iter().map(Run::from).collect();
+    enrich(&db, runs).await.map(Json)
+}
+
+/// 하위 Run 목록 (child_seq → 번호순 · 토큰 합 포함). 리드 Run이 없으면 404
+#[utoipa::path(operation_id = "run_children", get, path = "/runs/{sn}/children", params(("sn" = i64, Path, description = "리드 Run 번호")), responses((status = 200, body = Vec<Run>), (status = "default", body = ErrorBody)))]
+async fn children(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Run>>> {
+    get(&db, sn).await?;
+    let runs = r::Entity::find().filter(r::Column::ParentRunSn.eq(sn)).order_by_asc(r::Column::ChildSeq).order_by_asc(r::Column::Sn).all(&db).await?.into_iter().map(Run::from).collect();
+    enrich(&db, runs).await.map(Json)
 }
 
 /// Run 시작 (StartRun → RunStarted). Run은 queued로 만들고 태스크는 in_progress. 담당 멤버가 없거나 진행 중 Run(하위 Run 제외 · #67)이 있으면 409
@@ -166,10 +268,11 @@ async fn start(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<(StatusC
     Ok((StatusCode::CREATED, Json(out)))
 }
 
-/// 1건 조회. 없으면 404
+/// 1건 조회 (토큰 합 포함). 없으면 404
 #[utoipa::path(operation_id = "run_read", get, path = "/runs/{sn}", params(("sn" = i64, Path, description = "Run 번호")), responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
 async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Run>> {
-    get(&db, sn).await.map(|m| Json(m.into()))
+    let run = Run::from(get(&db, sn).await?);
+    enrich(&db, vec![run]).await?.pop().map(Json).ok_or_else(Error::not_found)
 }
 
 /// Run의 Session 목록 (번호순)
