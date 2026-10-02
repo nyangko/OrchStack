@@ -57,14 +57,14 @@ struct IssueNew {
 
 /// 수정 요청 본문. 보낸 필드만 바꾼다 (이벤트 payload로도 그대로 저장된다)
 #[derive(Serialize, Deserialize, ToSchema)]
-struct IssuePatch {
+pub(crate) struct IssuePatch {
     #[serde(skip_serializing_if = "Option::is_none")]
-    title: Option<String>,
+    pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    body: Option<String>,
+    pub body: Option<String>,
     /// open | in_progress | done | closed
     #[serde(skip_serializing_if = "Option::is_none")]
-    status: Option<String>,
+    pub status: Option<String>,
 }
 
 /// 프로젝트의 다음 표시 번호를 발급한다 (이슈 · 태스크 공용 · event::run 락 안에서만 부른다). 프로젝트가 없으면 404
@@ -114,23 +114,26 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
     if b.status.as_deref().is_some_and(|s| !STATUS.contains(&s)) {
         return Err(Error::invalid(format!("status must be one of {STATUS:?}")));
     }
-    let out = event::run(&db, async |tx| {
-        let mut q = Tbl::update_many().filter(i::Column::Sn.eq(sn)).col_expr(i::Column::UpdateAt, Expr::cust("datetime('now')"));
-        if let Some(v) = &b.title { q = q.col_expr(i::Column::Title, v.clone().into()); }
-        if let Some(v) = &b.body { q = q.col_expr(i::Column::Body, v.clone().into()); }
-        if let Some(v) = &b.status {
-            // 닫히면 닫은 시각을 남기고, 다시 열리면 지운다
-            q = q.col_expr(i::Column::Status, v.clone().into())
-                .col_expr(i::Column::CloseAt, Expr::cust(if v == "closed" { "datetime('now')" } else { "NULL" }));
-        }
-        if q.exec(tx).await?.rows_affected == 0 {
-            return Err(Error::not_found());
-        }
-        let out = get(tx, sn).await?;
-        let ev = Ev::new(Some(out.project_sn), "issue", sn, "IssueUpdated", &b);
-        Ok((out, vec![ev]))
-    }).await?;
+    let out = event::run(&db, async |tx| patch(tx, sn, &b).await.map(|(out, ev)| (out, vec![ev]))).await?;
     Ok(Json(out))
+}
+
+/// 이슈 부분 수정 + IssueUpdated. 수정 API와 Orch 제안 실행(이슈 닫기)이 함께 쓴다. 없으면 404
+pub(crate) async fn patch(tx: &DatabaseTransaction, sn: i64, b: &IssuePatch) -> Res<(Issue, Ev)> {
+    let mut q = Tbl::update_many().filter(i::Column::Sn.eq(sn)).col_expr(i::Column::UpdateAt, Expr::cust("datetime('now')"));
+    if let Some(v) = &b.title { q = q.col_expr(i::Column::Title, v.clone().into()); }
+    if let Some(v) = &b.body { q = q.col_expr(i::Column::Body, v.clone().into()); }
+    if let Some(v) = &b.status {
+        // 닫히면 닫은 시각을 남기고, 다시 열리면 지운다
+        q = q.col_expr(i::Column::Status, v.clone().into())
+            .col_expr(i::Column::CloseAt, Expr::cust(if v == "closed" { "datetime('now')" } else { "NULL" }));
+    }
+    if q.exec(tx).await?.rows_affected == 0 {
+        return Err(Error::not_found());
+    }
+    let out = get(tx, sn).await?;
+    let ev = Ev::new(Some(out.project_sn), "issue", sn, "IssueUpdated", b);
+    Ok((out, ev))
 }
 
 /// 삭제 (IssueDeleted). 성공 204, 없으면 404. 속한 태스크는 남고 issue_sn만 비워진다

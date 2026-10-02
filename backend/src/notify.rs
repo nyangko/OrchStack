@@ -1,5 +1,5 @@
 //! 알림(tbl_notification) 목록 · 읽음 + 이벤트 → 알림 projection, 알림 규칙 · 채널(tbl_notify_rule · _channel), 감사 로그(tbl_log_audit) 조회
-use crate::{entity::{tbl_approval as ap, tbl_decision as dc, tbl_log_audit as au, tbl_log_event as e, tbl_notification as n, tbl_notify_channel as ch,
+use crate::{entity::{tbl_approval as ap, tbl_connection as cn, tbl_decision as dc, tbl_orch_proposal as op, tbl_log_audit as au, tbl_log_event as e, tbl_notification as n, tbl_notify_channel as ch,
     tbl_notify_rule as nr, tbl_run as r, tbl_task as t},
     error::{Body, Error, ErrorBody, Res}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}};
@@ -35,21 +35,39 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
 /// 이벤트 1건 → 알림 0~1건. event::run 트랜잭션 안에서 불린다 (이벤트와 알림이 함께 커밋 · 롤백).
 /// 워크스페이스 기본 규칙에서 그 이벤트의 앱 알림을 끈 경우는 만들지 않는다
 pub async fn project(tx: &DatabaseTransaction, ev: &e::Model) -> Res<()> {
-    // 알린 쪽 · 멤버는 이벤트 행의 행위자에서 가져온다
-    // (이벤트 코드, 제목, 설명, 바로가기 종류, 확인 필요)
-    let (code, title, body, ref_type, action) = match ev.event_type.as_str() {
+    // 알린 쪽 · 멤버는 이벤트 행의 행위자에서 가져온다 (알림에는 user가 없어 사용자가 낸 이벤트는 system)
+    // (이벤트 코드, 제목, 설명, 바로가기 종류, 바로가기 번호, 확인 필요)
+    let sn = ev.aggregate_sn;
+    let (code, title, body, ref_type, ref_sn, action) = match ev.event_type.as_str() {
         "DecisionRequested" => {
             let Some(m) = dc::Entity::find_by_id(ev.aggregate_sn).one(tx).await? else { return Ok(()) };
-            ("decision_request", m.title, None, "decision", 1)
+            ("decision_request", m.title, None, "decision", sn, 1)
         }
         "ApprovalRequested" => {
             let Some(m) = ap::Entity::find_by_id(ev.aggregate_sn).one(tx).await? else { return Ok(()) };
-            ("approval_request", m.title, m.detail, "approval", 1)
+            ("approval_request", m.title, m.detail, "approval", sn, 1)
         }
         "RunFailed" => {
             let Some(m) = r::Entity::find_by_id(ev.aggregate_sn).one(tx).await? else { return Ok(()) };
             let title = t::Entity::find_by_id(m.task_sn).one(tx).await?.map_or_else(String::new, |x| x.title);
-            ("run_failed", title, m.fail_detail, "run", 0)
+            ("run_failed", title, m.fail_detail, "run", sn, 0)
+        }
+        // 태스크 done (TaskMoved · RunApproved)
+        "TaskMoved" | "RunApproved" => {
+            let Some(ts) = crate::orch_rule::done_task(ev) else { return Ok(()) };
+            let Some(m) = t::Entity::find_by_id(ts).one(tx).await? else { return Ok(()) };
+            ("task_done", m.title, None, "task", ts, 0)
+        }
+        // 가드 정지 (OrchProposed kind=guard_stop)
+        "OrchProposed" => {
+            let Some(m) = op::Entity::find_by_id(sn).one(tx).await?.filter(|x| x.kind == "guard_stop") else { return Ok(()) };
+            ("guard_stop", m.title, m.reason, "proposal", sn, 1)
+        }
+        // 폴백 연결로 바꿈 (FallbackUsed): 제목 = 새 연결 이름
+        "FallbackUsed" => {
+            let p: serde_json::Value = serde_json::from_str(&ev.payload_json).unwrap_or_default();
+            let Some(m) = cn::Entity::find_by_id(p["to"].as_i64().unwrap_or_default()).one(tx).await? else { return Ok(()) };
+            ("fallback_used", m.name, None, "run", sn, 0)
         }
         _ => return Ok(()),
     };
@@ -59,8 +77,8 @@ pub async fn project(tx: &DatabaseTransaction, ev: &e::Model) -> Res<()> {
         return Ok(());
     }
     n::ActiveModel {
-        wid: Set(crate::WID), uid: Set(crate::UID), event_code: Set(code.into()), actor_type: Set(ev.actor_type.clone()), member_sn: Set(ev.member_sn),
-        title: Set(title), body: Set(body), ref_type: Set(Some(ref_type.into())), ref_sn: Set(Some(ev.aggregate_sn)), is_action: Set(action),
+        wid: Set(crate::WID), uid: Set(crate::UID), event_code: Set(code.into()), actor_type: Set(if ev.actor_type == "user" { "system".into() } else { ev.actor_type.clone() }), member_sn: Set(ev.member_sn),
+        title: Set(title), body: Set(body), ref_type: Set(Some(ref_type.into())), ref_sn: Set(Some(ref_sn)), is_action: Set(action),
         event_sn: Set(Some(ev.sn)), ..Default::default()
     }.insert(tx).await?;
     Ok(())

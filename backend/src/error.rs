@@ -34,6 +34,11 @@ impl Error {
         Self(StatusCode::NOT_FOUND, "not_found", "not found".into())
     }
 
+    /// 설명 문구
+    pub fn message(&self) -> &str {
+        &self.2
+    }
+
     /// 값이 허용 범위를 벗어났을 때 (422)
     pub fn invalid(msg: String) -> Self {
         Self(StatusCode::UNPROCESSABLE_ENTITY, "invalid", msg)

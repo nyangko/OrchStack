@@ -10,6 +10,12 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 
+#[cfg(test)]
+thread_local!(
+    /// 테스트용: 이 스레드에서 `run`이 불린 횟수 (Orch 규칙 엔진이 모델을 부르지 않는다는 단언용)
+    pub static CALLS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) }
+);
+
 /// 자식 프로세스에 넘기는 환경 변수 (나머지는 지운다). CLI 로그인 상태는 HOME 아래 설정 · 키체인에서 읽는다
 const ENV_KEEP: [&str; 9] = ["PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR"];
 /// stderr는 끝부분만 남긴다
@@ -247,6 +253,8 @@ fn auth_fail(s: &str) -> bool {
 /// 실행: stdin으로 프롬프트 → stdout JSON 줄마다 이벤트를 `tx`로 보낸다 → 끝 · 제한 시간 · 취소 중 먼저 오는 것으로 정리.
 /// `cancel`은 값이 오면 취소, 보내는 쪽이 사라지면 무시
 pub async fn run(ex: &dyn Executor, job: &Job, tx: &mpsc::UnboundedSender<Event>, cancel: oneshot::Receiver<()>) -> Outcome {
+    #[cfg(test)]
+    CALLS.with(|c| c.set(c.get() + 1));
     let bin = job.bin.clone().unwrap_or_else(|| ex.bin().into());
     let mut out = Outcome { status: Status::Failed, exit: None, session: None, text: None, usage: Usage::default(), err: None };
     let mut child = match command(&bin, &ex.args(job), &job.cwd, &job.env).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {

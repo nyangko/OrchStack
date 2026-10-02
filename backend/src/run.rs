@@ -295,14 +295,24 @@ async fn stop(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Run>
 /// 재시도 (RetryRun → RunStarted). failed · cancelled Run에서만, 기존 Run은 그대로 두고 새 Run을 만든다
 #[utoipa::path(operation_id = "run_retry", post, path = "/runs/{sn}/retry", params(("sn" = i64, Path, description = "재시도할 Run 번호")), responses((status = 201, body = Run), (status = "default", body = ErrorBody)))]
 async fn retry(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<(StatusCode, Json<Run>)> {
-    let out = event::run(&db, async |tx| {
-        let old = get(tx, sn).await?;
-        if !matches!(old.status.as_str(), "failed" | "cancelled") {
-            return Err(Error::conflict(format!("cannot retry run {}", old.status)));
-        }
-        begin(tx, old.task_sn, Some(sn)).await.map(|(out, ev)| (out, vec![ev]))
-    }).await?;
+    let out = event::run(&db, async |tx| redo(tx, sn).await.map(|(out, ev)| (out, vec![ev]))).await?;
     Ok((StatusCode::CREATED, Json(out)))
+}
+
+/// 재시도 Run을 만든다 (RunStarted). failed · cancelled Run에서만 (아니면 409). 재시도 API와 Orch 제안 실행이 함께 쓴다
+pub(crate) async fn redo(tx: &DatabaseTransaction, sn: i64) -> Res<(Run, Ev)> {
+    let old = get(tx, sn).await?;
+    if !matches!(old.status.as_str(), "failed" | "cancelled") {
+        return Err(Error::conflict(format!("cannot retry run {}", old.status)));
+    }
+    begin(tx, old.task_sn, Some(sn)).await
+}
+
+/// Run의 연결을 바꿔 표시한다 (FallbackUsed). 실제 전환은 실행기(#13)가 한다
+pub(crate) async fn switch(tx: &DatabaseTransaction, sn: i64, connection_sn: i64) -> Res<Ev> {
+    let cur = get(tx, sn).await?;
+    r::Entity::update_many().filter(r::Column::Sn.eq(sn)).col_expr(r::Column::ConnectionSn, connection_sn.into()).exec(tx).await?;
+    Ok(Ev::new(Some(cur.project_sn), "run", sn, "FallbackUsed", &json!({ "from": cur.connection_sn, "to": connection_sn })))
 }
 
 /// 리뷰 요청 (RequestReview → ReviewRequested). running Run과 in_progress 태스크가 함께 review로 간다

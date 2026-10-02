@@ -297,26 +297,38 @@ async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusC
 
 /// 담당 멤버 설정 (없으면 해제)과 배정 이벤트를 남긴다. 태스크가 없으면 404
 async fn set_member(db: &DatabaseConnection, sn: i64, member: Option<i64>) -> Res<Task> {
-    event::run(db, async |tx| {
-        get(tx, sn).await?;
-        if let Some(ms) = member {
-            let m = crate::entity::tbl_member::Entity::find_by_id(ms).one(tx).await?.ok_or_else(|| Error::invalid("member not found".into()))?;
-            if m.status == "archived" {
-                return Err(Error::conflict("member is archived".into()));
-            }
+    event::run(db, async |tx| put_member(tx, sn, member, "user").await.map(|(out, ev)| (out, vec![ev]))).await
+}
+
+/// 담당 멤버를 바꾸고 배정 이벤트를 만든다 (by = assign_by: user | orch_auto | orch_move). 사용자 배정과 Orch 제안 실행이 함께 쓴다.
+/// 없는 태스크 404 · 없는 멤버 422 · 보관 멤버 409
+pub(crate) async fn put_member(tx: &DatabaseTransaction, sn: i64, member: Option<i64>, by: &str) -> Res<(Task, Ev)> {
+    get(tx, sn).await?;
+    if let Some(ms) = member {
+        let m = crate::entity::tbl_member::Entity::find_by_id(ms).one(tx).await?.ok_or_else(|| Error::invalid("member not found".into()))?;
+        if m.status == "archived" {
+            return Err(Error::conflict("member is archived".into()));
         }
-        // 해제는 member_sn · assign_by 모두 NULL
-        let (to, by) = member.map_or((Expr::cust("NULL"), Expr::cust("NULL")), |v| (Expr::value(v), Expr::value("user")));
-        let q = Tbl::update_many().filter(t::Column::Sn.eq(sn)).col_expr(t::Column::MemberSn, to).col_expr(t::Column::AssignBy, by)
-            .col_expr(t::Column::UpdateAt, Expr::cust("datetime('now')"));
-        q.exec(tx).await?;
-        let out = get(tx, sn).await?;
-        let ev = match member {
-            Some(ms) => Ev::new(Some(out.project_sn), "task", sn, "AgentAssigned", &json!({ "member_sn": ms, "assign_by": "user" })),
-            None => Ev::new(Some(out.project_sn), "task", sn, "AgentUnassigned", &json!({})),
-        };
-        Ok((out, vec![ev]))
-    }).await
+    }
+    // 해제는 member_sn · assign_by 모두 NULL
+    let (to, by_col) = member.map_or((Expr::cust("NULL"), Expr::cust("NULL")), |v| (Expr::value(v), Expr::value(by.to_owned())));
+    let q = Tbl::update_many().filter(t::Column::Sn.eq(sn)).col_expr(t::Column::MemberSn, to).col_expr(t::Column::AssignBy, by_col)
+        .col_expr(t::Column::UpdateAt, Expr::cust("datetime('now')"));
+    q.exec(tx).await?;
+    let out = get(tx, sn).await?;
+    let ev = match member {
+        Some(ms) => Ev::new(Some(out.project_sn), "task", sn, "AgentAssigned", &json!({ "member_sn": ms, "assign_by": by })),
+        None => Ev::new(Some(out.project_sn), "task", sn, "AgentUnassigned", &json!({})),
+    };
+    Ok((out, ev))
+}
+
+/// 의존 대기(먼저 끝나야 하는 태스크가 done이 아님)인 태스크 번호 집합 (sns 중에서)
+pub(crate) async fn waiting(db: &impl ConnectionTrait, sns: Vec<i64>) -> Res<std::collections::HashSet<i64>> {
+    let deps = dp::Entity::find().filter(dp::Column::TaskSn.is_in(sns)).all(db).await?;
+    let open: Vec<i64> = Tbl::find().filter(t::Column::Sn.is_in(deps.iter().map(|d| d.depend_task_sn))).filter(t::Column::Status.ne("done")).all(db).await?
+        .into_iter().map(|m| m.sn).collect();
+    Ok(deps.into_iter().filter(|d| open.contains(&d.depend_task_sn)).map(|d| d.task_sn).collect())
 }
 
 /// 멤버 배정 (AssignAgent → AgentAssigned · assign_by = user). 없는 멤버 422, 보관된 멤버 409. Run은 만들지 않는다

@@ -84,7 +84,7 @@ struct Cost {
 }
 
 /// 숫자 1개를 돌려주는 SQL (NULL이면 None)
-async fn one(db: &DatabaseConnection, sql: &str, vals: Vec<Value>) -> Res<Option<i64>> {
+pub(crate) async fn one(db: &DatabaseConnection, sql: &str, vals: Vec<Value>) -> Res<Option<i64>> {
     Ok(db.query_one_raw(Statement::from_sql_and_values(DbBackend::Sqlite, sql, vals)).await?.and_then(|r| r.try_get_by_index::<Option<i64>>(0).ok().flatten()))
 }
 

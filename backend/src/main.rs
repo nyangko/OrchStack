@@ -10,8 +10,10 @@ mod error; // 공통 에러 응답
 mod event; // 명령 실행 틀 (상태 변경 + 이벤트 append + 발행)
 mod exec; // 실행기: Claude Code · Codex CLI 비대화형 실행 (#13)
 mod issue; // /issues CRUD
+mod orch_rule; // Orch 규칙 엔진 (LLM 0): 이벤트 → 제안 · 제안 실행 · 타이머 · 가드 · 멤버 대기열
 mod orch; // PM Dock: /projects/{sn}/conversation · messages · /messages/* · /proposals · /runs/{sn}/instruct
 mod meta; // 완료 조건 · 의존 · 라벨 목록 · 저장 보기 · Diagram 배치
+mod policy; // /teams/{sn}/policy Orch 진행 정책 (모드 · 타이머 · 레벨 · 가드)
 mod notify; // /notifications · /notify/* · /audit + 이벤트 → 알림 projection
 mod preset; // 프리셋 편집 · 가져오기 · 사용처 · 보고서 양식 · 미리보기
 mod project; // /projects CRUD
@@ -65,7 +67,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(orch_rule::routes()).merge(policy::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -105,6 +107,9 @@ async fn main() {
     let db = connect(ConnectOptions::new(url)).await.expect("db connect failed");
     let listener = tokio::net::TcpListener::bind(&addr).await.expect("bind failed");
     println!("listening on http://{addr}");
+    // Orch 규칙 엔진: 이벤트 소비 + 1초 타이머 (테스트는 on · tick을 직접 부른다)
+    tokio::spawn(orch_rule::listen(db.clone()));
+    tokio::spawn(orch_rule::ticker(db.clone()));
     axum::serve(listener, app(db)).await.unwrap();
 }
 
@@ -792,12 +797,13 @@ mod tests {
 
         // Orch 제안: 목록 · edit은 선택지 필요 · 처리 후 다시 처리 409 · 모르는 동작 404
         let pn = |kind: &str| ProposalNew { project_sn: 1, issue_sn: None, task_sn: Some(ts), run_sn: None, member_sn: Some(1), kind: kind.into(), level: 1,
-            title: "#130 QA를 하린에게 배정".into(), reason: None, options: Some(vec!["Todo로 보내고 대기".into()]), streak_count: 3, deadline_at: None, event_sn: None };
+            title: "#130 QA를 하린에게 배정".into(), reason: None, options: Some(vec![orch::Opt { label: "Todo로 보내고 대기".into(), kind: None, member_sn: None, task_sn: None }]),
+            streak_count: 3, deadline_at: None, event_sn: None, guard_sn: None, status: None };
         orch::suggest(&db, pn("assign")).await.unwrap();
         orch::suggest(&db, pn("next_issue")).await.unwrap();
         assert!(orch::suggest(&db, pn("x")).await.is_err());
         let v = call(&app, "GET", "/proposals?project_sn=1&status=proposed", None).await.1;
-        assert_eq!((v.as_array().unwrap().len(), v[1]["options"][0].as_str()), (2, Some("Todo로 보내고 대기")));
+        assert_eq!((v.as_array().unwrap().len(), v[1]["options"][0]["label"].as_str()), (2, Some("Todo로 보내고 대기")));
         assert_eq!(call(&app, "POST", "/proposals/1/edit", Some(json!({}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(call(&app, "POST", "/proposals/1/edit", Some(json!({"option": "Todo로 보내고 대기"}))).await.1["status"], "changed");
         assert_eq!(call(&app, "POST", "/proposals/2/proceed", None).await.1["status"], "user_done");
@@ -883,6 +889,321 @@ mod tests {
         let c = call(&app, "GET", "/workspace/cost?month=2000-01", None).await.1;
         assert_eq!((c["items"].as_array().unwrap().len(), c["items"][0]["kind"].as_str(), c["items"][0]["token"].as_i64()), (1, Some("unknown"), Some(7)));
         assert_eq!(call(&app, "GET", "/workspace/cost?month=2000-13", None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    /// B-16 도우미: 프로젝트 1(팀 1 · Orch 멤버 2) · 이슈 1 · 태스크 a(멤버 1) · b · c(담당 없음). a의 sn을 돌려준다
+    async fn rig(app: &Router, db: &DatabaseConnection) -> i64 {
+        let a = task_of(app, db, true).await;
+        db.execute_unprepared("UPDATE tbl_project SET team_sn = 1; INSERT INTO tbl_member (sn, team_sn, profile_sn, name, role_name, is_orch) VALUES (2, 1, 1, 'Orch', 'PM', 1);").await.unwrap();
+        for t in ["B", "C"] {
+            call(app, "POST", "/issues/1/tasks", Some(json!({"title": t}))).await;
+        }
+        a
+    }
+
+    /// 가장 최근 이벤트(kind)
+    async fn last(db: &DatabaseConnection, kind: &str) -> crate::entity::tbl_log_event::Model {
+        use crate::entity::tbl_log_event as ev;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+        ev::Entity::find().filter(ev::Column::EventType.eq(kind)).order_by_desc(ev::Column::Sn).one(db).await.unwrap().unwrap()
+    }
+
+    /// 팀 1 정책을 읽어 고친 뒤 저장한다
+    async fn set_policy(app: &Router, edit: impl FnOnce(&mut Value)) -> (StatusCode, Value) {
+        let mut p = call(app, "GET", "/teams/1/policy", None).await.1;
+        edit(&mut p);
+        call(app, "PUT", "/teams/1/policy", Some(p)).await
+    }
+
+    /// 태스크를 in_progress → done으로 옮기고 그 TaskMoved 이벤트를 돌려준다
+    async fn finish(app: &Router, db: &DatabaseConnection, sn: i64) -> crate::entity::tbl_log_event::Model {
+        for to in ["in_progress", "done"] {
+            call(app, "POST", &format!("/tasks/{sn}/move"), Some(json!({"status": to}))).await;
+        }
+        last(db, "TaskMoved").await
+    }
+
+    /// B-16 DoD: 태스크 done → 다음 태스크가 같은 멤버에게 assign 제안(기한 있음) → 타이머가 지나면 auto_done · 배정(orch_auto) · 모델 호출 0,
+    /// 같은 이벤트를 다시 받아도 중복 제안 없음, manual 모드는 기한 없음 · 타이머가 건드리지 않음 · proceed로만 진행
+    #[tokio::test]
+    async fn orch_rule() {
+        use crate::orch_rule as rule;
+        let db = mem().await;
+        let app = app(db.clone());
+        let a = rig(&app, &db).await;
+        let calls = || crate::exec::CALLS.with(|c| c.get());
+        let ev = finish(&app, &db, a).await;
+
+        // 알림 task_done (사용자 이벤트 → 알림)
+        let n = call(&app, "GET", "/notifications", None).await.1;
+        assert_eq!((n[0]["event_code"].as_str(), n[0]["ref_type"].as_str(), n[0]["ref_sn"].as_i64(), n[0]["title"].as_str()), (Some("task_done"), Some("task"), Some(a), Some("T")));
+
+        // 기본 정책(auto · 5초): 다음 태스크(b = 2)를 끝낸 멤버(1)에게 assign 제안, 아직 배정 전
+        let sn = rule::on(&db, &ev).await.unwrap().unwrap();
+        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["sn"].as_i64(), v[0]["kind"].as_str(), v[0]["task_sn"].as_i64(), v[0]["member_sn"].as_i64()), (1, Some(sn), Some("assign"), Some(2), Some(1)));
+        assert_eq!((v[0]["event_sn"].as_i64(), v[0]["deadline_at"].is_string(), v[0]["level"].as_i64()), (Some(ev.sn), true, Some(1)));
+        assert!(call(&app, "GET", "/tasks/2", None).await.1["member_sn"].is_null());
+        assert_eq!(actor(&db, "OrchProposed", sn).await.0, "orch");
+        assert_eq!(rule::on(&db, &ev).await.unwrap(), None); // 같은 제안이 대기 중
+
+        // 타이머: 기한 전 0건 · 기한이 지나면 auto_done + 배정(orch_auto) + 행위자 orch
+        assert_eq!(rule::tick(&db).await.unwrap(), 0);
+        db.execute_unprepared("UPDATE tbl_orch_proposal SET deadline_at = datetime('now', '-1 seconds');").await.unwrap();
+        assert_eq!(rule::tick(&db).await.unwrap(), 1);
+        let v = call(&app, "GET", "/proposals?status=auto_done", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["streak_count"].as_i64()), (1, Some(1)));
+        let t = call(&app, "GET", "/tasks/2", None).await.1;
+        assert_eq!((t["member_sn"].as_i64(), t["assign_by"].as_str()), (Some(1), Some("orch_auto")));
+        assert_eq!(actor(&db, "AgentAssigned", 2).await, ("orch".into(), Some(2), None));
+        assert_eq!(events(&db, "proposal", sn).await, [("OrchProposed".into(), 1), ("OrchProposalResolved".into(), 2)]);
+        assert_eq!(calls(), 0); // 모델 · 실행기 호출 0
+
+        // manual: 기한 없음 · 타이머가 실행하지 않음 · proceed로만 (다음 태스크 c = 3)
+        assert_eq!(set_policy(&app, |p| p["mode"] = json!("manual")).await.0, StatusCode::OK);
+        let sn = rule::on(&db, &ev).await.unwrap().unwrap();
+        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
+        assert_eq!((v[0]["task_sn"].as_i64(), v[0]["deadline_at"].is_null()), (Some(3), true));
+        assert_eq!(rule::tick(&db).await.unwrap(), 0);
+        assert!(call(&app, "GET", "/tasks/3", None).await.1["member_sn"].is_null());
+        let (st, p) = call(&app, "POST", &format!("/proposals/{sn}/proceed"), None).await;
+        assert_eq!((st, p["status"].as_str(), p["streak_count"].as_i64()), (StatusCode::OK, Some("user_done"), Some(0)));
+        let t = call(&app, "GET", "/tasks/3", None).await.1;
+        assert_eq!((t["member_sn"].as_i64(), t["assign_by"].as_str()), (Some(1), Some("orch_auto")));
+        assert_eq!(rule::on(&db, &ev).await.unwrap(), None); // 남은 후보 없음
+        assert_eq!(calls(), 0);
+    }
+
+    /// B-16 가드: auto_streak threshold 2 → 세 번째 제안은 guard_stop(stopped · guard_sn · trigger_at) + 알림 guard_stop(actor orch),
+    /// 멈춘 뒤에는 기한 없이 대기 · 사용자가 처리하면 재개, on_trigger = to_manual이면 정책 mode가 manual
+    #[tokio::test]
+    async fn orch_guard() {
+        use crate::orch_rule as rule;
+        let db = mem().await;
+        let app = app(db.clone());
+        let a = rig(&app, &db).await;
+        call(&app, "POST", "/issues/1/tasks", Some(json!({"title": "D"}))).await; // d = 4
+        let ev = finish(&app, &db, a).await;
+        let on = |db: DatabaseConnection, ev: crate::entity::tbl_log_event::Model| async move { rule::on(&db, &ev).await.unwrap() };
+        assert_eq!(set_policy(&app, |p| { p["mode"] = json!("full_auto"); p["guards"][0]["threshold"] = json!(2); }).await.0, StatusCode::OK);
+
+        // full_auto: 바로 실행 → auto_done 2번 (streak 1 · 2)
+        for (k, streak) in [(2, 1), (3, 2)] {
+            assert!(on(db.clone(), ev.clone()).await.is_some());
+            let t = call(&app, "GET", &format!("/tasks/{k}"), None).await.1;
+            assert_eq!(t["assign_by"].as_str(), Some("orch_auto"));
+            assert_eq!(call(&app, "GET", "/proposals?status=auto_done", None).await.1[0]["streak_count"].as_i64(), Some(streak));
+        }
+        // 세 번째: 제안 대신 guard_stop. d(4)는 배정되지 않는다
+        let sn = on(db.clone(), ev.clone()).await.unwrap();
+        let v = call(&app, "GET", "/proposals?status=stopped", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["sn"].as_i64(), v[0]["kind"].as_str(), v[0]["guard_sn"].is_i64(), v[0]["task_sn"].as_i64()), (1, Some(sn), Some("guard_stop"), true, Some(a)));
+        assert!(call(&app, "GET", "/tasks/4", None).await.1["member_sn"].is_null());
+        let n = call(&app, "GET", "/notifications", None).await.1;
+        assert_eq!((n[0]["event_code"].as_str(), n[0]["actor_type"].as_str(), n[0]["member_sn"].as_i64(), n[0]["ref_type"].as_str(), n[0]["ref_sn"].as_i64(), n[0]["is_action"].as_i64()),
+            (Some("guard_stop"), Some("orch"), Some(2), Some("proposal"), Some(sn), Some(1)));
+        assert!(call(&app, "GET", "/teams/1/policy", None).await.1["guards"][0]["trigger_at"].is_string());
+
+        // 멈춘 뒤: 제안은 만들되 기한 없이 대기 (full_auto여도 실행하지 않음) → 사용자가 처리하면 재개
+        let sn = on(db.clone(), ev.clone()).await.unwrap();
+        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
+        assert_eq!((v[0]["sn"].as_i64(), v[0]["task_sn"].as_i64(), v[0]["deadline_at"].is_null()), (Some(sn), Some(4), true));
+        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/proceed"), None).await.1["status"], "user_done");
+        assert_eq!(call(&app, "GET", "/tasks/4", None).await.1["member_sn"].as_i64(), Some(1));
+
+        // to_manual: 걸리면 정책 mode가 manual로 바뀐다 (이벤트 OrchPolicyUpdated)
+        call(&app, "POST", "/issues/1/tasks", Some(json!({"title": "E"}))).await;
+        call(&app, "POST", "/issues/1/tasks", Some(json!({"title": "F"}))).await;
+        assert_eq!(set_policy(&app, |p| { p["guards"][0]["threshold"] = json!(1); p["guards"][0]["on_trigger"] = json!("to_manual"); }).await.0, StatusCode::OK);
+        assert!(on(db.clone(), ev.clone()).await.is_some()); // e 자동 배정
+        let sn = on(db.clone(), ev.clone()).await.unwrap(); // 걸림
+        assert_eq!(call(&app, "GET", "/proposals?status=stopped", None).await.1[0]["sn"].as_i64(), Some(sn));
+        assert_eq!(call(&app, "GET", "/teams/1/policy", None).await.1["mode"], "manual");
+        assert_eq!(events(&db, "team", 1).await.last().unwrap().0, "OrchPolicyUpdated");
+    }
+
+    /// B-16 정책: 기본값 응답(저장 전) → 저장 → 유지 · 프로젝트별 정책 분리 · L4 block 고정 등 422 · 팀 대상 이벤트
+    #[tokio::test]
+    async fn orch_policy() {
+        let db = mem().await;
+        let app = app(db.clone());
+        rig(&app, &db).await;
+        let p = call(&app, "GET", "/teams/1/policy", None).await.1;
+        assert_eq!((p["is_saved"].as_i64(), p["mode"].as_str(), p["timer_sec"].as_i64(), p["levels"].as_array().unwrap().len(), p["guards"].as_array().unwrap().len()), (Some(0), Some("auto"), Some(5), 5, 4));
+        assert_eq!((p["levels"][1]["handle"].as_str(), p["levels"][2]["wait_min"].as_i64(), p["levels"][2]["no_reply"].as_str(), p["levels"][4]["is_locked"].as_i64()), (Some("timer"), Some(10), Some("orch_decide"), Some(1)));
+        assert_eq!(db_count(&db, "tbl_orch_policy").await, 0); // 저장은 PUT 때
+
+        // 저장 → 다시 읽기 유지 (레벨 · 가드 전체 교체)
+        let (st, v) = set_policy(&app, |p| { p["mode"] = json!("full_auto"); p["timer_sec"] = json!(10); p["levels"][1]["handle"] = json!("auto"); p["guards"].as_array_mut().unwrap().remove(1); }).await;
+        assert_eq!((st, v["is_saved"].as_i64()), (StatusCode::OK, Some(1)));
+        let v = call(&app, "GET", "/teams/1/policy", None).await.1;
+        assert_eq!((v["mode"].as_str(), v["timer_sec"].as_i64(), v["levels"][1]["handle"].as_str(), v["guards"].as_array().unwrap().len(), v["guards"][1]["code"].as_str()), (Some("full_auto"), Some(10), Some("auto"), 3, Some("same_failure")));
+        assert_eq!((db_count(&db, "tbl_orch_policy_level").await, db_count(&db, "tbl_orch_guard").await), (5, 3));
+
+        // 프로젝트별: 따로 저장 · 팀 기본은 그대로
+        let mut pj = call(&app, "GET", "/teams/1/policy?project=1", None).await.1;
+        pj["mode"] = json!("manual");
+        assert_eq!(call(&app, "PUT", "/teams/1/policy?project=1", Some(pj)).await.1["project_sn"].as_i64(), Some(1));
+        assert_eq!(call(&app, "GET", "/teams/1/policy?project=1", None).await.1["mode"], "manual");
+        assert_eq!(call(&app, "GET", "/teams/1/policy", None).await.1["mode"], "full_auto");
+
+        // 422: L4 handle 바꿈 · 모르는 mode · 레벨 모자람 · 가드 중복 · 모르는 가드 코드 · timer 0 / 404: 없는 팀 · 프로젝트
+        for edit in [
+            (|p: &mut Value| p["levels"][4]["handle"] = json!("wait")) as fn(&mut Value),
+            |p| p["mode"] = json!("x"),
+            |p| { p["levels"].as_array_mut().unwrap().pop(); },
+            |p| { let g = p["guards"][0].clone(); p["guards"].as_array_mut().unwrap().push(g); },
+            |p| p["guards"][0]["code"] = json!("nope"),
+            |p| p["timer_sec"] = json!(0),
+        ] {
+            assert_eq!(set_policy(&app, edit).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        assert_eq!(call(&app, "GET", "/teams/99/policy", None).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(call(&app, "GET", "/teams/1/policy?project=99", None).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(events(&db, "team", 1).await, [("OrchPolicyUpdated".into(), 1), ("OrchPolicyUpdated".into(), 2)]);
+    }
+
+    /// 테이블 행 수
+    async fn db_count(db: &DatabaseConnection, table: &str) -> i64 {
+        db.query_one_raw(Statement::from_string(DbBackend::Sqlite, format!("SELECT COUNT(*) FROM {table}"))).await.unwrap().unwrap().try_get_by_index(0).unwrap()
+    }
+
+    /// B-16 제안 처리: 선택지 edit(kind가 있으면 그 동작 실행) · hold(기한 연장) · dismiss · cancel · 자동 실행 실패는 dismissed + 사유
+    #[tokio::test]
+    async fn orch_pick() {
+        use crate::orch_rule as rule;
+        let db = mem().await;
+        let app = app(db.clone());
+        let a = rig(&app, &db).await;
+        db.execute_unprepared("INSERT INTO tbl_member (sn, team_sn, profile_sn, name, role_name) VALUES (3, 1, 1, 'm3', 'Dev');").await.unwrap();
+        let ev = finish(&app, &db, a).await;
+
+        // 같은 역할의 노는 멤버가 선택지로 붙는다
+        let sn = rule::on(&db, &ev).await.unwrap().unwrap();
+        let v = call(&app, "GET", "/proposals?project_sn=1&status=proposed", None).await.1;
+        assert_eq!((v[0]["options"][0]["label"].as_str(), v[0]["options"][0]["kind"].as_str(), v[0]["options"][0]["member_sn"].as_i64(), v[0]["options"][0]["task_sn"].as_i64()), (Some("m3"), Some("assign"), Some(3), Some(2)));
+
+        // hold: 기한이 뒤로 밀린다 (본문 없이도 · 정책 timer_sec) · 모르는 선택지 422(제안은 그대로)
+        let before = v[0]["deadline_at"].as_str().unwrap().to_owned();
+        let (st, h) = call(&app, "POST", &format!("/proposals/{sn}/hold"), Some(json!({"sec": 60}))).await;
+        assert_eq!((st, h["status"].as_str(), h["deadline_at"].as_str().unwrap() > before.as_str()), (StatusCode::OK, Some("proposed"), true));
+        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/hold"), None).await.0, StatusCode::OK);
+        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/hold"), Some(json!({"sec": 0}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/edit"), Some(json!({"option": "zzz"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "GET", "/proposals?status=proposed", None).await.1.as_array().unwrap().len(), 1);
+
+        // edit(m3) → changed + 그 멤버에게 배정
+        let (st, p) = call(&app, "POST", &format!("/proposals/{sn}/edit"), Some(json!({"option": "m3"}))).await;
+        assert_eq!((st, p["status"].as_str()), (StatusCode::OK, Some("changed")));
+        let t = call(&app, "GET", "/tasks/2", None).await.1;
+        assert_eq!((t["member_sn"].as_i64(), t["assign_by"].as_str()), (Some(3), Some("orch_auto")));
+        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/hold"), None).await.0, StatusCode::CONFLICT); // 이미 처리됨
+
+        // dismiss · cancel (다음 태스크 c = 3 제안을 두 번)
+        let s1 = rule::on(&db, &ev).await.unwrap().unwrap();
+        assert_eq!(call(&app, "POST", &format!("/proposals/{s1}/dismiss"), None).await.1["status"], "dismissed");
+        let s2 = rule::on(&db, &ev).await.unwrap().unwrap();
+        assert_ne!(s1, s2);
+        assert_eq!(call(&app, "POST", &format!("/proposals/{s2}/cancel"), None).await.1["status"], "stopped");
+        assert!(call(&app, "GET", "/tasks/3", None).await.1["member_sn"].is_null());
+
+        // 자동 실행 실패(그 사이 c가 다른 멤버에게 배정됨) → dismissed + 사유, 배정은 그대로 · 사용자 proceed는 409 + proposed 유지
+        let s3 = rule::on(&db, &ev).await.unwrap().unwrap();
+        db.execute_unprepared("UPDATE tbl_task SET member_sn = 3 WHERE sn = 3; UPDATE tbl_orch_proposal SET deadline_at = datetime('now', '-1 seconds');").await.unwrap();
+        assert_eq!(rule::tick(&db).await.unwrap(), 1);
+        let v = call(&app, "GET", "/proposals?status=dismissed", None).await.1;
+        assert_eq!((v[0]["sn"].as_i64(), v[0]["reason"].as_str().unwrap().contains("failed")), (Some(s3), true));
+        assert_eq!(call(&app, "GET", "/tasks/3", None).await.1["member_sn"].as_i64(), Some(3));
+        assert_eq!(rule::on(&db, &ev).await.unwrap(), None); // 후보 없음
+    }
+
+    /// B-16 Run 실패: auto_retry_max(기본 1) 안이면 retry 제안(실행하면 새 Run) · 넘으면 제안 없음 · 연결 오류면 fallback 제안(실행하면 run.connection_sn 교체 + 알림 fallback_used)
+    #[tokio::test]
+    async fn orch_fail() {
+        use crate::{entity::tbl_run as r, orch_rule as rule};
+        use sea_orm::EntityTrait;
+        let db = mem().await;
+        let app = app(db.clone());
+        let a = rig(&app, &db).await;
+        let fail = |rs: i64| { let db = db.clone(); async move {
+            run::run_to(&db, rs, "starting").await.unwrap();
+            run::run_to(&db, rs, "failed").await.unwrap();
+            last(&db, "RunFailed").await
+        }};
+
+        // retry: 첫 실패 → 제안 → 실행(새 Run · retry_run_sn) → 두 번째 실패 → 제안 없음
+        let rs = call(&app, "POST", &format!("/tasks/{a}/runs"), None).await.1["sn"].as_i64().unwrap();
+        let sn = rule::on(&db, &fail(rs).await).await.unwrap().unwrap();
+        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
+        assert_eq!((v[0]["kind"].as_str(), v[0]["run_sn"].as_i64(), v[0]["task_sn"].as_i64(), v[0]["member_sn"].as_i64()), (Some("retry"), Some(rs), Some(a), Some(1)));
+        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/proceed"), None).await.1["status"], "user_done");
+        let runs = call(&app, "GET", &format!("/tasks/{a}/runs"), None).await.1;
+        assert_eq!((runs.as_array().unwrap().len(), runs[1]["retry_run_sn"].as_i64(), runs[1]["status"].as_str()), (2, Some(rs), Some("queued")));
+        let rs2 = runs[1]["sn"].as_i64().unwrap();
+        assert_eq!(rule::on(&db, &fail(rs2).await).await.unwrap(), None);
+
+        // fallback: 연결 1(error) → 체인의 연결 2. 제안 → 실행 → 연결 교체 + FallbackUsed + 알림
+        db.execute_unprepared(
+            "INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name, status) VALUES (1, 1, 'api_key', 'openai', 'OpenAI', 'bad', 'error'), (2, 1, 'api_key', 'openai', 'OpenAI', 'good', 'connected'); \
+             INSERT INTO tbl_runtime (sn, wid, code, name) VALUES (1, 1, 'codex', 'Codex'); \
+             INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort) VALUES (1, 1, 1, 1), (1, 1, 2, 2);",
+        ).await.unwrap();
+        let b = 2;
+        call(&app, "POST", &format!("/tasks/{b}/assign"), Some(json!({"member_sn": 1}))).await;
+        let rs3 = call(&app, "POST", &format!("/tasks/{b}/runs"), None).await.1["sn"].as_i64().unwrap();
+        db.execute_unprepared(&format!("UPDATE tbl_run SET connection_sn = 1 WHERE sn = {rs3};")).await.unwrap();
+        let sn = rule::on(&db, &fail(rs3).await).await.unwrap().unwrap();
+        let v = call(&app, "GET", "/proposals?status=proposed", None).await.1;
+        assert_eq!((v[0]["kind"].as_str(), v[0]["title"].as_str().unwrap().contains("good")), (Some("fallback"), true));
+        assert_eq!(call(&app, "POST", &format!("/proposals/{sn}/proceed"), None).await.1["status"], "user_done");
+        assert_eq!(r::Entity::find_by_id(rs3).one(&db).await.unwrap().unwrap().connection_sn, Some(2));
+        assert_eq!(events(&db, "run", rs3).await.last().unwrap().0, "FallbackUsed");
+        let n = call(&app, "GET", "/notifications", None).await.1;
+        assert_eq!((n[0]["event_code"].as_str(), n[0]["title"].as_str(), n[0]["ref_type"].as_str(), n[0]["ref_sn"].as_i64()), (Some("fallback_used"), Some("good"), Some("run"), Some(rs3)));
+    }
+
+    /// B-16 레벨 처리: L1 handle이 wait면 제안 대신 판단 요청(L2 · Orch가 묻는다 · 알림 actor orch)
+    #[tokio::test]
+    async fn orch_ask() {
+        use crate::orch_rule as rule;
+        let db = mem().await;
+        let app = app(db.clone());
+        let a = rig(&app, &db).await;
+        let ev = finish(&app, &db, a).await;
+        assert_eq!(set_policy(&app, |p| p["levels"][1]["handle"] = json!("wait")).await.0, StatusCode::OK);
+        assert_eq!(rule::on(&db, &ev).await.unwrap(), None);
+        assert_eq!(call(&app, "GET", "/proposals", None).await.1.as_array().unwrap().len(), 0);
+        let d = call(&app, "GET", "/decisions", None).await.1;
+        assert_eq!((d.as_array().unwrap().len(), d[0]["level"].as_i64(), d[0]["member_sn"].as_i64(), d[0]["deadline_at"].is_null()), (1, Some(2), Some(2), true));
+        let n = call(&app, "GET", "/notifications", None).await.1;
+        assert_eq!((n[0]["event_code"].as_str(), n[0]["actor_type"].as_str()), (Some("decision_request"), Some("orch")));
+    }
+
+    /// B-16 대기열: NOW = 진행 중 Run의 태스크 · NEXT = 담당 todo (queue_sort → priority → num) · 의존 대기 표시 · 없는 멤버 404
+    #[tokio::test]
+    async fn orch_queue() {
+        let db = mem().await;
+        let app = app(db.clone());
+        let a = rig(&app, &db).await; // a(1) · b(2) · c(3)
+        for sn in [2, 3] {
+            call(&app, "POST", &format!("/tasks/{sn}/assign"), Some(json!({"member_sn": 1}))).await;
+        }
+        let q = call(&app, "GET", "/members/1/queue", None).await.1;
+        assert_eq!((q["now"].is_null(), q["next"].as_array().unwrap().len()), (true, 3));
+        call(&app, "PATCH", "/tasks/3", Some(json!({"queue_sort": 1}))).await;
+        call(&app, "PATCH", "/tasks/2", Some(json!({"priority": 0}))).await;
+        call(&app, "POST", &format!("/tasks/{a}/deps"), Some(json!({"depend_task_sn": 3}))).await; // a는 c를 기다린다
+        let q = call(&app, "GET", "/members/1/queue", None).await.1;
+        let order: Vec<i64> = q["next"].as_array().unwrap().iter().map(|x| x["task_sn"].as_i64().unwrap()).collect();
+        assert_eq!(order, [3, 2, a]); // c(queue_sort) → b(P0) → a(P2)
+        assert_eq!((q["next"][0]["title"].as_str(), q["next"][1]["priority"].as_i64(), q["next"][2]["waiting"].as_bool(), q["next"][0]["waiting"].as_bool()), (Some("C"), Some(0), Some(true), Some(false)));
+        assert!(q["next"][0]["num"].is_i64());
+
+        // Run을 시작하면 NOW로 올라가고 NEXT에서 빠진다
+        call(&app, "POST", &format!("/tasks/{a}/runs"), None).await;
+        let q = call(&app, "GET", "/members/1/queue", None).await.1;
+        assert_eq!((q["now"]["task_sn"].as_i64(), q["now"]["waiting"].as_bool(), q["next"].as_array().unwrap().len()), (Some(a), Some(true), 2));
+        assert_eq!(call(&app, "GET", "/members/99/queue", None).await.0, StatusCode::NOT_FOUND);
     }
 
     /// B-13: 완료 조건 교체(sn 유지 · 체크 이벤트) · 라벨(PATCH 이름 → 생성 · 목록) · 의존(대기 계산 · 순환 · 중복 · 삭제) · 저장 보기 · 전체 목록 필터 · Diagram 배치
