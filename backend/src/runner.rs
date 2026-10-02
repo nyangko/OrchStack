@@ -3,8 +3,8 @@
 #![allow(dead_code)] // 리드 Run 디스패처가 호출한다
 
 use crate::{
-    agent,
-    entity::{tbl_profile_rule as pr, tbl_profile_tool as pt, tbl_context_manifest as cm, tbl_context_source as cs, tbl_log_token as lt, tbl_map_fallback as fb, tbl_member, tbl_model, tbl_project, tbl_run as r, tbl_runtime, tbl_session as s, tbl_task, tbl_team, tbl_workspace},
+    agent, context,
+    entity::{tbl_agent_profile as ap, tbl_profile_rule as pr, tbl_profile_tool as pt, tbl_context_manifest as cm, tbl_log_token as lt, tbl_map_fallback as fb, tbl_member, tbl_model, tbl_project, tbl_run as r, tbl_runtime, tbl_session as s, tbl_task, tbl_team, tbl_workspace},
     error::{Error, Res},
     event::{self, Ev},
     exec::{self, Job, Status},
@@ -19,7 +19,7 @@ use std::{collections::{HashMap, HashSet}, future::Future, hash::{DefaultHasher,
 use tokio::sync::{mpsc, oneshot, watch};
 
 /// 하위 작업자 고정 규칙 (≈200 tok). 항상 프롬프트 맨 앞에 같은 글자로 둔다 (캐시 접두어)
-const RULES: &str = "\
+pub(crate) const RULES: &str = "\
 You are a sub-task worker. Rules:
 - Do only the @TASK below. Edit only files in `paths`. Read nothing else.
 - Follow the existing code style of the given files. Smallest change that meets every `ac`.
@@ -33,7 +33,7 @@ ac 1 ok | ac 2 fail \"short reason\"
 left todo \"short\"   (optional, one per line; also risk perf|security|data|compat \"short\")
 ";
 /// paths 파일 하나에 넣는 최대 바이트 (넘으면 앞부분만)
-const FILE_MAX: usize = 64 * 1024;
+pub(crate) const FILE_MAX: usize = 64 * 1024;
 
 /// 실행기별 지침 차단 인자 (Job.args). 저장소 · 사용자 지침 md · 메모리 · 설정 파일 hooks · MCP · 스킬을 끈다.
 /// Claude는 canary(CLAUDE.md "reply BANANA")로 확인 (2.1.286). Codex는 미검증 · CODEX_HOME 아래 사용자 AGENTS.md는 막지 못한다 (#60)
@@ -67,18 +67,6 @@ pub fn perms(code: &str, tools: &[pt::Model], rules: &[pr::Model]) -> Vec<String
     a.push("--disallowedTools".into());
     a.extend(deny);
     a
-}
-
-/// 최소 입력: 고정 규칙 → @TASK 원문 → paths 파일 (경로, 내용 · None = 아직 없는 파일 · glob)
-pub fn prompt(brief: &str, files: &[(String, Option<String>)]) -> String {
-    let mut p = format!("{RULES}\n{}\n", brief.trim());
-    for (path, body) in files {
-        match body {
-            Some(b) => p += &format!("\n--- {path}\n{b}\n"),
-            None => p += &format!("\n--- {path} (not read: new file or glob)\n"),
-        }
-    }
-    p
 }
 
 /// 실행기 응답에서 찾은 @REPORT
@@ -150,6 +138,10 @@ pub async fn spawn(db: &DatabaseConnection, lead_sn: i64, text: &str) -> Res<Spa
             Ok(p) => p,
             Err(s) => return Ok((Spawn::Stop(s), vec![])),
         };
+        // 입력 상한: 넘으면 Run을 만들지 않고 큰 출처와 함께 리드에게 돌려준다 (@ASK로 늘어나는 경로는 실행 때 다시 본다)
+        if let Some(why) = context::over_sub(tx, lead.project_sn, &b.id, text.trim(), &b.paths).await? {
+            return Ok((Spawn::Stop(Stop::Lead(format!("context_over: {why}"))), vec![]));
+        }
         // runner: 리드 프로필 폴백 체인에서 등급이 맞는 첫 단계 (리드는 모델을 고르지 않는다)
         let mut step = None;
         if let Some(t) = plan.tier {
@@ -183,7 +175,7 @@ pub async fn spawn(db: &DatabaseConnection, lead_sn: i64, text: &str) -> Res<Spa
 }
 
 /// tbl_run.paths JSON → 허용 경로 목록 (violation으로 남긴 범위 밖 변경은 뺀다)
-fn granted(m: &r::Model) -> Vec<String> {
+pub(crate) fn granted(m: &r::Model) -> Vec<String> {
     let v: serde_json::Value = m.paths.as_deref().and_then(|p| serde_json::from_str(p).ok()).unwrap_or_default();
     v.as_array().into_iter().flatten().filter(|x| x["source"] != "violation").filter_map(|x| x["path"].as_str().map(str::to_owned)).collect()
 }
@@ -275,86 +267,120 @@ pub fn drain(db: DatabaseConnection, lead_sn: i64, out: mpsc::UnboundedSender<(i
     })
 }
 
-/// queued runner 하위 Run 하나를 실행하고 리드에게 줄 @REPORT를 돌려준다. `cancel`이 true가 되면 취소.
-/// @ASK가 받은 경로 인접이면 paths에 더해 새 파일로 다시 실행한다 (rule::ask 상한까지 · 새 경로가 형제와 겹치면 그 형제가 끝날 때까지 waiting).
-/// 범위 밖 @ASK · 질문은 리드에게 blocked로 넘긴다. 실행마다 세션 · ContextManifest · 토큰(하위 Run에만)을 남기고,
-/// 끝나면 paths 밖 변경을 검사(위반이면 failed)하고 이 Run을 기다리던 형제의 대기를 푼다
+/// 호출에 쓰는 실행기 · 연결 · 모델
+struct Via {
+    ex: &'static dyn exec::Executor,
+    conn: Option<i64>,
+    model: Option<String>,
+}
+
+/// 모델 호출 1번: 세션 · manifest(조립 결과) 기록 → 실행 → 토큰 기록 · 연결 갱신 → 세션 닫기. Run 합계(total)에 이번 사용량을 더한다
+async fn call(db: &DatabaseConnection, m: &r::Model, built: &context::Built, job: Job, via: &Via, total: &mut exec::Usage, cancel: &watch::Receiver<bool>) -> Res<exec::Outcome> {
+    let Via { ex, conn, model } = via;
+    let (conn, model) = (*conn, model.clone());
+    let (session, manifest) = event::run(db, async |tx| {
+        let num = s::Entity::find().filter(s::Column::MemberSn.eq(m.member_sn)).order_by_desc(s::Column::Num).one(tx).await?.map_or(1, |x| x.num + 1);
+        let ses = s::ActiveModel { run_sn: Set(m.sn), member_sn: Set(m.member_sn), num: Set(num), ..Default::default() }.insert(tx).await?;
+        let man = cm::ActiveModel { run_sn: Set(m.sn), session_sn: Set(Some(ses.sn)), budget_token: Set(context::INPUT_CAP), ..Default::default() }.insert(tx).await?;
+        context::record(tx, built, man.sn).await?;
+        Ok(((ses.sn, man.sn), vec![]))
+    }).await?;
+    run::session_to(db, session, "active").await?;
+
+    let (tx, _rx) = mpsc::unbounded_channel(); // ponytail: 실시간 스트림은 B-5 구독이 붙을 때
+    // watch(true) → exec의 oneshot 취소. 보내는 쪽이 사라지면 취소하지 않는다
+    let (stop, stop_rx) = oneshot::channel();
+    let mut c = cancel.clone();
+    let fwd = tokio::spawn(async move { if c.wait_for(|v| *v).await.is_ok() { let _ = stop.send(()); } else { std::future::pending::<()>().await } });
+    let out = exec::run(*ex, &job, &tx, stop_rx).await;
+    fwd.abort();
+
+    // 토큰은 하위 Run에만 쌓는다 (리드 합계와 분리) · Run 합계 = 실행 합
+    let u = out.usage;
+    (total.input, total.cache_read, total.cache_write, total.output) = (total.input + u.input, total.cache_read + u.cache_read, total.cache_write + u.cache_write, total.output + u.output);
+    let sum = *total;
+    event::run(db, async |tx| {
+        lt::ActiveModel {
+            run_sn: Set(m.sn), session_sn: Set(Some(session)), connection_sn: Set(conn), manifest_sn: Set(Some(manifest)), model_code: Set(model.clone()),
+            token_input: Set(u.input), token_cache_read: Set(u.cache_read), token_cache_write: Set(u.cache_write), token_output: Set(u.output), ..Default::default()
+        }.insert(tx).await?;
+        context::touch(tx, conn).await?;
+        r::Entity::update_many().filter(r::Column::Sn.eq(m.sn))
+            .col_expr(r::Column::TokenInput, sum.input.into()).col_expr(r::Column::TokenCacheRead, sum.cache_read.into())
+            .col_expr(r::Column::TokenCacheWrite, sum.cache_write.into()).col_expr(r::Column::TokenOutput, sum.output.into())
+            .exec(tx).await?;
+        s::Entity::update_many().filter(s::Column::Sn.eq(session)).col_expr(s::Column::ProviderSessionId, out.session.clone().into()).exec(tx).await?;
+        Ok(((), vec![]))
+    }).await?;
+    run::session_to(db, session, if out.status == Status::Done { "stopped" } else { "failed" }).await?;
+    Ok(out)
+}
+
+/// queued Run 하나를 실행한다. 하위 Run(runner)은 리드에게 줄 @REPORT를, 리드 Run은 실행기의 마지막 응답을 돌려준다. `cancel`이 true가 되면 취소.
+/// 입력은 `context::assemble`이 만든다 (상한을 넘으면 세션 · manifest 없이 context_over로 실패).
+/// 하위: @ASK가 받은 경로 인접이면 paths에 더해 새 파일로 다시 실행한다 (rule::ask 상한까지 · 새 경로가 형제와 겹치면 그 형제가 끝날 때까지 waiting).
+/// 범위 밖 @ASK · 질문은 리드에게 blocked로 넘긴다. 끝나면 paths 밖 변경을 검사(위반이면 failed)하고 이 Run을 기다리던 형제의 대기를 푼다.
+/// 리드: 프로필의 실행기 · 연결 · 모델로 한 번 실행하고 끝 (@TASK 해석 · 리뷰 전이는 리드 디스패처 몫)
 pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bool>) -> Res<String> {
     let m = r::Entity::find_by_id(sn).one(db).await?.ok_or_else(Error::not_found)?;
-    let (Some("runner"), Some(text), "queued", None) = (m.spawn_mode.as_deref(), m.brief.as_deref(), m.status.as_str(), m.wait_run_sn) else {
-        return Err(Error::conflict(format!("run {sn} is not a ready runner")));
+    let lead = m.parent_run_sn.is_none() && m.spawn_mode.is_none();
+    let b: Option<Brief> = if lead {
+        if m.status != "queued" {
+            return Err(Error::conflict(format!("run {sn} is not queued")));
+        }
+        None
+    } else {
+        let (Some("runner"), Some(text), "queued", None) = (m.spawn_mode.as_deref(), m.brief.as_deref(), m.status.as_str(), m.wait_run_sn) else {
+            return Err(Error::conflict(format!("run {sn} is not a ready runner")));
+        };
+        Some(rule::parse(text).map_err(|_| Error::conflict("stored brief is invalid".into()))?)
     };
-    let b: Brief = rule::parse(text).map_err(|_| Error::conflict("stored brief is invalid".into()))?;
     // 먼저 starting으로 잡는다 (같은 Run을 두 번 띄우지 않게)
     run::run_to(db, sn, "starting").await?;
     let project = tbl_project::Entity::find_by_id(m.project_sn).one(db).await?.ok_or_else(Error::not_found)?;
     let ws = tbl_workspace::Entity::find_by_id(project.wid).one(db).await?.ok_or_else(Error::not_found)?;
-    let rt = match m.runtime_sn { Some(x) => tbl_runtime::Entity::find_by_id(x).one(db).await?, None => None };
-    let (Some(rt), Some(cwd)) = (rt, project.repo_path.clone()) else {
-        return finish(db, &m, &b, None, "no_runtime", None).await;
-    };
-    let Some(ex) = exec::pick(&rt.code) else { return finish(db, &m, &b, None, "no_runtime", None).await };
     // 도구 정책은 리드 프로필을 따른다 (하위 Run의 member_sn = 리드 멤버)
     let profile = tbl_member::Entity::find_by_id(m.member_sn).one(db).await?.ok_or_else(Error::not_found)?.profile_sn;
+    let prof = ap::Entity::find_by_id(profile).one(db).await?.ok_or_else(Error::not_found)?;
+    // 실행기 · 연결 · 모델: 하위 Run은 spawn이 정해 둔 값, 리드 Run은 프로필 값 (Run에도 남긴다)
+    let (rt_sn, conn, model) = if lead {
+        let code = match prof.model_sn { Some(x) => tbl_model::Entity::find_by_id(x).one(db).await?.map(|x| x.code), None => None };
+        event::run(db, async |tx| {
+            r::Entity::update_many().filter(r::Column::Sn.eq(sn)).col_expr(r::Column::RuntimeSn, prof.runtime_sn.into())
+                .col_expr(r::Column::ConnectionSn, prof.connection_sn.into()).col_expr(r::Column::ModelCode, code.clone().into()).exec(tx).await?;
+            Ok(((), vec![]))
+        }).await?;
+        (prof.runtime_sn, prof.connection_sn, code)
+    } else {
+        (m.runtime_sn, m.connection_sn, m.model_code.clone())
+    };
+    let rt = match rt_sn { Some(x) => tbl_runtime::Entity::find_by_id(x).one(db).await?, None => None };
+    let (Some(rt), Some(cwd)) = (rt, project.repo_path.clone()) else {
+        return finish(db, &m, b.as_ref(), None, "no_runtime", None).await;
+    };
+    let Some(ex) = exec::pick(&rt.code) else { return finish(db, &m, b.as_ref(), None, "no_runtime", None).await };
     let tools = pt::Entity::find().filter(pt::Column::ProfileSn.eq(profile)).all(db).await?;
     let rules = pr::Entity::find().filter(pr::Column::ProfileSn.eq(profile)).all(db).await?;
+    // 저장소 규칙 · 프로필 지침은 context가 직접 넣으므로 실행기가 따로 읽지 않게 막는다 (리드도 같다)
     let args: Vec<String> = block(&rt.code).into_iter().chain(perms(&rt.code, &tools, &rules)).collect();
-    let before = dirty(&cwd).await;
+    let via = Via { ex, conn, model: model.clone() };
+    let before = if lead { None } else { dirty(&cwd).await };
     run::run_to(db, sn, "running").await?;
     let (mut total, mut asked) = (exec::Usage::default(), 0u8);
+    let mut said = String::new();
 
     let (rep, code, detail): (Option<Report>, String, Option<String>) = loop {
         // ponytail: repo 모드만 (Alpha 기본). worktree 모드는 #21 worktree 생성 때
-        let paths = granted(&r::Entity::find_by_id(sn).one(db).await?.ok_or_else(Error::not_found)?);
-        let files: Vec<(String, Option<String>)> = paths.iter().map(|p| {
-            let body = (!p.contains('*')).then(|| std::fs::read(Path::new(&cwd).join(p)).ok()).flatten()
-                .map(|v| String::from_utf8_lossy(&v[..v.len().min(FILE_MAX)]).into_owned());
-            (p.clone(), body)
-        }).collect();
-        let input = prompt(text, &files);
-
-        // 세션 · 컨텍스트 목록 (보낸 항목만 · 토큰은 글자 수 / 4 추정)
-        let (session, manifest) = event::run(db, async |tx| {
-            let num = s::Entity::find().filter(s::Column::MemberSn.eq(m.member_sn)).order_by_desc(s::Column::Num).one(tx).await?.map_or(1, |x| x.num + 1);
-            let ses = s::ActiveModel { run_sn: Set(sn), member_sn: Set(m.member_sn), num: Set(num), ..Default::default() }.insert(tx).await?;
-            let man = cm::ActiveModel { run_sn: Set(sn), session_sn: Set(Some(ses.sn)), budget_token: Set(b.tok.unwrap_or(0)), ..Default::default() }.insert(tx).await?;
-            let mut items = vec![("instruction", "runner-rules".to_owned(), RULES.len()), ("task", format!("@TASK {}", b.id), text.len())];
-            items.extend(files.iter().map(|(p, body)| ("file", p.clone(), body.as_ref().map_or(0, String::len))));
-            for (i, (kind, label, len)) in items.into_iter().enumerate() {
-                cs::ActiveModel { manifest_sn: Set(man.sn), kind: Set(kind.into()), ref_label: Set(label), token_count: Set((len / 4) as i64), sort: Set(i as i64), ..Default::default() }.insert(tx).await?;
-            }
-            Ok(((ses.sn, man.sn), vec![]))
-        }).await?;
-        run::session_to(db, session, "active").await?;
-
+        // 세션은 호출마다 새로 만든다 (실행기에 이어가기가 없다) → 반복 항목도 보내고 repeat로만 표시
+        let built = context::assemble(db, sn, None).await?;
+        if let Some(why) = context::over(&built) {
+            break (None, "context_over".into(), Some(why));
+        }
         let job = Job {
-            prompt: input, cwd: cwd.clone().into(), bin: rt.bin_path.clone().map(Into::into), model: m.model_code.clone(), args: args.clone(),
+            prompt: built.prompt.clone(), cwd: cwd.clone().into(), bin: rt.bin_path.clone().map(Into::into), model: model.clone(), args: args.clone(),
             timeout: Duration::from_secs(ws.run_timeout_min.max(1) as u64 * 60), ..Default::default()
         };
-        let (tx, _rx) = mpsc::unbounded_channel(); // ponytail: 실시간 스트림은 B-5 구독이 붙을 때
-        // watch(true) → exec의 oneshot 취소. 보내는 쪽이 사라지면 취소하지 않는다
-        let (stop, stop_rx) = oneshot::channel();
-        let mut c = cancel.clone();
-        let fwd = tokio::spawn(async move { if c.wait_for(|v| *v).await.is_ok() { let _ = stop.send(()); } else { std::future::pending::<()>().await } });
-        let out = exec::run(ex, &job, &tx, stop_rx).await;
-        fwd.abort();
-
-        // 토큰은 하위 Run에만 쌓는다 (리드 합계와 분리) · Run 합계 = 실행 합
-        let u = out.usage;
-        (total.input, total.cache_read, total.cache_write, total.output) = (total.input + u.input, total.cache_read + u.cache_read, total.cache_write + u.cache_write, total.output + u.output);
-        event::run(db, async |tx| {
-            lt::ActiveModel {
-                run_sn: Set(sn), session_sn: Set(Some(session)), connection_sn: Set(m.connection_sn), manifest_sn: Set(Some(manifest)), model_code: Set(m.model_code.clone()),
-                token_input: Set(u.input), token_cache_read: Set(u.cache_read), token_cache_write: Set(u.cache_write), token_output: Set(u.output), ..Default::default()
-            }.insert(tx).await?;
-            r::Entity::update_many().filter(r::Column::Sn.eq(sn))
-                .col_expr(r::Column::TokenInput, total.input.into()).col_expr(r::Column::TokenCacheRead, total.cache_read.into())
-                .col_expr(r::Column::TokenCacheWrite, total.cache_write.into()).col_expr(r::Column::TokenOutput, total.output.into())
-                .exec(tx).await?;
-            s::Entity::update_many().filter(s::Column::Sn.eq(session)).col_expr(s::Column::ProviderSessionId, out.session.clone().into()).exec(tx).await?;
-            Ok(((), vec![]))
-        }).await?;
-        run::session_to(db, session, if out.status == Status::Done { "stopped" } else { "failed" }).await?;
+        let out = call(db, &m, &built, job, &via, &mut total, &cancel).await?;
 
         let fail = match out.status {
             Status::Done => None,
@@ -366,6 +392,11 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
         };
         if let Some(code) = fail { break (None, code.into(), out.err) }
         let t = out.text.unwrap_or_default();
+        if lead {
+            said = t;
+            break (None, String::new(), out.err);
+        }
+        let b = b.as_ref().expect("sub run has a brief");
         // 마지막 블록이 @REPORT(또는 둘 다 없음)면 끝
         if t.rfind("@ASK v1") <= t.rfind("@REPORT v1") {
             break match report(&t) {
@@ -374,6 +405,7 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
                 None => (None, "no_report".into(), Some(t)),
             };
         }
+        let paths = granted(&r::Entity::find_by_id(sn).one(db).await?.ok_or_else(Error::not_found)?);
         // @ASK: 인접 경로면 더해서 다시, 아니면 리드에게
         let (need, line) = ask_of(&t).unwrap_or_default();
         let add = if need.is_empty() { Err(Stop::Lead("question".into())) } else { rule::ask(&need, &paths, asked) };
@@ -412,9 +444,9 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
         }
     };
 
-    // 범위 밖 변경 → violation으로 남기고 실패
+    // 범위 밖 변경 → violation으로 남기고 실패 (하위 Run만)
     let (mut rep, mut code) = (rep, code);
-    if let Some(before) = before {
+    if let (Some(before), Some(b)) = (before, b.as_ref()) {
         let bad = outside(db, &m, &cwd, &before).await?;
         if !bad.is_empty() {
             add_paths(db, sn, &bad, "violation").await?;
@@ -423,12 +455,13 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
             code = "paths_violation".into();
         }
     }
-    finish(db, &m, &b, rep, &code, detail).await
+    let report = finish(db, &m, b.as_ref(), rep, &code, detail).await?;
+    Ok(if lead { said } else { report })
 }
 
 /// 끝 상태 기록 → 기다리던 형제 대기 해제 → 리드에게 줄 @REPORT. code가 비면 completed, 아니면 failed(code)
-async fn finish(db: &DatabaseConnection, m: &r::Model, b: &Brief, rep: Option<Report>, code: &str, detail: Option<String>) -> Res<String> {
-    let lead = rep.as_ref().map_or_else(|| failed(&b.id, &b.parent, "failed", code), |r| r.lead.clone());
+async fn finish(db: &DatabaseConnection, m: &r::Model, b: Option<&Brief>, rep: Option<Report>, code: &str, detail: Option<String>) -> Res<String> {
+    let lead = rep.as_ref().map_or_else(|| b.map_or_else(String::new, |b| failed(&b.id, &b.parent, "failed", code)), |r| r.lead.clone());
     let summary = rep.as_ref().map(|r| r.status.clone());
     let fail = (!code.is_empty()).then(|| code.to_owned());
     event::run(db, async |tx| {
@@ -446,16 +479,13 @@ async fn finish(db: &DatabaseConnection, m: &r::Model, b: &Brief, rep: Option<Re
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entity::tbl_context_source as cs;
 
     const BRIEF: &str = "@TASK v1\nid: T1.1  parent: R1  mode: runner  kind: fix\ngoal: g\nac: [1 a]\npaths: [a.txt]";
 
-    /// 최소 입력: 고정 규칙 → @TASK → 파일 순서, 저장소 지침이 끼지 않는다
+    /// 고정 규칙 크기 · 지침 차단 인자 · 도구 정책 → 허용/차단 인자 (입력 조립 순서는 context 테스트)
     #[test]
     fn input() {
-        let p = prompt(BRIEF, &[("a.txt".into(), Some("hello".into())), ("src/*".into(), None)]);
-        assert!(p.starts_with(RULES));
-        assert!(p.find("@TASK v1").unwrap() < p.find("--- a.txt\nhello").unwrap());
-        assert!(p.contains("--- src/* (not read"));
         assert!(RULES.len() / 4 < 300);
         assert!(block("claude_code").contains(&"--strict-mcp-config".to_owned()));
         // 프로필 정책: 행 없음 = Bash 허용 · shell 차단 = Bash 없음 · push 차단 · 명령 규칙 차단

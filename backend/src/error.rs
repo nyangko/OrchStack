@@ -34,6 +34,11 @@ impl Error {
         Self(StatusCode::NOT_FOUND, "not_found", "not found".into())
     }
 
+    /// 컨텍스트가 호출당 입력 상한을 넘었을 때 (422 · 코드 context_over)
+    pub fn over(msg: String) -> Self {
+        Self(StatusCode::UNPROCESSABLE_ENTITY, "context_over", msg)
+    }
+
     /// 설명 문구
     pub fn message(&self) -> &str {
         &self.2

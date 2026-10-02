@@ -112,7 +112,7 @@ struct Preview {
 
 /// 본문 토큰 수 추정: ASCII 글자 / 4 + CJK(한글 · 한자 · 가나) 글자 × 1.5, 올림
 // ponytail: 토크나이저 없는 근사. 실행기 실측(tbl_context_manifest.token_count)이 오면 교체
-fn tokens(s: &str) -> i64 {
+pub(crate) fn tokens(s: &str) -> i64 {
     // n/4 + 1.5k = (n + 6k)/4 — 정수로 올림
     let cjk = |c: char| matches!(c, '\u{AC00}'..='\u{D7A3}' | '\u{1100}'..='\u{11FF}' | '\u{3130}'..='\u{318F}' | '\u{4E00}'..='\u{9FFF}' | '\u{3400}'..='\u{4DBF}' | '\u{3040}'..='\u{30FF}');
     let (n, k) = s.chars().fold((0i64, 0i64), |(n, k), c| if cjk(c) { (n, k + 1) } else { (n + 1, k) });

@@ -10,6 +10,7 @@ mod error; // 공통 에러 응답
 mod event; // 명령 실행 틀 (상태 변경 + 이벤트 append + 발행)
 mod exec; // 실행기: Claude Code · Codex CLI 비대화형 실행 (#13)
 mod issue; // /issues CRUD
+mod context; // 컨텍스트 조립기 (고정 접두 · 반복 · 상한 · 견적) + /tasks/{sn}/estimate · /runs/{sn}/context
 mod orch_rule; // Orch 규칙 엔진 (LLM 0): 이벤트 → 제안 · 제안 실행 · 타이머 · 가드 · 멤버 대기열
 mod orch; // PM Dock: /projects/{sn}/conversation · messages · /messages/* · /proposals · /runs/{sn}/instruct
 mod meta; // 완료 조건 · 의존 · 라벨 목록 · 저장 보기 · Diagram 배치
@@ -67,7 +68,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(orch_rule::routes()).merge(policy::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(orch_rule::routes()).merge(policy::routes()).merge(context::routes()).merge(stat::routes()).merge(meta::routes()).merge(preset::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -1204,6 +1205,227 @@ mod tests {
         let q = call(&app, "GET", "/members/1/queue", None).await.1;
         assert_eq!((q["now"]["task_sn"].as_i64(), q["now"]["waiting"].as_bool(), q["next"].as_array().unwrap().len()), (Some(a), Some(true), 2));
         assert_eq!(call(&app, "GET", "/members/99/queue", None).await.0, StatusCode::NOT_FOUND);
+    }
+
+    /// 값 하나를 돌려주는 SQL (테스트용)
+    async fn scalar(db: &DatabaseConnection, sql: &str) -> i64 {
+        db.query_one_raw(Statement::from_string(DbBackend::Sqlite, sql.to_owned())).await.unwrap().unwrap().try_get_by_index::<Option<i64>>(0).unwrap().unwrap_or(-1)
+    }
+
+    /// B-17 도우미: 가짜 Claude CLI(받은 프롬프트를 prompt.txt · 인자를 args.txt에 남기고 호출 횟수에 따라 usage를 다르게 낸다)와 DB.
+    /// 멤버 1(프로필 1 = 실행기 1 · 연결 1) · 프로젝트 1(repo = dir) · 태스크 1 Login(#2 · 완료 조건 2 · 라벨 auth · 의존 → 태스크 2 Logout #3) ·
+    /// 프리셋 3개(role · protocol · rule 순으로 연결 → 조립은 protocol → rule → role) · 프로필 파일 1 · 저장소 CLAUDE.md
+    async fn ctx_rig(name: &str) -> (DatabaseConnection, std::path::PathBuf) {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("orch-ctx-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("CLAUDE.md"), "REPO-RULE").unwrap();
+        let bin = dir.join("claude");
+        std::fs::write(&bin, format!(r#"#!/bin/sh
+D={0}
+cat > $D/prompt.txt
+echo "$@" > $D/args.txt
+n=$(cat $D/n 2>/dev/null || echo 0); echo $((n+1)) > $D/n
+if [ "$n" = 0 ]; then CR=0; else CR=300; fi
+echo '{{"type":"system","subtype":"init","session_id":"s9"}}'
+printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_tokens":100,"output_tokens":3,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}}\n' "$CR"
+"#, dir.display())).unwrap();
+        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let db = mem().await;
+        db.execute_unprepared(&format!("
+            INSERT INTO tbl_team (sn, wid, name) VALUES (1, 1, 'T');
+            INSERT INTO tbl_runtime (sn, wid, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{1}');
+            INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c');
+            INSERT INTO tbl_agent_profile (sn, wid, kind, runtime_sn, connection_sn) VALUES (1, 1, 'member', 1, 1);
+            INSERT INTO tbl_member (sn, team_sn, profile_sn, name, role_name) VALUES (1, 1, 1, 'm', 'dev');
+            INSERT INTO tbl_project (sn, wid, team_sn, name, repo_path) VALUES (1, 1, 1, 'p', '{0}');
+            INSERT INTO tbl_issue (sn, project_sn, num, title) VALUES (1, 1, 1, 'I');
+            INSERT INTO tbl_task (sn, project_sn, issue_sn, num, title, description, member_sn) VALUES (1, 1, 1, 2, 'Login', 'desc a', 1), (2, 1, 1, 3, 'Logout', NULL, 1);
+            INSERT INTO tbl_task_criterion (task_sn, content, is_done, sort) VALUES (1, 'works', 0, 1), (1, 'errors', 1, 2);
+            INSERT INTO tbl_label (sn, project_sn, name) VALUES (1, 1, 'auth');
+            INSERT INTO tbl_map_task_label (task_sn, label_sn) VALUES (1, 1);
+            INSERT INTO tbl_map_task_dependency (task_sn, depend_task_sn) VALUES (1, 2);
+            INSERT INTO tbl_profile_path (profile_sn, kind, pattern, sort) VALUES (1, 'include', 'src/**', 1), (1, 'exclude', '**/.env*', 2);
+            INSERT INTO tbl_profile_file (profile_sn, path, content, sort) VALUES (1, 'rules/a11y.md', 'A11Y-FILE', 1);
+            INSERT INTO tbl_instruction_preset (sn, wid, kind, preset_key, name, limit_tok) VALUES (1, 1, 'protocol', 'p', 'P', 500), (2, 1, 'rule', 'r', 'R', 500), (3, 1, 'role', 'd', 'D', 500);
+            INSERT INTO tbl_instruction_preset_version (preset_sn, version, content, token_count) VALUES (1, 1, 'P-PROTO v1', 5), (2, 1, '- keep small', 0), (3, 1, '# Role: Dev', 5);
+            INSERT INTO tbl_map_profile_preset (profile_sn, preset_sn, pinned_version, sort) VALUES (1, 3, 1, 0), (1, 1, 1, 1), (1, 2, 1, 2);
+            INSERT INTO tbl_run (sn, project_sn, task_sn, member_sn, num, status) VALUES (1, 1, 1, 1, 1, 'queued'), (2, 1, 2, 1, 2, 'queued');",
+            dir.display(), bin.display())).await.unwrap();
+        (db, dir)
+    }
+
+    /// 조립 결과를 manifest(세션 sn)로 저장한다 (runner가 하는 것과 같다)
+    async fn ctx_save(db: &DatabaseConnection, run: i64, session: Option<i64>, b: &crate::context::Built) -> i64 {
+        use crate::entity::tbl_context_manifest as cm;
+        use sea_orm::ActiveModelTrait;
+        let tx = db.begin().await.unwrap();
+        let m = cm::ActiveModel { run_sn: sea_orm::Set(run), session_sn: sea_orm::Set(session), budget_token: sea_orm::Set(40_000), ..Default::default() }.insert(&tx).await.unwrap();
+        crate::context::record(&tx, b, m.sn).await.unwrap();
+        tx.commit().await.unwrap();
+        m.sn
+    }
+
+    /// (kind, ref_label) 목록
+    fn labels(b: &crate::context::Built) -> Vec<(&str, &str)> {
+        b.sources.iter().map(|s| (s.kind.as_str(), s.ref_label.as_str())).collect()
+    }
+
+    /// B-17 DoD 1: 조립 순서(protocol → rule → role → repo_rule → 프로필 파일 → @TASK) · 같은 입력 = 같은 바이트 · 접두는 태스크가 달라도 같다 ·
+    /// 같은 세션 두 번째 호출은 반복 항목을 프롬프트에서 빼고 새 세션이면 보내되 repeat 표시 · new_run 프로필은 빼지 않는다 · 토큰 0인 프리셋 버전은 채워 저장
+    #[tokio::test]
+    async fn context_order() {
+        use crate::context;
+        let (db, _dir) = ctx_rig("order").await;
+        let b = context::assemble(&db, 1, None).await.unwrap();
+        assert_eq!(labels(&b), [("preset", "protocol/p"), ("preset", "rule/r"), ("preset", "role/d"), ("repo_rule", "CLAUDE.md"), ("instruction", "rules/a11y.md"), ("task", "@TASK #2")]);
+        assert!(b.sources.iter().all(|s| s.content_hash.len() == 16 && s.is_repeat == 0));
+        assert_eq!((b.sources[0].ref_sn, b.sources[0].ref_version, b.sources[5].ref_sn), (Some(1), Some(1), Some(1)));
+        assert_eq!(b.prompt, "P-PROTO v1\n\n- keep small\n\n# Role: Dev\n\nREPO-RULE\n\nA11Y-FILE\n\n@TASK v1\nid: #2  title: Login\ndesc: desc a\nac 1 todo: works\nac 2 done: errors\ndep #3 todo: Logout\nlabels: auth\npaths: src/**  !**/.env*\n\n");
+        assert_eq!(b.estimate, b.sources.iter().map(|s| s.token_count).sum::<i64>());
+
+        // 같은 입력 → 같은 바이트 · 해시 / 다른 태스크도 @TASK 앞 접두는 같다
+        let again = context::assemble(&db, 1, None).await.unwrap();
+        assert_eq!((again.prompt.as_str(), again.sources.iter().map(|s| s.content_hash.clone()).collect::<Vec<_>>()), (b.prompt.as_str(), b.sources.iter().map(|s| s.content_hash.clone()).collect::<Vec<_>>()));
+        let other = context::assemble(&db, 2, None).await.unwrap();
+        let cut = b.prompt.find("@TASK v1").unwrap();
+        assert_eq!(&other.prompt[..cut], &b.prompt[..cut]);
+        assert_eq!((other.sources[..5].iter().map(|s| &s.content_hash).collect::<Vec<_>>(), other.sources[5].content_hash == b.sources[5].content_hash),
+            (b.sources[..5].iter().map(|s| &s.content_hash).collect::<Vec<_>>(), false));
+
+        // 저장: 출처 6건 · 토큰 0이던 프리셋 버전(rule)만 추정값으로 채워진다
+        db.execute_unprepared("INSERT INTO tbl_session (sn, run_sn, member_sn, num) VALUES (1, 1, 1, 1), (2, 1, 1, 2);").await.unwrap();
+        ctx_save(&db, 1, Some(1), &b).await;
+        assert_eq!(db_count(&db, "tbl_context_source").await, 6);
+        assert_eq!((scalar(&db, "SELECT token_count FROM tbl_instruction_preset_version WHERE preset_sn = 2").await > 0, scalar(&db, "SELECT token_count FROM tbl_instruction_preset_version WHERE preset_sn = 3").await), (true, 5));
+
+        // 같은 세션 두 번째 호출: 전부 반복 · 프롬프트에서 빠진다 (토큰 0) → 태스크 설명이 바뀌면 태스크 블록만 보낸다
+        let two = context::assemble(&db, 1, Some(1)).await.unwrap();
+        assert_eq!((two.sources.iter().all(|s| s.is_repeat == 1), two.prompt.as_str(), two.estimate), (true, "", 0));
+        db.execute_unprepared("UPDATE tbl_task SET description = 'desc b' WHERE sn = 1;").await.unwrap();
+        let two = context::assemble(&db, 1, Some(1)).await.unwrap();
+        assert_eq!(two.sources.iter().map(|s| s.is_repeat).collect::<Vec<_>>(), [1, 1, 1, 1, 1, 0]);
+        assert!(two.prompt.starts_with("@TASK v1") && two.prompt.contains("desc: desc b") && two.sources[..5].iter().all(|s| s.token_count == 0));
+        assert_eq!(two.estimate, two.sources[5].token_count);
+        // 새 세션(session 없음 · 다른 세션): 모두 보내되 repeat 표시
+        let fresh = context::assemble(&db, 1, Some(2)).await.unwrap();
+        assert_eq!((fresh.sources.iter().map(|s| s.is_repeat).collect::<Vec<_>>(), fresh.prompt.starts_with("P-PROTO v1")), ([1, 1, 1, 1, 1, 0].to_vec(), true));
+        // new_run 프로필은 같은 세션이어도 빼지 않는다
+        db.execute_unprepared("UPDATE tbl_agent_profile SET session_mode = 'new_run';").await.unwrap();
+        let nr = context::assemble(&db, 1, Some(1)).await.unwrap();
+        assert!(nr.prompt.starts_with("P-PROTO v1") && nr.sources[0].is_repeat == 1 && nr.sources[0].token_count > 0);
+        // repo_rule_mode = ignore → 저장소 규칙을 넣지 않는다
+        db.execute_unprepared("UPDATE tbl_agent_profile SET repo_rule_mode = 'ignore';").await.unwrap();
+        assert!(!labels(&context::assemble(&db, 1, None).await.unwrap()).contains(&("repo_rule", "CLAUDE.md")));
+    }
+
+    /// B-17 DoD 2: 상한 초과 → 422 context_over(상위 출처 3개) · Run 시작 · 다시 시도 모두 Run · 세션 · manifest가 생기지 않는다 ·
+    /// 견적은 200 + over = true · 하위 Run도 spawn이 만들지 않고 리드에게 돌려준다
+    #[tokio::test]
+    async fn context_over() {
+        use crate::{rule::Stop, runner::{self, Spawn}};
+        let (db, dir) = ctx_rig("over").await;
+        let app = app(db.clone());
+        let before = (db_count(&db, "tbl_run").await, db_count(&db, "tbl_session").await, db_count(&db, "tbl_context_manifest").await);
+        // 큰 프로필 파일 (ASCII 170K자 ≈ 42.5K 토큰) + 작은 파일
+        db.execute_unprepared(&format!("INSERT INTO tbl_profile_file (profile_sn, path, content, sort) VALUES (1, 'rules/big.md', '{}', 2);", "x".repeat(170_000))).await.unwrap();
+        let (st, e) = call(&app, "POST", "/tasks/1/runs", None).await;
+        let msg = e["message"].as_str().unwrap_or_default();
+        assert_eq!((st, e["error"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("context_over")), "{e}");
+        assert!(msg.contains("top: instruction rules/big.md 42.5K") && msg.contains("> cap 40.0K") && msg.matches(", ").count() == 2, "{msg}");
+        db.execute_unprepared("UPDATE tbl_run SET status = 'failed' WHERE sn = 1;").await.unwrap();
+        assert_eq!(call(&app, "POST", "/runs/1/retry", None).await.1["error"], "context_over");
+        assert_eq!((db_count(&db, "tbl_run").await, db_count(&db, "tbl_session").await, db_count(&db, "tbl_context_manifest").await), before);
+        assert_eq!(call(&app, "GET", "/tasks/1", None).await.1["status"], "todo"); // 태스크도 그대로
+
+        // 견적: 200 + over
+        let (st, v) = call(&app, "POST", "/tasks/1/estimate", None).await;
+        assert_eq!((st, v["over"].as_bool(), v["cap"].as_i64(), v["estimate"].as_i64().unwrap() > 40_000), (StatusCode::OK, Some(true), Some(40_000), true));
+
+        // 하위 Run: 64K 파일 3개 ≈ 48K 토큰 → Run을 만들지 않고 리드에게 context_over
+        for f in ["a", "b", "c"] {
+            std::fs::write(dir.join(format!("{f}.txt")), "y".repeat(70_000)).unwrap();
+        }
+        db.execute_unprepared("INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort, tier) VALUES (1, 1, 1, 1, 'L'), (1, 1, 1, 2, 'M'); UPDATE tbl_run SET status = 'running' WHERE sn = 1;").await.unwrap();
+        let brief = "@TASK v1\nid: T1.1  parent: R1  mode: runner  kind: fix\ngoal: g\nac: [1 a]\npaths: [a.txt, b.txt, c.txt]";
+        let runs = db_count(&db, "tbl_run").await;
+        let Spawn::Stop(Stop::Lead(why)) = runner::spawn(&db, 1, brief).await.unwrap() else { panic!("not stopped") };
+        assert!(why.starts_with("context_over: input") && why.contains("top: file "), "{why}");
+        assert_eq!(db_count(&db, "tbl_run").await, runs);
+        // 파일 하나면 통과
+        assert!(matches!(runner::spawn(&db, 1, &brief.replace("[a.txt, b.txt, c.txt]", "[a.txt]")).await.unwrap(), Spawn::Run(_)));
+    }
+
+    /// B-17 DoD 3: 견적 — Run이 없으면 cached 0 · 직전 Run과 접두가 같으면 그 접두 토큰이 cached_estimate · 담당 없음 409 · 없는 태스크 404
+    #[tokio::test]
+    async fn context_estimate() {
+        let (db, _dir) = ctx_rig("estimate").await;
+        let app = app(db.clone());
+        let (st, v) = call(&app, "POST", "/tasks/1/estimate", None).await;
+        assert_eq!((st, v["cached_estimate"].as_i64(), v["over"].as_bool(), v["sources"].as_array().unwrap().len()), (StatusCode::OK, Some(0), Some(false), 6));
+        assert_eq!((v["sources"][0]["kind"].as_str(), v["sources"][0]["ref_label"].as_str(), v["sources"][5]["ref_label"].as_str()), (Some("preset"), Some("protocol/p"), Some("@TASK #2")));
+        let est = v["estimate"].as_i64().unwrap();
+        assert_eq!(est, v["sources"].as_array().unwrap().iter().map(|s| s["token_count"].as_i64().unwrap()).sum::<i64>());
+
+        // 직전 Run(태스크 1)이 보낸 manifest → 태스크 2 견적의 접두 5개(@TASK 앞)가 캐시에 맞는다
+        let prev = crate::context::assemble(&db, 1, None).await.unwrap();
+        ctx_save(&db, 1, None, &prev).await;
+        let prefix: i64 = prev.sources[..5].iter().map(|s| s.token_count).sum();
+        let (_, v) = call(&app, "POST", "/tasks/2/estimate", None).await;
+        assert_eq!((v["cached_estimate"].as_i64(), v["estimate"].as_i64().unwrap() > prefix), (Some(prefix), true));
+        // 같은 태스크는 @TASK까지 전부 맞는다
+        assert_eq!(call(&app, "POST", "/tasks/1/estimate", None).await.1["cached_estimate"].as_i64(), Some(est));
+        // 접두가 중간에 달라지면 그 앞까지만 (프로필 파일 수정 → 그 앞 4개)
+        db.execute_unprepared("UPDATE tbl_profile_file SET content = 'A11Y-CHANGED';").await.unwrap();
+        let four: i64 = prev.sources[..4].iter().map(|s| s.token_count).sum();
+        assert_eq!(call(&app, "POST", "/tasks/2/estimate", None).await.1["cached_estimate"].as_i64(), Some(four));
+        db.execute_unprepared("UPDATE tbl_task SET member_sn = NULL WHERE sn = 2;").await.unwrap();
+        assert_eq!(call(&app, "POST", "/tasks/2/estimate", None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", "/tasks/99/estimate", None).await.0, StatusCode::NOT_FOUND);
+    }
+
+    /// B-17 DoD 4 + 리드 실행: 리드 Run을 가짜 CLI로 두 번 실행 → 프롬프트 = 조립 결과 · 호출마다 manifest(상한 예산) · /runs/{sn}/context ·
+    /// tbl_log_token 2건 뒤 연결 cache_hit_percent(300 / 500 = 60) · sync_at 갱신 · 팀 통계 avg_input_token · cache_hit_percent · 모델 호출은 실행기 1번씩
+    #[tokio::test]
+    async fn context_cache() {
+        use crate::runner;
+        let (db, dir) = ctx_rig("cache").await;
+        let app = app(db.clone());
+        assert_eq!(call(&app, "GET", "/connections/1", None).await.1["cache_hit_percent"], Value::Null);
+        let want = crate::context::assemble(&db, 1, None).await.unwrap();
+        assert_eq!(want.cached_estimate, 0);
+
+        let said = runner::go(&db, 1, tokio::sync::watch::channel(false).1).await.unwrap();
+        assert_eq!(said, "all done");
+        assert_eq!(std::fs::read_to_string(dir.join("prompt.txt")).unwrap(), want.prompt); // 실행기가 받은 것 = 조립 결과
+        assert!(std::fs::read_to_string(dir.join("args.txt")).unwrap().contains("--strict-mcp-config"));
+        let r1 = call(&app, "GET", "/runs/1", None).await.1;
+        assert_eq!((r1["status"].as_str(), r1["tokens"]["total"].as_i64()), (Some("completed"), Some(103)));
+        assert_eq!(scalar(&db, "SELECT connection_sn FROM tbl_run WHERE sn = 1").await, 1); // 리드 Run에 연결 · 실행기를 남긴다
+        // 첫 호출만으로 적중률이 생긴다 (0 / 100 = 0%)
+        let c = call(&app, "GET", "/connections/1", None).await.1;
+        assert_eq!((c["cache_hit_percent"].as_i64(), c["sync_at"].is_string()), (Some(0), true));
+
+        // 두 번째 Run(같은 멤버): 직전 Run의 접두가 캐시 예상으로 잡힌다 → 실행 → 300 / (200 + 300) = 60%
+        let pre = crate::context::assemble(&db, 2, None).await.unwrap();
+        assert_eq!(pre.cached_estimate, pre.sources[..5].iter().map(|s| s.token_count).sum::<i64>());
+        runner::go(&db, 2, tokio::sync::watch::channel(false).1).await.unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("n")).unwrap().trim(), "2"); // 실행기 호출 = Run마다 1번 · 요약 · 압축 호출 없음
+        let c = call(&app, "GET", "/connections/1", None).await.1;
+        assert_eq!(c["cache_hit_percent"].as_i64(), Some(60));
+        assert_eq!(db_count(&db, "tbl_log_token").await, 2);
+
+        // /runs/{sn}/context: 호출마다 1개 · 출처 순서 · 예산 · 실측 캐시율
+        let v = call(&app, "GET", "/runs/2/context", None).await.1;
+        assert_eq!((v["manifests"].as_array().unwrap().len(), v["manifests"][0]["budget_token"].as_i64(), v["manifests"][0]["sources"].as_array().unwrap().len(), v["manifests"][0]["cache_percent"].as_i64()), (1, Some(40_000), 6, Some(75)));
+        assert_eq!((v["manifests"][0]["sources"][0]["ref_label"].as_str(), v["manifests"][0]["sources"][5]["kind"].as_str(), v["manifests"][0]["total"].as_i64(), v["total"].as_i64()), (Some("protocol/p"), Some("task"), Some(pre.estimate), Some(pre.estimate)));
+        assert_eq!(call(&app, "GET", "/runs/1/context", None).await.1["manifests"][0]["cache_percent"].as_i64(), Some(0));
+        assert_eq!(call(&app, "GET", "/runs/99/context", None).await.0, StatusCode::NOT_FOUND);
+
+        // 팀 통계: 호출당 평균 입력 (100 + 400) / 2 · 연결 캐시율
+        let s = call(&app, "GET", "/teams/1/stats", None).await.1;
+        assert_eq!((s["avg_input_token"].as_i64(), s["cache_hit_percent"].as_i64()), (Some(250), Some(60)));
     }
 
     /// B-13: 완료 조건 교체(sn 유지 · 체크 이벤트) · 라벨(PATCH 이름 → 생성 · 목록) · 의존(대기 계산 · 순환 · 중복 · 삭제) · 저장 보기 · 전체 목록 필터 · Diagram 배치

@@ -264,6 +264,7 @@ async fn children(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<
 /// Run 시작 (StartRun → RunStarted). Run은 queued로 만들고 태스크는 in_progress. 담당 멤버가 없거나 진행 중 Run(하위 Run 제외 · #67)이 있으면 409
 #[utoipa::path(operation_id = "run_start", post, path = "/tasks/{sn}/runs", params(("sn" = i64, Path, description = "태스크 번호")), responses((status = 201, body = Run), (status = "default", body = ErrorBody)))]
 async fn start(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<(StatusCode, Json<Run>)> {
+    crate::context::guard(&db, sn).await?; // 입력 상한을 넘으면 422 context_over · Run을 만들지 않는다
     let out = event::run(&db, async |tx| begin(tx, sn, None).await.map(|(out, ev)| (out, vec![ev]))).await?;
     Ok((StatusCode::CREATED, Json(out)))
 }
@@ -295,6 +296,7 @@ async fn stop(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Run>
 /// 재시도 (RetryRun → RunStarted). failed · cancelled Run에서만, 기존 Run은 그대로 두고 새 Run을 만든다
 #[utoipa::path(operation_id = "run_retry", post, path = "/runs/{sn}/retry", params(("sn" = i64, Path, description = "재시도할 Run 번호")), responses((status = 201, body = Run), (status = "default", body = ErrorBody)))]
 async fn retry(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<(StatusCode, Json<Run>)> {
+    crate::context::guard(&db, get(&db, sn).await?.task_sn).await?; // 입력 상한을 넘으면 422 context_over
     let out = event::run(&db, async |tx| redo(tx, sn).await.map(|(out, ev)| (out, vec![ev]))).await?;
     Ok((StatusCode::CREATED, Json(out)))
 }
