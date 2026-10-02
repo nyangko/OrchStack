@@ -1,5 +1,5 @@
-//! tbl_task CRUD + MoveTask + 배정. 쓰기는 event::run 경유 (TaskCreated · TaskUpdated · TaskMoved · TaskDeleted · AgentAssigned · AgentUnassigned)
-use crate::{entity::tbl_task::{self as t, Entity as Tbl}, error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::next_num};
+//! tbl_task CRUD + 전체 목록(/tasks) + MoveTask + 배정 + 라벨(PATCH labels). 응답에 의존 · 의존 대기 · 라벨을 채운다. 쓰기는 event::run 경유 (TaskCreated · TaskUpdated · TaskMoved · TaskDeleted · AgentAssigned · AgentUnassigned)
+use crate::{entity::{tbl_label as lb, tbl_map_task_dependency as dp, tbl_map_task_label as tl, tbl_task::{self as t, Entity as Tbl}}, error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, issue::next_num};
 use axum::{Json, extract::{Query, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,7 @@ const MOVES: &[(&str, &str)] = &[
 pub fn routes() -> OpenApiRouter<DatabaseConnection> {
     OpenApiRouter::new()
         .routes(routes!(board))
+        .routes(routes!(all))
         .routes(routes!(list, create))
         .routes(routes!(read, update, remove))
         .routes(routes!(mv))
@@ -58,6 +59,12 @@ pub struct Task {
     update_at: String,
     start_at: Option<String>,
     done_at: Option<String>,
+    /// 먼저 끝나야 하는 태스크들 (tbl_map_task_dependency)
+    deps: Vec<i64>,
+    /// 의존 대기: 끝나지 않은 의존이 있다 (저장하지 않고 계산 · #9)
+    waiting: bool,
+    /// 라벨 이름 (프로젝트 라벨)
+    labels: Vec<String>,
 }
 
 impl From<t::Model> for Task {
@@ -68,6 +75,7 @@ impl From<t::Model> for Task {
             estimate_min: m.estimate_min, eta_at: m.eta_at, block_reason: m.block_reason, branch: m.branch,
             commit_count: m.commit_count, pr_number: m.pr_number, pr_status: m.pr_status, create_by: m.create_by,
             create_at: m.create_at, update_at: m.update_at, start_at: m.start_at, done_at: m.done_at,
+            deps: Vec::new(), waiting: false, labels: Vec::new(),
         }
     }
 }
@@ -93,6 +101,21 @@ struct TaskPatch {
     priority: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     queue_sort: Option<i64>,
+    /// 라벨 이름 전체 교체. 프로젝트에 없는 이름은 새로 만든다
+    #[serde(skip_serializing_if = "Option::is_none")]
+    labels: Option<Vec<String>>,
+}
+
+/// 전체 태스크 목록 쿼리 (Tasks 페이지 · 검색 ⌘K)
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+struct Search {
+    project: Option<i64>,
+    status: Option<String>,
+    member: Option<i64>,
+    priority: Option<i64>,
+    /// 제목 포함 검색 · `#12`처럼 쓰면 표시 번호
+    q: Option<String>,
 }
 
 /// MoveTask 요청 본문
@@ -114,9 +137,42 @@ fn prio(v: i64) -> Res<i64> {
     if (0..=3).contains(&v) { Ok(v) } else { Err(Error::invalid("priority must be 0..=3".into())) }
 }
 
-/// 1건 읽기. 없으면 404
+/// 1건 읽기 (의존 · 라벨 포함). 없으면 404
 async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<Task> {
-    Tbl::find_by_id(sn).one(db).await?.map(Task::from).ok_or_else(Error::not_found)
+    let one = Tbl::find_by_id(sn).one(db).await?.map(Task::from).ok_or_else(Error::not_found)?;
+    enrich(db, vec![one]).await?.pop().ok_or_else(Error::not_found)
+}
+
+/// 태스크 목록에 의존 · 의존 대기 · 라벨 이름을 채운다
+pub(crate) async fn enrich(db: &impl ConnectionTrait, mut ts: Vec<Task>) -> Res<Vec<Task>> {
+    let sns: Vec<i64> = ts.iter().map(|x| x.sn).collect();
+    let deps = dp::Entity::find().filter(dp::Column::TaskSn.is_in(sns.clone())).order_by_asc(dp::Column::DependTaskSn).all(db).await?;
+    let open: Vec<i64> = Tbl::find().filter(t::Column::Sn.is_in(deps.iter().map(|d| d.depend_task_sn))).filter(t::Column::Status.ne("done")).all(db).await?
+        .into_iter().map(|m| m.sn).collect();
+    let maps = tl::Entity::find().filter(tl::Column::TaskSn.is_in(sns)).all(db).await?;
+    let names = lb::Entity::find().filter(lb::Column::Sn.is_in(maps.iter().map(|m| m.label_sn))).order_by_asc(lb::Column::Name).all(db).await?;
+    for x in &mut ts {
+        x.deps = deps.iter().filter(|d| d.task_sn == x.sn).map(|d| d.depend_task_sn).collect();
+        x.waiting = x.deps.iter().any(|d| open.contains(d));
+        x.labels = names.iter().filter(|l| maps.iter().any(|m| m.task_sn == x.sn && m.label_sn == l.sn)).map(|l| l.name.clone()).collect();
+    }
+    Ok(ts)
+}
+
+/// 라벨 이름 → 태스크 라벨 전체 교체. 프로젝트에 없는 이름은 만든다. 빈 이름은 422
+async fn relabel(tx: &DatabaseTransaction, sn: i64, project_sn: i64, names: &[String]) -> Res<()> {
+    if names.iter().any(|n| n.trim().is_empty()) {
+        return Err(Error::invalid("label name is empty".into()));
+    }
+    tl::Entity::delete_many().filter(tl::Column::TaskSn.eq(sn)).exec(tx).await?;
+    for n in names.iter().map(|n| n.trim()).collect::<std::collections::BTreeSet<_>>() {
+        let label = match lb::Entity::find().filter(lb::Column::ProjectSn.eq(project_sn)).filter(lb::Column::Name.eq(n)).one(tx).await? {
+            Some(l) => l.sn,
+            None => lb::ActiveModel { project_sn: Set(project_sn), name: Set(n.to_owned()), ..Default::default() }.insert(tx).await?.sn,
+        };
+        tl::ActiveModel { task_sn: Set(sn), label_sn: Set(label), ..Default::default() }.insert(tx).await?;
+    }
+    Ok(())
 }
 
 /// 프로젝트 태스크 목록 (Kanban용). `status`로 거르고 queue_sort → 번호순
@@ -124,13 +180,34 @@ async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<Task> {
 async fn board(State(db): State<DatabaseConnection>, Sn(sn): Sn, Query(q): Query<std::collections::HashMap<String, String>>) -> Res<Json<Vec<Task>>> {
     let mut f = Tbl::find().filter(t::Column::ProjectSn.eq(sn));
     if let Some(s) = q.get("status") { f = f.filter(t::Column::Status.eq(s.as_str())); }
-    Ok(Json(f.order_by_asc(t::Column::QueueSort).order_by_asc(t::Column::Sn).all(&db).await?.into_iter().map(Task::from).collect()))
+    let ts = f.order_by_asc(t::Column::QueueSort).order_by_asc(t::Column::Sn).all(&db).await?.into_iter().map(Task::from).collect();
+    enrich(&db, ts).await.map(Json)
+}
+
+/// 전체 태스크 목록 (프로젝트 → 번호순 · 최대 500). project · status · member · priority · q로 거른다
+#[utoipa::path(operation_id = "task_all", get, path = "/tasks", params(Search), responses((status = 200, body = Vec<Task>), (status = "default", body = ErrorBody)))]
+async fn all(State(db): State<DatabaseConnection>, Query(q): Query<Search>) -> Res<Json<Vec<Task>>> {
+    use sea_orm::QuerySelect;
+    let mut f = Tbl::find();
+    if let Some(v) = q.project { f = f.filter(t::Column::ProjectSn.eq(v)); }
+    if let Some(v) = q.status { f = f.filter(t::Column::Status.eq(v)); }
+    if let Some(v) = q.member { f = f.filter(t::Column::MemberSn.eq(v)); }
+    if let Some(v) = q.priority { f = f.filter(t::Column::Priority.eq(v)); }
+    if let Some(v) = q.q.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        f = match v.strip_prefix('#').and_then(|n| n.parse::<i64>().ok()) {
+            Some(n) => f.filter(t::Column::Num.eq(n)),
+            None => f.filter(t::Column::Title.contains(v)),
+        };
+    }
+    let ts = f.order_by_asc(t::Column::ProjectSn).order_by_asc(t::Column::Num).limit(500).all(&db).await?.into_iter().map(Task::from).collect();
+    enrich(&db, ts).await.map(Json)
 }
 
 /// 이슈의 태스크 목록 (번호순)
 #[utoipa::path(operation_id = "task_list", get, path = "/issues/{sn}/tasks", params(("sn" = i64, Path, description = "이슈 번호")), responses((status = 200, body = Vec<Task>), (status = "default", body = ErrorBody)))]
 async fn list(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Task>>> {
-    Ok(Json(Tbl::find().filter(t::Column::IssueSn.eq(sn)).order_by_asc(t::Column::Num).all(&db).await?.into_iter().map(Task::from).collect()))
+    let ts = Tbl::find().filter(t::Column::IssueSn.eq(sn)).order_by_asc(t::Column::Num).all(&db).await?.into_iter().map(Task::from).collect();
+    enrich(&db, ts).await.map(Json)
 }
 
 /// 태스크 생성 (CreateTask → TaskCreated). 이슈가 없으면 404
@@ -157,7 +234,7 @@ async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Task
     get(&db, sn).await.map(Json)
 }
 
-/// 부분 수정 (TaskUpdated). 상태는 못 바꾼다. 없으면 404
+/// 부분 수정 (TaskUpdated). 상태는 못 바꾼다. labels는 이름 전체 교체(없는 라벨은 만든다). 없으면 404
 #[utoipa::path(operation_id = "task_update", patch, path = "/tasks/{sn}", params(("sn" = i64, Path, description = "태스크 번호")), request_body = TaskPatch, responses((status = 200, body = Task), (status = "default", body = ErrorBody)))]
 async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<TaskPatch>) -> Res<Json<Task>> {
     b.priority.map(prio).transpose()?;
@@ -169,6 +246,10 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
         if let Some(v) = b.queue_sort { q = q.col_expr(t::Column::QueueSort, v.into()); }
         if q.exec(tx).await?.rows_affected == 0 {
             return Err(Error::not_found());
+        }
+        if let Some(names) = &b.labels {
+            let project_sn = Tbl::find_by_id(sn).one(tx).await?.ok_or_else(Error::not_found)?.project_sn;
+            relabel(tx, sn, project_sn, names).await?;
         }
         let out = get(tx, sn).await?;
         let ev = Ev::new(Some(out.project_sn), "task", sn, "TaskUpdated", &b);

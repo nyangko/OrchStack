@@ -11,6 +11,7 @@ mod event; // 명령 실행 틀 (상태 변경 + 이벤트 append + 발행)
 mod exec; // 실행기: Claude Code · Codex CLI 비대화형 실행 (#13)
 mod issue; // /issues CRUD
 mod orch; // PM Dock: /projects/{sn}/conversation · messages · /messages/* · /proposals · /runs/{sn}/instruct
+mod meta; // 완료 조건 · 의존 · 라벨 목록 · 저장 보기 · Diagram 배치
 mod notify; // /notifications · /notify/* · /audit + 이벤트 → 알림 projection
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
@@ -63,7 +64,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(stat::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).merge(stat::routes()).merge(meta::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -846,11 +847,88 @@ mod tests {
         assert_eq!(call(&app, "GET", "/workspace/cost?month=2000-13", None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
     }
 
+    /// B-13: 완료 조건 교체(sn 유지 · 체크 이벤트) · 라벨(PATCH 이름 → 생성 · 목록) · 의존(대기 계산 · 순환 · 중복 · 삭제) · 저장 보기 · 전체 목록 필터 · Diagram 배치
+    #[tokio::test]
+    async fn meta() {
+        let db = mem().await;
+        let app = app(db.clone());
+        let a = task_of(&app, &db, true).await; // 프로젝트 1 · 이슈 1 · 태스크 a(member 1)
+        let (_, b) = call(&app, "POST", "/issues/1/tasks", Some(json!({"title": "Login API", "priority": 0}))).await;
+        let b = b["sn"].as_i64().unwrap();
+
+        // 완료 조건: 만들기 → sn 유지한 채 체크 · 순서 변경 · 하나 삭제 → CriterionChecked 1번
+        let v = call(&app, "PUT", &format!("/tasks/{a}/criteria"), Some(json!([{"content": "로그인 성공", "is_done": 0}, {"content": "에러 표시", "is_done": 0}]))).await.1;
+        let (c1, c2) = (v[0]["sn"].as_i64().unwrap(), v[1]["sn"].as_i64().unwrap());
+        let v = call(&app, "PUT", &format!("/tasks/{a}/criteria"), Some(json!([{"sn": c2, "content": "에러 표시", "is_done": 1}, {"content": "새 조건", "is_done": 0}]))).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["sn"].as_i64(), v[0]["is_done"].as_i64(), v[1]["content"].as_str()), (2, Some(c2), Some(1), Some("새 조건")));
+        assert_eq!(call(&app, "PUT", &format!("/tasks/{a}/criteria"), Some(json!([{"sn": c1, "content": "x", "is_done": 0}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY); // 지운 sn
+        assert_eq!(call(&app, "PUT", &format!("/tasks/{a}/criteria"), Some(json!([{"content": " ", "is_done": 0}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "GET", &format!("/tasks/{a}/criteria"), None).await.1[0]["sn"].as_i64(), Some(c2));
+        let kinds: Vec<String> = events(&db, "task", a).await.into_iter().map(|e| e.0).collect();
+        assert_eq!(kinds, ["TaskCreated", "CriteriaUpdated", "CriteriaUpdated", "CriterionChecked"]);
+
+        // 라벨: 이름으로 붙이면 프로젝트 라벨이 생기고 중복 · 공백은 정리 · 빈 이름 422
+        let t = call(&app, "PATCH", &format!("/tasks/{a}"), Some(json!({"labels": ["ui", "auth", " ui "]}))).await.1;
+        assert_eq!(t["labels"], json!(["auth", "ui"]));
+        call(&app, "PATCH", &format!("/tasks/{b}"), Some(json!({"labels": ["auth"]}))).await;
+        assert_eq!(call(&app, "GET", "/projects/1/labels", None).await.1.as_array().unwrap().len(), 2);
+        assert_eq!(call(&app, "PATCH", &format!("/tasks/{a}"), Some(json!({"labels": [""]}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+
+        // 의존: a가 b를 기다림 → waiting · b 완료 후 waiting 아님 · 순환 · 자기 자신 · 중복 · 다른 프로젝트
+        let (st, d) = call(&app, "POST", &format!("/tasks/{a}/deps"), Some(json!({"depend_task_sn": b}))).await;
+        assert_eq!((st, d), (StatusCode::CREATED, json!([b])));
+        let t = call(&app, "GET", &format!("/tasks/{a}"), None).await.1;
+        assert_eq!((t["deps"].clone(), t["waiting"].as_bool()), (json!([b]), Some(true)));
+        assert_eq!(call(&app, "GET", "/projects/1/snapshot", None).await.1["tasks"][0]["waiting"], true);
+        assert_eq!(call(&app, "POST", &format!("/tasks/{b}/deps"), Some(json!({"depend_task_sn": a}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", &format!("/tasks/{a}/deps"), Some(json!({"depend_task_sn": a}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", &format!("/tasks/{a}/deps"), Some(json!({"depend_task_sn": b}))).await.0, StatusCode::CONFLICT);
+        let other = task_of(&app, &db, false).await;
+        assert_eq!(call(&app, "POST", &format!("/tasks/{a}/deps"), Some(json!({"depend_task_sn": other}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        call(&app, "POST", &format!("/tasks/{b}/move"), Some(json!({"status": "in_progress"}))).await;
+        call(&app, "POST", &format!("/tasks/{b}/move"), Some(json!({"status": "done"}))).await;
+        assert_eq!(call(&app, "GET", &format!("/tasks/{a}"), None).await.1["waiting"], false);
+        assert_eq!(call(&app, "DELETE", &format!("/tasks/{a}/deps/{b}"), None).await.0, StatusCode::NO_CONTENT);
+        assert_eq!(call(&app, "DELETE", &format!("/tasks/{a}/deps/{b}"), None).await.0, StatusCode::NOT_FOUND);
+
+        // 전체 목록: 프로젝트 · 상태 · 우선순위 · 제목 검색 · #번호
+        assert_eq!(call(&app, "GET", "/tasks", None).await.1.as_array().unwrap().len(), 3);
+        assert_eq!(call(&app, "GET", "/tasks?project=1&status=done", None).await.1[0]["sn"].as_i64(), Some(b));
+        assert_eq!(call(&app, "GET", "/tasks?priority=0", None).await.1.as_array().unwrap().len(), 1);
+        assert_eq!(call(&app, "GET", "/tasks?q=login", None).await.1[0]["sn"].as_i64(), Some(b));
+        assert_eq!(call(&app, "GET", "/tasks?project=1&q=%232", None).await.1[0]["sn"].as_i64(), Some(a));
+        assert_eq!(call(&app, "GET", "/tasks?member=1", None).await.1.as_array().unwrap().len(), 1);
+
+        // 저장 보기: 만들기 · 목록 · 필터는 객체만 · 삭제 후 404
+        let (st, v) = call(&app, "POST", "/task-views", Some(json!({"name": "P0–P1", "filter": {"priority": [0, 1]}}))).await;
+        assert_eq!((st, v["filter"]["priority"][1].as_i64()), (StatusCode::CREATED, Some(1)));
+        assert_eq!(call(&app, "GET", "/task-views", None).await.1[0]["name"], "P0–P1");
+        assert_eq!(call(&app, "POST", "/task-views", Some(json!({"name": "x", "filter": []}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        let vs = v["sn"].as_i64().unwrap();
+        assert_eq!(call(&app, "DELETE", &format!("/task-views/{vs}"), None).await.0, StatusCode::NO_CONTENT);
+        assert_eq!(call(&app, "DELETE", &format!("/task-views/{vs}"), None).await.0, StatusCode::NOT_FOUND);
+
+        // Diagram: 기본값 → 저장 → 다시 읽으면 유지 · 다시 저장하면 교체 · 잘못된 값 422
+        assert_eq!(call(&app, "GET", "/projects/1/diagram", None).await.1["view"]["layout_mode"], "auto");
+        let body = json!({"view": {"layout_mode": "manual", "zoom_percent": 80, "is_show_capability": 0, "is_show_done": 1},
+            "nodes": [{"node_type": "task", "node_sn": a, "pos_x": 10, "pos_y": 20}, {"node_type": "member", "node_sn": 1, "pos_x": -5, "pos_y": 0, "is_collapsed": 1}]});
+        assert_eq!(call(&app, "PUT", "/projects/1/diagram", Some(body)).await.0, StatusCode::OK);
+        let d = call(&app, "GET", "/projects/1/diagram", None).await.1;
+        assert_eq!((d["view"]["zoom_percent"].as_i64(), d["nodes"].as_array().unwrap().len(), d["nodes"][1]["is_collapsed"].as_i64()), (Some(80), 2, Some(1)));
+        call(&app, "PUT", "/projects/1/diagram", Some(json!({"view": d["view"], "nodes": [{"node_type": "task", "node_sn": a, "pos_x": 1, "pos_y": 1}]}))).await;
+        assert_eq!(call(&app, "GET", "/projects/1/diagram", None).await.1["nodes"].as_array().unwrap().len(), 1);
+        for bad in [json!({"view": {"layout_mode": "x", "zoom_percent": 100, "is_show_capability": 1, "is_show_done": 0}, "nodes": []}),
+                    json!({"view": d["view"], "nodes": [{"node_type": "task", "node_sn": 1, "pos_x": 0, "pos_y": 0}, {"node_type": "task", "node_sn": 1, "pos_x": 1, "pos_y": 1}]})] {
+            assert_eq!(call(&app, "PUT", "/projects/1/diagram", Some(bad)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        assert_eq!(call(&app, "GET", "/projects/99/diagram", None).await.0, StatusCode::NOT_FOUND);
+    }
+
     #[tokio::test]
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/proposals", "/proposals/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/proposals", "/proposals/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

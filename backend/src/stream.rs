@@ -75,7 +75,7 @@ async fn snapshot(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<
     // 마지막 이벤트 sn을 먼저 읽는다: 그 뒤에 생긴 변경은 stream · events로 다시 오므로 중복은 있어도 빠짐은 없다
     let last = e::Entity::find().order_by_desc(e::Column::Sn).one(&db).await?.map_or(0, |m| m.sn);
     let issues = i::Entity::find().filter(i::Column::ProjectSn.eq(sn)).order_by_asc(i::Column::Num).all(&db).await?.into_iter().map(Issue::from).collect();
-    let tasks = t::Entity::find().filter(t::Column::ProjectSn.eq(sn)).order_by_asc(t::Column::Num).all(&db).await?.into_iter().map(Task::from).collect();
+    let tasks = crate::task::enrich(&db, t::Entity::find().filter(t::Column::ProjectSn.eq(sn)).order_by_asc(t::Column::Num).all(&db).await?.into_iter().map(Task::from).collect()).await?;
     let members = match project.team_sn {
         Some(team) => mb::Entity::find().filter(mb::Column::TeamSn.eq(team)).order_by_asc(mb::Column::Sort).order_by_asc(mb::Column::Sn).all(&db).await?.into_iter().map(Member::from).collect(),
         None => Vec::new(),
