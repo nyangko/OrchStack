@@ -53,10 +53,6 @@ pub enum Relation {
     TblMessage,
     #[sea_orm(has_many = "super::tbl_notification::Entity")]
     TblNotification,
-    #[sea_orm(has_many = "super::tbl_review::Entity")]
-    TblReview,
-    #[sea_orm(has_many = "super::tbl_run::Entity")]
-    TblRun,
     #[sea_orm(has_many = "super::tbl_session::Entity")]
     TblSession,
     #[sea_orm(has_many = "super::tbl_task::Entity")]
@@ -118,18 +114,6 @@ impl Related<super::tbl_message::Entity> for Entity {
 impl Related<super::tbl_notification::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblNotification.def()
-    }
-}
-
-impl Related<super::tbl_review::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblReview.def()
-    }
-}
-
-impl Related<super::tbl_run::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblRun.def()
     }
 }
 

@@ -619,13 +619,10 @@ CREATE TABLE tbl_run (
     branch             TEXT,                                        -- 작업 브랜치
     workdir            TEXT,                                        -- 이 Run이 만든 worktree 경로 (repo 모드면 NULL)
     workdir_clean_at   TEXT,                                        -- worktree · 임시 브랜치 정리 시각 (workdir 있음 + NULL + 종료된 Run = 정리 대상)
-    token_input        INTEGER,                                     -- 새 입력 토큰 합계 · tbl_log_token 합의 캐시(projection) · NULL = 모름 (sub · fork는 실행기가 알려줄 때만 · #16 #67)
-    token_cache_read   INTEGER,                                     -- 캐시 읽기 토큰 합계 (캐시)
-    token_cache_write  INTEGER,                                     -- 캐시 쓰기 토큰 합계 (캐시)
-    token_output       INTEGER,                                     -- 출력 토큰 합계 (캐시)
-    context_token      INTEGER,                                     -- 현재 컨텍스트 크기 (예: 41200) · NULL = 모름
+    file_json          TEXT,                                        -- 변경 파일 JSON 배열 [{path, change_kind, additions, deletions}] · change_kind = A(추가) | M(수정) | D(삭제) | R(이름 변경)
+    review_member_sn   INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,  -- 반려한 멤버 (fail_code = rejected일 때 · 반려 횟수 = 그 태스크의 rejected Run 수)
+    review_reason      TEXT,                                        -- 반려 사유 (예: 접근성 라벨 누락 2곳)
     context_limit      INTEGER,                                     -- 컨텍스트 한도 (예: 128000)
-    cost_usd_micro     INTEGER,                                     -- 비용 (1달러 = 1,000,000) · 구독은 0 · NULL = 모름
     start_at           TEXT,                                        -- 시작 시각
     end_at             TEXT,                                        -- 종료 시각
     create_at          TEXT NOT NULL DEFAULT (datetime('now')),     -- 생성 시각
@@ -648,40 +645,16 @@ CREATE TABLE tbl_session (
 );
 
 
--- 변경 파일. Run이 바꾼 파일 목록
-CREATE TABLE tbl_run_file (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 변경 파일 번호
-    run_sn           INTEGER NOT NULL REFERENCES tbl_run(sn) ON DELETE CASCADE,       -- Run
-    change_kind      TEXT NOT NULL CHECK (change_kind IN ('A','M','D','R')),  -- 변경 종류: A(추가) | M(수정) | D(삭제) | R(이름 변경)
-    path             TEXT NOT NULL,                                 -- 파일 경로
-    additions        INTEGER NOT NULL DEFAULT 0,                    -- 추가된 줄 수
-    deletions        INTEGER NOT NULL DEFAULT 0,                    -- 삭제된 줄 수
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))       -- 생성 시각
-);
-
--- 컨텍스트 목록. 모델에 보낸 컨텍스트 묶음 (ContextManifest)
+-- 컨텍스트 목록. 모델 호출 1회에 보낸 컨텍스트 묶음 (ContextManifest) · 출처 목록은 source_json
 CREATE TABLE tbl_context_manifest (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 목록 번호
     run_sn           INTEGER NOT NULL REFERENCES tbl_run(sn) ON DELETE CASCADE,       -- Run
     session_sn       INTEGER REFERENCES tbl_session(sn) ON DELETE SET NULL,            -- 세션
     budget_token     INTEGER NOT NULL,                              -- 허용 예산(토큰)
+    source_json      TEXT,                                          -- 이 호출에 보낸 출처 JSON 배열 (순서 = 조립 순서) [{kind, ref_label, ref_sn, ref_version, content_hash, token_count, is_repeat, sort}] · kind = preset(Instruction preset · 고정 버전) | instruction(개별 지침 · tbl_profile_file) | repo_rule(저장소 AGENTS.md · CLAUDE.md) | task(태스크 · 완료 조건) | file(코드 파일) · ref_label = 표시 이름 (예: AGENT.md, src/lib/auth.ts) · ref_sn = 원본 번호 (repo_rule · file은 NULL) · content_hash = 보낸 내용의 sha256 앞 16자 · is_repeat = 같은 Run의 이전 호출에 같은 (kind, ref_label, content_hash)가 있었다 · token_count = 이 호출에 보낸 추정 토큰
     create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 생성 시각
 );
 
--- 컨텍스트 출처. 목록에 담긴 항목별 토큰
-CREATE TABLE tbl_context_source (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 출처 번호
-    manifest_sn      INTEGER NOT NULL REFERENCES tbl_context_manifest(sn) ON DELETE CASCADE,  -- 컨텍스트 목록
-    kind             TEXT NOT NULL CHECK (kind IN ('preset','instruction','repo_rule','skill','mcp','issue','task','decision','file','checkpoint')),  -- 종류: preset(Instruction preset · 버전 고정) | instruction(개별 지침 · tbl_profile_file) | repo_rule(저장소 AGENTS.md · CLAUDE.md) | skill(스킬 요약) | mcp(MCP 도구 목록) | issue(이슈 본문) | task(태스크 · 완료 조건) | decision(결정 기록) | file(코드 파일) | checkpoint(이전 세션 요약)
-    ref_label        TEXT NOT NULL,                                 -- 표시 이름 (예: AGENT.md, src/lib/auth.ts)
-    ref_sn           INTEGER,                                       -- 원본 번호 (종류에 맞는 테이블의 sn · FK 없음 · repo_rule · file 은 NULL, ref_label 로 식별)
-    ref_version      INTEGER,                                       -- 보낸 버전 (preset = 고정 버전 · 그 밖은 NULL)
-    content_hash     TEXT,                                          -- 보낸 내용의 해시 (sha256 앞 16자) · 같은 Run의 이전 호출에 같은 (kind, ref_label, content_hash)가 있으면 반복 (#16)
-    token_count      INTEGER NOT NULL DEFAULT 0,                    -- 토큰 수
-    is_repeat        INTEGER NOT NULL DEFAULT 0,                    -- 이전 호출에서 이미 보낸 항목인지 (content_hash 비교 결과)
-    sort             INTEGER NOT NULL DEFAULT 0,                    -- 표시 순서
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))       -- 생성 시각
-);
 
 -- 계약. 여러 태스크가 함께 쓰는 약속 (API · 스키마 · 공유 컴포넌트 · 설정 · 의존성 · 라우트 · 환경 변수)
 --   연쇄 수정은 계약 버전으로 추적하고, 소비 태스크에는 마지막으로 본 버전 이후의 차이만 보낸다
@@ -700,7 +673,7 @@ CREATE TABLE tbl_contract (
 );
 
 -- 보고 항목. @REPORT 블록을 항목 단위로 쪼개 저장 (받는 쪽은 필요한 기계 항목만 받고, 사용자 보고서는 사람 칸 + 시스템 사실로 조립)
---   변경 파일 · 줄 수 · 테스트 · 토큰 · 시간은 시스템이 수집하므로 여기에 두지 않는다 (tbl_run_file · tbl_run · tbl_log_token)
+--   변경 파일 · 줄 수 · 테스트 · 토큰 · 시간은 시스템이 수집하므로 여기에 두지 않는다 (tbl_run.file_json · tbl_log_token)
 CREATE TABLE tbl_report_item (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 항목 번호
     run_sn           INTEGER NOT NULL REFERENCES tbl_run(sn) ON DELETE CASCADE,  -- 보고한 Run
@@ -736,18 +709,6 @@ CREATE TABLE tbl_map_task_contract (
     role             TEXT NOT NULL CHECK (role IN ('provide','consume')),  -- 관계: provide(제공 · 바꿀 수 있음) | consume(사용 · 바뀌면 영향)
     seen_version     INTEGER NOT NULL DEFAULT 0,                    -- 이 태스크가 마지막으로 받은 버전 (이후 delta만 전달)
     UNIQUE (task_sn, contract_sn)
-);
-
--- 리뷰. Reviewer의 승인 · 반려 기록
-CREATE TABLE tbl_review (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 리뷰 번호
-    task_sn          INTEGER NOT NULL REFERENCES tbl_task(sn) ON DELETE CASCADE,      -- 태스크
-    run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,                -- 리뷰 대상 Run
-    member_sn        INTEGER NOT NULL REFERENCES tbl_member(sn) ON DELETE RESTRICT,    -- 리뷰한 멤버
-    round            INTEGER NOT NULL DEFAULT 1,                    -- 몇 번째 리뷰인지 (반려 반복 감지)
-    result           TEXT NOT NULL CHECK (result IN ('approved','rejected')),  -- 결과: approved(승인) | rejected(반려 · 재작업)
-    reason           TEXT,                                          -- 사유 (예: 접근성 라벨 누락 2곳)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 리뷰 시각
 );
 
 
@@ -1033,12 +994,8 @@ CREATE INDEX idx_log_audit_workspace    ON tbl_log_audit (workspace_sn, create_a
 
 -- 외래 키 조회 · CASCADE 삭제용 (SQLite는 FK 인덱스를 자동으로 만들지 않음)
 CREATE INDEX idx_task_dependency_depend ON tbl_map_task_dependency (depend_task_sn);
-CREATE INDEX idx_run_file_run           ON tbl_run_file (run_sn);
 CREATE INDEX idx_context_manifest_run   ON tbl_context_manifest (run_sn);
-CREATE INDEX idx_context_source_manifest ON tbl_context_source (manifest_sn);
-CREATE INDEX idx_context_source_hash    ON tbl_context_source (content_hash);
 CREATE INDEX idx_task_criterion_task    ON tbl_task_criterion (task_sn, sort);
-CREATE INDEX idx_review_task            ON tbl_review (task_sn);
 CREATE INDEX idx_issue_parent           ON tbl_issue (parent_sn);
 CREATE INDEX idx_map_task_label_label   ON tbl_map_task_label (label_sn);
 CREATE INDEX idx_map_issue_label_label  ON tbl_map_issue_label (label_sn);
@@ -1115,8 +1072,6 @@ CREATE INDEX idx_fk_project_team_sn ON tbl_project (team_sn);
 CREATE INDEX idx_fk_project_workspace_sn ON tbl_project (workspace_sn);
 CREATE INDEX idx_fk_report_item_task_sn ON tbl_report_item (task_sn);
 CREATE INDEX idx_fk_report_item_contract_sn ON tbl_report_item (contract_sn);
-CREATE INDEX idx_fk_review_member_sn ON tbl_review (member_sn);
-CREATE INDEX idx_fk_review_run_sn ON tbl_review (run_sn);
 CREATE INDEX idx_fk_run_connection_sn ON tbl_run (connection_sn);
 CREATE INDEX idx_fk_run_retry_run_sn ON tbl_run (retry_run_sn);
 CREATE INDEX idx_fk_run_runtime_sn ON tbl_run (runtime_sn);

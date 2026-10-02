@@ -1,13 +1,13 @@
 //! 컨텍스트 조립기 (#120): 모델에 보내는 입력을 한 곳에서 고정 순서로 만들고(`assemble`), 보낸 출처 · 토큰을 manifest에 남긴다(`record`).
 //! 리드 Run 순서: protocol → rule → role → style → report → repo_rule → 프로필 파일 → @TASK → (파일). 접두(@TASK 앞)는 같은 프로필이면 바이트까지 같다.
 //! 하위 Run은 최소 입력(고정 규칙 → @TASK → paths 파일)이다. 토큰은 `preset::tokens` 추정이고 실측은 tbl_log_token에만 있다. manifest · source는 이벤트를 남기지 않는다
-use crate::{entity::{tbl_agent_profile as ap, tbl_context_manifest as cm, tbl_context_source as cs, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv,
+use crate::{entity::{tbl_agent_profile as ap, tbl_context_manifest as cm, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv,
     tbl_label as lb, tbl_log_token as lt, tbl_map_profile_preset as mp, tbl_map_task_dependency as dp, tbl_map_task_label as tl, tbl_member as mb, tbl_profile_file as pf,
     tbl_project as pj, tbl_run as r, tbl_task as t, tbl_task_criterion as tc, tbl_connection as cn},
     error::{Error, ErrorBody, Res, Sn}, event, preset::tokens, rule, runner::{FILE_MAX, RULES, granted}};
 use axum::{Json, extract::State};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect, sea_query::Expr};
-use serde::Serialize;
+use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect, sea_query::Expr};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{collections::HashSet, path::Path};
 use utoipa::ToSchema;
@@ -29,7 +29,7 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
 }
 
 /// 컨텍스트 출처 1건
-#[derive(Serialize, ToSchema, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct Source {
     /// preset | instruction | repo_rule | task | file
     pub kind: String,
@@ -47,11 +47,9 @@ pub struct Source {
     pub sort: i64,
 }
 
-impl From<cs::Model> for Source {
-    fn from(m: cs::Model) -> Self {
-        Self { kind: m.kind, ref_label: m.ref_label, ref_sn: m.ref_sn, ref_version: m.ref_version, content_hash: m.content_hash.unwrap_or_default(),
-            token_count: m.token_count, is_repeat: m.is_repeat, sort: m.sort }
-    }
+/// manifest의 출처 목록 (source_json)
+fn sources_of(m: &cm::Model) -> Vec<Source> {
+    m.source_json.as_deref().and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default()
 }
 
 /// 조립 결과
@@ -122,8 +120,8 @@ async fn seen(db: &impl ConnectionTrait, run: Option<&r::Model>, session: Option
     let (mut any, mut same) = (HashSet::new(), HashSet::new());
     let Some(run) = run else { return Ok((any, same)) };
     for m in cm::Entity::find().filter(cm::Column::RunSn.eq(run.sn)).all(db).await? {
-        for s in cs::Entity::find().filter(cs::Column::ManifestSn.eq(m.sn)).all(db).await? {
-            let k = (s.kind, s.ref_label, s.content_hash.unwrap_or_default());
+        for s in sources_of(&m) {
+            let k = (s.kind, s.ref_label, s.content_hash);
             if session.is_some() && m.session_sn == session { same.insert(k.clone()); }
             any.insert(k);
         }
@@ -132,7 +130,7 @@ async fn seen(db: &impl ConnectionTrait, run: Option<&r::Model>, session: Option
 }
 
 /// 캐시 비교 기준: 이 Run의 마지막 manifest, 없으면 같은 멤버의 이전 Run(같은 종류 · 번호가 앞선 것) 중 manifest가 있는 가장 최근 Run의 마지막 manifest
-async fn baseline(db: &impl ConnectionTrait, run: Option<&r::Model>, member: Option<i64>, lead: bool) -> Res<Vec<cs::Model>> {
+async fn baseline(db: &impl ConnectionTrait, run: Option<&r::Model>, member: Option<i64>, lead: bool) -> Res<Vec<Source>> {
     let mut runs = Vec::new();
     if let Some(rn) = run { runs.push(rn.sn); }
     if let Some(ms) = member {
@@ -142,7 +140,7 @@ async fn baseline(db: &impl ConnectionTrait, run: Option<&r::Model>, member: Opt
     }
     for sn in runs {
         if let Some(m) = cm::Entity::find().filter(cm::Column::RunSn.eq(sn)).order_by_desc(cm::Column::Sn).one(db).await? {
-            return Ok(cs::Entity::find().filter(cs::Column::ManifestSn.eq(m.sn)).order_by_asc(cs::Column::Sort).all(db).await?);
+            return Ok(sources_of(&m));
         }
     }
     Ok(Vec::new())
@@ -207,7 +205,7 @@ async fn build(db: &impl ConnectionTrait, sp: &Spec, run: Option<&r::Model>, mem
     }
     // 접두가 이어지는 동안만 캐시에 맞는다고 본다 (제공자 프롬프트 캐시는 접두 일치)
     let base = baseline(db, run, member, matches!(sp, Spec::Lead { .. })).await?;
-    let cached = sources.iter().zip(&base).take_while(|(s, b)| s.kind == b.kind && s.ref_label == b.ref_label && Some(&s.content_hash) == b.content_hash.as_ref()).map(|(s, _)| s.token_count).sum();
+    let cached = sources.iter().zip(&base).take_while(|(s, b)| s.kind == b.kind && s.ref_label == b.ref_label && s.content_hash == b.content_hash).map(|(s, _)| s.token_count).sum();
     Ok(Built { estimate: sources.iter().map(|s| s.token_count).sum(), cached_estimate: cached, prompt, sources, fill })
 }
 
@@ -271,12 +269,9 @@ pub async fn over_sub(db: &impl ConnectionTrait, project_sn: i64, id: &str, brie
     Ok(over(&build(db, &sp, None, None, None, false).await?))
 }
 
-/// 조립 결과를 manifest의 출처로 저장한다 (이벤트 없음). 토큰 수가 0인 프리셋 버전은 추정값을 채워 저장한다
+/// 조립 결과를 manifest의 source_json으로 저장한다 (이벤트 없음). 토큰 수가 0인 프리셋 버전은 추정값을 채워 저장한다
 pub async fn record(tx: &DatabaseTransaction, b: &Built, manifest_sn: i64) -> Res<()> {
-    for s in &b.sources {
-        cs::ActiveModel { manifest_sn: Set(manifest_sn), kind: Set(s.kind.clone()), ref_label: Set(s.ref_label.clone()), ref_sn: Set(s.ref_sn), ref_version: Set(s.ref_version),
-            content_hash: Set(Some(s.content_hash.clone())), token_count: Set(s.token_count), is_repeat: Set(s.is_repeat), sort: Set(s.sort), ..Default::default() }.insert(tx).await?;
-    }
+    cm::Entity::update_many().filter(cm::Column::Sn.eq(manifest_sn)).col_expr(cm::Column::SourceJson, serde_json::json!(b.sources).to_string().into()).exec(tx).await?;
     fill(tx, &b.fill).await
 }
 
@@ -358,7 +353,7 @@ async fn run_context(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Js
     r::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
     let mut manifests = Vec::new();
     for m in cm::Entity::find().filter(cm::Column::RunSn.eq(sn)).order_by_asc(cm::Column::Sn).all(&db).await? {
-        let sources: Vec<Source> = cs::Entity::find().filter(cs::Column::ManifestSn.eq(m.sn)).order_by_asc(cs::Column::Sort).all(&db).await?.into_iter().map(Source::from).collect();
+        let sources = sources_of(&m);
         let (inp, read) = lt::Entity::find().filter(lt::Column::ManifestSn.eq(m.sn)).all(&db).await?.iter().fold((0, 0), |(i, c), x| (i + x.token_input, c + x.token_cache_read));
         manifests.push(Manifest {
             sn: m.sn, session_sn: m.session_sn, budget_token: m.budget_token, total: sources.iter().map(|s| s.token_count).sum(), repeat_count: sources.iter().filter(|s| s.is_repeat == 1).count() as i64,

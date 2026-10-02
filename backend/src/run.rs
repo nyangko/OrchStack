@@ -1,5 +1,5 @@
 //! tbl_run · tbl_session 조회 + Run 명령 (Start · Stop · Retry · Review · Approve · Reject) + 실행기(#13)용 전이 함수
-use crate::{entity::{tbl_review as rv, tbl_run as r, tbl_session as s, tbl_task}, error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, task};
+use crate::{entity::{tbl_run as r, tbl_session as s, tbl_task}, error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, task};
 use axum::{Json, extract::{Query, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Statement, sea_query::Expr};
 use serde::{Deserialize, Serialize};
@@ -186,10 +186,15 @@ impl From<s::Model> for Session {
     }
 }
 
+/// 태스크의 반려 횟수 = fail_code가 rejected인 Run 수 (반려 반복 가드 · round)
+pub(crate) async fn rejects(db: &impl ConnectionTrait, task_sn: i64) -> Res<i64> {
+    Ok(r::Entity::find().filter(r::Column::TaskSn.eq(task_sn)).filter(r::Column::FailCode.eq("rejected")).count(db).await? as i64)
+}
+
 /// 반려 요청 본문
 #[derive(Deserialize, ToSchema)]
 struct RejectBody {
-    /// 리뷰한 멤버 (tbl_review.member_sn이 필수라 받는다)
+    /// 반려한 멤버 (tbl_run.review_member_sn)
     member_sn: i64,
     /// 반려 사유
     reason: Option<String>,
@@ -342,21 +347,19 @@ async fn approve(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<R
     Ok(Json(out))
 }
 
-/// 반려 (RejectRun → RunRejected). Run은 failed(rejected), 태스크는 in_progress로 돌아가고 tbl_review에 반려가 쌓인다 (round = 반려 횟수). 재실행은 retry
+/// 반려 (RejectRun → RunRejected). Run은 failed(rejected), 태스크는 in_progress로 돌아가고 반려 멤버 · 사유가 Run에 남는다 (round = 그 태스크의 반려 Run 수). 재실행은 retry
 #[utoipa::path(operation_id = "run_reject", post, path = "/runs/{sn}/reject", params(("sn" = i64, Path, description = "Run 번호")), request_body = RejectBody, responses((status = 200, body = Run), (status = "default", body = ErrorBody)))]
 async fn reject(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<RejectBody>) -> Res<Json<Run>> {
     let out = event::run(&db, async |tx| {
         in_review(tx, sn).await?;
         step(tx, sn, "failed").await?;
         r::Entity::update_many().filter(r::Column::Sn.eq(sn)).col_expr(r::Column::FailCode, "rejected".into())
-            .col_expr(r::Column::FailDetail, b.reason.clone().into()).exec(tx).await?;
+            .col_expr(r::Column::FailDetail, b.reason.clone().into()).col_expr(r::Column::ReviewMemberSn, b.member_sn.into())
+            .col_expr(r::Column::ReviewReason, b.reason.clone().into()).exec(tx).await?;
         let out = Run::from(get(tx, sn).await?);
         task::shift(tx, out.task_sn, "in_progress").await?;
-        let round = rv::Entity::find().filter(rv::Column::TaskSn.eq(out.task_sn)).count(tx).await? as i64 + 1;
-        rv::ActiveModel {
-            task_sn: Set(out.task_sn), run_sn: Set(Some(sn)), member_sn: Set(b.member_sn), round: Set(round),
-            result: Set("rejected".into()), reason: Set(b.reason.clone()), ..Default::default()
-        }.insert(tx).await?;
+        // 몇 번째 반려인지 = 그 태스크의 반려 Run 수 (방금 것 포함)
+        let round = rejects(tx, out.task_sn).await?;
         let ev = Ev::new(Some(out.project_sn), "run", sn, "RunRejected", &json!({
             "task_sn": out.task_sn, "member_sn": b.member_sn, "reason": b.reason, "round": round, "task_status": "in_progress",
         }));

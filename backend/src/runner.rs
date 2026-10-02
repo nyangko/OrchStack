@@ -275,8 +275,8 @@ struct Via {
     model: Option<String>,
 }
 
-/// 모델 호출 1번: 세션 · manifest(조립 결과) 기록 → 실행 → 토큰 기록 · 연결 갱신 → 세션 닫기. Run 합계(total)에 이번 사용량을 더한다
-async fn call(db: &DatabaseConnection, m: &r::Model, built: &context::Built, job: Job, via: &Via, total: &mut exec::Usage, cancel: &watch::Receiver<bool>) -> Res<exec::Outcome> {
+/// 모델 호출 1번: 세션 · manifest(조립 결과) 기록 → 실행 → 토큰 기록(원천은 tbl_log_token뿐 · 합계는 조회 때 계산) · 연결 갱신 → 세션 닫기
+async fn call(db: &DatabaseConnection, m: &r::Model, built: &context::Built, job: Job, via: &Via, cancel: &watch::Receiver<bool>) -> Res<exec::Outcome> {
     let Via { ex, conn, model } = via;
     let (conn, model) = (*conn, model.clone());
     let (session, manifest) = event::run(db, async |tx| {
@@ -296,20 +296,13 @@ async fn call(db: &DatabaseConnection, m: &r::Model, built: &context::Built, job
     let out = exec::run(*ex, &job, &tx, stop_rx).await;
     fwd.abort();
 
-    // 토큰은 하위 Run에만 쌓는다 (리드 합계와 분리) · Run 합계 = 실행 합
     let u = out.usage;
-    (total.input, total.cache_read, total.cache_write, total.output) = (total.input + u.input, total.cache_read + u.cache_read, total.cache_write + u.cache_write, total.output + u.output);
-    let sum = *total;
     event::run(db, async |tx| {
         lt::ActiveModel {
             run_sn: Set(m.sn), session_sn: Set(Some(session)), connection_sn: Set(conn), manifest_sn: Set(Some(manifest)), model_code: Set(model.clone()),
             token_input: Set(u.input), token_cache_read: Set(u.cache_read), token_cache_write: Set(u.cache_write), token_output: Set(u.output), ..Default::default()
         }.insert(tx).await?;
         context::touch(tx, conn).await?;
-        r::Entity::update_many().filter(r::Column::Sn.eq(m.sn))
-            .col_expr(r::Column::TokenInput, sum.input.into()).col_expr(r::Column::TokenCacheRead, sum.cache_read.into())
-            .col_expr(r::Column::TokenCacheWrite, sum.cache_write.into()).col_expr(r::Column::TokenOutput, sum.output.into())
-            .exec(tx).await?;
         s::Entity::update_many().filter(s::Column::Sn.eq(session)).col_expr(s::Column::ProviderSessionId, out.session.clone().into()).exec(tx).await?;
         Ok(((), vec![]))
     }).await?;
@@ -366,7 +359,7 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
     let via = Via { ex, conn, model: model.clone() };
     let before = if lead { None } else { dirty(&cwd).await };
     run::run_to(db, sn, "running").await?;
-    let (mut total, mut asked) = (exec::Usage::default(), 0u8);
+    let mut asked = 0u8;
     let mut said = String::new();
 
     let (rep, code, detail): (Option<Report>, String, Option<String>) = loop {
@@ -380,7 +373,7 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
             prompt: built.prompt.clone(), cwd: cwd.clone().into(), bin: rt.bin_path.clone().map(Into::into), model: model.clone(), args: args.clone(),
             timeout: Duration::from_secs(ws.run_timeout_min.max(1) as u64 * 60), ..Default::default()
         };
-        let out = call(db, &m, &built, job, &via, &mut total, &cancel).await?;
+        let out = call(db, &m, &built, job, &via, &cancel).await?;
 
         let fail = match out.status {
             Status::Done => None,
@@ -479,8 +472,7 @@ async fn finish(db: &DatabaseConnection, m: &r::Model, b: Option<&Brief>, rep: O
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entity::tbl_context_source as cs;
-
+    
     const BRIEF: &str = "@TASK v1\nid: T1.1  parent: R1  mode: runner  kind: fix\ngoal: g\nac: [1 a]\npaths: [a.txt]";
 
     /// 고정 규칙 크기 · 지침 차단 인자 · 도구 정책 → 허용/차단 인자 (입력 조립 순서는 context 테스트)
@@ -561,10 +553,12 @@ printf '%s\n' '{{"type":"result","is_error":false,"result":"done.\n@REPORT v1\ni
         assert!(std::fs::read_to_string(dir.join("args.txt")).unwrap().contains("--strict-mcp-config"));
 
         let done = r::Entity::find_by_id(kid.sn).one(&db).await.unwrap().unwrap();
-        assert_eq!((done.status.as_str(), done.token_input, done.result_summary.as_deref()), ("completed", Some(7), Some("done")));
+        let sum = |sn: i64| { let db = db.clone(); async move { lt::Entity::find().filter(lt::Column::RunSn.eq(sn)).all(&db).await.unwrap().iter().map(|t| t.token_input).sum::<i64>() } };
+        assert_eq!((done.status.as_str(), sum(kid.sn).await, done.result_summary.as_deref()), ("completed", 7, Some("done")));
         let toks = lt::Entity::find().all(&db).await.unwrap();
         assert_eq!(toks.iter().map(|t| t.run_sn).collect::<Vec<_>>(), [kid.sn, next.sn]);
-        let kinds: Vec<String> = cs::Entity::find().filter(cs::Column::ManifestSn.eq(1)).all(&db).await.unwrap().into_iter().map(|c| c.kind).collect();
+        let src: serde_json::Value = serde_json::from_str(cm::Entity::find_by_id(1).one(&db).await.unwrap().unwrap().source_json.as_deref().unwrap()).unwrap();
+        let kinds: Vec<&str> = src.as_array().unwrap().iter().map(|c| c["kind"].as_str().unwrap()).collect();
         assert_eq!(kinds, ["instruction", "task", "file"]);
         assert_eq!(r::Entity::find_by_id(next.sn).one(&db).await.unwrap().unwrap().status, "completed");
     }
@@ -606,7 +600,8 @@ printf '{"type":"result","is_error":false,"result":"%s","usage":{"input_tokens":
         let lead = go(&db, kid.sn, watch::channel(false).1).await.unwrap();
         assert_eq!(lead, "@REPORT v1\nid: T1.1  run: R1  status: failed\nleft blocked \"paths_violation stray.txt\"");
         let done = r::Entity::find_by_id(kid.sn).one(&db).await.unwrap().unwrap();
-        assert_eq!((done.status.as_str(), done.fail_code.as_deref(), done.token_input), ("failed", Some("paths_violation"), Some(10)));
+        let toks: i64 = lt::Entity::find().filter(lt::Column::RunSn.eq(kid.sn)).all(&db).await.unwrap().iter().map(|t| t.token_input).sum();
+        assert_eq!((done.status.as_str(), done.fail_code.as_deref(), toks), ("failed", Some("paths_violation"), 10));
         let paths: serde_json::Value = serde_json::from_str(done.paths.as_deref().unwrap()).unwrap();
         let src: Vec<(&str, &str)> = paths.as_array().unwrap().iter().map(|p| (p["path"].as_str().unwrap(), p["source"].as_str().unwrap())).collect();
         assert_eq!(src, [("src/a.txt", "brief"), ("src/b.txt", "ask"), ("stray.txt", "violation")]);

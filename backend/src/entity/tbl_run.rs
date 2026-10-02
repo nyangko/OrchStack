@@ -52,13 +52,12 @@ pub struct Model {
     pub workdir: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub workdir_clean_at: Option<String>,
-    pub token_input: Option<i64>,
-    pub token_cache_read: Option<i64>,
-    pub token_cache_write: Option<i64>,
-    pub token_output: Option<i64>,
-    pub context_token: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub file_json: Option<String>,
+    pub review_member_sn: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub review_reason: Option<String>,
     pub context_limit: Option<i64>,
-    pub cost_usd_micro: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub start_at: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
@@ -97,12 +96,20 @@ pub enum Relation {
     TblLogToken,
     #[sea_orm(
         belongs_to = "super::tbl_member::Entity",
+        from = "Column::ReviewMemberSn",
+        to = "super::tbl_member::Column::Sn",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    TblMember2,
+    #[sea_orm(
+        belongs_to = "super::tbl_member::Entity",
         from = "Column::MemberSn",
         to = "super::tbl_member::Column::Sn",
         on_update = "NoAction",
         on_delete = "Restrict"
     )]
-    TblMember,
+    TblMember1,
     #[sea_orm(has_many = "super::tbl_message::Entity")]
     TblMessage,
     #[sea_orm(
@@ -115,8 +122,6 @@ pub enum Relation {
     TblProject,
     #[sea_orm(has_many = "super::tbl_report_item::Entity")]
     TblReportItem,
-    #[sea_orm(has_many = "super::tbl_review::Entity")]
-    TblReview,
     #[sea_orm(
         belongs_to = "Entity",
         from = "Column::WaitRunSn",
@@ -141,8 +146,6 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     SelfRef1,
-    #[sea_orm(has_many = "super::tbl_run_file::Entity")]
-    TblRunFile,
     #[sea_orm(
         belongs_to = "super::tbl_runtime::Entity",
         from = "Column::RuntimeSn",
@@ -223,12 +226,6 @@ impl Related<super::tbl_log_token::Entity> for Entity {
     }
 }
 
-impl Related<super::tbl_member::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblMember.def()
-    }
-}
-
 impl Related<super::tbl_message::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblMessage.def()
@@ -244,18 +241,6 @@ impl Related<super::tbl_project::Entity> for Entity {
 impl Related<super::tbl_report_item::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblReportItem.def()
-    }
-}
-
-impl Related<super::tbl_review::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblReview.def()
-    }
-}
-
-impl Related<super::tbl_run_file::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblRunFile.def()
     }
 }
 

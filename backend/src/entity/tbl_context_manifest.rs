@@ -10,14 +10,14 @@ pub struct Model {
     pub run_sn: i64,
     pub session_sn: Option<i64>,
     pub budget_token: i64,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub source_json: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::tbl_context_source::Entity")]
-    TblContextSource,
     #[sea_orm(has_many = "super::tbl_log_token::Entity")]
     TblLogToken,
     #[sea_orm(
@@ -36,12 +36,6 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     TblSession,
-}
-
-impl Related<super::tbl_context_source::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblContextSource.def()
-    }
 }
 
 impl Related<super::tbl_log_token::Entity> for Entity {

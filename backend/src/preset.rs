@@ -1,7 +1,7 @@
 //! 프리셋 편집(새로 · 복제 · 새 버전 · .md 가져오기 · 사용처)과 보고서 양식(tbl_report_form 조회 · 수정 · 미리보기).
 //! 조회(목록 · 버전)는 setting.rs. 저장 검사(토큰 상한 · 비밀키 · 겹치는 규칙 줄)는 서버가 판정해 422 사유로 돌려준다
 use crate::{entity::{tbl_instruction_preset as ip, tbl_instruction_preset_version as iv, tbl_map_profile_preset as pp, tbl_report_form as rf,
-    tbl_report_item as ri, tbl_run as r, tbl_run_file as fl, tbl_task as t},
+    tbl_report_item as ri, tbl_run as r, tbl_task as t},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}, run, setting::Preset, skill::{Usage, owners}};
 use axum::{Json, extract::{Path, Query, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
@@ -383,9 +383,9 @@ async fn preview(State(db): State<DatabaseConnection>, Path(key): Path<String>, 
     let lead = r::Entity::find().filter(r::Column::TaskSn.eq(task.sn)).filter(r::Column::ParentRunSn.is_null()).order_by_desc(r::Column::Num).one(&db).await?;
     if let Some(run) = lead {
         if let Some(s) = &run.result_summary { vals.insert("tests.passed_summary".into(), s.clone()); }
-        let files = fl::Entity::find().filter(fl::Column::RunSn.eq(run.sn)).all(&db).await?;
-        vals.extend([("scope.files".into(), files.len().to_string()), ("scope.add".into(), files.iter().map(|x| x.additions).sum::<i64>().to_string()),
-            ("scope.del".into(), files.iter().map(|x| x.deletions).sum::<i64>().to_string())]);
+        let files: Vec<Value> = run.file_json.as_deref().and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default();
+        let sum = |k: &str| files.iter().filter_map(|x| x[k].as_i64()).sum::<i64>().to_string();
+        vals.extend([("scope.files".into(), files.len().to_string()), ("scope.add".into(), sum("additions")), ("scope.del".into(), sum("deletions"))]);
         if let Some(Value::Object(tot)) = serde_json::to_value(run::enrich(&db, vec![run::Run::from(run.clone())]).await?.pop()).ok().map(|v| v["runner_total"].clone()) {
             vals.insert("run.tokens".into(), tot.get("value").map(Value::to_string).unwrap_or_default());
         }

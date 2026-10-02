@@ -1,7 +1,7 @@
 //! Orch 규칙 엔진 (#119 · LLM 0): 이벤트 1건 → 제안 0~1건 (`on`), 제안 실행 (`run` · 기존 command 재사용), 타이머 (`tick`), 멤버 대기열.
 //! 일상 PM 판단(다음 태스크 배정 · 재시도 · 이슈 닫기 · 폴백 · 가드 정지)을 모델 없이 처리한다. 실행기 · 모델 호출은 여기서 하지 않는다 (B-18)
 use crate::{ask::{self, Choice, DecisionNew, Opt, ProposalNew, Question}, entity::{tbl_agent_profile as ap, tbl_connection as cn, tbl_issue as i, tbl_log_event as e, tbl_member as mb,
-    tbl_ask as ak, tbl_project as pj, tbl_review as rv, tbl_run as r, tbl_task as t},
+    tbl_ask as ak, tbl_project as pj, tbl_run as r, tbl_task as t},
     error::{Error, ErrorBody, Res, Sn}, event::self,
     orch, policy::{self, Guard, Level, Policy}, run as runs, stat, task};
 use axum::{Json, extract::State};
@@ -106,7 +106,7 @@ impl Cx<'_> {
         for g in self.pol.guards.iter().filter(|g| g.is_enabled == 1 && codes.contains(&g.code.as_str())) {
             let n = match (g.code.as_str(), tk.issue_sn) {
                 ("auto_streak", _) => streak(self.db, &projects_of(self.db, self.ps).await?).await?,
-                ("reject_loop", _) => rv::Entity::find().filter(rv::Column::TaskSn.eq(tk.sn)).filter(rv::Column::Result.eq("rejected")).count(self.db).await? as i64,
+                ("reject_loop", _) => runs::rejects(self.db, tk.sn).await?,
                 ("same_failure", _) => match fail {
                     Some(f) => r::Entity::find().filter(r::Column::TaskSn.eq(tk.sn)).filter(r::Column::ParentRunSn.is_null()).filter(r::Column::Status.eq("failed"))
                         .filter(r::Column::FailCode.eq(f)).count(self.db).await? as i64,

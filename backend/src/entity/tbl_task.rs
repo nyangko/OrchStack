@@ -87,8 +87,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     TblProject,
-    #[sea_orm(has_many = "super::tbl_review::Entity")]
-    TblReview,
     #[sea_orm(has_many = "super::tbl_run::Entity")]
     TblRun,
     #[sea_orm(has_many = "super::tbl_task_criterion::Entity")]
@@ -160,12 +158,6 @@ impl Related<super::tbl_message::Entity> for Entity {
 impl Related<super::tbl_project::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblProject.def()
-    }
-}
-
-impl Related<super::tbl_review::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblReview.def()
     }
 }
 

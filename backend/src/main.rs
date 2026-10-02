@@ -297,8 +297,6 @@ mod tests {
     /// stop · retry(새 Run · 기존 불변) · reject(tbl_review + 태스크 복귀) · 실행기 전이 함수 · 막힌 전이 409
     #[tokio::test]
     async fn run_more() {
-        use crate::entity::tbl_review as rv;
-        use sea_orm::EntityTrait;
         let db = mem().await;
         let app = app(db.clone());
         let status = |sn: i64| { let app = app.clone(); async move { call(&app, "GET", &format!("/runs/{sn}"), None).await.1["status"].as_str().unwrap().to_string() } };
@@ -340,8 +338,9 @@ mod tests {
         let (st, r) = call(&app, "POST", "/runs/2/reject", Some(json!({"member_sn": 1, "reason": "라벨 누락"}))).await;
         assert_eq!((st, r["status"].as_str(), r["fail_code"].as_str(), r["fail_detail"].as_str()), (StatusCode::OK, Some("failed"), Some("rejected"), Some("라벨 누락")));
         assert_eq!(call(&app, "GET", &format!("/tasks/{ts}"), None).await.1["status"], "in_progress");
-        let reviews = rv::Entity::find().all(&db).await.unwrap();
-        assert_eq!(reviews.iter().map(|r| (r.round, r.result.as_str())).collect::<Vec<_>>(), [(1, "rejected")]);
+        let rj = crate::run::rejects(&db, ts).await.unwrap();
+        assert_eq!((rj, scalar(&db, "SELECT review_member_sn FROM tbl_run WHERE sn = 2").await), (1, 1));
+        assert_eq!(call(&app, "GET", "/runs/2", None).await.1["fail_detail"], "라벨 누락");
         assert_eq!(events(&db, "run", 2).await.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(),
             ["RunStarted", "RunProgressed", "RunProgressed", "ReviewRequested", "RunRejected"]);
 
@@ -350,7 +349,7 @@ mod tests {
         db.execute_unprepared("UPDATE tbl_run SET status = 'running' WHERE sn = 3").await.unwrap();
         call(&app, "POST", "/runs/3/review", None).await;
         call(&app, "POST", "/runs/3/reject", Some(json!({"member_sn": 1}))).await;
-        assert_eq!(rv::Entity::find().all(&db).await.unwrap().last().unwrap().round, 2);
+        assert_eq!(crate::run::rejects(&db, ts).await.unwrap(), 2); // round = 반려 Run 수
 
         // 실패 전이 + Session 전이
         call(&app, "POST", "/runs/2/retry", None).await; // 이미 failed인 2 → Run 4
@@ -1321,7 +1320,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         // 저장: 출처 6건 · 토큰 0이던 프리셋 버전(rule)만 추정값으로 채워진다
         db.execute_unprepared("INSERT INTO tbl_session (sn, run_sn, member_sn, num) VALUES (1, 1, 1, 1), (2, 1, 1, 2);").await.unwrap();
         ctx_save(&db, 1, Some(1), &b).await;
-        assert_eq!(db_count(&db, "tbl_context_source").await, 6);
+        assert_eq!(scalar(&db, "SELECT json_array_length(source_json) FROM tbl_context_manifest WHERE sn = 1").await, 6);
         assert_eq!((scalar(&db, "SELECT token_count FROM tbl_instruction_preset_version WHERE preset_sn = 2").await > 0, scalar(&db, "SELECT token_count FROM tbl_instruction_preset_version WHERE preset_sn = 3").await), (true, 5));
 
         // 같은 세션 두 번째 호출: 전부 반복 · 프롬프트에서 빠진다 (토큰 0) → 태스크 설명이 바뀌면 태스크 블록만 보낸다
