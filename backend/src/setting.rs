@@ -33,6 +33,14 @@ pub struct Workspace {
     theme: String,
     /// 인트로(연결 → 프로젝트 → 기본 팀) 완료 여부
     is_onboarded: i64,
+    /// 방해 금지 시작 · 끝 (HH:MM)
+    dnd_start: Option<String>,
+    dnd_end: Option<String>,
+    is_dnd_weekend: i64,
+    /// 이 레벨 이상은 방해 금지 무시 (0~4)
+    dnd_bypass_level: i64,
+    /// 일일 요약 시각 (HH:MM)
+    daily_summary_time: Option<String>,
     update_at: String,
 }
 
@@ -40,7 +48,8 @@ impl From<ws::Model> for Workspace {
     fn from(m: ws::Model) -> Self {
         Self {
             name: m.name, default_repo: m.default_repo, timezone: m.timezone, ui_language: m.ui_language, report_language: m.report_language,
-            commit_language: m.commit_language, date_format: m.date_format, theme: m.theme, is_onboarded: m.is_onboarded, update_at: m.update_at,
+            commit_language: m.commit_language, date_format: m.date_format, theme: m.theme, is_onboarded: m.is_onboarded, dnd_start: m.dnd_start,
+            dnd_end: m.dnd_end, is_dnd_weekend: m.is_dnd_weekend, dnd_bypass_level: m.dnd_bypass_level, daily_summary_time: m.daily_summary_time, update_at: m.update_at,
         }
     }
 }
@@ -67,6 +76,25 @@ struct WorkspacePatch {
     theme: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     is_onboarded: Option<i64>,
+    /// HH:MM
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dnd_start: Option<String>,
+    /// HH:MM
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dnd_end: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    is_dnd_weekend: Option<i64>,
+    /// 0~4
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dnd_bypass_level: Option<i64>,
+    /// HH:MM
+    #[serde(skip_serializing_if = "Option::is_none")]
+    daily_summary_time: Option<String>,
+}
+
+/// HH:MM (00:00 ~ 23:59) 인지
+fn hhmm(v: &str) -> bool {
+    matches!(v.split_once(':'), Some((h, m)) if h.len() == 2 && m.len() == 2 && h.parse::<u8>().is_ok_and(|h| h < 24) && m.parse::<u8>().is_ok_and(|m| m < 60))
 }
 
 /// 실행기 (API 응답 형태). 감지 · 설치 · 로그인 상태 갱신은 실행기 Task가 한다
@@ -158,11 +186,15 @@ async fn workspace(State(db): State<DatabaseConnection>) -> Res<Json<Workspace>>
     get(&db).await.map(Json)
 }
 
-/// 워크스페이스 부분 수정 (WorkspaceUpdated). 모르는 테마는 422
+/// 워크스페이스 부분 수정 (WorkspaceUpdated). 모르는 테마 · HH:MM 아닌 시각 · 레벨 0~4 밖은 422
 #[utoipa::path(operation_id = "setting_edit", patch, path = "/workspace", request_body = WorkspacePatch, responses((status = 200, body = Workspace), (status = "default", body = ErrorBody)))]
 async fn edit(State(db): State<DatabaseConnection>, Body(b): Body<WorkspacePatch>) -> Res<Json<Workspace>> {
     if b.theme.as_deref().is_some_and(|t| !THEMES.contains(&t)) {
         return Err(Error::invalid(format!("theme must be one of {THEMES:?}")));
+    }
+    if [&b.dnd_start, &b.dnd_end, &b.daily_summary_time].iter().any(|v| v.as_deref().is_some_and(|v| !hhmm(v)))
+        || b.dnd_bypass_level.is_some_and(|v| !(0..=4).contains(&v)) || b.is_dnd_weekend.is_some_and(|v| !(0..=1).contains(&v)) {
+        return Err(Error::invalid("times must be HH:MM, dnd_bypass_level 0..=4, is_dnd_weekend 0/1".into()));
     }
     let out = event::run(&db, async |tx| {
         use ws::Column as C;
@@ -176,6 +208,11 @@ async fn edit(State(db): State<DatabaseConnection>, Body(b): Body<WorkspacePatch
         if let Some(v) = &b.date_format { u = u.col_expr(C::DateFormat, v.clone().into()); }
         if let Some(v) = &b.theme { u = u.col_expr(C::Theme, v.clone().into()); }
         if let Some(v) = b.is_onboarded { u = u.col_expr(C::IsOnboarded, v.into()); }
+        if let Some(v) = &b.dnd_start { u = u.col_expr(C::DndStart, v.clone().into()); }
+        if let Some(v) = &b.dnd_end { u = u.col_expr(C::DndEnd, v.clone().into()); }
+        if let Some(v) = b.is_dnd_weekend { u = u.col_expr(C::IsDndWeekend, v.into()); }
+        if let Some(v) = b.dnd_bypass_level { u = u.col_expr(C::DndBypassLevel, v.into()); }
+        if let Some(v) = &b.daily_summary_time { u = u.col_expr(C::DailySummaryTime, v.clone().into()); }
         if u.exec(tx).await?.rows_affected == 0 {
             return Err(Error::not_found());
         }

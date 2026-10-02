@@ -1,4 +1,4 @@
-//! 명령 실행 틀: 상태 변경 + tbl_log_event append + seq 발급을 한 트랜잭션에서 하고, 커밋한 뒤 broadcast로 내보낸다
+//! 명령 실행 틀: 상태 변경 + tbl_log_event append + seq 발급 + 알림 projection을 한 트랜잭션에서 하고, 커밋한 뒤 broadcast로 내보낸다
 use crate::{entity::tbl_log_event as e, error::Res};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, TransactionTrait};
 use serde::Serialize;
@@ -43,7 +43,7 @@ pub async fn run<T>(db: &DatabaseConnection, f: impl AsyncFnOnce(&DatabaseTransa
         // 대상별 순번: 마지막 seq + 1 (락 안이라 경합 없음)
         let seq = e::Entity::find().filter(e::Column::AggregateType.eq(ev.agg)).filter(e::Column::AggregateSn.eq(ev.sn))
             .order_by_desc(e::Column::Seq).one(&tx).await?.map_or(1, |m| m.seq + 1);
-        done.push(e::ActiveModel {
+        let m = e::ActiveModel {
             wid: Set(crate::WID),
             project_sn: Set(ev.project_sn),
             aggregate_type: Set(ev.agg.into()),
@@ -55,7 +55,9 @@ pub async fn run<T>(db: &DatabaseConnection, f: impl AsyncFnOnce(&DatabaseTransa
             actor_type: Set("user".into()),
             uid: Set(Some(crate::UID)),
             ..Default::default()
-        }.insert(&tx).await?);
+        }.insert(&tx).await?;
+        crate::notify::project(&tx, &m).await?; // 알림 projection — 이벤트와 같은 트랜잭션
+        done.push(m);
     }
     tx.commit().await?;
     for m in done {

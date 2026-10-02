@@ -10,6 +10,7 @@ mod error; // 공통 에러 응답
 mod event; // 명령 실행 틀 (상태 변경 + 이벤트 append + 발행)
 mod exec; // 실행기: Claude Code · Codex CLI 비대화형 실행 (#13)
 mod issue; // /issues CRUD
+mod notify; // /notifications · /notify/* · /audit + 이벤트 → 알림 projection
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
 mod rule; // 하위 작업 규칙 엔진 (#67 · LLM 0)
@@ -60,7 +61,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -651,11 +652,78 @@ mod tests {
         assert_eq!(call(&app, "GET", "/mcps/9/usage", None).await.0, StatusCode::NOT_FOUND);
     }
 
+    /// B-10: 판단 · 승인 요청 · Run 실패 → 알림(같은 트랜잭션 · event_sn · project_sn), 앱 규칙 끄면 안 만듦, 탭 · after · 묶음 · 읽음,
+    /// 규칙 교체 검사, 채널(key_ref 없음) · 테스트, 방해 금지 설정, 감사 로그 필터
+    #[tokio::test]
+    async fn notify() {
+        use crate::{approval::{self, ApprovalNew}, decision::{self, ChoiceNew, DecisionNew, QuestionNew}};
+        let db = mem().await;
+        let app = app(db.clone());
+        let ts = task_of(&app, &db, true).await;
+        let q = QuestionNew { title: "Q".into(), body: None, code_snippet: None, ref_json: None, options: vec![ChoiceNew { code: "A".into(), label: "a".into(), note: None, is_recommended: false }] };
+        decision::create(&db, DecisionNew { project_sn: 1, task_sn: Some(ts), run_sn: None, member_sn: 1, level: 2, title: "재전송 제한".into(), deadline_at: None, questions: vec![q] }).await.unwrap();
+        let rs = call(&app, "POST", &format!("/tasks/{ts}/runs"), None).await.1["sn"].as_i64().unwrap();
+        run::run_to(&db, rs, "starting").await.unwrap();
+        run::run_to(&db, rs, "failed").await.unwrap();
+
+        // 알림 2건: 최신순 · 판단 요청은 확인 필요 묶음 + 프로젝트 · 바로가기, Run 실패는 오늘 묶음
+        let v = call(&app, "GET", "/notifications", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["event_code"].as_str(), v[0]["group"].as_str(), v[0]["ref_type"].as_str(), v[0]["title"].as_str()), (2, Some("run_failed"), Some("today"), Some("run"), Some("T")));
+        assert_eq!((v[1]["event_code"].as_str(), v[1]["group"].as_str(), v[1]["ref_sn"].as_i64(), v[1]["project_sn"].as_i64(), v[1]["is_action"].as_i64()), (Some("decision_request"), Some("need"), Some(1), Some(1), Some(1)));
+        assert_eq!(call(&app, "GET", "/notifications?tab=need", None).await.1.as_array().unwrap().len(), 1);
+        assert_eq!(call(&app, "GET", "/notifications?tab=run", None).await.1[0]["event_code"], "run_failed");
+        assert_eq!(call(&app, "GET", "/notifications?tab=quota", None).await.1.as_array().unwrap().len(), 0);
+        assert_eq!(call(&app, "GET", &format!("/notifications?after={}", v[1]["sn"]), None).await.1.as_array().unwrap().len(), 1);
+        assert_eq!(call(&app, "GET", "/notifications?tab=x", None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+
+        // 읽음: 개별 → 확인 필요 묶음에서 빠짐 · 전체 · 다시 하면 0
+        let ns = v[1]["sn"].as_i64().unwrap();
+        assert_eq!(call(&app, "POST", "/notifications/read", Some(json!({"sns": [ns]}))).await.1["updated"], 1);
+        assert_eq!(call(&app, "GET", "/notifications", None).await.1[1]["group"], "today");
+        assert_eq!(call(&app, "POST", "/notifications/read", Some(json!({}))).await.1["updated"], 1);
+        assert_eq!(call(&app, "POST", "/notifications/read", Some(json!({}))).await.1["updated"], 0);
+
+        // 규칙: 앱 승인 알림 끄면 승인 요청은 알림을 만들지 않는다 · 잘못된 칸 · 중복 422
+        let rule = json!({"connection_sn": null, "event_code": "approval_request", "channel_kind": "app", "is_enabled": 0});
+        assert_eq!(call(&app, "PUT", "/notify/rules", Some(json!([rule]))).await.0, StatusCode::OK);
+        approval::create(&db, ApprovalNew { project_sn: 1, task_sn: None, run_sn: None, member_sn: 1, rule_sn: None, action_code: "pr_merge".into(), title: "A".into(), detail: None, deadline_at: None }).await.unwrap();
+        assert_eq!(call(&app, "GET", "/notifications", None).await.1.as_array().unwrap().len(), 2);
+        assert_eq!(call(&app, "GET", "/notify/rules", None).await.1[0]["is_enabled"], 0);
+        for bad in [json!([rule, rule]), json!([{"event_code": "x", "channel_kind": "app", "is_enabled": 1}]), json!([{"event_code": "pr", "channel_kind": "sms", "is_enabled": 1}])] {
+            assert_eq!(call(&app, "PUT", "/notify/rules", Some(bad)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        assert_eq!(events(&db, "workspace", WID).await, [("NotifyRulesUpdated".into(), 1)]);
+
+        // 채널 · 테스트: key_ref 없음, app 항상 준비, off 채널은 준비 안 됨
+        db.execute_unprepared("INSERT INTO tbl_notify_channel (wid, kind, status, key_ref) VALUES (1, 'telegram', 'connected', 'orch.tg'), (1, 'email', 'off', NULL);").await.unwrap();
+        let v = call(&app, "GET", "/notify/channels", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0].get("key_ref")), (2, None));
+        for (k, ready) in [("app", true), ("telegram", true), ("email", false), ("desktop", false)] {
+            let v = call(&app, "POST", "/notify/test", Some(json!({"kind": k}))).await.1;
+            assert_eq!((v["ready"].as_bool(), v["delivered"].as_bool()), (Some(ready), Some(false)), "{k}");
+        }
+        assert_eq!(call(&app, "POST", "/notify/test", Some(json!({"kind": "sms"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+
+        // 방해 금지 · 일일 요약: 저장 · HH:MM · 레벨 검사
+        let w = call(&app, "PATCH", "/workspace", Some(json!({"dnd_start": "22:00", "dnd_end": "08:00", "dnd_bypass_level": 4, "daily_summary_time": "18:00"}))).await.1;
+        assert_eq!((w["dnd_start"].as_str(), w["dnd_bypass_level"].as_i64(), w["daily_summary_time"].as_str()), (Some("22:00"), Some(4), Some("18:00")));
+        for bad in [json!({"dnd_start": "24:00"}), json!({"daily_summary_time": "9:00"}), json!({"dnd_bypass_level": 5})] {
+            assert_eq!(call(&app, "PATCH", "/workspace", Some(bad)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+
+        // 감사 로그: 최신순 · 종류 · limit · 모르는 종류 422
+        db.execute_unprepared("INSERT INTO tbl_log_audit (wid, actor_type, kind, title) VALUES (1, 'user', 'KEY', 'k'), (1, 'member', 'BLOCK', 'git reset'), (1, 'user', 'BLOCK', 'git stash');").await.unwrap();
+        let v = call(&app, "GET", "/audit?kind=BLOCK&limit=1", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[0]["title"].as_str()), (1, Some("git stash")));
+        assert_eq!(call(&app, "GET", "/audit", None).await.1.as_array().unwrap().len(), 3);
+        assert_eq!(call(&app, "GET", "/audit?kind=x", None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
     #[tokio::test]
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());
