@@ -25,7 +25,12 @@
 	import { PageHeader } from '$lib/components/orch/page-header';
 	import { Segmented } from '$lib/components/orch/segmented';
 	import { setMode, userPrefersMode } from 'mode-watcher';
-	import { FieldRow } from '$lib/components/ui/field';
+	import { FieldRow, FieldSwitchRow } from '$lib/components/ui/field';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '$lib/components/ui/dialog';
+	import Lock from '@lucide/svelte/icons/lock';
+	import { toast } from 'svelte-sonner';
+	import { store } from '$lib/teams.svelte';
+	import { tasks, issues, decisions } from '$lib/mock';
 	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '$lib/components/ui/empty';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { onMount } from 'svelte';
@@ -52,6 +57,25 @@
 	});
 	let saved = $state(false);
 	let deleting = $state(false);
+	// 워크스페이스 내보내기 (.pen 워크스페이스 내보내기) — Alpha는 고른 항목을 JSON 한 파일로. Run 로그 · .zip은 서버 연결 후.
+	let exportOpen = $state(false);
+	let pick = $state({ settings: true, teams: true, projects: true, decisions: true });
+	function exportWorkspace() {
+		const data = {
+			app: 'OrchStack', exportedAt: new Date().toISOString(),
+			...(pick.settings && { settings: $state.snapshot(s) }),
+			...(pick.teams && { teams: $state.snapshot(store.crew), templates: $state.snapshot(store.templates) }),
+			...(pick.projects && { projects: $state.snapshot(store.projects), issues, tasks }),
+			...(pick.decisions && { decisions })
+		};
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+		a.download = `${s.name.toLowerCase().replace(/\s+/g, '-')}-workspace.json`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+		exportOpen = false;
+		toast.success('워크스페이스를 내보냈어요');
+	}
 	let confirmName = $state('');
 
 	let loadState = $state<'loading' | 'ready' | 'error'>(useMock ? 'ready' : 'loading');
@@ -232,8 +256,8 @@
 						<CardDescription>되돌릴 수 없는 작업</CardDescription>
 					</CardHeader>
 					<CardContent class="flex flex-col gap-2.5 pt-1">
-						<!-- 내보내기 · 삭제는 서버 연결(#47) 후 실제 동작 -->
-						<Button variant="outline" class="w-full"><Download />워크스페이스 내보내기 (.zip)</Button>
+						<!-- 삭제는 서버 연결(#47) 후 실제 동작 -->
+						<Button variant="outline" class="w-full" onclick={() => (exportOpen = true)}><Download />워크스페이스 내보내기</Button>
 						<Button variant="destructive" class="w-full" onclick={() => ((confirmName = ''), (deleting = true))}><Trash2 />워크스페이스 삭제</Button>
 					</CardContent>
 				</Card>
@@ -257,3 +281,29 @@
 		</AlertDialogFooter>
 	</AlertDialogContent>
 </AlertDialog>
+
+<!-- 워크스페이스 내보내기 (.pen 워크스페이스 내보내기) -->
+<Dialog bind:open={exportOpen}>
+	<DialogContent size="md">
+		<DialogHeader icon={Download}>
+			<DialogTitle>워크스페이스 내보내기</DialogTitle>
+			<DialogDescription>한 파일로 받아 다른 기기에서 가져올 수 있어요</DialogDescription>
+		</DialogHeader>
+		<DialogBody>
+			<h3 class="pt-2 text-sm font-semibold">포함할 것</h3>
+			<FieldSwitchRow label="설정 · 연결" hint="언어 · 알림 · 권한 · 연결 목록 (키 원문 제외)" bind:checked={pick.settings} />
+			<FieldSwitchRow label="팀 · 템플릿 · 프리셋" hint="멤버 · Instructions · Skills · 정책" bind:checked={pick.teams} />
+			<FieldSwitchRow label="프로젝트 · 이슈 · 태스크" hint="완료 조건 · 의존 · 보고서 포함" bind:checked={pick.projects} />
+			<FieldSwitchRow label="결정 기록" hint="판단 · 승인 · Orch 대신 결정" bind:checked={pick.decisions} />
+			<FieldSwitchRow label="Run 로그 · diff" hint="단계별 로그 · 스크린샷 · 서버 연결 후 (.zip)" checked={false} disabled />
+			<div class="mt-4 flex items-start gap-2.5 rounded-md bg-muted px-3 py-2.5 text-caption">
+				<Lock class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+				<span><span class="font-semibold">API 키 · 토큰 원문은 들어가지 않아요</span><span class="text-muted-foreground"> · 가져온 뒤 각 연결에서 다시 로그인하거나 키를 넣어요</span></span>
+			</div>
+		</DialogBody>
+		<DialogFooter note="지금은 JSON 한 파일 · Run 로그를 담은 .zip은 서버 연결 후">
+			<Button variant="ghost" size="sm" onclick={() => (exportOpen = false)}>취소</Button>
+			<Button size="sm" disabled={!Object.values(pick).some(Boolean)} onclick={exportWorkspace}><Download />내보내기</Button>
+		</DialogFooter>
+	</DialogContent>
+</Dialog>
