@@ -44,8 +44,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     TblConnection,
-    #[sea_orm(has_many = "super::tbl_map_fallback::Entity")]
-    TblMapFallback,
 }
 
 impl Related<super::tbl_agent_profile::Entity> for Entity {
@@ -57,12 +55,6 @@ impl Related<super::tbl_agent_profile::Entity> for Entity {
 impl Related<super::tbl_connection::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblConnection.def()
-    }
-}
-
-impl Related<super::tbl_map_fallback::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblMapFallback.def()
     }
 }
 

@@ -3,7 +3,7 @@
 //! 하위 Run은 최소 입력(고정 규칙 → @TASK → paths 파일)이다. 토큰은 `preset::tokens` 추정이고 실측은 tbl_log_token에만 있다. manifest · source는 이벤트를 남기지 않는다
 use crate::{entity::{tbl_agent_profile as ap, tbl_context_manifest as cm, tbl_context_source as cs, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv,
     tbl_label as lb, tbl_log_token as lt, tbl_map_profile_preset as mp, tbl_map_task_dependency as dp, tbl_map_task_label as tl, tbl_member as mb, tbl_profile_file as pf,
-    tbl_profile_path as pp, tbl_project as pj, tbl_run as r, tbl_task as t, tbl_task_criterion as tc, tbl_connection as cn},
+    tbl_project as pj, tbl_run as r, tbl_task as t, tbl_task_criterion as tc, tbl_connection as cn},
     error::{Error, ErrorBody, Res, Sn}, event, preset::tokens, rule, runner::{FILE_MAX, RULES, granted}};
 use axum::{Json, extract::State};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect, sea_query::Expr};
@@ -93,7 +93,7 @@ fn read(cwd: &str, p: &str) -> Option<String> {
 }
 
 /// 리드용 @TASK 블록: 제목 · 설명 · 완료 조건 · 의존 · 라벨 · 허용 경로 (서버가 만든다)
-async fn task_block(db: &impl ConnectionTrait, task: &t::Model, profile_sn: i64) -> Res<String> {
+async fn task_block(db: &impl ConnectionTrait, task: &t::Model, profile: &ap::Model) -> Res<String> {
     let mut l = vec!["@TASK v1".to_owned(), format!("id: #{}  title: {}", task.num, task.title)];
     if let Some(d) = task.description.as_deref().filter(|d| !d.trim().is_empty()) {
         l.push(format!("desc: {d}"));
@@ -110,8 +110,7 @@ async fn task_block(db: &impl ConnectionTrait, task: &t::Model, profile_sn: i64)
     if !names.is_empty() {
         l.push(format!("labels: {}", names.join(", ")));
     }
-    let paths: Vec<String> = pp::Entity::find().filter(pp::Column::ProfileSn.eq(profile_sn)).order_by_asc(pp::Column::Sort).order_by_asc(pp::Column::Sn).all(db).await?
-        .into_iter().map(|p| if p.kind == "exclude" { format!("!{}", p.pattern) } else { p.pattern }).collect();
+    let paths: Vec<String> = crate::agent::paths_of(profile).into_iter().map(|p| if p.kind == "exclude" { format!("!{}", p.pattern) } else { p.pattern }).collect();
     if !paths.is_empty() {
         l.push(format!("paths: {}", paths.join("  ")));
     }
@@ -180,7 +179,7 @@ async fn build(db: &impl ConnectionTrait, sp: &Spec, run: Option<&r::Model>, mem
             for f in pf::Entity::find().filter(pf::Column::ProfileSn.eq(profile.sn)).order_by_asc(pf::Column::Sort).order_by_asc(pf::Column::Sn).all(db).await? {
                 items.push(it("instruction", f.path, Some(f.sn), None, format!("{}{END}", f.content)));
             }
-            items.push(it("task", format!("@TASK #{}", task.num), Some(task.sn), None, format!("{}{END}", task_block(db, task, profile.sn).await?)));
+            items.push(it("task", format!("@TASK #{}", task.num), Some(task.sn), None, format!("{}{END}", task_block(db, task, profile).await?)));
         }
         Spec::Sub { id, brief, paths, cwd } => {
             items.push(it("instruction", "runner-rules".into(), None, None, format!("{RULES}{END}")));

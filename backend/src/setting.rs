@@ -1,5 +1,5 @@
 //! 설정: 워크스페이스(tbl_workspace sn=WORKSPACE) 조회 · 수정, 보안 기본값(workspace 프로필), 실행기 목록, Instruction preset 목록 · 버전 조회 (편집은 preset.rs)
-use crate::{entity::{tbl_agent_profile as ap, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv, tbl_profile_guard as pg, tbl_profile_rule as pr, tbl_runtime as rt, tbl_workspace as ws},
+use crate::{agent::{self, Guard, Rule}, entity::{tbl_agent_profile as ap, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv, tbl_runtime as rt, tbl_workspace as ws},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
@@ -19,43 +19,6 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
         .routes(routes!(versions))
         .routes(routes!(profile, set_profile))
 }
-
-/// 허용되는 규칙 동작 · 정책 · 승인자, 가드 시점
-const ACTIONS: [&str; 6] = ["pr_create", "dependency_add", "external_message", "env_access", "run_extend", "command"];
-const POLICIES: [&str; 3] = ["auto", "approval", "block"];
-const APPROVERS: [&str; 2] = ["user", "orch_then_user"];
-const STAGES: [&str; 3] = ["tool_use", "tool_result", "output"];
-
-/// 승인 규칙 · 차단 패턴 1줄 (tbl_profile_rule)
-#[derive(Serialize, Deserialize, ToSchema)]
-struct Rule {
-    /// pr_create | dependency_add | external_message | env_access | run_extend | command
-    action_code: String,
-    title: String,
-    /// 명령 패턴 (command일 때)
-    pattern: Option<String>,
-    description: Option<String>,
-    /// auto | approval | block
-    policy: String,
-    /// user | orch_then_user (approval일 때)
-    approver: Option<String>,
-    #[serde(default = "one")]
-    is_notify: i64,
-}
-
-/// 가드 트리거 1줄 (tbl_profile_guard)
-#[derive(Serialize, Deserialize, ToSchema)]
-struct Guard {
-    name: String,
-    /// tool_use | tool_result | output
-    stage: String,
-    pattern: Option<String>,
-    #[serde(default = "one")]
-    is_enabled: i64,
-}
-
-/// 기본값 1
-fn one() -> i64 { 1 }
 
 /// 워크스페이스 보안 기본값: kind=workspace 프로필의 Trust · 규칙 · 가드 + 워크스페이스 GitHub 계정 (조회 응답 · 저장 본문 겸용)
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -303,11 +266,7 @@ async fn base(db: &impl ConnectionTrait) -> Res<Option<ap::Model>> {
 async fn security(db: &impl ConnectionTrait) -> Res<SecurityProfile> {
     let w = ws::Entity::find_by_id(crate::WORKSPACE).one(db).await?.ok_or_else(Error::not_found)?;
     let p = base(db).await?;
-    let sn = p.as_ref().map_or(0, |p| p.sn);
-    let rules = pr::Entity::find().filter(pr::Column::ProfileSn.eq(sn)).order_by_asc(pr::Column::Sort).order_by_asc(pr::Column::Sn).all(db).await?.into_iter()
-        .map(|m| Rule { action_code: m.action_code, title: m.title, pattern: m.pattern, description: m.description, policy: m.policy, approver: m.approver, is_notify: m.is_notify }).collect();
-    let guards = pg::Entity::find().filter(pg::Column::ProfileSn.eq(sn)).order_by_asc(pg::Column::Sort).order_by_asc(pg::Column::Sn).all(db).await?.into_iter()
-        .map(|m| Guard { name: m.name, stage: m.stage, pattern: m.pattern, is_enabled: m.is_enabled }).collect();
+    let (rules, guards) = p.as_ref().map_or_else(|| (Vec::new(), Vec::new()), |p| (agent::rules_of(p), agent::guards_of(p)));
     Ok(SecurityProfile {
         trust_level: p.map_or(3, |p| p.trust_level), rules, guards, github_mode: w.github_mode, github_account: w.github_account, github_repo_scope: w.github_repo_scope,
     })
@@ -323,31 +282,20 @@ async fn profile(State(db): State<DatabaseConnection>) -> Res<Json<SecurityProfi
 /// Trust 1~4 · 모르는 동작 · 정책 · 승인자 · 시점 · GitHub 방식, command인데 패턴 없음, 빈 이름은 422
 #[utoipa::path(operation_id = "setting_set_profile", put, path = "/workspace/profile", request_body = SecurityProfile, responses((status = 200, body = SecurityProfile), (status = "default", body = ErrorBody)))]
 async fn set_profile(State(db): State<DatabaseConnection>, Body(b): Body<SecurityProfile>) -> Res<Json<SecurityProfile>> {
-    let bad_rule = b.rules.iter().any(|r| !ACTIONS.contains(&r.action_code.as_str()) || !POLICIES.contains(&r.policy.as_str()) || r.title.trim().is_empty()
-        || r.approver.as_deref().is_some_and(|a| !APPROVERS.contains(&a)) || (r.action_code == "command" && r.pattern.as_deref().is_none_or(|p| p.trim().is_empty())));
-    let bad_guard = b.guards.iter().any(|g| !STAGES.contains(&g.stage.as_str()) || g.name.trim().is_empty());
-    if !(1..=4).contains(&b.trust_level) || !["bot", "personal"].contains(&b.github_mode.as_str()) || bad_rule || bad_guard {
-        return Err(Error::invalid(format!("trust_level 1..=4, github_mode bot|personal, action in {ACTIONS:?}, policy in {POLICIES:?}, approver in {APPROVERS:?}, stage in {STAGES:?}, command needs pattern")));
+    agent::check_rules(&b.rules)?;
+    agent::check_guards(&b.guards)?;
+    if !(1..=4).contains(&b.trust_level) || !["bot", "personal"].contains(&b.github_mode.as_str()) {
+        return Err(Error::invalid("trust_level 1..=4, github_mode bot|personal".into()));
     }
     let out = event::run(&db, async |tx| {
         let sn = match base(tx).await? {
             Some(p) => p.sn,
             None => ap::ActiveModel { workspace_sn: Set(crate::WORKSPACE), kind: Set("workspace".into()), ..Default::default() }.insert(tx).await?.sn,
         };
-        ap::Entity::update_many().filter(ap::Column::Sn.eq(sn)).col_expr(ap::Column::TrustLevel, b.trust_level.into()).exec(tx).await?;
-        pr::Entity::delete_many().filter(pr::Column::ProfileSn.eq(sn)).exec(tx).await?;
-        for (i, r) in b.rules.iter().enumerate() {
-            pr::ActiveModel {
-                profile_sn: Set(sn), action_code: Set(r.action_code.clone()), title: Set(r.title.trim().into()), pattern: Set(r.pattern.clone()), description: Set(r.description.clone()),
-                policy: Set(r.policy.clone()), approver: Set(r.approver.clone()), is_notify: Set(r.is_notify), sort: Set(i as i64), ..Default::default()
-            }.insert(tx).await?;
-        }
-        pg::Entity::delete_many().filter(pg::Column::ProfileSn.eq(sn)).exec(tx).await?;
-        for (i, g) in b.guards.iter().enumerate() {
-            pg::ActiveModel {
-                profile_sn: Set(sn), name: Set(g.name.trim().into()), stage: Set(g.stage.clone()), pattern: Set(g.pattern.clone()), is_enabled: Set(g.is_enabled), sort: Set(i as i64), ..Default::default()
-            }.insert(tx).await?;
-        }
+        let (rules, guards): (Vec<Rule>, Vec<Guard>) = (b.rules.iter().map(|r| Rule { title: r.title.trim().into(), ..r.clone() }).collect(), b.guards.iter().map(|g| Guard { name: g.name.trim().into(), ..g.clone() }).collect());
+        ap::Entity::update_many().filter(ap::Column::Sn.eq(sn)).col_expr(ap::Column::TrustLevel, b.trust_level.into())
+            .col_expr(ap::Column::RuleJson, serde_json::json!(rules).to_string().into()).col_expr(ap::Column::GuardJson, serde_json::json!(guards).to_string().into())
+            .col_expr(ap::Column::UpdateAt, Expr::cust("datetime('now')")).exec(tx).await?;
         ws::Entity::update_many().filter(ws::Column::Sn.eq(crate::WORKSPACE)).col_expr(ws::Column::GithubMode, b.github_mode.clone().into())
             .col_expr(ws::Column::GithubAccount, b.github_account.clone().into()).col_expr(ws::Column::GithubRepoScope, b.github_repo_scope.clone().into())
             .col_expr(ws::Column::UpdateAt, Expr::cust("datetime('now')")).exec(tx).await?;

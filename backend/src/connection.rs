@@ -239,6 +239,9 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
 async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusCode> {
     event::run(&db, async |tx| {
         let m = get(tx, sn).await?;
+        if crate::agent::fallback_uses(tx, sn).await? > 0 {
+            return Err(Error::conflict(format!("connection {} is in a fallback chain", m.name)));
+        }
         Tbl::delete_by_id(sn).exec(tx).await.map_err(in_use)?;
         Ok(((), vec![Ev::new(None, "connection", sn, "ConnectionDeleted", &json!({ "name": m.name }))]))
     }).await?;

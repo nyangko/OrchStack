@@ -30,6 +30,16 @@ pub struct Model {
     pub context_warn_percent: i64,
     pub run_time_limit_min: Option<i64>,
     pub auto_retry_max: i64,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub path_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub tool_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub rule_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub guard_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub fallback_json: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
     #[sea_orm(column_type = "Text")]
@@ -46,8 +56,6 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     TblConnection,
-    #[sea_orm(has_many = "super::tbl_map_fallback::Entity")]
-    TblMapFallback,
     #[sea_orm(has_many = "super::tbl_map_profile_mcp::Entity")]
     TblMapProfileMcp,
     #[sea_orm(has_many = "super::tbl_map_profile_preset::Entity")]
@@ -66,14 +74,6 @@ pub enum Relation {
     TblModel,
     #[sea_orm(has_many = "super::tbl_profile_file::Entity")]
     TblProfileFile,
-    #[sea_orm(has_many = "super::tbl_profile_guard::Entity")]
-    TblProfileGuard,
-    #[sea_orm(has_many = "super::tbl_profile_path::Entity")]
-    TblProfilePath,
-    #[sea_orm(has_many = "super::tbl_profile_rule::Entity")]
-    TblProfileRule,
-    #[sea_orm(has_many = "super::tbl_profile_tool::Entity")]
-    TblProfileTool,
     #[sea_orm(
         belongs_to = "super::tbl_runtime::Entity",
         from = "Column::RuntimeSn",
@@ -97,12 +97,6 @@ pub enum Relation {
 impl Related<super::tbl_connection::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblConnection.def()
-    }
-}
-
-impl Related<super::tbl_map_fallback::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblMapFallback.def()
     }
 }
 
@@ -139,30 +133,6 @@ impl Related<super::tbl_model::Entity> for Entity {
 impl Related<super::tbl_profile_file::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblProfileFile.def()
-    }
-}
-
-impl Related<super::tbl_profile_guard::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblProfileGuard.def()
-    }
-}
-
-impl Related<super::tbl_profile_path::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblProfilePath.def()
-    }
-}
-
-impl Related<super::tbl_profile_rule::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblProfileRule.def()
-    }
-}
-
-impl Related<super::tbl_profile_tool::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblProfileTool.def()
     }
 }
 

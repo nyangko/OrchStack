@@ -386,28 +386,34 @@ mod tests {
             "INSERT INTO tbl_runtime (sn, workspace_sn, code, name) VALUES (1, 1, 'claude_code', 'Claude Code'); \
              INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'max');",
         ).await.unwrap();
-        let fbs = format!("/profiles/{ps}/fallbacks");
+        let pu = format!("/profiles/{ps}");
         let chain = json!([{"runtime_sn": 1, "connection_sn": 1, "tier": "S"}, {"runtime_sn": 1, "connection_sn": 1, "tier": null}]);
-        assert_eq!(call(&app, "PUT", &fbs, Some(chain)).await.0, StatusCode::OK);
-        let v = call(&app, "GET", &fbs, None).await.1;
-        assert_eq!((v[0]["tier"].as_str(), v[1]["tier"].is_null()), (Some("S"), true));
-        assert_eq!(call(&app, "PUT", &fbs, Some(json!([{"runtime_sn": 1, "connection_sn": 1, "tier": "X"}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(call(&app, "PUT", &fbs, Some(json!([{"runtime_sn": 1, "connection_sn": 9}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(call(&app, "GET", &fbs, None).await.1.as_array().unwrap().len(), 2); // 실패한 교체는 기존 체인을 지우지 않는다
-        // 명령 사용 여부: 기본 3개 차단 → checkout 켜기 · rm -rf 차단 추가 → 기본 목록 순서 뒤에 추가 명령
-        let cmds = format!("/profiles/{ps}/commands");
-        let on = |v: &Value| v.as_array().unwrap().iter().map(|c| (c["cmd"].as_str().unwrap().to_owned(), c["on"].as_bool().unwrap())).collect::<Vec<_>>();
-        assert_eq!(on(&call(&app, "GET", &cmds, None).await.1), [("git stash".into(), false), ("git checkout".into(), false), ("git reset".into(), false)]);
-        let v = call(&app, "PUT", &cmds, Some(json!([{"cmd": "git checkout", "on": true}, {"cmd": "rm -rf", "on": false}]))).await.1;
+        let (st, v) = call(&app, "PATCH", &pu, Some(json!({"fallbacks": chain}))).await;
+        assert_eq!((st, v["fallbacks"][0]["tier"].as_str(), v["fallbacks"][1]["tier"].is_null()), (StatusCode::OK, Some("S"), true));
+        assert_eq!(call(&app, "PATCH", &pu, Some(json!({"fallbacks": [{"runtime_sn": 1, "connection_sn": 1, "tier": "X"}]}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "PATCH", &pu, Some(json!({"fallbacks": [{"runtime_sn": 1, "connection_sn": 9}]}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "GET", &pu, None).await.1["fallbacks"].as_array().unwrap().len(), 2); // 실패한 교체는 기존 체인을 지우지 않는다
+        // 도구 · 파일 범위 · 규칙 · 가드: 전체 교체 · 값 검사(모르는 도구 · 중복 도구 · 모르는 정책 · 빈 패턴 · command 패턴 없음 · 모르는 시점)는 422
+        let (st, v) = call(&app, "PATCH", &pu, Some(json!({"tools": [{"tool_code": "shell", "policy": "approval"}], "paths": [{"kind": "include", "pattern": "src/**"}, {"kind": "exclude", "pattern": "**/.env*"}],
+            "guards": [{"name": "키 감지", "stage": "output", "pattern": "sk-"}]}))).await;
+        assert_eq!((st, v["tools"][0]["policy"].as_str(), v["paths"][1]["kind"].as_str(), v["guards"][0]["is_enabled"].as_i64(), v["fallbacks"].as_array().unwrap().len()), (StatusCode::OK, Some("approval"), Some("exclude"), Some(1), 2));
+        for bad in [json!({"tools": [{"tool_code": "x", "policy": "allow"}]}), json!({"tools": [{"tool_code": "shell", "policy": "allow"}, {"tool_code": "shell", "policy": "block"}]}),
+                    json!({"tools": [{"tool_code": "read", "policy": "x"}]}), json!({"paths": [{"kind": "include", "pattern": " "}]}), json!({"rules": [{"action_code": "command", "title": "t", "policy": "block"}]}),
+                    json!({"guards": [{"name": "g", "stage": "x"}]})] {
+            assert_eq!(call(&app, "PATCH", &pu, Some(bad)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        // 명령 사용 여부(응답 안): 기본 3개 차단 → rules의 command 규칙으로 checkout 켜기 · rm -rf 차단 추가 → 기본 목록 순서 뒤에 추가 명령
+        let on = |v: &Value| v["commands"].as_array().unwrap().iter().map(|c| (c["cmd"].as_str().unwrap().to_owned(), c["on"].as_bool().unwrap())).collect::<Vec<_>>();
+        assert_eq!(on(&call(&app, "GET", &pu, None).await.1), [("git stash".into(), false), ("git checkout".into(), false), ("git reset".into(), false)]);
+        let cmd = |c: &str, p: &str| json!({"action_code": "command", "title": c, "pattern": c, "policy": p});
+        let v = call(&app, "PATCH", &pu, Some(json!({"rules": [cmd("git checkout", "auto"), cmd("rm -rf", "block")]}))).await.1;
         assert_eq!(on(&v), [("git stash".into(), false), ("git checkout".into(), true), ("git reset".into(), false), ("rm -rf".into(), false)]);
-        assert_eq!(v[3]["builtin"], false);
-        assert_eq!(call(&app, "PUT", &cmds, Some(json!([{"cmd": " ", "on": true}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!((v["commands"][3]["builtin"].as_bool(), v["rules"].as_array().unwrap().len()), (Some(false), 2));
         assert_eq!(call(&app, "DELETE", &format!("/profiles/{ps}"), None).await.0, StatusCode::NO_CONTENT);
 
         // 템플릿(live v2 · 도구 정책 1개)과 draft 템플릿은 SQL로 넣는다 (템플릿 편집은 이 Task 범위 밖)
         db.execute_unprepared(
-            "INSERT INTO tbl_agent_profile (sn, workspace_sn, kind, effort) VALUES (10, 1, 'template', 'high'); \
-             INSERT INTO tbl_profile_tool (profile_sn, tool_code, policy) VALUES (10, 'shell', 'approval'); \
+            "INSERT INTO tbl_agent_profile (sn, workspace_sn, kind, effort, tool_json) VALUES (10, 1, 'template', 'high', '[{\"tool_code\":\"shell\",\"policy\":\"approval\"}]'); \
              INSERT INTO tbl_template (sn, workspace_sn, name, role_name, icon, color) VALUES (1, 1, 'Frontend', 'Frontend Developer', 'monitor', 'role-frontend'); \
              INSERT INTO tbl_template_revision (template_sn, profile_sn, version, status) VALUES (1, 10, 2, 'live'); \
              INSERT INTO tbl_template (sn, workspace_sn, name, status) VALUES (2, 1, 'Draft', 'draft');",
@@ -439,8 +445,7 @@ mod tests {
         assert_ne!(mp, 10);
         let p = call(&app, "GET", &format!("/profiles/{mp}"), None).await.1;
         assert_eq!((p["kind"].as_str(), p["effort"].as_str()), (Some("member"), Some("high")));
-        let caps = call(&app, "GET", &format!("/profiles/{mp}/caps"), None).await.1;
-        assert_eq!((caps["tools"][0]["tool_code"].as_str(), caps["tools"][0]["policy"].as_str()), (Some("shell"), Some("approval")));
+        assert_eq!((p["tools"][0]["tool_code"].as_str(), p["tools"][0]["policy"].as_str()), (Some("shell"), Some("approval")));
 
         // draft 템플릿 409 · 없는 템플릿 422 · 템플릿도 역할도 없으면 422 · 빈 캐릭터는 역할만으로
         assert_eq!(call(&app, "POST", &members, Some(json!({"name": "a", "template_sn": 2}))).await.0, StatusCode::CONFLICT);
@@ -534,9 +539,9 @@ mod tests {
 
         // 삭제: 폴백 체인에 쓰이면 409, 빠지면 204 (한도도 함께 지워짐)
         let ps = call(&app, "POST", "/profiles", Some(json!({}))).await.1["sn"].as_i64().unwrap();
-        call(&app, "PUT", &format!("/profiles/{ps}/fallbacks"), Some(json!([{"runtime_sn": 1, "connection_sn": cs, "tier": null}]))).await;
+        call(&app, "PATCH", &format!("/profiles/{ps}"), Some(json!({"fallbacks": [{"runtime_sn": 1, "connection_sn": cs, "tier": null}]}))).await;
         assert_eq!(call(&app, "DELETE", &format!("/connections/{cs}"), None).await.0, StatusCode::CONFLICT);
-        call(&app, "PUT", &format!("/profiles/{ps}/fallbacks"), Some(json!([]))).await;
+        call(&app, "PATCH", &format!("/profiles/{ps}"), Some(json!({"fallbacks": []}))).await;
         assert_eq!(call(&app, "DELETE", &format!("/connections/{cs}"), None).await.0, StatusCode::NO_CONTENT);
         assert_eq!(call(&app, "GET", &format!("/connections/{cs}"), None).await.0, StatusCode::NOT_FOUND);
 
@@ -664,7 +669,7 @@ mod tests {
         for sn in [1, 2, 3] {
             assert_eq!(call(&app, "PUT", "/profiles/2/skills", Some(json!([{"skill_sn": sn, "is_enabled": 1}]))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         }
-        assert_eq!(call(&app, "GET", "/profiles/2/caps", None).await.1["skills"].as_array().unwrap().len(), 0);
+        assert_eq!(call(&app, "GET", "/profiles/2", None).await.1["skills"].as_array().unwrap().len(), 0);
         assert_eq!(call(&app, "PUT", "/profiles/99/skills", Some(json!([]))).await.0, StatusCode::NOT_FOUND);
 
         // 사용처: 스킬은 멤버 '진'(on) · MCP는 멤버(installed). 템플릿 버전 프로필도 잡힌다
@@ -875,7 +880,7 @@ mod tests {
 
         // 팀 한도: 프로필 연결(1) + 폴백(2) → 연결별 한도 · 가장 적게 남은 비율
         db.execute_unprepared("UPDATE tbl_agent_profile SET connection_sn = 1 WHERE sn = 1; INSERT INTO tbl_runtime (sn, workspace_sn, code, name) VALUES (1, 1, 'codex', 'Codex'); \
-            INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort) VALUES (1, 1, 2, 1); \
+            UPDATE tbl_agent_profile SET fallback_json = '[{\"runtime_sn\":1,\"connection_sn\":2}]' WHERE sn = 1; \
             INSERT INTO tbl_connection_quota (connection_sn, period, unit, used_value, remain_percent) VALUES (2, '5h', 'percent', 70, 30), (2, 'week', 'percent', 88, 12);").await.unwrap();
         let v = call(&app, "GET", "/teams/1/quota", None).await.1;
         assert_eq!((v.as_array().unwrap().len(), v[1]["kind"].as_str(), v[1]["min_remain_percent"].as_i64(), v[1]["quotas"].as_array().unwrap().len(), v[0]["min_remain_percent"].is_null()), (2, Some("subscription"), Some(12), 2, true));
@@ -1154,7 +1159,7 @@ mod tests {
         db.execute_unprepared(
             "INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name, status) VALUES (1, 1, 'api_key', 'openai', 'OpenAI', 'bad', 'error'), (2, 1, 'api_key', 'openai', 'OpenAI', 'good', 'connected'); \
              INSERT INTO tbl_runtime (sn, workspace_sn, code, name) VALUES (1, 1, 'codex', 'Codex'); \
-             INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort) VALUES (1, 1, 1, 1), (1, 1, 2, 2);",
+             UPDATE tbl_agent_profile SET fallback_json = '[{\"runtime_sn\":1,\"connection_sn\":1},{\"runtime_sn\":1,\"connection_sn\":2}]' WHERE sn = 1;",
         ).await.unwrap();
         let b = 2;
         call(&app, "POST", &format!("/tasks/{b}/assign"), Some(json!({"member_sn": 1}))).await;
@@ -1253,7 +1258,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
             INSERT INTO tbl_label (sn, project_sn, name) VALUES (1, 1, 'auth');
             INSERT INTO tbl_map_task_label (task_sn, label_sn) VALUES (1, 1);
             INSERT INTO tbl_map_task_dependency (task_sn, depend_task_sn) VALUES (1, 2);
-            INSERT INTO tbl_profile_path (profile_sn, kind, pattern, sort) VALUES (1, 'include', 'src/**', 1), (1, 'exclude', '**/.env*', 2);
+            UPDATE tbl_agent_profile SET path_json = '[{{\"kind\":\"include\",\"pattern\":\"src/**\"}},{{\"kind\":\"exclude\",\"pattern\":\"**/.env*\"}}]' WHERE sn = 1;
             INSERT INTO tbl_profile_file (profile_sn, path, content, sort) VALUES (1, 'rules/a11y.md', 'A11Y-FILE', 1);
             INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, limit_tok) VALUES (1, 1, 'protocol', 'p', 'P', 500), (2, 1, 'rule', 'r', 'R', 500), (3, 1, 'role', 'd', 'D', 500);
             INSERT INTO tbl_instruction_preset_version (preset_sn, version, content, token_count) VALUES (1, 1, 'P-PROTO v1', 5), (2, 1, '- keep small', 0), (3, 1, '# Role: Dev', 5);
@@ -1354,7 +1359,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         for f in ["a", "b", "c"] {
             std::fs::write(dir.join(format!("{f}.txt")), "y".repeat(70_000)).unwrap();
         }
-        db.execute_unprepared("INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort, tier) VALUES (1, 1, 1, 1, 'L'), (1, 1, 1, 2, 'M'); UPDATE tbl_run SET status = 'running' WHERE sn = 1;").await.unwrap();
+        db.execute_unprepared("UPDATE tbl_agent_profile SET fallback_json = '[{\"runtime_sn\":1,\"connection_sn\":1,\"tier\":\"L\"},{\"runtime_sn\":1,\"connection_sn\":1,\"tier\":\"M\"}]' WHERE sn = 1; UPDATE tbl_run SET status = 'running' WHERE sn = 1;").await.unwrap();
         let brief = "@TASK v1\nid: T1.1  parent: R1  mode: runner  kind: fix\ngoal: g\nac: [1 a]\npaths: [a.txt, b.txt, c.txt]";
         let runs = db_count(&db, "tbl_run").await;
         let Spawn::Stop(Stop::Lead(why)) = runner::spawn(&db, 1, brief).await.unwrap() else { panic!("not stopped") };
@@ -1615,7 +1620,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/asks/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram", "/presets/{sn}", "/presets/{sn}/usage", "/presets/import", "/report-forms", "/report-forms/{key}", "/report-forms/{key}/preview", "/workspace/profile", "/asks", "/asks/{sn}", "/asks/{sn}/answer", "/asks/{sn}/writing", "/asks/{sn}/approve", "/asks/{sn}/deny", "/asks/{sn}/hold", "/asks/{sn}/{action}"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/asks/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram", "/presets/{sn}", "/presets/{sn}/usage", "/presets/import", "/report-forms", "/report-forms/{key}", "/report-forms/{key}/preview", "/workspace/profile", "/asks", "/asks/{sn}", "/asks/{sn}/answer", "/asks/{sn}/writing", "/asks/{sn}/approve", "/asks/{sn}/deny", "/asks/{sn}/hold", "/asks/{sn}/{action}"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

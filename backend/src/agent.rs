@@ -1,5 +1,5 @@
 //! tbl_agent_profile CRUD + 하위 매핑 조회 + tbl_template 조회. 쓰기는 event::run 경유 (ProfileCreated · ProfileUpdated · ProfileDeleted)
-use crate::{entity::{tbl_agent_profile::{self as p, Entity as Tbl}, tbl_map_fallback as fb, tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_profile_rule as pr, tbl_profile_tool as pt, tbl_skill as sk, tbl_template as tp},
+use crate::{entity::{tbl_agent_profile::{self as p, Entity as Tbl}, tbl_connection as cn, tbl_map_profile_mcp as pm, tbl_map_profile_skill as ps, tbl_model as md, tbl_runtime as rt, tbl_skill as sk, tbl_template as tp},
     error::{Body, Error, ErrorBody, Res, Sn, in_use}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::{NotSet, Set}, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, EntityTrait,
@@ -12,28 +12,31 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 /// 허용되는 하위 작업 모델 등급 (#67)
 pub(crate) const TIERS: [&str; 3] = ["S", "M", "L"];
 
-/// 기본 차단 명령 (하위 Run · #67). 프로필 tbl_profile_rule(command · pattern = 명령 글자)이 같은 명령이면 그 정책이 이긴다.
+/// 기본 차단 명령 (하위 Run · #67). 프로필 rule_json의 command 규칙(pattern = 명령 글자)이 같은 명령이면 그 정책이 이긴다.
 /// 명령 글자 → 실행기 인자 맵핑은 runner::perms
 pub(crate) const CMDS: [&str; 3] = ["git stash", "git checkout", "git reset"];
 
 /// 허용되는 프로필 소유 종류
 const KINDS: [&str; 3] = ["workspace", "template", "member"];
 
-/// 프로필을 복사할 때 함께 복사하는 하위 설정 테이블 (tbl_template_revision · tbl_member는 소유자라 제외)
-const CHILDREN: [&str; 9] = [
-    "tbl_profile_file", "tbl_map_profile_skill", "tbl_map_profile_mcp", "tbl_profile_tool", "tbl_profile_path",
-    "tbl_profile_rule", "tbl_profile_guard", "tbl_map_fallback", "tbl_map_profile_preset",
-];
+/// 프로필을 복사할 때 함께 복사하는 하위 설정 테이블 (tbl_member는 소유자라 제외 · 작은 목록은 *_json 컬럼이라 프로필 행과 함께 복사된다)
+const CHILDREN: [&str; 4] = ["tbl_profile_file", "tbl_map_profile_skill", "tbl_map_profile_mcp", "tbl_map_profile_preset"];
+
+/// 허용되는 도구 · 도구 정책 · 파일 범위 종류 · 규칙 동작 · 규칙 정책 · 승인자 · 가드 시점
+const TOOLS: [&str; 6] = ["read", "edit", "shell", "git_push", "web_fetch", "git_destructive"];
+const TOOL_POLICIES: [&str; 4] = ["allow", "allowlist", "approval", "block"];
+const PATHS: [&str; 2] = ["include", "exclude"];
+const ACTIONS: [&str; 6] = ["pr_create", "dependency_add", "external_message", "env_access", "run_extend", "command"];
+const POLICIES: [&str; 3] = ["auto", "approval", "block"];
+const APPROVERS: [&str; 2] = ["user", "orch_then_user"];
+const STAGES: [&str; 3] = ["tool_use", "tool_result", "output"];
 
 /// profile · template 관련 경로 묶음
 pub fn routes() -> OpenApiRouter<DatabaseConnection> {
     OpenApiRouter::new()
         .routes(routes!(list, create))
         .routes(routes!(read, update, remove))
-        .routes(routes!(caps))
         .routes(routes!(set_skills))
-        .routes(routes!(fallbacks, chain))
-        .routes(routes!(commands, set_commands))
         .routes(routes!(templates))
         .routes(routes!(template))
 }
@@ -65,13 +68,47 @@ pub struct Profile {
     context_warn_percent: i64,
     run_time_limit_min: Option<i64>,
     auto_retry_max: i64,
+    /// 파일 범위 (path_json)
+    paths: Vec<PathRule>,
+    /// CLI 기본 도구 정책 (tool_json)
+    tools: Vec<ToolRule>,
+    /// 승인 규칙 · 항상 차단 (rule_json)
+    rules: Vec<Rule>,
+    /// 가드 트리거 (guard_json)
+    guards: Vec<Guard>,
+    /// 폴백 체인 (fallback_json · 위에서부터 시도)
+    fallbacks: Vec<Fallback>,
+    /// 명령 사용 여부 (기본 목록 + rules의 command 규칙 · 읽기 전용)
+    commands: Vec<Cmd>,
+    /// 켠 스킬 (tbl_map_profile_skill · 편집은 PUT /profiles/{sn}/skills)
+    skills: Vec<SkillLink>,
+    /// 쓰는 MCP (tbl_map_profile_mcp)
+    mcps: Vec<McpLink>,
     create_at: String,
     update_at: String,
 }
 
+/// JSON 배열 컬럼 → 목록 (비었거나 깨졌으면 빈 목록)
+fn arr<T: serde::de::DeserializeOwned>(j: &Option<String>) -> Vec<T> {
+    j.as_deref().and_then(|s| serde_json::from_str(s).ok()).unwrap_or_default()
+}
+
+/// 프로필의 파일 범위
+pub(crate) fn paths_of(m: &p::Model) -> Vec<PathRule> { arr(&m.path_json) }
+/// 프로필의 도구 정책
+pub(crate) fn tools_of(m: &p::Model) -> Vec<ToolRule> { arr(&m.tool_json) }
+/// 프로필의 승인 규칙
+pub(crate) fn rules_of(m: &p::Model) -> Vec<Rule> { arr(&m.rule_json) }
+/// 프로필의 가드
+pub(crate) fn guards_of(m: &p::Model) -> Vec<Guard> { arr(&m.guard_json) }
+/// 프로필의 폴백 체인 (위에서부터)
+pub(crate) fn fallbacks_of(m: &p::Model) -> Vec<Fallback> { arr(&m.fallback_json) }
+
 impl From<p::Model> for Profile {
     fn from(m: p::Model) -> Self {
         Self {
+            paths: paths_of(&m), tools: tools_of(&m), guards: guards_of(&m), fallbacks: fallbacks_of(&m), commands: effective(&rules_of(&m)), rules: rules_of(&m),
+            skills: Vec::new(), mcps: Vec::new(),
             sn: m.sn, workspace_sn: m.workspace_sn, kind: m.kind, runtime_sn: m.runtime_sn, connection_sn: m.connection_sn, model_sn: m.model_sn,
             effort: m.effort, session_mode: m.session_mode, repo_rule_mode: m.repo_rule_mode, workdir: m.workdir,
             trust_level: m.trust_level, github_mode: m.github_mode, network_mode: m.network_mode, run_token_limit: m.run_token_limit,
@@ -120,6 +157,21 @@ struct ProfilePatch {
     run_time_limit_min: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     auto_retry_max: Option<i64>,
+    /// 파일 범위 전체 교체
+    #[serde(skip_serializing_if = "Option::is_none")]
+    paths: Option<Vec<PathRule>>,
+    /// 도구 정책 전체 교체
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<ToolRule>>,
+    /// 승인 규칙 전체 교체
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rules: Option<Vec<Rule>>,
+    /// 가드 전체 교체
+    #[serde(skip_serializing_if = "Option::is_none")]
+    guards: Option<Vec<Guard>>,
+    /// 폴백 체인 전체 교체 (배열 순서 = 시도 순서)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fallbacks: Option<Vec<Fallback>>,
 }
 
 /// 프로필의 스킬 연결
@@ -137,22 +189,69 @@ struct McpLink {
     access_mode: String,
 }
 
-/// 프로필의 도구 정책
-#[derive(Serialize, ToSchema)]
-struct ToolRule {
-    /// read | edit | shell | git_push | web_fetch | git_destructive
-    tool_code: String,
-    scope_text: Option<String>,
-    /// allow | allowlist | approval | block
-    policy: String,
+/// 파일 범위 1줄 (path_json)
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct PathRule {
+    /// include | exclude (제외가 포함보다 우선)
+    pub kind: String,
+    /// glob 패턴 (예: frontend/**, **/.env*)
+    pub pattern: String,
 }
 
-/// 프로필 하위 매핑 (조회 전용)
-#[derive(Serialize, ToSchema)]
-struct Caps {
-    skills: Vec<SkillLink>,
-    mcps: Vec<McpLink>,
-    tools: Vec<ToolRule>,
+/// 도구 정책 1줄 (tool_json). 행이 없는 도구는 허용
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct ToolRule {
+    /// read | edit | shell | git_push | web_fetch | git_destructive
+    pub tool_code: String,
+    /// 허용 범위 설명 (예: pnpm lint · test · dev)
+    pub scope_text: Option<String>,
+    /// allow | allowlist | approval | block
+    pub policy: String,
+}
+
+/// 승인 규칙 · 차단 패턴 1줄 (rule_json)
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct Rule {
+    /// pr_create | dependency_add | external_message | env_access | run_extend | command
+    pub action_code: String,
+    pub title: String,
+    /// 명령 패턴 (command일 때)
+    pub pattern: Option<String>,
+    pub description: Option<String>,
+    /// auto | approval | block
+    pub policy: String,
+    /// user | orch_then_user (approval일 때)
+    pub approver: Option<String>,
+    #[serde(default = "one")]
+    pub is_notify: i64,
+}
+
+/// 가드 트리거 1줄 (guard_json)
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct Guard {
+    pub name: String,
+    /// tool_use | tool_result | output
+    pub stage: String,
+    pub pattern: Option<String>,
+    #[serde(default = "one")]
+    pub is_enabled: i64,
+}
+
+/// 기본값 1
+fn one() -> i64 { 1 }
+
+/// 폴백 체인 1단계 (fallback_json). 배열 순서대로 시도하고, tier가 있으면 그 등급의 하위 작업만 쓴다 (NULL = 모든 등급)
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct Fallback {
+    pub runtime_sn: i64,
+    pub connection_sn: i64,
+    /// NULL = 연결 기본 모델
+    pub model_sn: Option<i64>,
+    /// 다음 단계로 넘어가는 조건 (예: 429)
+    pub switch_rule: Option<String>,
+    pub max_level: Option<i64>,
+    /// S | M | L | NULL
+    pub tier: Option<String>,
 }
 
 /// 역할 템플릿 (API 응답 형태)
@@ -186,9 +285,20 @@ impl From<tp::Model> for Template {
     }
 }
 
+/// 프로필 행 + 켠 스킬 · MCP 연결 (응답 모양)
+async fn full(db: &impl ConnectionTrait, m: p::Model) -> Res<Profile> {
+    let sn = m.sn;
+    let mut out = Profile::from(m);
+    out.skills = ps::Entity::find().filter(ps::Column::ProfileSn.eq(sn)).order_by_asc(ps::Column::Sn).all(db).await?
+        .into_iter().map(|m| SkillLink { skill_sn: m.skill_sn, is_enabled: m.is_enabled }).collect();
+    out.mcps = pm::Entity::find().filter(pm::Column::ProfileSn.eq(sn)).order_by_asc(pm::Column::Sn).all(db).await?
+        .into_iter().map(|m| McpLink { mcp_sn: m.mcp_sn, access_mode: m.access_mode }).collect();
+    Ok(out)
+}
+
 /// 1건 읽기. 없으면 404
 async fn get(db: &impl ConnectionTrait, sn: i64) -> Res<Profile> {
-    Tbl::find_by_id(sn).one(db).await?.map(Profile::from).ok_or_else(Error::not_found)
+    full(db, Tbl::find_by_id(sn).one(db).await?.ok_or_else(Error::not_found)?).await
 }
 
 /// 프로필과 하위 설정을 `kind` 소유로 복사하고 새 번호를 돌려준다 (템플릿 → 멤버)
@@ -220,12 +330,72 @@ fn check(kind: Option<&str>, trust: Option<i64>) -> Res<()> {
     Ok(())
 }
 
+/// 규칙 · 가드 · 도구 · 파일 범위 · 폴백 값 검사 (저장하는 쪽이 부른다). 틀리면 422
+pub(crate) fn check_rules(rules: &[Rule]) -> Res<()> {
+    let bad = rules.iter().any(|r| !ACTIONS.contains(&r.action_code.as_str()) || !POLICIES.contains(&r.policy.as_str()) || r.title.trim().is_empty()
+        || r.approver.as_deref().is_some_and(|a| !APPROVERS.contains(&a)) || (r.action_code == "command" && r.pattern.as_deref().is_none_or(|p| p.trim().is_empty())));
+    if bad {
+        return Err(Error::invalid(format!("rule: action in {ACTIONS:?}, policy in {POLICIES:?}, approver in {APPROVERS:?}, title not empty, command needs pattern")));
+    }
+    Ok(())
+}
+
+/// 가드 값 검사 (시점 · 이름). 틀리면 422
+pub(crate) fn check_guards(guards: &[Guard]) -> Res<()> {
+    if guards.iter().any(|g| !STAGES.contains(&g.stage.as_str()) || g.name.trim().is_empty()) {
+        return Err(Error::invalid(format!("guard: stage in {STAGES:?}, name not empty")));
+    }
+    Ok(())
+}
+
+/// PATCH 본문의 목록 값 검사 (도구 · 파일 범위 · 규칙 · 가드 · 폴백 등급). 틀리면 422
+fn check_lists(b: &ProfilePatch) -> Res<()> {
+    if let Some(ts) = &b.tools {
+        let dup = ts.iter().enumerate().any(|(i, t)| ts[..i].iter().any(|o| o.tool_code == t.tool_code));
+        if dup || ts.iter().any(|t| !TOOLS.contains(&t.tool_code.as_str()) || !TOOL_POLICIES.contains(&t.policy.as_str())) {
+            return Err(Error::invalid(format!("tool: tool_code in {TOOLS:?} (once each), policy in {TOOL_POLICIES:?}")));
+        }
+    }
+    if b.paths.as_ref().is_some_and(|ps| ps.iter().any(|p| !PATHS.contains(&p.kind.as_str()) || p.pattern.trim().is_empty())) {
+        return Err(Error::invalid(format!("path: kind in {PATHS:?}, pattern not empty")));
+    }
+    if let Some(rs) = &b.rules { check_rules(rs)?; }
+    if let Some(gs) = &b.guards { check_guards(gs)?; }
+    if b.fallbacks.as_ref().is_some_and(|fs| fs.iter().any(|f| f.tier.as_deref().is_some_and(|t| !TIERS.contains(&t)))) {
+        return Err(Error::invalid(format!("tier must be one of {TIERS:?} or null")));
+    }
+    Ok(())
+}
+
+/// 폴백 단계가 가리키는 실행기 · 연결 · 모델이 있는지 (없으면 422 · 예전 FK 검사)
+async fn check_refs(db: &impl ConnectionTrait, fs: &[Fallback]) -> Res<()> {
+    for f in fs {
+        let ok = rt::Entity::find_by_id(f.runtime_sn).one(db).await?.is_some() && cn::Entity::find_by_id(f.connection_sn).one(db).await?.is_some()
+            && match f.model_sn { Some(m) => md::Entity::find_by_id(m).one(db).await?.is_some(), None => true };
+        if !ok {
+            return Err(Error::invalid(format!("fallback: runtime {} · connection {} · model not found", f.runtime_sn, f.connection_sn)));
+        }
+    }
+    Ok(())
+}
+
+/// 이 연결을 폴백 체인에 쓰는 프로필 수 (연결 삭제 409용)
+pub(crate) async fn fallback_uses(db: &impl ConnectionTrait, connection_sn: i64) -> Res<i64> {
+    let row = db.query_one_raw(Statement::from_sql_and_values(DbBackend::Sqlite,
+        "SELECT COUNT(*) FROM tbl_agent_profile p, json_each(p.fallback_json) j WHERE json_extract(j.value, '$.connection_sn') = ?", [connection_sn.into()])).await?;
+    Ok(row.map(|r| r.try_get_by_index::<i64>(0)).transpose()?.unwrap_or(0))
+}
+
 /// 프로필 목록 (번호순). `kind`로 거른다
 #[utoipa::path(operation_id = "agent_list", get, path = "/profiles", params(("kind" = Option<String>, Query, description = "이 종류만")), responses((status = 200, body = Vec<Profile>), (status = "default", body = ErrorBody)))]
 async fn list(State(db): State<DatabaseConnection>, Query(q): Query<std::collections::HashMap<String, String>>) -> Res<Json<Vec<Profile>>> {
     let mut f = Tbl::find();
     if let Some(k) = q.get("kind") { f = f.filter(p::Column::Kind.eq(k.as_str())); }
-    Ok(Json(f.order_by_asc(p::Column::Sn).all(&db).await?.into_iter().map(Profile::from).collect()))
+    let mut out = Vec::new();
+    for m in f.order_by_asc(p::Column::Sn).all(&db).await? {
+        out.push(full(&db, m).await?);
+    }
+    Ok(Json(out))
 }
 
 /// 프로필 생성 (ProfileCreated)
@@ -234,7 +404,7 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ProfileNew>)
     let kind = b.kind.unwrap_or_else(|| "workspace".into());
     check(Some(&kind), None)?;
     let out = event::run(&db, async |tx| {
-        let out = Profile::from(p::ActiveModel { workspace_sn: Set(crate::WORKSPACE), kind: Set(kind), ..Default::default() }.insert(tx).await?);
+        let out = full(tx, p::ActiveModel { workspace_sn: Set(crate::WORKSPACE), kind: Set(kind), ..Default::default() }.insert(tx).await?).await?;
         let ev = Ev::new(None, "profile", out.sn, "ProfileCreated", &out);
         Ok((out, vec![ev]))
     }).await?;
@@ -251,6 +421,7 @@ async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Prof
 #[utoipa::path(operation_id = "agent_update", patch, path = "/profiles/{sn}", params(("sn" = i64, Path, description = "프로필 번호")), request_body = ProfilePatch, responses((status = 200, body = Profile), (status = "default", body = ErrorBody)))]
 async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<ProfilePatch>) -> Res<Json<Profile>> {
     check(None, b.trust_level)?;
+    check_lists(&b)?;
     let out = event::run(&db, async |tx| {
         use p::Column as C;
         let mut q = Tbl::update_many().filter(C::Sn.eq(sn)).col_expr(C::UpdateAt, Expr::cust("datetime('now')"));
@@ -268,9 +439,15 @@ async fn update(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
         if let Some(v) = b.context_warn_percent { q = q.col_expr(C::ContextWarnPercent, v.into()); }
         if let Some(v) = b.run_time_limit_min { q = q.col_expr(C::RunTimeLimitMin, v.into()); }
         if let Some(v) = b.auto_retry_max { q = q.col_expr(C::AutoRetryMax, v.into()); }
+        if let Some(v) = &b.paths { q = q.col_expr(C::PathJson, json!(v).to_string().into()); }
+        if let Some(v) = &b.tools { q = q.col_expr(C::ToolJson, json!(v).to_string().into()); }
+        if let Some(v) = &b.rules { q = q.col_expr(C::RuleJson, json!(v).to_string().into()); }
+        if let Some(v) = &b.guards { q = q.col_expr(C::GuardJson, json!(v).to_string().into()); }
+        if let Some(v) = &b.fallbacks { q = q.col_expr(C::FallbackJson, json!(v).to_string().into()); }
         if q.exec(tx).await?.rows_affected == 0 {
             return Err(Error::not_found());
         }
+        if let Some(fs) = &b.fallbacks { check_refs(tx, fs).await?; }
         let out = get(tx, sn).await?;
         Ok((out, vec![Ev::new(None, "profile", sn, "ProfileUpdated", &b)]))
     }).await?;
@@ -286,19 +463,6 @@ async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusC
         Ok(((), vec![Ev::new(None, "profile", sn, "ProfileDeleted", &json!({ "kind": m.kind }))]))
     }).await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-/// 하위 매핑 조회: 스킬 · MCP · 도구 정책 (편집은 별도 Task). 프로필이 없으면 404
-#[utoipa::path(operation_id = "agent_caps", get, path = "/profiles/{sn}/caps", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Caps), (status = "default", body = ErrorBody)))]
-async fn caps(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Caps>> {
-    get(&db, sn).await?;
-    let skills = ps::Entity::find().filter(ps::Column::ProfileSn.eq(sn)).order_by_asc(ps::Column::Sn).all(&db).await?
-        .into_iter().map(|m| SkillLink { skill_sn: m.skill_sn, is_enabled: m.is_enabled }).collect();
-    let mcps = pm::Entity::find().filter(pm::Column::ProfileSn.eq(sn)).order_by_asc(pm::Column::Sn).all(&db).await?
-        .into_iter().map(|m| McpLink { mcp_sn: m.mcp_sn, access_mode: m.access_mode }).collect();
-    let tools = pt::Entity::find().filter(pt::Column::ProfileSn.eq(sn)).order_by_asc(pt::Column::Sort).all(&db).await?
-        .into_iter().map(|m| ToolRule { tool_code: m.tool_code, scope_text: m.scope_text, policy: m.policy }).collect();
-    Ok(Json(Caps { skills, mcps, tools }))
 }
 
 /// 스킬 연결 전체 교체 (ProfileUpdated). 차단 · 보안 검사 미통과 스킬은 422, 없는 스킬은 422(invalid_ref), 프로필이 없으면 404
@@ -320,50 +484,7 @@ async fn set_skills(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): B
     Ok(Json(b))
 }
 
-/// 폴백 체인 1단계. sort 순으로 시도하고, tier가 있으면 그 등급의 하위 작업만 쓴다 (NULL = 모든 등급)
-#[derive(Serialize, Deserialize, ToSchema)]
-struct Fallback {
-    runtime_sn: i64,
-    connection_sn: i64,
-    /// NULL = 연결 기본 모델
-    model_sn: Option<i64>,
-    /// 다음 단계로 넘어가는 조건 (예: 429)
-    switch_rule: Option<String>,
-    max_level: Option<i64>,
-    /// S | M | L | NULL
-    tier: Option<String>,
-}
-
-/// 폴백 체인 조회 (sort 순). 프로필이 없으면 404
-#[utoipa::path(operation_id = "agent_fallbacks", get, path = "/profiles/{sn}/fallbacks", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Vec<Fallback>), (status = "default", body = ErrorBody)))]
-async fn fallbacks(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Fallback>>> {
-    get(&db, sn).await?;
-    Ok(Json(fb::Entity::find().filter(fb::Column::ProfileSn.eq(sn)).order_by_asc(fb::Column::Sort).all(&db).await?.into_iter()
-        .map(|m| Fallback { runtime_sn: m.runtime_sn, connection_sn: m.connection_sn, model_sn: m.model_sn, switch_rule: m.switch_rule, max_level: m.max_level, tier: m.tier })
-        .collect()))
-}
-
-/// 폴백 체인 전체 교체 (ProfileUpdated). 배열 순서 = sort. 모르는 tier · 없는 실행기 · 연결 · 모델은 422, 프로필이 없으면 404
-#[utoipa::path(operation_id = "agent_chain", put, path = "/profiles/{sn}/fallbacks", params(("sn" = i64, Path, description = "프로필 번호")), request_body = Vec<Fallback>, responses((status = 200, body = Vec<Fallback>), (status = "default", body = ErrorBody)))]
-async fn chain(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Vec<Fallback>>) -> Res<Json<Vec<Fallback>>> {
-    if b.iter().any(|f| f.tier.as_deref().is_some_and(|t| !TIERS.contains(&t))) {
-        return Err(Error::invalid(format!("tier must be one of {TIERS:?} or null")));
-    }
-    event::run(&db, async |tx| {
-        get(tx, sn).await?;
-        fb::Entity::delete_many().filter(fb::Column::ProfileSn.eq(sn)).exec(tx).await?;
-        for (i, f) in b.iter().enumerate() {
-            fb::ActiveModel {
-                profile_sn: Set(sn), runtime_sn: Set(f.runtime_sn), connection_sn: Set(f.connection_sn), model_sn: Set(f.model_sn),
-                sort: Set(i as i64 + 1), switch_rule: Set(f.switch_rule.clone()), max_level: Set(f.max_level), tier: Set(f.tier.clone()), ..Default::default()
-            }.insert(tx).await?;
-        }
-        Ok(((), vec![Ev::new(None, "profile", sn, "ProfileUpdated", &json!({ "fallbacks": &b }))]))
-    }).await?;
-    Ok(Json(b))
-}
-
-/// 명령 사용 여부 한 줄
+/// 명령 사용 여부 한 줄 (응답 전용 · 편집은 rules의 command 규칙)
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug, PartialEq)]
 pub struct Cmd {
     /// 명령 글자 (예: git push). 이 글자로 시작하는 명령 전체에 적용
@@ -376,40 +497,12 @@ pub struct Cmd {
 }
 
 /// 기본 목록 + 프로필 command 규칙 → 실제 적용 목록 (기본 순서 → 추가 명령)
-pub(crate) fn effective(rules: &[pr::Model]) -> Vec<Cmd> {
+pub(crate) fn effective(rules: &[Rule]) -> Vec<Cmd> {
     let mine: Vec<(&str, bool)> = rules.iter().filter(|r| r.action_code == "command").filter_map(|r| Some((r.pattern.as_deref()?, r.policy == "auto"))).collect();
     let on = |c: &str| mine.iter().find(|(p, _)| *p == c).map(|(_, o)| *o);
     CMDS.iter().map(|c| Cmd { cmd: (*c).into(), on: on(c).unwrap_or(false), builtin: true })
         .chain(mine.iter().filter(|(p, _)| !CMDS.contains(p)).map(|(p, o)| Cmd { cmd: (*p).into(), on: *o, builtin: false }))
         .collect()
-}
-
-/// 명령 사용 여부 조회 (기본 목록 + 프로필 설정). 프로필이 없으면 404
-#[utoipa::path(operation_id = "agent_commands", get, path = "/profiles/{sn}/commands", params(("sn" = i64, Path, description = "프로필 번호")), responses((status = 200, body = Vec<Cmd>), (status = "default", body = ErrorBody)))]
-async fn commands(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Cmd>>> {
-    get(&db, sn).await?;
-    Ok(Json(effective(&pr::Entity::find().filter(pr::Column::ProfileSn.eq(sn)).order_by_asc(pr::Column::Sort).all(&db).await?)))
-}
-
-/// 명령 사용 여부 전체 교체 (ProfileUpdated). 기본값과 같은 기본 명령은 저장하지 않는다. 빈 명령은 422
-#[utoipa::path(operation_id = "agent_set_commands", put, path = "/profiles/{sn}/commands", params(("sn" = i64, Path, description = "프로필 번호")), request_body = Vec<Cmd>, responses((status = 200, body = Vec<Cmd>), (status = "default", body = ErrorBody)))]
-async fn set_commands(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Vec<Cmd>>) -> Res<Json<Vec<Cmd>>> {
-    if b.iter().any(|c| c.cmd.trim().is_empty()) {
-        return Err(Error::invalid("cmd must not be empty".into()));
-    }
-    let out = event::run(&db, async |tx| {
-        get(tx, sn).await?;
-        pr::Entity::delete_many().filter(pr::Column::ProfileSn.eq(sn)).filter(pr::Column::ActionCode.eq("command")).exec(tx).await?;
-        for (i, c) in b.iter().filter(|c| !(CMDS.contains(&c.cmd.trim()) && !c.on)).enumerate() {
-            pr::ActiveModel {
-                profile_sn: Set(sn), action_code: Set("command".into()), title: Set(c.cmd.trim().into()), pattern: Set(Some(c.cmd.trim().into())),
-                policy: Set(if c.on { "auto" } else { "block" }.into()), sort: Set(i as i64), ..Default::default()
-            }.insert(tx).await?;
-        }
-        let out = effective(&pr::Entity::find().filter(pr::Column::ProfileSn.eq(sn)).order_by_asc(pr::Column::Sort).all(tx).await?);
-        Ok((out.clone(), vec![Ev::new(None, "profile", sn, "ProfileUpdated", &json!({ "commands": &out }))]))
-    }).await?;
-    Ok(Json(out))
 }
 
 /// 템플릿 목록 (보관 제외 · sort → 번호순)

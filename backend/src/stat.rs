@@ -1,5 +1,5 @@
 //! 화면 집계: 팀 통계(Teams KPI · 작업량) · 팀 한도 요약 · 워크스페이스 월 비용. 원천은 tbl_log_token · tbl_task · tbl_run · tbl_connection_quota — 저장하지 않고 응답에서 합친다
-use crate::{connection::Quota, entity::{tbl_agent_profile as ap, tbl_connection as c, tbl_connection_quota as q, tbl_map_fallback as fb, tbl_member as mb, tbl_team as tm},
+use crate::{connection::Quota, entity::{tbl_agent_profile as ap, tbl_connection as c, tbl_connection_quota as q, tbl_member as mb, tbl_team as tm},
     error::{Error, ErrorBody, Res, Sn}};
 use axum::{Json, extract::{Query, State}};
 use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, QueryFilter, QueryOrder, Statement, Value};
@@ -128,7 +128,7 @@ async fn team(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Team
             WHERE r.member_sn IN ({team}) AND r.parent_run_sn IS NULL AND t.create_at >= datetime('now','-7 day')"), v()).await?,
         cache_hit_percent: one(&db, &team_q("SELECT CAST(ROUND(AVG(c.cache_hit_percent)) AS INTEGER) FROM tbl_connection c WHERE c.cache_hit_percent IS NOT NULL AND c.sn IN ( \
             SELECT p.connection_sn FROM tbl_agent_profile p JOIN tbl_member m ON m.profile_sn = p.sn WHERE m.sn IN ({team}) AND p.connection_sn IS NOT NULL \
-            UNION SELECT f.connection_sn FROM tbl_map_fallback f JOIN tbl_member m ON m.profile_sn = f.profile_sn WHERE m.sn IN ({team}))"), v().into_iter().chain(v()).collect()).await?,
+            UNION SELECT json_extract(j.value, '$.connection_sn') FROM tbl_agent_profile p2 JOIN tbl_member m2 ON m2.profile_sn = p2.sn, json_each(p2.fallback_json) j WHERE m2.sn IN ({team}))"), v().into_iter().chain(v()).collect()).await?,
         members: loads,
     }))
 }
@@ -138,8 +138,9 @@ async fn team(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Team
 async fn quota(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<ConnQuota>>> {
     let (_, ms) = members(&db, sn).await?;
     let profiles: Vec<i64> = ms.iter().map(|m| m.profile_sn).collect();
-    let mut conns: Vec<i64> = ap::Entity::find().filter(ap::Column::Sn.is_in(profiles.clone())).all(&db).await?.into_iter().filter_map(|p| p.connection_sn).collect();
-    conns.extend(fb::Entity::find().filter(fb::Column::ProfileSn.is_in(profiles)).all(&db).await?.into_iter().map(|f| f.connection_sn));
+    let profs = ap::Entity::find().filter(ap::Column::Sn.is_in(profiles)).all(&db).await?;
+    let mut conns: Vec<i64> = profs.iter().filter_map(|p| p.connection_sn).collect();
+    conns.extend(profs.iter().flat_map(crate::agent::fallbacks_of).map(|f| f.connection_sn));
     let mut out = Vec::new();
     for cm in c::Entity::find().filter(c::Column::Sn.is_in(conns)).order_by_asc(c::Column::Sn).all(&db).await? {
         let rows = q::Entity::find().filter(q::Column::ConnectionSn.eq(cm.sn)).order_by_asc(q::Column::Sn).all(&db).await?;

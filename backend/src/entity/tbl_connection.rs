@@ -68,8 +68,6 @@ pub enum Relation {
     TblLogToken,
     #[sea_orm(has_many = "super::tbl_map_connection_team::Entity")]
     TblMapConnectionTeam,
-    #[sea_orm(has_many = "super::tbl_map_fallback::Entity")]
-    TblMapFallback,
     #[sea_orm(has_many = "super::tbl_map_runtime_connection::Entity")]
     TblMapRuntimeConnection,
     #[sea_orm(has_many = "super::tbl_model::Entity")]
@@ -131,12 +129,6 @@ impl Related<super::tbl_log_token::Entity> for Entity {
 impl Related<super::tbl_map_connection_team::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblMapConnectionTeam.def()
-    }
-}
-
-impl Related<super::tbl_map_fallback::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblMapFallback.def()
     }
 }
 

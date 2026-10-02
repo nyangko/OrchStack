@@ -4,7 +4,7 @@
 
 use crate::{
     agent, context,
-    entity::{tbl_agent_profile as ap, tbl_profile_rule as pr, tbl_profile_tool as pt, tbl_context_manifest as cm, tbl_log_token as lt, tbl_map_fallback as fb, tbl_member, tbl_model, tbl_project, tbl_run as r, tbl_runtime, tbl_session as s, tbl_task, tbl_team, tbl_workspace},
+    entity::{tbl_agent_profile as ap, tbl_context_manifest as cm, tbl_log_token as lt, tbl_member, tbl_model, tbl_project, tbl_run as r, tbl_runtime, tbl_session as s, tbl_task, tbl_team, tbl_workspace},
     error::{Error, Res},
     event::{self, Ev},
     exec::{self, Job, Status},
@@ -54,7 +54,7 @@ pub fn block(code: &str) -> Vec<String> {
 /// 리드 프로필의 도구 정책 · 명령 사용 여부(기본 목록 agent::CMDS + 프로필) → Claude 허용 · 차단 인자. 도구 행이 없으면 허용 (스키마 기본 allow).
 /// 하위 Run은 승인을 물을 수 없어(`--permission-prompts none`) approval · allowlist도 차단으로 본다
 // ponytail: Codex는 명령별 차단이 없어 무시 (workspace-write 샌드박스만). 필요하면 shell 차단 → --sandbox read-only
-pub fn perms(code: &str, tools: &[pt::Model], rules: &[pr::Model]) -> Vec<String> {
+pub fn perms(code: &str, tools: &[agent::ToolRule], rules: &[agent::Rule]) -> Vec<String> {
     if code != "claude_code" { return vec![] }
     let off = |t: &str| tools.iter().any(|x| x.tool_code == t && x.policy != "allow");
     let mut deny = vec!["mcp__*".to_owned()];
@@ -145,7 +145,8 @@ pub async fn spawn(db: &DatabaseConnection, lead_sn: i64, text: &str) -> Res<Spa
         // runner: 리드 프로필 폴백 체인에서 등급이 맞는 첫 단계 (리드는 모델을 고르지 않는다)
         let mut step = None;
         if let Some(t) = plan.tier {
-            let chain = fb::Entity::find().filter(fb::Column::ProfileSn.eq(member.profile_sn)).order_by_asc(fb::Column::Sort).all(tx).await?;
+            let prof = ap::Entity::find_by_id(member.profile_sn).one(tx).await?.ok_or_else(Error::not_found)?;
+            let chain = agent::fallbacks_of(&prof);
             let Some(m) = rule::models(&chain, t).next().cloned() else {
                 return Ok((Spawn::Stop(Stop::Judge(format!("no fallback step for tier {t}"))), vec![]));
             };
@@ -359,8 +360,7 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
         return finish(db, &m, b.as_ref(), None, "no_runtime", None).await;
     };
     let Some(ex) = exec::pick(&rt.code) else { return finish(db, &m, b.as_ref(), None, "no_runtime", None).await };
-    let tools = pt::Entity::find().filter(pt::Column::ProfileSn.eq(profile)).all(db).await?;
-    let rules = pr::Entity::find().filter(pr::Column::ProfileSn.eq(profile)).all(db).await?;
+    let (tools, rules) = (agent::tools_of(&prof), agent::rules_of(&prof));
     // 저장소 규칙 · 프로필 지침은 context가 직접 넣으므로 실행기가 따로 읽지 않게 막는다 (리드도 같다)
     let args: Vec<String> = block(&rt.code).into_iter().chain(perms(&rt.code, &tools, &rules)).collect();
     let via = Via { ex, conn, model: model.clone() };
@@ -489,10 +489,10 @@ mod tests {
         assert!(RULES.len() / 4 < 300);
         assert!(block("claude_code").contains(&"--strict-mcp-config".to_owned()));
         // 프로필 정책: 행 없음 = Bash 허용 · shell 차단 = Bash 없음 · push 차단 · 명령 규칙 차단
-        let tool = |c: &str, p: &str| pt::Model { sn: 0, profile_sn: 1, tool_code: c.into(), scope_text: None, policy: p.into(), sort: 0, create_at: String::new() };
+        let tool = |c: &str, p: &str| agent::ToolRule { tool_code: c.into(), scope_text: None, policy: p.into() };
         assert_eq!(perms("claude_code", &[], &[]), ["--allowedTools", "Bash", "--disallowedTools", "mcp__*", "Bash(git stash:*)", "Bash(git checkout:*)", "Bash(git reset:*)"]);
         // 명령 사용 여부: 기본 차단을 켜고(checkout) · 새 명령을 차단(rm -rf)
-        let rule = |c: &str, p: &str| pr::Model { sn: 0, profile_sn: 1, action_code: "command".into(), title: c.into(), pattern: Some(c.into()), description: None, policy: p.into(), approver: None, is_notify: 1, sort: 0, create_at: String::new() };
+                let rule = |c: &str, p: &str| agent::Rule { action_code: "command".into(), title: c.into(), pattern: Some(c.into()), description: None, policy: p.into(), approver: None, is_notify: 1 };
         let a = perms("claude_code", &[tool("shell", "approval"), tool("git_push", "block")], &[rule("git checkout", "auto"), rule("rm -rf", "block")]);
         assert!(!a.contains(&"Bash".to_owned()) && a.contains(&"Bash(git push:*)".to_owned()) && a.contains(&"Bash(rm -rf:*)".to_owned()));
         assert!(!a.contains(&"Bash(git checkout:*)".to_owned()) && a.contains(&"Bash(git stash:*)".to_owned()));
@@ -537,7 +537,7 @@ printf '%s\n' '{{"type":"result","is_error":false,"result":"done.\n@REPORT v1\ni
             INSERT INTO tbl_task (sn, project_sn, num, title, member_sn, status) VALUES (1, 1, 1, 't', 1, 'in_progress');
             INSERT INTO tbl_runtime (sn, workspace_sn, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{1}');
             INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c');
-            INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort, tier) VALUES (1, 1, 1, 1, 'L'), (1, 1, 1, 2, 'M');
+            UPDATE tbl_agent_profile SET fallback_json = '[{{\"runtime_sn\":1,\"connection_sn\":1,\"tier\":\"L\"}},{{\"runtime_sn\":1,\"connection_sn\":1,\"tier\":\"M\"}}]' WHERE sn = 1;
             INSERT INTO tbl_run (sn, project_sn, task_sn, member_sn, num, status) VALUES (1, 1, 1, 1, 1, 'running');",
             dir.display(), bin.display())).await.unwrap();
 
@@ -598,7 +598,7 @@ printf '{"type":"result","is_error":false,"result":"%s","usage":{"input_tokens":
             INSERT INTO tbl_task (sn, project_sn, num, title, member_sn, status) VALUES (1, 1, 1, 't', 1, 'in_progress');
             INSERT INTO tbl_runtime (sn, workspace_sn, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{1}');
             INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c');
-            INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort) VALUES (1, 1, 1, 1);
+            UPDATE tbl_agent_profile SET fallback_json = '[{{\"runtime_sn\":1,\"connection_sn\":1}}]' WHERE sn = 1;
             INSERT INTO tbl_run (sn, project_sn, task_sn, member_sn, num, status) VALUES (1, 1, 1, 1, 1, 'running');",
             dir.display(), bin.display())).await.unwrap();
 

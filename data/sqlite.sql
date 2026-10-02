@@ -270,7 +270,7 @@ CREATE TABLE tbl_mcp (
 --    멤버 추가 = 템플릿 프로필을 복사해서 새 프로필을 만든다.
 -- =====================================================================
 
--- 에이전트 프로필. Harness · 권한 · 한도
+-- 에이전트 프로필. Harness · 권한 · 한도 · 도구 · 규칙 · 가드 · 폴백 (작은 목록은 *_json 컬럼에 통째로 둔다)
 CREATE TABLE tbl_agent_profile (
     sn                    INTEGER PRIMARY KEY AUTOINCREMENT,        -- 프로필 번호
     workspace_sn          INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
@@ -289,6 +289,11 @@ CREATE TABLE tbl_agent_profile (
     context_warn_percent  INTEGER NOT NULL DEFAULT 80,              -- 컨텍스트 경고 기준(%)
     run_time_limit_min    INTEGER,                                  -- Run 시간 한도(분) (예: 120)
     auto_retry_max        INTEGER NOT NULL DEFAULT 1,               -- 실패 시 자동 재시도 횟수
+    path_json             TEXT,                                     -- 파일 범위 JSON 배열 [{kind, pattern}] · kind = include(포함) | exclude(제외 · 포함보다 우선) · pattern = glob (예: frontend/**, **/.env*)
+    tool_json             TEXT,                                     -- CLI 기본 도구 정책 JSON 배열 [{tool_code, scope_text, policy}] · tool_code = read(파일 읽기) | edit(파일 수정 · 쓰기) | shell(명령 실행) | git_push(push · PR) | web_fetch(웹 요청) | git_destructive(force push · reset --hard) · policy = allow(허용) | allowlist(허용 목록만) | approval(승인 필요) | block(항상 차단) · 행이 없는 도구는 allow
+    rule_json             TEXT,                                     -- 승인 규칙 · 항상 차단 JSON 배열 [{action_code, title, pattern, description, policy, approver, is_notify}] · action_code = pr_create | dependency_add | external_message | env_access | run_extend | command(명령 패턴 · pattern = 명령 글자) · policy = auto(자동 허용) | approval(승인 필요 · tbl_ask 승인 요청 생성) | block(항상 차단) · approver = user | orch_then_user
+    guard_json            TEXT,                                     -- 가드 트리거 JSON 배열 [{name, stage, pattern, is_enabled}] · Run 도중 위험 신호를 감지하면 멈추고 알림 · stage = tool_use(도구 실행 직전) | tool_result(도구 결과) | output(모델 출력)
+    fallback_json         TEXT,                                     -- 폴백 체인 JSON 배열 (위에서부터 시도) [{runtime_sn, connection_sn, model_sn, switch_rule, max_level, tier}] · model_sn NULL = 연결 기본 · switch_rule = 다음으로 넘어가는 조건 (예: 429) · max_level = 맡을 수 있는 최대 작업 레벨 · tier = S | M | L 하위 작업 모델 등급 (NULL = 모든 등급 · #67) · 연결을 지우려면 먼저 체인에서 빼야 한다 (앱에서 409)
     create_at             TEXT NOT NULL DEFAULT (datetime('now')),  -- 생성 시각
     update_at             TEXT NOT NULL DEFAULT (datetime('now'))   -- 수정 시각
 );
@@ -326,68 +331,6 @@ CREATE TABLE tbl_map_profile_mcp (
     UNIQUE (profile_sn, mcp_sn)
 );
 
--- CLI 기본 도구 정책. read · edit · shell · git push · web fetch
-CREATE TABLE tbl_profile_tool (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 도구 정책 번호
-    profile_sn       INTEGER NOT NULL REFERENCES tbl_agent_profile(sn) ON DELETE CASCADE,  -- 프로필
-    tool_code        TEXT NOT NULL CHECK (tool_code IN ('read','edit','shell','git_push','web_fetch','git_destructive')),  -- 도구: read(파일 읽기) | edit(파일 수정 · 쓰기) | shell(명령 실행) | git_push(push · PR) | web_fetch(웹 요청) | git_destructive(force push · reset --hard)
-    scope_text       TEXT,                                          -- 허용 범위 설명 (예: pnpm lint · test · dev)
-    policy           TEXT NOT NULL DEFAULT 'allow' CHECK (policy IN ('allow','allowlist','approval','block')),  -- 정책: allow(허용) | allowlist(허용 목록만) | approval(승인 필요) | block(항상 차단)
-    sort             INTEGER NOT NULL DEFAULT 0,                    -- 표시 순서
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (profile_sn, tool_code)
-);
-
--- 파일 범위. glob 패턴 · 제외가 포함보다 우선
-CREATE TABLE tbl_profile_path (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 패턴 번호
-    profile_sn       INTEGER NOT NULL REFERENCES tbl_agent_profile(sn) ON DELETE CASCADE,  -- 프로필
-    kind             TEXT NOT NULL CHECK (kind IN ('include','exclude')),  -- 종류: include(포함) | exclude(제외 · 포함보다 우선)
-    pattern          TEXT NOT NULL,                                 -- glob 패턴 (예: frontend/**, **/.env*)
-    sort             INTEGER NOT NULL DEFAULT 0,                    -- 표시 순서
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))       -- 생성 시각
-);
-
--- 승인 규칙 · 항상 차단. 동작별로 자동 · 승인 필요 · 차단을 정한다
-CREATE TABLE tbl_profile_rule (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 규칙 번호
-    profile_sn       INTEGER NOT NULL REFERENCES tbl_agent_profile(sn) ON DELETE CASCADE,  -- 프로필
-    action_code      TEXT NOT NULL CHECK (action_code IN ('pr_create','dependency_add','external_message','env_access','run_extend','command')),  -- 동작: pr_create(PR 생성) | dependency_add(새 의존성 추가) | external_message(팀 외부로 메시지) | env_access(.env 파일 접근) | run_extend(Run 제한 시간 연장) | command(명령 패턴 · pattern 컬럼)
-    title            TEXT NOT NULL,                                 -- 표시 이름 (예: PR 생성, git push --force)
-    pattern          TEXT,                                          -- 명령 패턴 (action_code = command 일 때)
-    description      TEXT,                                          -- 설명 (예: 원격 기록 덮어쓰기)
-    policy           TEXT NOT NULL CHECK (policy IN ('auto','approval','block')),  -- 정책: auto(자동 허용) | approval(승인 필요 · tbl_ask 승인 요청 생성) | block(항상 차단)
-    approver         TEXT CHECK (approver IN ('user','orch_then_user')),  -- 승인자: user(사용자) | orch_then_user(Orch가 먼저 검토 후 사용자)
-    is_notify        INTEGER NOT NULL DEFAULT 1,                    -- 알림 여부
-    sort             INTEGER NOT NULL DEFAULT 0,                    -- 표시 순서
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))       -- 생성 시각
-);
-
--- 가드 트리거. Run 도중 위험 신호를 감지하면 멈추고 알림
-CREATE TABLE tbl_profile_guard (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 가드 번호
-    profile_sn       INTEGER NOT NULL REFERENCES tbl_agent_profile(sn) ON DELETE CASCADE,  -- 프로필
-    name             TEXT NOT NULL,                                 -- 이름 (예: 비밀키 패턴 출력 감지)
-    stage            TEXT NOT NULL CHECK (stage IN ('tool_use','tool_result','output')),  -- 감시 시점: tool_use(도구 실행 직전) | tool_result(도구 결과) | output(모델 출력)
-    pattern          TEXT,                                          -- 감지 패턴 (예: sk-… / ghp_…)
-    is_enabled       INTEGER NOT NULL DEFAULT 1,                    -- 활성 여부
-    sort             INTEGER NOT NULL DEFAULT 0,                    -- 표시 순서
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))       -- 생성 시각
-);
-
--- 폴백 체인. 실행기별로 위에서부터 시도할 연결 순서
-CREATE TABLE tbl_map_fallback (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 폴백 단계 번호
-    profile_sn       INTEGER NOT NULL REFERENCES tbl_agent_profile(sn) ON DELETE CASCADE,  -- 프로필 (워크스페이스 기본 · 템플릿 · 멤버)
-    runtime_sn       INTEGER NOT NULL REFERENCES tbl_runtime(sn) ON DELETE RESTRICT,   -- 실행기
-    connection_sn    INTEGER NOT NULL REFERENCES tbl_connection(sn) ON DELETE RESTRICT,  -- 연결
-    model_sn         INTEGER REFERENCES tbl_model(sn) ON DELETE SET NULL,              -- 이 단계에서 쓸 모델 (NULL = 연결 기본)
-    sort             INTEGER NOT NULL,                              -- 순서 (1 = 기본)
-    switch_rule      TEXT,                                          -- 다음으로 넘어가는 조건 (예: 주간 잔량 20% 미만, 429)
-    max_level        INTEGER,                                       -- 이 단계가 맡을 수 있는 최대 작업 레벨 (예: 0 = L0만)
-    tier             TEXT CHECK (tier IN ('S','M','L')),  -- 하위 작업 모델 등급: S | M | L · NULL = 모든 등급 (#67)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 생성 시각 · 순서 겹침 금지는 ux_fallback_sort (같은 연결도 등급별 모델로 여러 번 올 수 있다 · #67)
-);
 
 -- 템플릿. 역할별 에이전트 기본값 · Agents 탭
 CREATE TABLE tbl_template (
@@ -1210,10 +1153,6 @@ CREATE INDEX idx_context_manifest_run   ON tbl_context_manifest (run_sn);
 CREATE INDEX idx_context_source_manifest ON tbl_context_source (manifest_sn);
 CREATE INDEX idx_context_source_hash    ON tbl_context_source (content_hash);
 CREATE INDEX idx_task_criterion_task    ON tbl_task_criterion (task_sn, sort);
-CREATE INDEX idx_profile_tool           ON tbl_profile_tool (profile_sn);
-CREATE INDEX idx_profile_path           ON tbl_profile_path (profile_sn);
-CREATE INDEX idx_profile_rule           ON tbl_profile_rule (profile_sn);
-CREATE INDEX idx_profile_guard          ON tbl_profile_guard (profile_sn);
 CREATE INDEX idx_review_task            ON tbl_review (task_sn);
 CREATE INDEX idx_issue_parent           ON tbl_issue (parent_sn);
 CREATE INDEX idx_orch_policy_level      ON tbl_orch_policy_level (policy_sn);
@@ -1234,7 +1173,6 @@ CREATE INDEX idx_template_revision      ON tbl_template_revision (template_sn);
 CREATE UNIQUE INDEX ux_orch_policy      ON tbl_orch_policy (team_sn, COALESCE(project_sn, 0));  -- 팀 기본(NULL) 1개 · 프로젝트별 1개
 CREATE UNIQUE INDEX ux_session_num      ON tbl_session (member_sn, num);                     -- 멤버별 세션 번호
 CREATE UNIQUE INDEX ux_notify_rule      ON tbl_notify_rule (workspace_sn, COALESCE(connection_sn, 0), event_code, channel_kind);
-CREATE UNIQUE INDEX ux_fallback_sort    ON tbl_map_fallback (profile_sn, runtime_sn, sort);  -- 실행기 안에서 순서 겹침 금지
 CREATE UNIQUE INDEX ux_run_child        ON tbl_run (parent_run_sn, child_seq);        -- 리드 Run 안 하위 순번 (NULL 여러 개 허용)
 CREATE UNIQUE INDEX ux_event_command     ON tbl_log_event (command_id, command_idx);             -- NULL은 여러 개 허용 · 같은 명령 재전송은 첫 이벤트에서 충돌
 CREATE INDEX idx_log_event_project      ON tbl_log_event (project_sn, sn);
@@ -1287,9 +1225,6 @@ CREATE INDEX idx_fk_log_run_session_sn ON tbl_log_run (session_sn);
 CREATE INDEX idx_fk_log_token_connection_sn ON tbl_log_token (connection_sn);
 CREATE INDEX idx_fk_log_token_manifest_sn ON tbl_log_token (manifest_sn);
 CREATE INDEX idx_fk_log_token_session_sn ON tbl_log_token (session_sn);
-CREATE INDEX idx_fk_map_fallback_connection_sn ON tbl_map_fallback (connection_sn);
-CREATE INDEX idx_fk_map_fallback_model_sn ON tbl_map_fallback (model_sn);
-CREATE INDEX idx_fk_map_fallback_runtime_sn ON tbl_map_fallback (runtime_sn);
 CREATE INDEX idx_fk_member_profile_sn ON tbl_member (profile_sn);
 CREATE INDEX idx_fk_member_template_sn ON tbl_member (template_sn);
 CREATE INDEX idx_fk_message_member_sn ON tbl_message (member_sn);

@@ -2,7 +2,7 @@
 //! DB를 읽지 않는다. 호출하는 쪽(runner 실행)이 현재 상태를 `Ctx`로 모아 넘긴다
 #![allow(dead_code)] // runner 실행(#67 다음 Task)이 호출한다
 
-use crate::{agent::TIERS, entity::tbl_map_fallback as fb, team::SPAWN};
+use crate::{agent::{Fallback, TIERS}, team::SPAWN};
 
 /// 작업 종류 → 기본 등급 (TIERS 위치: 0 = S, 1 = M, 2 = L)
 const KINDS: [(&str, usize); 9] = [
@@ -153,8 +153,8 @@ pub fn tier(kind: &str, paths: usize, ac: usize, retry: u8, low: bool) -> Result
     Ok(TIERS[i])
 }
 
-/// 등급 → 폴백 체인에서 시도할 단계 (sort 순, tier 일치 또는 NULL). 리드는 모델을 고르지 않는다
-pub fn models<'a>(chain: &'a [fb::Model], tier: &str) -> impl Iterator<Item = &'a fb::Model> {
+/// 등급 → 폴백 체인에서 시도할 단계 (체인 순서, tier 일치 또는 NULL). 리드는 모델을 고르지 않는다
+pub fn models<'a>(chain: &'a [Fallback], tier: &str) -> impl Iterator<Item = &'a Fallback> {
     chain.iter().filter(move |m| m.tier.as_deref().is_none_or(|t| t == tier))
 }
 
@@ -249,16 +249,13 @@ ctx: []          # rules only
         assert!(matches!(tier("chat", 1, 1, 0, false), Err(Stop::Lead(_))));
     }
 
-    /// 등급 칩이 맞거나 비어 있는 단계만, sort 순
+    /// 등급 칩이 맞거나 비어 있는 단계만, 체인 순서
     #[test]
     fn chain() {
-        let step = |sn, tier: Option<&str>| fb::Model {
-            sn, profile_sn: 1, runtime_sn: 1, connection_sn: 1, model_sn: Some(sn), sort: sn, switch_rule: None, max_level: None,
-            tier: tier.map(str::to_owned), create_at: String::new(),
-        };
+        let step = |sn, tier: Option<&str>| Fallback { runtime_sn: 1, connection_sn: 1, model_sn: Some(sn), switch_rule: None, max_level: None, tier: tier.map(str::to_owned) };
         let c = [step(1, Some("S")), step(2, None), step(3, Some("L"))];
-        assert_eq!(models(&c, "S").map(|m| m.sn).collect::<Vec<_>>(), [1, 2]);
-        assert_eq!(models(&c, "M").map(|m| m.sn).collect::<Vec<_>>(), [2]);
+        assert_eq!(models(&c, "S").filter_map(|m| m.model_sn).collect::<Vec<_>>(), [1, 2]);
+        assert_eq!(models(&c, "M").filter_map(|m| m.model_sn).collect::<Vec<_>>(), [2]);
     }
 
     #[test]
