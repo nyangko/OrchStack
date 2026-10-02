@@ -55,13 +55,15 @@ pub struct Workspace {
     dnd_bypass_level: i64,
     /// 일일 요약 시각 (HH:MM)
     daily_summary_time: Option<String>,
+    /// 알림 채널 (channel_json · 봇 토큰 위치는 내보내지 않는다)
+    channels: Vec<crate::notify::Channel>,
     update_at: String,
 }
 
 impl From<ws::Model> for Workspace {
     fn from(m: ws::Model) -> Self {
         Self {
-            name: m.name, default_repo: m.default_repo, timezone: m.timezone, ui_language: m.ui_language, report_language: m.report_language,
+            channels: crate::notify::channels_of(&m), name: m.name, default_repo: m.default_repo, timezone: m.timezone, ui_language: m.ui_language, report_language: m.report_language,
             commit_language: m.commit_language, date_format: m.date_format, theme: m.theme, is_onboarded: m.is_onboarded, dnd_start: m.dnd_start,
             dnd_end: m.dnd_end, is_dnd_weekend: m.is_dnd_weekend, dnd_bypass_level: m.dnd_bypass_level, daily_summary_time: m.daily_summary_time, update_at: m.update_at,
         }

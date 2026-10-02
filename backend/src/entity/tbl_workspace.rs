@@ -56,6 +56,10 @@ pub struct Model {
     pub dnd_bypass_level: i64,
     #[sea_orm(column_type = "Text", nullable)]
     pub daily_summary_time: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub channel_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub notify_json: Option<String>,
     pub is_onboarded: i64,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
@@ -79,10 +83,6 @@ pub enum Relation {
     TblMcp,
     #[sea_orm(has_many = "super::tbl_notification::Entity")]
     TblNotification,
-    #[sea_orm(has_many = "super::tbl_notify_channel::Entity")]
-    TblNotifyChannel,
-    #[sea_orm(has_many = "super::tbl_notify_rule::Entity")]
-    TblNotifyRule,
     #[sea_orm(has_many = "super::tbl_project::Entity")]
     TblProject,
     #[sea_orm(has_many = "super::tbl_report_form::Entity")]
@@ -148,18 +148,6 @@ impl Related<super::tbl_mcp::Entity> for Entity {
 impl Related<super::tbl_notification::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblNotification.def()
-    }
-}
-
-impl Related<super::tbl_notify_channel::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblNotifyChannel.def()
-    }
-}
-
-impl Related<super::tbl_notify_rule::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblNotifyRule.def()
     }
 }
 

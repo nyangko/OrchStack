@@ -532,10 +532,11 @@ mod tests {
         assert_eq!(call(&app, "PATCH", "/connections/99", Some(json!({"name": "x"}))).await.0, StatusCode::NOT_FOUND);
 
         // 한도: 연결별 목록 · 없는 연결 404
-        db.execute_unprepared(&format!("INSERT INTO tbl_connection_quota (connection_sn, period, unit, used_value, remain_percent) VALUES ({cs}, 'week', 'percent', 82, 18);")).await.unwrap();
-        let v = call(&app, "GET", &format!("/connections/{cs}/quotas"), None).await.1;
-        assert_eq!((v[0]["period"].as_str(), v[0]["remain_percent"].as_i64()), (Some("week"), Some(18)));
-        assert_eq!(call(&app, "GET", "/connections/99/quotas", None).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(call(&app, "GET", &format!("/connections/{cs}"), None).await.1["quotas"].as_array().unwrap().len(), 0);
+        db.execute_unprepared(&format!("UPDATE tbl_connection SET quota_json = '[{{\"period\":\"week\",\"unit\":\"percent\",\"used_value\":82,\"remain_percent\":18}}]' WHERE sn = {cs};")).await.unwrap();
+        let v = call(&app, "GET", &format!("/connections/{cs}"), None).await.1["quotas"].clone();
+        assert_eq!((v[0]["period"].as_str(), v[0]["remain_percent"].as_i64(), v[0]["limit_value"].is_null()), (Some("week"), Some(18), true));
+        assert!(call(&app, "GET", "/connections", None).await.1[0]["quotas"].is_array());
 
         // 삭제: 폴백 체인에 쓰이면 409, 빠지면 204 (한도도 함께 지워짐)
         let ps = call(&app, "POST", "/profiles", Some(json!({}))).await.1["sn"].as_i64().unwrap();
@@ -725,8 +726,8 @@ mod tests {
         assert_eq!(events(&db, "workspace", WORKSPACE).await, [("NotifyRulesUpdated".into(), 1)]);
 
         // 채널 · 테스트: key_ref 없음, app 항상 준비, off 채널은 준비 안 됨
-        db.execute_unprepared("INSERT INTO tbl_notify_channel (workspace_sn, kind, status, key_ref) VALUES (1, 'telegram', 'connected', 'orch.tg'), (1, 'email', 'off', NULL);").await.unwrap();
-        let v = call(&app, "GET", "/notify/channels", None).await.1;
+        db.execute_unprepared("UPDATE tbl_workspace SET channel_json = '[{\"kind\":\"telegram\",\"status\":\"connected\",\"key_ref\":\"orch.tg\"},{\"kind\":\"email\",\"status\":\"off\"}]';").await.unwrap();
+        let v = call(&app, "GET", "/workspace", None).await.1["channels"].clone();
         assert_eq!((v.as_array().unwrap().len(), v[0].get("key_ref")), (2, None));
         for (k, ready) in [("app", true), ("telegram", true), ("email", false), ("desktop", false)] {
             let v = call(&app, "POST", "/notify/test", Some(json!({"kind": k}))).await.1;
@@ -881,7 +882,7 @@ mod tests {
         // 팀 한도: 프로필 연결(1) + 폴백(2) → 연결별 한도 · 가장 적게 남은 비율
         db.execute_unprepared("UPDATE tbl_agent_profile SET connection_sn = 1 WHERE sn = 1; INSERT INTO tbl_runtime (sn, workspace_sn, code, name) VALUES (1, 1, 'codex', 'Codex'); \
             UPDATE tbl_agent_profile SET fallback_json = '[{\"runtime_sn\":1,\"connection_sn\":2}]' WHERE sn = 1; \
-            INSERT INTO tbl_connection_quota (connection_sn, period, unit, used_value, remain_percent) VALUES (2, '5h', 'percent', 70, 30), (2, 'week', 'percent', 88, 12);").await.unwrap();
+            UPDATE tbl_connection SET quota_json = '[{\"period\":\"5h\",\"unit\":\"percent\",\"used_value\":70,\"remain_percent\":30},{\"period\":\"week\",\"unit\":\"percent\",\"used_value\":88,\"remain_percent\":12}]' WHERE sn = 2;").await.unwrap();
         let v = call(&app, "GET", "/teams/1/quota", None).await.1;
         assert_eq!((v.as_array().unwrap().len(), v[1]["kind"].as_str(), v[1]["min_remain_percent"].as_i64(), v[1]["quotas"].as_array().unwrap().len(), v[0]["min_remain_percent"].is_null()), (2, Some("subscription"), Some(12), 2, true));
 
@@ -1631,7 +1632,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/asks/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram", "/presets/{sn}", "/presets/{sn}/usage", "/presets/import", "/report-forms", "/report-forms/{key}", "/report-forms/{key}/preview", "/workspace/profile", "/asks", "/asks/{sn}", "/asks/{sn}/answer", "/asks/{sn}/writing", "/asks/{sn}/approve", "/asks/{sn}/deny", "/asks/{sn}/hold", "/asks/{sn}/{action}"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/asks/{sn}/{action}", "/runs/{sn}/instruct", "/runs/{sn}/children", "/teams/{sn}/stats", "/teams/{sn}/quota", "/workspace/cost", "/tasks", "/tasks/{sn}/criteria", "/tasks/{sn}/deps", "/tasks/{sn}/deps/{dep}", "/projects/{sn}/labels", "/task-views", "/task-views/{sn}", "/projects/{sn}/diagram", "/presets/{sn}", "/presets/{sn}/usage", "/presets/import", "/report-forms", "/report-forms/{key}", "/report-forms/{key}/preview", "/workspace/profile", "/asks", "/asks/{sn}", "/asks/{sn}/answer", "/asks/{sn}/writing", "/asks/{sn}/approve", "/asks/{sn}/deny", "/asks/{sn}/hold", "/asks/{sn}/{action}"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());

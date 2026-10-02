@@ -143,8 +143,6 @@ pub enum Relation {
     SelfRef1,
     #[sea_orm(has_many = "super::tbl_run_file::Entity")]
     TblRunFile,
-    #[sea_orm(has_many = "super::tbl_run_step::Entity")]
-    TblRunStep,
     #[sea_orm(
         belongs_to = "super::tbl_runtime::Entity",
         from = "Column::RuntimeSn",
@@ -258,12 +256,6 @@ impl Related<super::tbl_review::Entity> for Entity {
 impl Related<super::tbl_run_file::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblRunFile.def()
-    }
-}
-
-impl Related<super::tbl_run_step::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblRunStep.def()
     }
 }
 

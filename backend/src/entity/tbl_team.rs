@@ -46,8 +46,6 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::tbl_log_activity::Entity")]
     TblLogActivity,
-    #[sea_orm(has_many = "super::tbl_map_connection_team::Entity")]
-    TblMapConnectionTeam,
     #[sea_orm(has_many = "super::tbl_member::Entity")]
     TblMember,
     #[sea_orm(has_many = "super::tbl_project::Entity")]
@@ -65,12 +63,6 @@ pub enum Relation {
 impl Related<super::tbl_log_activity::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblLogActivity.def()
-    }
-}
-
-impl Related<super::tbl_map_connection_team::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblMapConnectionTeam.def()
     }
 }
 

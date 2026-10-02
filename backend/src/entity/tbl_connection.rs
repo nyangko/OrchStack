@@ -50,6 +50,12 @@ pub struct Model {
     pub test_at: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub sync_at: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub team_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub quota_json: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub notify_json: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
     #[sea_orm(column_type = "Text")]
@@ -60,20 +66,10 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::tbl_agent_profile::Entity")]
     TblAgentProfile,
-    #[sea_orm(has_many = "super::tbl_connection_quota::Entity")]
-    TblConnectionQuota,
-    #[sea_orm(has_many = "super::tbl_log_connection_quota::Entity")]
-    TblLogConnectionQuota,
     #[sea_orm(has_many = "super::tbl_log_token::Entity")]
     TblLogToken,
-    #[sea_orm(has_many = "super::tbl_map_connection_team::Entity")]
-    TblMapConnectionTeam,
-    #[sea_orm(has_many = "super::tbl_map_runtime_connection::Entity")]
-    TblMapRuntimeConnection,
     #[sea_orm(has_many = "super::tbl_model::Entity")]
     TblModel,
-    #[sea_orm(has_many = "super::tbl_notify_rule::Entity")]
-    TblNotifyRule,
     #[sea_orm(has_many = "super::tbl_run::Entity")]
     TblRun,
     #[sea_orm(
@@ -108,45 +104,15 @@ impl Related<super::tbl_agent_profile::Entity> for Entity {
     }
 }
 
-impl Related<super::tbl_connection_quota::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblConnectionQuota.def()
-    }
-}
-
-impl Related<super::tbl_log_connection_quota::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblLogConnectionQuota.def()
-    }
-}
-
 impl Related<super::tbl_log_token::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblLogToken.def()
     }
 }
 
-impl Related<super::tbl_map_connection_team::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblMapConnectionTeam.def()
-    }
-}
-
-impl Related<super::tbl_map_runtime_connection::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblMapRuntimeConnection.def()
-    }
-}
-
 impl Related<super::tbl_model::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblModel.def()
-    }
-}
-
-impl Related<super::tbl_notify_rule::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TblNotifyRule.def()
     }
 }
 

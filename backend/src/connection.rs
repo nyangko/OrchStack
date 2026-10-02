@@ -1,5 +1,5 @@
-//! tbl_connection CRUD + 한도(tbl_connection_quota) 조회. 쓰기는 event::run 경유 (Connection* 이벤트). key_ref는 응답에 내보내지 않는다
-use crate::{entity::{tbl_connection::{self as c, Entity as Tbl}, tbl_connection_quota as q},
+//! tbl_connection CRUD (한도는 응답의 quotas = quota_json). 쓰기는 event::run 경유 (Connection* 이벤트). key_ref는 응답에 내보내지 않는다
+use crate::{entity::tbl_connection::{self as c, Entity as Tbl},
     error::{Body, Error, ErrorBody, Res, Sn, in_use}, event::{self, Ev}};
 use axum::{Json, extract::State, http::StatusCode};
 use sea_orm::{ActiveModelTrait, ActiveValue::{NotSet, Set}, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, sea_query::Expr};
@@ -20,7 +20,6 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
     OpenApiRouter::new()
         .routes(routes!(list, create))
         .routes(routes!(read, update, remove))
-        .routes(routes!(quotas))
 }
 
 /// 연결 (API 응답 형태). 키체인 항목 이름(key_ref)은 빼고 끝 4자리(key_hint)만 준다
@@ -55,6 +54,8 @@ pub struct Connection {
     cache_hit_percent: Option<i64>,
     test_at: Option<String>,
     sync_at: Option<String>,
+    /// 현재 한도 (quota_json · 실행기가 갱신)
+    quotas: Vec<Quota>,
     create_at: String,
     update_at: String,
 }
@@ -62,7 +63,7 @@ pub struct Connection {
 impl From<c::Model> for Connection {
     fn from(m: c::Model) -> Self {
         Self {
-            sn: m.sn, kind: m.kind, provider_code: m.provider_code, provider_name: m.provider_name, name: m.name,
+            quotas: quotas_of(&m), sn: m.sn, kind: m.kind, provider_code: m.provider_code, provider_name: m.provider_name, name: m.name,
             account_label: m.account_label, plan_name: m.plan_name, runtime_sn: m.runtime_sn, login_method: m.login_method,
             base_url: m.base_url, key_hint: m.key_hint, status: m.status, status_message: m.status_message,
             monthly_budget_usd_micro: m.monthly_budget_usd_micro, monthly_fee_usd_micro: m.monthly_fee_usd_micro, budget_warn_percent: m.budget_warn_percent, is_budget_exclude: m.is_budget_exclude,
@@ -72,25 +73,24 @@ impl From<c::Model> for Connection {
     }
 }
 
-/// 연결 한도 1건 (API 응답 형태). 갱신은 실행기가 한다
-#[derive(Serialize, ToSchema)]
+/// 연결 한도 1건 (quota_json 원소 · 갱신은 실행기가 한다)
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct Quota {
-    sn: i64,
     /// minute | 5h | day | week | month
-    period: String,
+    pub period: String,
     /// percent | usd | request | token
-    unit: String,
-    used_value: f64,
-    limit_value: Option<f64>,
-    remain_percent: Option<i64>,
-    reset_at: Option<String>,
-    update_at: String,
+    pub unit: String,
+    #[serde(default)]
+    pub used_value: f64,
+    pub limit_value: Option<f64>,
+    pub remain_percent: Option<i64>,
+    pub reset_at: Option<String>,
+    pub update_at: Option<String>,
 }
 
-impl From<q::Model> for Quota {
-    fn from(m: q::Model) -> Self {
-        Self { sn: m.sn, period: m.period, unit: m.unit, used_value: m.used_value, limit_value: m.limit_value, remain_percent: m.remain_percent, reset_at: m.reset_at, update_at: m.update_at }
-    }
+/// 연결의 한도 목록 (quota_json)
+pub(crate) fn quotas_of(m: &c::Model) -> Vec<Quota> {
+    m.quota_json.as_deref().and_then(|j| serde_json::from_str(j).ok()).unwrap_or_default()
 }
 
 /// 연결 생성 요청 본문. 상태는 available로 시작하고 실행기가 확인해 바꾼다
@@ -246,11 +246,4 @@ async fn remove(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusC
         Ok(((), vec![Ev::new(None, "connection", sn, "ConnectionDeleted", &json!({ "name": m.name }))]))
     }).await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-/// 연결 한도 목록 (번호순). 연결이 없으면 404
-#[utoipa::path(operation_id = "connection_quotas", get, path = "/connections/{sn}/quotas", params(("sn" = i64, Path, description = "연결 번호")), responses((status = 200, body = Vec<Quota>), (status = "default", body = ErrorBody)))]
-async fn quotas(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec<Quota>>> {
-    get(&db, sn).await?;
-    Ok(Json(q::Entity::find().filter(q::Column::ConnectionSn.eq(sn)).order_by_asc(q::Column::Sn).all(&db).await?.into_iter().map(Quota::from).collect()))
 }

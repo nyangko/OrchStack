@@ -1,6 +1,6 @@
 //! Orch 규칙 엔진 (#119 · LLM 0): 이벤트 1건 → 제안 0~1건 (`on`), 제안 실행 (`run` · 기존 command 재사용), 타이머 (`tick`), 멤버 대기열.
 //! 일상 PM 판단(다음 태스크 배정 · 재시도 · 이슈 닫기 · 폴백 · 가드 정지)을 모델 없이 처리한다. 실행기 · 모델 호출은 여기서 하지 않는다 (B-18)
-use crate::{ask::{self, Choice, DecisionNew, Opt, ProposalNew, Question}, entity::{tbl_agent_profile as ap, tbl_connection as cn, tbl_connection_quota as qt, tbl_issue as i, tbl_log_event as e, tbl_member as mb,
+use crate::{ask::{self, Choice, DecisionNew, Opt, ProposalNew, Question}, entity::{tbl_agent_profile as ap, tbl_connection as cn, tbl_issue as i, tbl_log_event as e, tbl_member as mb,
     tbl_ask as ak, tbl_project as pj, tbl_review as rv, tbl_run as r, tbl_task as t},
     error::{Error, ErrorBody, Res, Sn}, event::self,
     orch, policy::{self, Guard, Level, Policy}, run as runs, stat, task};
@@ -288,7 +288,7 @@ async fn healthy(db: &impl ConnectionTrait, cs: i64) -> Res<bool> {
     if matches!(c.status.as_str(), "error" | "expired" | "login_required") {
         return Ok(false);
     }
-    Ok(qt::Entity::find().filter(qt::Column::ConnectionSn.eq(cs)).filter(qt::Column::RemainPercent.eq(0)).count(db).await? == 0)
+    Ok(!crate::connection::quotas_of(&c).iter().any(|q| q.remain_percent == Some(0)))
 }
 
 /// Run 멤버 프로필의 폴백 체인에서 지금 연결 다음의 쓸 만한 연결 (체인에 없으면 처음부터)

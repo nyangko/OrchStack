@@ -1,6 +1,5 @@
-//! 알림(tbl_notification) 목록 · 읽음 + 이벤트 → 알림 projection, 알림 규칙 · 채널(tbl_notify_rule · _channel), 감사 로그(tbl_log_audit) 조회
-use crate::{entity::{tbl_ask as ak, tbl_connection as cn, tbl_log_audit as au, tbl_log_event as e, tbl_notification as n, tbl_notify_channel as ch,
-    tbl_notify_rule as nr, tbl_run as r, tbl_task as t},
+//! 알림(tbl_notification) 목록 · 읽음 + 이벤트 → 알림 projection, 알림 규칙(워크스페이스 · 연결의 notify_json) · 채널 테스트(workspace.channel_json), 감사 로그(tbl_log_audit) 조회
+use crate::{entity::{tbl_ask as ak, tbl_connection as cn, tbl_log_audit as au, tbl_log_event as e, tbl_notification as n, tbl_run as r, tbl_task as t, tbl_workspace as ws},
     error::{Body, Error, ErrorBody, Res}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Statement, sea_query::Expr};
@@ -9,7 +8,7 @@ use serde_json::json;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-/// 알림 이벤트 코드 (tbl_notify_rule · tbl_notification CHECK와 같다)
+/// 알림 이벤트 코드 (notify_json · tbl_notification CHECK와 같다)
 const CODES: [&str; 14] = ["decision_request", "approval_request", "orch_decided", "run_failed", "guard_stop", "context_warn", "quota_low",
     "budget_80", "budget_over", "connection_error", "fallback_used", "pr", "task_done", "daily_summary"];
 /// 알림 채널
@@ -27,7 +26,6 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
         .routes(routes!(list))
         .routes(routes!(read))
         .routes(routes!(rules, set_rules))
-        .routes(routes!(channels))
         .routes(routes!(test))
         .routes(routes!(audit))
 }
@@ -72,8 +70,8 @@ pub async fn project(tx: &DatabaseTransaction, ev: &e::Model) -> Res<()> {
         }
         _ => return Ok(()),
     };
-    let off = nr::Entity::find().filter(nr::Column::ConnectionSn.is_null()).filter(nr::Column::EventCode.eq(code))
-        .filter(nr::Column::ChannelKind.eq("app")).filter(nr::Column::IsEnabled.eq(0)).one(tx).await?.is_some();
+    let w = ws::Entity::find_by_id(crate::WORKSPACE).one(tx).await?;
+    let off = w.is_some_and(|w| cells(&w.notify_json).iter().any(|c| c.event_code == code && c.channel_kind == "app" && c.is_enabled == 0));
     if off {
         return Ok(());
     }
@@ -140,17 +138,38 @@ struct Rule {
     is_enabled: i64,
 }
 
-/// 알림 채널 (API 응답 형태). 봇 토큰 위치(key_ref)는 내보내지 않는다
-#[derive(Serialize, ToSchema)]
-struct Channel {
-    sn: i64,
+/// 알림 규칙 1칸 (notify_json 원소 · 워크스페이스 기본 또는 연결별)
+#[derive(Serialize, Deserialize, Clone)]
+struct Cell {
+    event_code: String,
+    channel_kind: String,
+    is_enabled: i64,
+}
+
+/// notify_json → 규칙 칸 목록
+fn cells(j: &Option<String>) -> Vec<Cell> {
+    j.as_deref().and_then(|s| serde_json::from_str(s).ok()).unwrap_or_default()
+}
+
+/// 알림 채널 (channel_json 원소). 봇 토큰 위치(key_ref)는 응답에 내보내지 않는다
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct Channel {
     /// app | desktop | telegram | email
-    kind: String,
+    pub kind: String,
     /// on | allowed | connected | off
-    status: String,
-    target: Option<String>,
-    target_label: Option<String>,
-    update_at: String,
+    pub status: String,
+    pub target: Option<String>,
+    pub target_label: Option<String>,
+    pub update_at: Option<String>,
+    /// 봇 토큰의 키체인 항목 이름 (저장 전용 · 응답에는 없다)
+    #[serde(skip_serializing, default)]
+    #[allow(dead_code)] // 저장 전용 — 봇 발송(Ops Task)이 읽는다
+    key_ref: Option<String>,
+}
+
+/// 워크스페이스의 알림 채널 (channel_json)
+pub fn channels_of(w: &ws::Model) -> Vec<Channel> {
+    w.channel_json.as_deref().and_then(|s| serde_json::from_str(s).ok()).unwrap_or_default()
 }
 
 /// 채널 테스트 요청 본문
@@ -242,11 +261,16 @@ async fn read(State(db): State<DatabaseConnection>, Body(b): Body<ReadBody>) -> 
 /// 알림 규칙 목록 (워크스페이스 기본 → 연결별, 번호순). 행이 없는 이벤트 × 채널은 켜짐으로 본다
 #[utoipa::path(operation_id = "notify_rules", get, path = "/notify/rules", responses((status = 200, body = Vec<Rule>), (status = "default", body = ErrorBody)))]
 async fn rules(State(db): State<DatabaseConnection>) -> Res<Json<Vec<Rule>>> {
-    Ok(Json(nr::Entity::find().order_by_asc(nr::Column::ConnectionSn).order_by_asc(nr::Column::Sn).all(&db).await?.into_iter()
-        .map(|m| Rule { connection_sn: m.connection_sn, event_code: m.event_code, channel_kind: m.channel_kind, is_enabled: m.is_enabled }).collect()))
+    let w = ws::Entity::find_by_id(crate::WORKSPACE).one(&db).await?.ok_or_else(Error::not_found)?;
+    let rule = |connection_sn: Option<i64>, c: Cell| Rule { connection_sn, event_code: c.event_code, channel_kind: c.channel_kind, is_enabled: c.is_enabled };
+    let mut out: Vec<Rule> = cells(&w.notify_json).into_iter().map(|c| rule(None, c)).collect();
+    for m in cn::Entity::find().order_by_asc(cn::Column::Sn).all(&db).await? {
+        out.extend(cells(&m.notify_json).into_iter().map(|c| rule(Some(m.sn), c)));
+    }
+    Ok(Json(out))
 }
 
-/// 알림 규칙 전체 교체 (워크스페이스 NotifyRulesUpdated). 모르는 이벤트 · 채널 · 0/1 밖 · 같은 칸 중복은 422, 없는 연결은 422(invalid_ref)
+/// 알림 규칙 전체 교체 (워크스페이스 NotifyRulesUpdated). 모르는 이벤트 · 채널 · 0/1 밖 · 같은 칸 중복 · 없는 연결은 422
 #[utoipa::path(operation_id = "notify_set_rules", put, path = "/notify/rules", request_body = Vec<Rule>, responses((status = 200, body = Vec<Rule>), (status = "default", body = ErrorBody)))]
 async fn set_rules(State(db): State<DatabaseConnection>, Body(b): Body<Vec<Rule>>) -> Res<Json<Vec<Rule>>> {
     let mut keys: Vec<_> = b.iter().map(|x| (x.connection_sn, x.event_code.as_str(), x.channel_kind.as_str())).collect();
@@ -255,24 +279,24 @@ async fn set_rules(State(db): State<DatabaseConnection>, Body(b): Body<Vec<Rule>
     if keys.len() != b.len() || b.iter().any(|x| !CODES.contains(&x.event_code.as_str()) || !CHANNELS.contains(&x.channel_kind.as_str()) || !(0..=1).contains(&x.is_enabled)) {
         return Err(Error::invalid(format!("event_code in {CODES:?}, channel_kind in {CHANNELS:?}, is_enabled 0/1, no duplicate cell")));
     }
+    let of = |conn: Option<i64>| -> String {
+        json!(b.iter().filter(|x| x.connection_sn == conn).map(|x| json!({ "event_code": x.event_code, "channel_kind": x.channel_kind, "is_enabled": x.is_enabled })).collect::<Vec<_>>()).to_string()
+    };
     event::run(&db, async |tx| {
-        nr::Entity::delete_many().filter(nr::Column::WorkspaceSn.eq(crate::WORKSPACE)).exec(tx).await?;
-        for x in &b {
-            nr::ActiveModel {
-                workspace_sn: Set(crate::WORKSPACE), connection_sn: Set(x.connection_sn), event_code: Set(x.event_code.clone()), channel_kind: Set(x.channel_kind.clone()),
-                is_enabled: Set(x.is_enabled), ..Default::default()
-            }.insert(tx).await?;
+        // 연결별 규칙은 전부 비우고 보낸 연결 것만 다시 쓴다
+        cn::Entity::update_many().col_expr(cn::Column::NotifyJson, Expr::value(Option::<String>::None)).exec(tx).await?;
+        let mut conns: Vec<i64> = b.iter().filter_map(|x| x.connection_sn).collect();
+        conns.sort_unstable();
+        conns.dedup();
+        for sn in conns {
+            if cn::Entity::update_many().filter(cn::Column::Sn.eq(sn)).col_expr(cn::Column::NotifyJson, of(Some(sn)).into()).exec(tx).await?.rows_affected == 0 {
+                return Err(Error::invalid(format!("connection {sn} not found")));
+            }
         }
+        ws::Entity::update_many().filter(ws::Column::Sn.eq(crate::WORKSPACE)).col_expr(ws::Column::NotifyJson, of(None).into()).exec(tx).await?;
         Ok(((), vec![Ev::new(None, "workspace", crate::WORKSPACE, "NotifyRulesUpdated", &json!({ "count": b.len() }))]))
     }).await?;
     Ok(Json(b))
-}
-
-/// 알림 채널 목록 (번호순). 채널 연결 · OS 권한 갱신은 Ops Task
-#[utoipa::path(operation_id = "notify_channels", get, path = "/notify/channels", responses((status = 200, body = Vec<Channel>), (status = "default", body = ErrorBody)))]
-async fn channels(State(db): State<DatabaseConnection>) -> Res<Json<Vec<Channel>>> {
-    Ok(Json(ch::Entity::find().order_by_asc(ch::Column::Sn).all(&db).await?.into_iter()
-        .map(|m| Channel { sn: m.sn, kind: m.kind, status: m.status, target: m.target, target_label: m.target_label, update_at: m.update_at }).collect()))
 }
 
 /// 채널 테스트. app은 항상 준비됨, 나머지는 채널 행이 off가 아니면 준비됨. 모르는 채널은 422
@@ -281,7 +305,8 @@ async fn test(State(db): State<DatabaseConnection>, Body(b): Body<TestBody>) -> 
     if !CHANNELS.contains(&b.kind.as_str()) {
         return Err(Error::invalid(format!("kind in {CHANNELS:?}")));
     }
-    let ready = b.kind == "app" || ch::Entity::find().filter(ch::Column::Kind.eq(b.kind.as_str())).filter(ch::Column::Status.ne("off")).one(&db).await?.is_some();
+    let w = ws::Entity::find_by_id(crate::WORKSPACE).one(&db).await?.ok_or_else(Error::not_found)?;
+    let ready = b.kind == "app" || channels_of(&w).iter().any(|c| c.kind == b.kind && c.status != "off");
     Ok(Json(TestOut { kind: b.kind, ready, delivered: false }))
 }
 

@@ -86,6 +86,8 @@ CREATE TABLE tbl_workspace (
     is_dnd_weekend           INTEGER NOT NULL DEFAULT 1,            -- 주말 전체 방해 금지
     dnd_bypass_level         INTEGER NOT NULL DEFAULT 3,            -- 이 레벨 이상은 방해 금지 무시 (L3)
     daily_summary_time       TEXT,                                  -- 일일 요약 시각 (예: 18:00)
+    channel_json             TEXT,                                  -- 알림 채널 JSON 배열 [{kind, status, target, target_label, key_ref, update_at}] · kind = app(앱 내) | desktop(데스크톱 알림) | telegram | email · status = on(항상 켜짐 · 앱) | allowed(OS 권한 허용됨) | connected(연결됨) | off(설정 안 됨) · key_ref = 봇 토큰의 키체인 항목 이름 (응답에 내보내지 않는다)
+    notify_json              TEXT,                                  -- 알림 규칙 기본값 JSON 배열 [{event_code, channel_kind, is_enabled}] · event_code = decision_request | approval_request | orch_decided | run_failed | guard_stop | context_warn | quota_low | budget_80 | budget_over | connection_error | fallback_used | pr | task_done | daily_summary · 행이 없는 이벤트 × 채널은 켜짐
     is_onboarded             INTEGER NOT NULL DEFAULT 0,            -- 인트로(연결 → 프로젝트 → 기본 팀) 완료 여부
     create_at                TEXT NOT NULL DEFAULT (datetime('now')),  -- 생성 시각
     update_at                TEXT NOT NULL DEFAULT (datetime('now'))   -- 수정 시각
@@ -136,41 +138,20 @@ CREATE TABLE tbl_connection (
     monthly_fee_usd_micro INTEGER,                                 -- 월 정액 요금 (1달러 = 1,000,000 · NULL = 없음) · 구독 · 요금제 · 월 비용 집계의 subscription_fixed
     budget_warn_percent  INTEGER NOT NULL DEFAULT 80,               -- 예산 경고 기준(%)
     is_budget_exclude    INTEGER NOT NULL DEFAULT 1,                -- 예산 초과 시 폴백에서 자동 제외
-    scope                TEXT NOT NULL DEFAULT 'workspace' CHECK (scope IN ('workspace','team','me')),  -- 사용 범위: workspace(워크스페이스 전체) | team(선택한 팀만 · tbl_map_connection_team) | me(추가한 사용자만)
+    scope                TEXT NOT NULL DEFAULT 'workspace' CHECK (scope IN ('workspace','team','me')),  -- 사용 범위: workspace(워크스페이스 전체) | team(선택한 팀만 · team_json) | me(추가한 사용자만)
     report_language      TEXT,                                      -- 이 연결의 보고 언어 (NULL = 워크스페이스 기본)
     commit_language      TEXT,                                      -- 이 연결의 커밋 · PR 언어 (NULL = 워크스페이스 기본)
     latency_ms           INTEGER,                                   -- 마지막 연결 테스트 응답 시간
     cache_hit_percent    INTEGER,                                   -- 캐시 적중률(%) · 게이트웨이
     test_at              TEXT,                                      -- 마지막 연결 테스트 시각
     sync_at              TEXT,                                      -- 마지막 모델 목록 동기화 시각
+    team_json            TEXT,                                      -- 사용 범위가 team일 때 허용 팀 번호 JSON 배열 (예: [1, 3])
+    quota_json           TEXT,                                      -- 현재 한도 JSON 배열 [{period, unit, used_value, limit_value, remain_percent, reset_at, update_at}] · period = minute(분당) | 5h(5시간 창) | day(일간) | week(주간) | month(월간) · unit = percent | usd | request | token · limit_value = 한도 (구독처럼 알 수 없으면 NULL) · 추이는 tbl_log_token에서 계산 · 갱신은 실행기가 한다
+    notify_json          TEXT,                                      -- 이 연결만의 알림 규칙 JSON 배열 [{event_code, channel_kind, is_enabled}] · 행이 없는 이벤트 × 채널은 워크스페이스 기본(tbl_workspace.notify_json)을 따른다
     create_at            TEXT NOT NULL DEFAULT (datetime('now')),   -- 생성 시각
     update_at            TEXT NOT NULL DEFAULT (datetime('now'))    -- 수정 시각
 );
 
--- 연결의 현재 한도. 구독은 남은 비율, API 키 · 게이트웨이는 금액
-CREATE TABLE tbl_connection_quota (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 한도 번호
-    connection_sn    INTEGER NOT NULL REFERENCES tbl_connection(sn) ON DELETE CASCADE,  -- 연결
-    period           TEXT NOT NULL CHECK (period IN ('minute','5h','day','week','month')),  -- 기간: minute(분당) | 5h(5시간 창) | day(일간) | week(주간) | month(월간)
-    unit             TEXT NOT NULL CHECK (unit IN ('percent','usd','request','token')),  -- 단위: percent(%) | usd(달러) | request(요청 수) | token(토큰 수)
-    used_value       REAL NOT NULL DEFAULT 0,                       -- 사용량 (단위 기준)
-    limit_value      REAL,                                          -- 한도 (구독처럼 알 수 없으면 NULL)
-    remain_percent   INTEGER,                                       -- 남은 비율(%) (예: 주간 18)
-    reset_at         TEXT,                                          -- 다음 리셋 시각
-    update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 마지막 갱신 시각
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (connection_sn, period)
-);
-
--- 한도 변화 기록. 사용 추이 차트 · 소진 예상 계산
-CREATE TABLE tbl_log_connection_quota (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 기록 번호
-    connection_sn    INTEGER NOT NULL REFERENCES tbl_connection(sn) ON DELETE CASCADE,  -- 연결
-    period           TEXT NOT NULL CHECK (period IN ('minute','5h','day','week','month')),  -- 기간: minute(분당) | 5h(5시간 창) | day(일간) | week(주간) | month(월간)
-    used_value       REAL NOT NULL DEFAULT 0,                       -- 그 시점 사용량
-    remain_percent   INTEGER,                                       -- 그 시점 남은 비율(%)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))        -- 기록 시각
-);
 
 -- 연결에서 쓸 수 있는 모델. 모델 선택 다이얼로그
 CREATE TABLE tbl_model (
@@ -191,16 +172,6 @@ CREATE TABLE tbl_model (
     sync_at          TEXT,                                          -- 마지막 동기화 시각
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     UNIQUE (connection_sn, code)
-);
-
--- 실행기 ↔ 연결. 어느 실행기가 어느 연결을 쓸 수 있는지
-CREATE TABLE tbl_map_runtime_connection (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 연결 관계 번호
-    runtime_sn       INTEGER NOT NULL REFERENCES tbl_runtime(sn) ON DELETE CASCADE,   -- 실행기
-    connection_sn    INTEGER NOT NULL REFERENCES tbl_connection(sn) ON DELETE CASCADE,  -- 연결
-    connect_method   TEXT,                                          -- 연결 방법 설명 (예: ANTHROPIC_BASE_URL로 연결)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (runtime_sn, connection_sn)
 );
 
 
@@ -409,15 +380,6 @@ CREATE TABLE tbl_member (
     sort              INTEGER NOT NULL DEFAULT 0,                   -- 목록 순서
     create_at         TEXT NOT NULL DEFAULT (datetime('now')),      -- 생성 시각
     update_at         TEXT NOT NULL DEFAULT (datetime('now'))       -- 수정 시각
-);
-
--- 연결 ↔ 팀. 사용 범위가 '선택한 팀'인 연결의 허용 팀
-CREATE TABLE tbl_map_connection_team (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 연결 관계 번호
-    connection_sn    INTEGER NOT NULL REFERENCES tbl_connection(sn) ON DELETE CASCADE,  -- 연결
-    team_sn          INTEGER NOT NULL REFERENCES tbl_team(sn) ON DELETE CASCADE,      -- 팀
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (connection_sn, team_sn)
 );
 
 
@@ -685,17 +647,6 @@ CREATE TABLE tbl_session (
     end_at              TEXT                                        -- 종료 시각
 );
 
--- 실행 단계. Checkout → 컨텍스트 로드 → 구현 → lint → test
-CREATE TABLE tbl_run_step (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 단계 번호
-    run_sn           INTEGER NOT NULL REFERENCES tbl_run(sn) ON DELETE CASCADE,       -- Run
-    sort             INTEGER NOT NULL,                              -- 순서
-    name             TEXT NOT NULL,                                 -- 단계 이름 (예: pnpm lint)
-    status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','done','failed','skipped')),  -- 상태: pending(대기) | running(진행 중) | done(완료) | failed(실패) | skipped(앞 단계 실패로 건너뜀)
-    detail           TEXT,                                          -- 부가 설명 (예: 14 files)
-    duration_sec     INTEGER,                                       -- 소요 시간(초)
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))       -- 생성 시각
-);
 
 -- 변경 파일. Run이 바꾼 파일 목록
 CREATE TABLE tbl_run_file (
@@ -931,38 +882,13 @@ CREATE TABLE tbl_attachment (
 -- 9. 알림
 -- =====================================================================
 
--- 알림 채널. 앱 · 데스크톱 · Telegram · 이메일
-CREATE TABLE tbl_notify_channel (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 채널 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
-    kind             TEXT NOT NULL CHECK (kind IN ('app','desktop','telegram','email')),  -- 종류: app(앱 내) | desktop(데스크톱 알림) | telegram(Telegram) | email(이메일)
-    status           TEXT NOT NULL DEFAULT 'off' CHECK (status IN ('on','allowed','connected','off')),  -- 상태: on(항상 켜짐 · 앱) | allowed(OS 권한 허용됨) | connected(연결됨) | off(설정 안 됨)
-    target           TEXT,                                          -- 보낼 곳 (예: Telegram 채팅방 ID, 이메일 주소)
-    target_label     TEXT,                                          -- 표시 이름 (예: @orchstack_bot · 알림방)
-    key_ref          TEXT,                                          -- 봇 토큰의 키체인 항목 이름
-    create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
-    UNIQUE (workspace_sn, kind)
-);
-
--- 알림 규칙. 이벤트 × 채널 켬/끔 · 연결별로 따로 정할 수 있음
-CREATE TABLE tbl_notify_rule (
-    sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 규칙 번호
-    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
-    connection_sn    INTEGER REFERENCES tbl_connection(sn) ON DELETE SET NULL,         -- 특정 연결만의 규칙 (NULL = 워크스페이스 기본)
-    event_code       TEXT NOT NULL CHECK (event_code IN ('decision_request','approval_request','orch_decided','run_failed','guard_stop','context_warn','quota_low','budget_80','budget_over','connection_error','fallback_used','pr','task_done','daily_summary')),  -- 이벤트: decision_request(결정 요청 L2+) | approval_request(승인 요청) | orch_decided(Orch가 대신 결정) | run_failed(Run 실패) | guard_stop(루프 가드 정지) | context_warn(컨텍스트 경고) | quota_low(구독 잔량 부족) | budget_80(예산 80% 도달) | budget_over(예산 초과) | connection_error(연결 오류 · 키 만료) | fallback_used(폴백 사용) | pr(PR 생성 · 병합) | task_done(태스크 완료) | daily_summary(일일 요약)
-    channel_kind     TEXT NOT NULL CHECK (channel_kind IN ('app','desktop','telegram','email')),  -- 채널: app(앱 내) | desktop(데스크톱) | telegram(Telegram) | email(이메일)
-    is_enabled       INTEGER NOT NULL DEFAULT 1,                    -- 켬/끔
-    update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
-    create_at        TEXT NOT NULL DEFAULT (datetime('now'))       -- 생성 시각
-);
 
 -- 알림 목록. 상단 벨에 쌓이는 알림
 CREATE TABLE tbl_notification (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 알림 번호
     workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
     user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 받는 사용자
-    event_code       TEXT NOT NULL CHECK (event_code IN ('decision_request','approval_request','orch_decided','run_failed','guard_stop','context_warn','quota_low','budget_80','budget_over','connection_error','fallback_used','pr','task_done','daily_summary')),  -- 이벤트 (tbl_notify_rule.event_code 와 같음)
+    event_code       TEXT NOT NULL CHECK (event_code IN ('decision_request','approval_request','orch_decided','run_failed','guard_stop','context_warn','quota_low','budget_80','budget_over','connection_error','fallback_used','pr','task_done','daily_summary')),  -- 이벤트 (tbl_workspace.notify_json 의 event_code 와 같음)
     actor_type       TEXT NOT NULL DEFAULT 'system' CHECK (actor_type IN ('orch','member','system')),  -- 알린 쪽: orch(Orch) | member(멤버) | system(시스템)
     member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 알린 멤버
     title            TEXT NOT NULL,                                 -- 제목
@@ -1074,7 +1000,6 @@ CREATE TABLE tbl_log_audit (
 -- =====================================================================
 
 CREATE INDEX idx_connection_workspace   ON tbl_connection (workspace_sn, kind);
-CREATE INDEX idx_log_quota_connection   ON tbl_log_connection_quota (connection_sn, period, create_at);
 CREATE INDEX idx_member_team            ON tbl_member (team_sn);
 CREATE INDEX idx_issue_project          ON tbl_issue (project_sn, status);
 CREATE INDEX idx_task_project_status    ON tbl_task (project_sn, status);
@@ -1108,7 +1033,6 @@ CREATE INDEX idx_log_audit_workspace    ON tbl_log_audit (workspace_sn, create_a
 
 -- 외래 키 조회 · CASCADE 삭제용 (SQLite는 FK 인덱스를 자동으로 만들지 않음)
 CREATE INDEX idx_task_dependency_depend ON tbl_map_task_dependency (depend_task_sn);
-CREATE INDEX idx_run_step_run           ON tbl_run_step (run_sn, sort);
 CREATE INDEX idx_run_file_run           ON tbl_run_file (run_sn);
 CREATE INDEX idx_context_manifest_run   ON tbl_context_manifest (run_sn);
 CREATE INDEX idx_context_source_manifest ON tbl_context_source (manifest_sn);
@@ -1118,8 +1042,6 @@ CREATE INDEX idx_review_task            ON tbl_review (task_sn);
 CREATE INDEX idx_issue_parent           ON tbl_issue (parent_sn);
 CREATE INDEX idx_map_task_label_label   ON tbl_map_task_label (label_sn);
 CREATE INDEX idx_map_issue_label_label  ON tbl_map_issue_label (label_sn);
-CREATE INDEX idx_map_connection_team    ON tbl_map_connection_team (team_sn);
-CREATE INDEX idx_map_runtime_connection ON tbl_map_runtime_connection (connection_sn);
 CREATE INDEX idx_map_profile_skill      ON tbl_map_profile_skill (skill_sn);
 CREATE INDEX idx_map_profile_mcp        ON tbl_map_profile_mcp (mcp_sn);
 CREATE INDEX idx_template_revision      ON tbl_template_revision (template_sn);
@@ -1130,7 +1052,6 @@ CREATE INDEX idx_template_revision      ON tbl_template_revision (template_sn);
 -- =====================================================================
 
 CREATE UNIQUE INDEX ux_session_num      ON tbl_session (member_sn, num);                     -- 멤버별 세션 번호
-CREATE UNIQUE INDEX ux_notify_rule      ON tbl_notify_rule (workspace_sn, COALESCE(connection_sn, 0), event_code, channel_kind);
 CREATE UNIQUE INDEX ux_run_child        ON tbl_run (parent_run_sn, child_seq);        -- 리드 Run 안 하위 순번 (NULL 여러 개 허용)
 CREATE UNIQUE INDEX ux_event_command     ON tbl_log_event (command_id, command_idx);             -- NULL은 여러 개 허용 · 같은 명령 재전송은 첫 이벤트에서 충돌
 CREATE INDEX idx_log_event_project      ON tbl_log_event (project_sn, sn);
@@ -1190,7 +1111,6 @@ CREATE INDEX idx_fk_message_run_sn ON tbl_message (run_sn);
 CREATE INDEX idx_fk_message_task_sn ON tbl_message (task_sn);
 CREATE INDEX idx_fk_notification_member_sn ON tbl_notification (member_sn);
 CREATE INDEX idx_fk_notification_workspace_sn ON tbl_notification (workspace_sn);
-CREATE INDEX idx_fk_notify_rule_connection_sn ON tbl_notify_rule (connection_sn);
 CREATE INDEX idx_fk_project_team_sn ON tbl_project (team_sn);
 CREATE INDEX idx_fk_project_workspace_sn ON tbl_project (workspace_sn);
 CREATE INDEX idx_fk_report_item_task_sn ON tbl_report_item (task_sn);

@@ -1,5 +1,5 @@
-//! 화면 집계: 팀 통계(Teams KPI · 작업량) · 팀 한도 요약 · 워크스페이스 월 비용. 원천은 tbl_log_token · tbl_task · tbl_run · tbl_connection_quota — 저장하지 않고 응답에서 합친다
-use crate::{connection::Quota, entity::{tbl_agent_profile as ap, tbl_connection as c, tbl_connection_quota as q, tbl_member as mb, tbl_team as tm},
+//! 화면 집계: 팀 통계(Teams KPI · 작업량) · 팀 한도 요약 · 워크스페이스 월 비용. 원천은 tbl_log_token · tbl_task · tbl_run · tbl_connection.quota_json — 저장하지 않고 응답에서 합친다
+use crate::{connection::{Quota, quotas_of}, entity::{tbl_agent_profile as ap, tbl_connection as c, tbl_member as mb, tbl_team as tm},
     error::{Error, ErrorBody, Res, Sn}};
 use axum::{Json, extract::{Query, State}};
 use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, QueryFilter, QueryOrder, Statement, Value};
@@ -143,10 +143,10 @@ async fn quota(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Vec
     conns.extend(profs.iter().flat_map(crate::agent::fallbacks_of).map(|f| f.connection_sn));
     let mut out = Vec::new();
     for cm in c::Entity::find().filter(c::Column::Sn.is_in(conns)).order_by_asc(c::Column::Sn).all(&db).await? {
-        let rows = q::Entity::find().filter(q::Column::ConnectionSn.eq(cm.sn)).order_by_asc(q::Column::Sn).all(&db).await?;
+        let rows = quotas_of(&cm);
         out.push(ConnQuota {
             min_remain_percent: rows.iter().filter_map(|r| r.remain_percent).min(),
-            connection_sn: cm.sn, name: cm.name, kind: cm.kind, status: cm.status, quotas: rows.into_iter().map(Quota::from).collect(),
+            connection_sn: cm.sn, name: cm.name, kind: cm.kind, status: cm.status, quotas: rows,
         });
     }
     Ok(Json(out))
