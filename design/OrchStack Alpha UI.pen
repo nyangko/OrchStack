@@ -63624,6 +63624,95 @@
                           "height": 8
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "sxLtT",
+                      "name": "Example · hover",
+                      "width": 260,
+                      "layout": "vertical",
+                      "gap": 6,
+                      "padding": [
+                        4,
+                        0,
+                        0,
+                        0
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "fI183",
+                          "name": "Tooltip",
+                          "fill": "$foreground",
+                          "cornerRadius": "$radius-sm",
+                          "layout": "vertical",
+                          "gap": 2,
+                          "padding": [
+                            6,
+                            10
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "NutC2",
+                              "name": "t",
+                              "fill": "$background",
+                              "content": "OmniRoute · 월 예산",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "$fw-semibold"
+                            },
+                            {
+                              "type": "text",
+                              "id": "ce7Q7",
+                              "name": "v",
+                              "fill": "$background",
+                              "content": "$12.4 / $30 · 41% · 11월 1일 초기화",
+                              "fontFamily": "$font-sans",
+                              "fontSize": "$text-caption",
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "RwEMy",
+                          "name": "Bar (hover)",
+                          "clip": true,
+                          "width": 200,
+                          "height": 8,
+                          "fill": "$primary-soft",
+                          "cornerRadius": "$radius-full",
+                          "stroke": "$ring",
+                          "strokeWidth": 2,
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "Wkkzr",
+                              "x": 0,
+                              "y": 0,
+                              "name": "Indicator",
+                              "fill": "$primary",
+                              "width": 82,
+                              "height": 8
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "B9JK9",
+                      "name": "Rule · hover",
+                      "fill": "$muted-foreground",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "마우스를 올리거나 Tab으로 포커스하면 툴팁: 1줄 = 무엇(이름), 2줄 = 값 / 한도 · % · 기준(경고선 · 초기화 시각). 따로 주지 않으면 ‘이름 · 몇 %’. 화면에 이미 숫자가 있어도 기준 · 한도는 툴팁에.",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-caption",
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -70088,6 +70177,19 @@
                           ]
                         }
                       ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "BBHiD",
+                      "name": "Rule · hover",
+                      "fill": "$muted-foreground",
+                      "textGrowth": "fixed-width",
+                      "width": 420,
+                      "content": "마우스를 올리면: 그 막대(열)만 진하게 · 나머지 35%로 흐림 · 열 배경 연회색. 툴팁 = 날짜 · 항목별 값(범례 색) · 합계 · 한 줄 메모(선택). 커서 오른쪽, 화면 끝에선 왼쪽. 키보드 ←→로 열 이동 · 같은 툴팁. 예: 비용 상세 ‘목 · 10월 1일’.",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-caption",
+                      "fontWeight": "normal"
                     }
                   ]
                 }
@@ -145109,23 +145211,45 @@
                     "nWBOz": {
                       "content": "최근 7일 · 사용량 과금 $54.6"
                     },
+                    "Ixhwr": {
+                      "opacity": 0.35
+                    },
                     "VxfhO": {
                       "fill": "$status-review"
+                    },
+                    "mVS5S": {
+                      "opacity": 0.35
                     },
                     "gzQBw": {
                       "fill": "$status-review"
                     },
+                    "ywqj7": {
+                      "opacity": 0.35
+                    },
                     "fctKc": {
                       "fill": "$status-review"
+                    },
+                    "MIgFb": {
+                      "fill": "$muted",
+                      "cornerRadius": "$radius-sm"
                     },
                     "GJz9n": {
                       "fill": "$status-review"
                     },
+                    "BSCVZ": {
+                      "opacity": 0.35
+                    },
                     "IqT8N": {
                       "fill": "$status-review"
                     },
+                    "a8zIpy": {
+                      "opacity": 0.35
+                    },
                     "V4rth": {
                       "fill": "$status-review"
+                    },
+                    "GgnYi": {
+                      "opacity": 0.35
                     },
                     "A2T4qQ": {
                       "fill": "$status-review"
@@ -145975,6 +146099,196 @@
                           ]
                         }
                       ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "kvNy8",
+                  "layoutPosition": "absolute",
+                  "x": 462,
+                  "y": 142,
+                  "name": "Tooltip · 목 (hover)",
+                  "width": 196,
+                  "fill": "$popover",
+                  "cornerRadius": "$radius-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#0000001F",
+                    "offset": {
+                      "x": 0,
+                      "y": 6
+                    },
+                    "blur": 18
+                  },
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "LImO5",
+                      "name": "day",
+                      "fill": "$foreground",
+                      "content": "목 · 10월 1일",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-xs",
+                      "fontWeight": "$fw-semibold"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "YVQrG",
+                      "name": "API 키",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "SmPdH",
+                          "name": "sw",
+                          "fill": "$primary",
+                          "width": 8,
+                          "height": 8
+                        },
+                        {
+                          "type": "text",
+                          "id": "agHW2",
+                          "name": "l",
+                          "fill": "$muted-foreground",
+                          "content": "API 키",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "jiUse",
+                          "name": "sp",
+                          "width": "fill_container",
+                          "height": 1
+                        },
+                        {
+                          "type": "text",
+                          "id": "f9L94",
+                          "name": "v",
+                          "fill": "$foreground",
+                          "content": "$9.8",
+                          "fontFamily": "$font-mono",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "qhK4L",
+                      "name": "게이트웨이",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "WMty9",
+                          "name": "sw",
+                          "fill": "$status-review",
+                          "width": 8,
+                          "height": 8
+                        },
+                        {
+                          "type": "text",
+                          "id": "utdpf",
+                          "name": "l",
+                          "fill": "$muted-foreground",
+                          "content": "게이트웨이",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "K6ZQb",
+                          "name": "sp",
+                          "width": "fill_container",
+                          "height": 1
+                        },
+                        {
+                          "type": "text",
+                          "id": "hHO7H",
+                          "name": "v",
+                          "fill": "$foreground",
+                          "content": "$0.8",
+                          "fontFamily": "$font-mono",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "CvfRv",
+                      "name": "합계",
+                      "width": "fill_container",
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "top": 1
+                      },
+                      "gap": 6,
+                      "padding": [
+                        6,
+                        0,
+                        0,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "a69MB",
+                          "name": "l",
+                          "fill": "$foreground",
+                          "content": "합계",
+                          "fontFamily": "$font-sans",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-semibold"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "U9DD2w",
+                          "name": "sp",
+                          "width": "fill_container",
+                          "height": 1
+                        },
+                        {
+                          "type": "text",
+                          "id": "l5VLL",
+                          "name": "v",
+                          "fill": "$foreground",
+                          "content": "$10.6",
+                          "fontFamily": "$font-mono",
+                          "fontSize": "$text-caption",
+                          "fontWeight": "$fw-semibold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "VX0Kz",
+                      "name": "top",
+                      "fill": "$muted-foreground",
+                      "content": "가장 많이 쓴 멤버 · 민수 $4.2",
+                      "fontFamily": "$font-sans",
+                      "fontSize": "$text-2xs",
+                      "fontWeight": "normal"
                     }
                   ]
                 }
