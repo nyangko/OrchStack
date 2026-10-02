@@ -322,7 +322,7 @@
 								<span class="w-28"><StatusBadge status={t.status} /></span>
 								<span class="flex w-36 items-center gap-2">
 									{#if t.steps[1]}
-										<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="#{t.num} 완료 조건" />
+										<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="#{t.num} 완료 조건" tip={`#${t.num} 완료 조건\n${t.steps[0]} / ${t.steps[1]} 완료`} />
 										<span class="font-mono text-caption text-muted-foreground">{t.steps[0]}/{t.steps[1]}</span>
 									{:else}
 										<span class="text-caption text-muted-foreground">{t.priority} · 조건 없음</span>

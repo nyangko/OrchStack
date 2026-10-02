@@ -135,7 +135,7 @@
 	{/if}
 	{#if data.progress}
 		<div class="flex items-center gap-2">
-			<Progress value={data.progress.value} class="h-1" aria-label="진행" />
+			<Progress value={data.progress.value} class="h-1" aria-label="진행" tip={`${data.ref} 진행\n${data.progress.text} · ${Math.round(data.progress.value)}%`} />
 			<span class="mono-meta shrink-0">{data.progress.text}</span>
 		</div>
 	{/if}

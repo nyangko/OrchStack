@@ -243,7 +243,7 @@
 			<!-- 심볼이 로고의 O와 같아 여기선 글자만 둔다 -->
 			<span class="text-2xl font-semibold">OrchStack</span>
 			<span class="text-xs text-muted-foreground">이 기기에서 실행기(CLI)를 찾는 중… {found} / {clis.length}</span>
-			<Progress value={(found / clis.length) * 100} class="h-1 w-60" aria-label="실행기 찾기" />
+			<Progress value={(found / clis.length) * 100} class="h-1 w-60" aria-label="실행기 찾기" tip={`실행기 찾기\n${found} / ${clis.length}개 확인`} />
 			<span class="font-mono text-caption text-subtle-foreground">v0.1 Alpha</span>
 		</div>
 	{:else}
@@ -293,7 +293,7 @@
 							{#if c.state === 'ok'}
 								{#each [['5H', c.h5], ['주간', c.week]] as const as [l, v] (l)}
 									<span class="menu-line rounded-sm border text-caption">
-										{l}<Progress value={v} class="h-1 w-10 bg-muted" indicator={low(v) ? 'bg-destructive' : 'bg-success'} aria-label="{c.plan} {l} 잔량" />
+										{l}<Progress value={v} class="h-1 w-10 bg-muted" indicator={low(v) ? 'bg-destructive' : 'bg-success'} aria-label="{c.plan} {l} 잔량" tip={`${c.plan} · ${l}\n${v}% 남음`} />
 										<span class={['font-mono', low(v) ? 'text-destructive' : 'text-status-done']}>{v}%</span>
 									</span>
 								{/each}

@@ -169,7 +169,7 @@
 					</div>
 					<div class="flex flex-col gap-1.5">
 						<span class="flex text-caption"><span class="flex-1 text-muted-foreground">이슈 진행</span>{#if st.issuesAll}<span class="font-mono font-semibold">{st.issuesDone} / {st.issuesAll}</span>{:else}<span class="text-muted-foreground">이슈 없음</span>{/if}</span>
-						<Progress value={st.issuesAll ? (st.issuesDone / st.issuesAll) * 100 : 0} class="h-1.5" aria-label="{p.name} 이슈 진행" />
+						<Progress value={st.issuesAll ? (st.issuesDone / st.issuesAll) * 100 : 0} class="h-1.5" aria-label="{p.name} 이슈 진행" tip={`${p.name} 이슈 진행\n${st.issuesAll ? `${st.issuesDone} / ${st.issuesAll} 완료` : "이슈 없음"}`} />
 					</div>
 					<div class="flex items-center gap-1.5 border-t pt-3 text-caption text-muted-foreground">
 						{#if archived(p)}<Archive class="size-3" />{:else}<ActivityIcon class="size-3" />{/if}

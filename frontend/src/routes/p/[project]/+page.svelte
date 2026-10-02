@@ -911,7 +911,7 @@
 		</TableCell>
 		<TableCell>
 			<span class="flex items-center gap-2">
-				<Progress value={all.length ? (done / all.length) * 100 : 0} class="h-1.5" aria-label="#{i.num} 진행" />
+				<Progress value={all.length ? (done / all.length) * 100 : 0} class="h-1.5" aria-label="#{i.num} 진행" tip={`#${i.num} 진행\n태스크 ${done} / ${all.length} 완료`} />
 				<span class="font-mono text-xs text-muted-foreground">{done}/{all.length}</span>
 			</span>
 		</TableCell>
@@ -948,7 +948,7 @@
 				<TableCell>
 					<span class="flex items-center gap-2">
 						{#if t.steps[1]}
-							<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="#{t.num} 진행" />
+							<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="#{t.num} 진행" tip={`#${t.num} 완료 조건\n${t.steps[0]} / ${t.steps[1]} 완료`} />
 							<span class="font-mono text-xs text-muted-foreground">{t.steps[0]}/{t.steps[1]}</span>
 						{:else}
 							<span class="font-mono text-xs text-subtle-foreground">no steps</span>
@@ -1231,7 +1231,7 @@
 															</span>
 															<span class="flex items-center gap-2 pt-1.5">
 																{#if t.steps[1]}
-																	<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="완료 조건 진행" />
+																	<Progress value={(t.steps[0] / t.steps[1]) * 100} class="h-1.5" aria-label="완료 조건 진행" tip={`완료 조건\n${t.steps[0]} / ${t.steps[1]} 완료`} />
 																	<span class="shrink-0 font-mono text-xs font-semibold whitespace-nowrap text-muted-foreground">
 																		{t.steps[0]}/{t.steps[1]} · {Math.round((t.steps[0] / t.steps[1]) * 100)}%
 																	</span>
@@ -1292,7 +1292,7 @@
 									{#if ctx}
 										<div class="flex flex-col gap-1.5 pt-1.5">
 											<div class="flex text-xs font-medium"><span class="flex-1 text-muted-foreground">Context</span><span class={ctx[0] / ctx[1] > 0.9 ? 'text-warning' : ''}>{ctx[0]}K / {ctx[1]}K</span></div>
-											<Progress value={(ctx[0] / ctx[1]) * 100} class="h-2" aria-label="컨텍스트" />
+											<Progress value={(ctx[0] / ctx[1]) * 100} class="h-2" aria-label="컨텍스트" tip={`Run 컨텍스트\n${ctx[0]} / ${ctx[1]} · ${Math.round((ctx[0] / ctx[1]) * 100)}% · 90% 넘으면 경고`} />
 										</div>
 										{#if ctx[0] / ctx[1] > 0.9}<p class="font-medium text-warning">⚠ Context {Math.round((ctx[0] / ctx[1]) * 100)}% — 요약 또는 새 Session 권장</p>{/if}
 									{/if}
@@ -1534,7 +1534,7 @@
 									<section class="flex flex-col gap-2">
 										<h3 class="text-body font-semibold">Tokens · this task</h3>
 										<div class="flex items-center justify-between text-xs"><span class="text-muted-foreground">Run context</span><span class="font-mono">{info.context[0]}K / {info.context[1]}K</span></div>
-										<Progress value={(info.context[0] / info.context[1]) * 100} class="h-1.5" aria-label="컨텍스트 사용" />
+										<Progress value={(info.context[0] / info.context[1]) * 100} class="h-1.5" aria-label="컨텍스트 사용" tip={`Run 컨텍스트\n${info.context[0]}K / ${info.context[1]}K · ${Math.round((info.context[0] / info.context[1]) * 100)}%`} />
 									</section>
 								{/if}
 								{#if info?.git}
@@ -1576,7 +1576,7 @@
 							<div class="flex flex-wrap items-center gap-3 pl-11">
 								<span class={['label-xs', icon.text]}><icon.icon class="size-3.5" />{issueLabel[iss.status]}</span>
 								<span class="flex w-40 items-center gap-2">
-									<Progress value={all.length ? (done / all.length) * 100 : 0} class="h-1.5" aria-label="#{iss.num} 진행" />
+									<Progress value={all.length ? (done / all.length) * 100 : 0} class="h-1.5" aria-label="#{iss.num} 진행" tip={`#${iss.num} 진행\n태스크 ${done} / ${all.length} 완료`} />
 									<span class="font-mono text-xs text-muted-foreground">{done}/{all.length}</span>
 								</span>
 								{#if who.length}
@@ -1774,7 +1774,7 @@
 											<span class="flex-1 truncate text-body font-semibold">#{now.num} · {now.title}</span>
 											<span class="font-mono text-xs font-semibold text-status-in-progress">{Math.round((now.steps[0] / Math.max(1, now.steps[1])) * 100)}%</span>
 										</span>
-										<Progress value={(now.steps[0] / Math.max(1, now.steps[1])) * 100} class="h-1.5" indicator="bg-status-in-progress" aria-label="#{now.num} 진행" />
+										<Progress value={(now.steps[0] / Math.max(1, now.steps[1])) * 100} class="h-1.5" indicator="bg-status-in-progress" aria-label="#{now.num} 진행" tip={`#${now.num} 완료 조건\n${now.steps[0]} / ${now.steps[1]} 완료${now.run ? ` · Run ${now.run}` : ""}`} />
 										<span class="flex items-center gap-1.5 font-mono text-caption text-muted-foreground"><LoaderCircle class="size-3 text-status-in-progress" />완료 조건 {now.steps[0]}/{now.steps[1]}{now.run ? ` · Run ${now.run}` : ''}</span>
 									</button>
 								{:else}
@@ -2031,7 +2031,7 @@
 													<span class="flex-1"></span>
 													<span class="font-mono text-caption text-subtle-foreground">연속 자동 {k.streak[0]} / {k.streak[1]}</span>
 												</div>
-												<Progress value={(k.seconds / 4) * 100} class="h-1 bg-primary-soft" aria-label="자동 진행까지" />
+												<Progress value={(k.seconds / 4) * 100} class="h-1 bg-primary-soft" aria-label="자동 진행까지" tip={`자동 진행까지\n${k.seconds}초 · 개입하면 멈춰요`} />
 											</div>
 											<div class="flex flex-wrap items-center gap-1.5">
 												<Button size="sm" onclick={() => assignNext(k)}><Play />지금 진행</Button>
@@ -2122,7 +2122,7 @@
 										<p>{k.desc}</p>
 										<div class="flex flex-col gap-1.5 py-1.5">
 											<div class="flex items-center gap-2"><Terminal class="size-3.5 text-muted-foreground" /><span class="flex-1 text-muted-foreground">{k.label}</span><span class="font-mono font-medium text-status-blocked">{k.used}%</span><span class="font-mono text-subtle-foreground">· {k.reset}</span></div>
-											<Progress value={k.used} class="h-1.5 bg-muted" indicator="bg-status-blocked" aria-label={k.label} />
+											<Progress value={k.used} class="h-1.5 bg-muted" indicator="bg-status-blocked" aria-label={k.label} tip={`${k.label}\n${k.used}% 사용 · ${k.reset}`} />
 										</div>
 										{#if k.done}
 											<p class="saved-note"><Check class="size-3" />{k.done}</p>

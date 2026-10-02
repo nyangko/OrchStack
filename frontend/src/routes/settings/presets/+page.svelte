@@ -203,7 +203,7 @@
 			{/key}
 
 			<div class="meta-xs gap-3">
-				<Progress value={Math.min(100, (tok / sel.limit) * 100)} class="h-1.5 w-60 bg-muted" indicator={tok > sel.limit ? 'bg-destructive' : 'bg-status-done'} aria-label="토큰 상한" />
+				<Progress value={Math.min(100, (tok / sel.limit) * 100)} class="h-1.5 w-60 bg-muted" indicator={tok > sel.limit ? 'bg-destructive' : 'bg-status-done'} aria-label="토큰 상한" tip={`토큰 상한\n${tok} / ${sel.limit} tok${tok > sel.limit ? " · 넘어서 저장할 수 없어요" : ""}`} />
 				<span><span class="font-mono">{tok} / {sel.limit} tok</span> · {lang} · {vars ? `변수 ${vars}` : '변수 없음'}</span>
 			</div>
 

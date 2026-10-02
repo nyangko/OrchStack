@@ -37,7 +37,7 @@
 		<span class="font-mono text-subtle-foreground">{max}</span>
 	</span>
 	<span class="relative">
-		<Progress {value} class="h-1.5 bg-muted" indicator={cn("rounded-full", warn && "bg-status-blocked")} aria-label={label} />
+		<Progress {value} class="h-1.5 bg-muted" indicator={cn("rounded-full", warn && "bg-status-blocked")} aria-label={label} tip={`${label}\n${used} ${max}${mark ? ` · 경고선 ${mark}%` : ""}${note ? ` · ${note}` : ""}`} />
 		{#if mark}<span class="absolute top-0 h-full w-0.5 bg-card" style="left: {mark}%"></span>{/if}
 	</span>
 	{#if note}<span class={cn("text-caption", warn ? "text-status-blocked" : "text-muted-foreground")}>{note}</span>{/if}

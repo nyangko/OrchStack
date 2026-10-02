@@ -349,7 +349,7 @@
 								{@const tone = money ? 'text-primary' : v < 20 ? 'text-status-blocked' : 'text-status-done'}
 								<span class="flex shrink-0 items-center gap-1.5 rounded-sm border bg-card px-2 py-1">
 									<span class="text-2xs font-semibold text-muted-foreground">{q.label}</span>
-									<Progress value={v} class="h-1 w-8 bg-muted" indicator={money ? 'bg-primary' : v < 20 ? 'bg-status-blocked' : 'bg-status-done'} aria-label="{c.name} {q.label}" />
+									<Progress value={v} class="h-1 w-8 bg-muted" indicator={money ? 'bg-primary' : v < 20 ? 'bg-status-blocked' : 'bg-status-done'} aria-label="{c.name} {q.label}" tip={`${c.name} · ${q.label}\n${money ? `$${q.used} / $${q.limit} · ${Math.round(v)}%` : `${q.pct}% 남음${v < 20 ? " · 20% 미만 경고" : ""}`}`} />
 									<span class={['font-mono text-caption font-semibold', tone]}>{money ? `$${q.used}/$${q.limit}` : `${q.pct}%`}</span>
 								</span>
 							{/each}
@@ -449,7 +449,7 @@
 							<span class="font-mono font-medium">${c.used}</span>
 							<span class="text-subtle-foreground"><span class="font-mono">/ {c.limit ? `$${c.limit}` : ''}</span>{c.limit ? '' : '월'}</span>
 						</span>
-						<Progress value={c.limit ? (c.used / c.limit) * 100 : 100} class="h-1.5 bg-muted" indicator={c.limit ? 'bg-primary' : 'bg-muted-foreground'} aria-label="{c.label} 사용액" />
+						<Progress value={c.limit ? (c.used / c.limit) * 100 : 100} class="h-1.5 bg-muted" indicator={c.limit ? 'bg-primary' : 'bg-muted-foreground'} aria-label="{c.label} 사용액" tip={`${c.label}\n${c.limit ? `$${c.used} / $${c.limit} · ${Math.round((c.used / c.limit) * 100)}%` : `$${c.used} · 월정액`}`} />
 						{#if c.note}<span class="text-caption text-muted-foreground">{c.note}</span>{/if}
 					</div>
 				{/each}
@@ -491,7 +491,7 @@
 						{#if q.limit !== undefined}
 							<LimitRow icon={Gauge} label={q.label} used={usd(q.used ?? 0)} max="/ {usd(q.limit)}" value={((q.used ?? 0) / q.limit) * 100} />
 						{:else}
-							<LimitRow icon={Gauge} label={q.label} used="{q.pct ?? 0}%" max="남음" value={q.pct ?? 0} warn={(q.pct ?? 0) < 20} />
+							<LimitRow icon={Gauge} label={q.label} used="{q.pct ?? 0}%" max="남음" value={q.pct ?? 0} warn={(q.pct ?? 0) < 20} note={(q.pct ?? 0) < 20 ? "20% 미만 경고" : undefined} />
 						{/if}
 					{:else}
 						<p class="text-xs text-muted-foreground">이 연결은 한도를 표시하지 않아요.</p>
@@ -583,7 +583,7 @@
 						<div class="flex items-center gap-3 border-b px-3.5 py-2.5 last:border-b-0">
 							<span class="w-55 truncate text-xs font-medium">{r.name}</span>
 							<span class="w-28 text-caption text-muted-foreground">{r.kind}</span>
-							<Progress value={r.ratio * 100} class="h-1.5 flex-1 bg-muted" indicator={r.tone} aria-label="{r.name} 사용" />
+							<Progress value={r.ratio * 100} class="h-1.5 flex-1 bg-muted" indicator={r.tone} aria-label="{r.name} 사용" tip={`${r.name} · ${r.kind}\n${r.amount}${r.ratio < 1 ? ` · ${Math.round(r.ratio * 100)}%` : ""}`} />
 							<span class="w-30 text-right font-mono text-xs font-semibold">{r.amount}</span>
 						</div>
 					{/each}
@@ -596,7 +596,7 @@
 						<div class="flex items-center gap-3 border-b px-3.5 py-2.5 last:border-b-0">
 							<span class="w-55 text-xs font-medium">{m.name}</span>
 							<span class="w-28 text-caption text-muted-foreground">{m.runtime}</span>
-							<Progress value={(m.used / memberCost[0].used) * 56} class="h-1.5 flex-1 bg-muted" aria-label="{m.name} 사용" />
+							<Progress value={(m.used / memberCost[0].used) * 56} class="h-1.5 flex-1 bg-muted" aria-label="{m.name} 사용" tip={`${m.name}\n${usd(m.used)} · 이번 달 사용량 과금`} />
 							<span class="w-30 text-right font-mono text-xs font-semibold">{usd(m.used)}</span>
 						</div>
 					{/each}

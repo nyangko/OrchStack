@@ -587,14 +587,14 @@
 									</TableCell>
 									<TableCell>
 										<span class="flex items-center gap-2">
-											<Progress value={m.context} class="h-1.5 bg-muted" indicator={full ? 'bg-status-blocked' : undefined} aria-label="{m.name} 컨텍스트" />
+											<Progress value={m.context} class="h-1.5 bg-muted" indicator={full ? 'bg-status-blocked' : undefined} aria-label="{m.name} 컨텍스트" tip={`${m.name} 컨텍스트\n${m.context}% · 경고선 ${tp.contextWarn}%${full ? " · 요약 · 새 세션 제안" : ""}`} />
 											<span class={['font-mono text-caption', full ? 'font-semibold text-status-blocked' : 'text-muted-foreground']}>{m.context}%</span>
 										</span>
 									</TableCell>
 									<TableCell>
 										<span class="flex items-center gap-1.5 text-caption">
 											<span class="font-medium text-muted-foreground">주</span>
-											<Progress value={week} class="h-1 w-16 bg-muted" indicator={low(week) ? 'bg-destructive' : 'bg-success'} aria-label="{m.name} 주간 잔량" />
+											<Progress value={week} class="h-1 w-16 bg-muted" indicator={low(week) ? 'bg-destructive' : 'bg-success'} aria-label="{m.name} 주간 잔량" tip={`${m.name} · 주간 잔량\n${week}% 남음 · ${teamPolicy.quotaWarn}% 미만이면 경고`} />
 											<span class={['font-mono', low(week) ? 'font-semibold text-destructive' : 'font-medium']}>{week}%</span>
 										</span>
 									</TableCell>
@@ -667,7 +667,7 @@
 											<span class={['font-semibold', low(q.pct) && 'text-destructive']}><span class="font-mono">{q.pct}%</span> 남음</span>
 											<span class="text-subtle-foreground">· {q.reset} 리셋</span>
 										</span>
-										<Progress value={q.pct} class="h-1.5 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" />
+										<Progress value={q.pct} class="h-1.5 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" tip={`${a.name} · ${q.label}\n${q.pct}% 남음 · ${q.reset} 리셋`} />
 									</div>
 								{/each}
 							</div>
@@ -1157,7 +1157,7 @@
 										<span class="flex-1 font-medium">#{now.num} · {now.title}</span>
 										<span class="font-mono text-xs font-semibold">{det.now.pct}%</span>
 									</div>
-									<Progress value={det.now.pct} class="h-1.5" aria-label="#{now.num} 진행" />
+									<Progress value={det.now.pct} class="h-1.5" aria-label="#{now.num} 진행" tip={`#${now.num} 진행\n${det.now.pct}% · Run #${det.now.run} · ETA ${det.now.eta}`} />
 									<div class="flex flex-wrap gap-4 text-xs text-muted-foreground">
 										<span class="flex items-center gap-1.5"><LoaderCircle class="size-3" />Run #{det.now.run} · {det.now.elapsed}</span>
 										<span class="flex items-center gap-1.5"><GitBranch class="size-3" />{det.now.branch} · {det.now.commits} commits</span>
@@ -1290,7 +1290,7 @@
 									{#each [['Orch 자동 배정', det.source.orch], ['사용자 수동', det.source.manual]] as const as [l, n] (l)}
 										<div class="flex flex-col gap-1">
 											<span class="flex text-xs"><span class="flex-1 text-muted-foreground">{l}</span><span class="font-mono font-medium">{n}</span></span>
-											<Progress value={(n / (det.source.orch + det.source.manual)) * 100} class="h-1.5 bg-muted" aria-label={l} />
+											<Progress value={(n / (det.source.orch + det.source.manual)) * 100} class="h-1.5 bg-muted" aria-label={l} tip={`${l}\n${n}건 · ${Math.round((n / (det.source.orch + det.source.manual)) * 100)}%`} />
 										</div>
 									{/each}
 								</CardContent>
@@ -1431,7 +1431,7 @@
 											<span class="text-xs font-medium">{r.name} · {r.label}</span>
 											<span class="text-caption text-muted-foreground">{r.note}</span>
 										</span>
-										<Progress value={r.value} class="h-1.5 bg-muted" aria-label="{r.name} 협업 빈도" />
+										<Progress value={r.value} class="h-1.5 bg-muted" aria-label="{r.name} 협업 빈도" tip={`${r.name} · ${r.label}\n${r.note}`} />
 									</div>
 								{/each}
 							</CardContent>
@@ -1469,7 +1469,7 @@
 												<span class={['font-semibold', low(q.pct) && 'text-destructive']}><span class="font-mono">{q.pct}%</span> 남음</span>
 												<span class="text-subtle-foreground">· {q.reset} 리셋</span>
 											</span>
-											<Progress value={q.pct} class="h-1.5 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" />
+											<Progress value={q.pct} class="h-1.5 bg-muted" indicator={low(q.pct) ? 'bg-destructive' : 'bg-success'} aria-label="{a.name} {q.label} 잔량" tip={`${a.name} · ${q.label}\n${q.pct}% 남음 · ${q.reset} 리셋`} />
 										</div>
 									{/each}
 								</div>
