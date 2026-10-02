@@ -39,6 +39,10 @@
 	});
 	const tabs = $derived(store.projects.filter((p) => open.includes(p.sn)));
 	const current = $derived(Number(page.params.project));
+	// 닫힌 프로젝트를 All Projects 등에서 열면 탭을 다시 연다
+	$effect(() => {
+		if (current && !open.includes(current) && store.projects.some((p) => p.sn === current)) open = [...open, current];
+	});
 
 	/// 탭을 닫고, 보고 있던 탭이면 옆 탭(없으면 All Projects)으로 이동한다.
 	function close(sn: number) {
