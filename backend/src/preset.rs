@@ -167,12 +167,12 @@ async fn preset(db: &impl ConnectionTrait, sn: i64) -> Res<ip::Model> {
 #[allow(clippy::too_many_arguments)]
 async fn insert(tx: &DatabaseTransaction, kind: &str, key: &str, name: &str, description: Option<String>, limit: i64, content: &str, language: &str, source: &str, copy_from: Option<i64>) -> Res<(Preset, Ev)> {
     let m = ip::ActiveModel {
-        wid: Set(crate::WID), kind: Set(kind.into()), preset_key: Set(key.into()), name: Set(name.into()), description: Set(description), limit_tok: Set(limit),
-        copy_from_sn: Set(copy_from), uid: Set(Some(crate::UID)), ..Default::default()
+        workspace_sn: Set(crate::WORKSPACE), kind: Set(kind.into()), preset_key: Set(key.into()), name: Set(name.into()), description: Set(description), limit_tok: Set(limit),
+        copy_from_sn: Set(copy_from), user_sn: Set(Some(crate::USER)), ..Default::default()
     }.insert(tx).await?;
     iv::ActiveModel {
         preset_sn: Set(m.sn), version: Set(1), content: Set(content.into()), token_count: Set(tokens(content)), language: Set(language.into()), source: Set(source.into()),
-        uid: Set(Some(crate::UID)), ..Default::default()
+        user_sn: Set(Some(crate::USER)), ..Default::default()
     }.insert(tx).await?;
     let ev = Ev::new(None, "preset", m.sn, "PresetCreated", &json!({ "kind": kind, "preset_key": key, "copy_from_sn": copy_from }));
     Ok((Preset::from(m), ev))
@@ -187,7 +187,7 @@ async fn bump(tx: &DatabaseTransaction, cur: &ip::Model, content: &str, note: Op
     let version = cur.version + 1;
     iv::ActiveModel {
         preset_sn: Set(cur.sn), version: Set(version), content: Set(content.into()), token_count: Set(tokens(content)), language: Set(language.into()), source: Set(source.into()),
-        change_note: Set(note.clone()), uid: Set(Some(crate::UID)), ..Default::default()
+        change_note: Set(note.clone()), user_sn: Set(Some(crate::USER)), ..Default::default()
     }.insert(tx).await?;
     let mut u = ip::Entity::update_many().filter(ip::Column::Sn.eq(cur.sn)).col_expr(ip::Column::Version, version.into()).col_expr(ip::Column::LimitTok, limit.into())
         .col_expr(ip::Column::UpdateAt, Expr::cust("datetime('now')"));
@@ -319,7 +319,7 @@ async fn set_form(State(db): State<DatabaseConnection>, Path(key): Path<String>,
         if let Some(v) = &b.name { u = u.col_expr(rf::Column::Name, v.clone().into()); }
         u.exec(tx).await?;
         let out = Form::from(form_of(tx, &key).await?);
-        Ok((out, vec![Ev::new(None, "workspace", crate::WID, "ReportFormUpdated", &json!({ "form_key": key, "version": cur.version + 1 }))]))
+        Ok((out, vec![Ev::new(None, "workspace", crate::WORKSPACE, "ReportFormUpdated", &json!({ "form_key": key, "version": cur.version + 1 }))]))
     }).await?;
     Ok(Json(out))
 }

@@ -42,7 +42,7 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
 #[derive(Serialize, ToSchema)]
 pub struct Profile {
     sn: i64,
-    wid: i64,
+    workspace_sn: i64,
     /// workspace | template | member
     kind: String,
     runtime_sn: Option<i64>,
@@ -72,7 +72,7 @@ pub struct Profile {
 impl From<p::Model> for Profile {
     fn from(m: p::Model) -> Self {
         Self {
-            sn: m.sn, wid: m.wid, kind: m.kind, runtime_sn: m.runtime_sn, connection_sn: m.connection_sn, model_sn: m.model_sn,
+            sn: m.sn, workspace_sn: m.workspace_sn, kind: m.kind, runtime_sn: m.runtime_sn, connection_sn: m.connection_sn, model_sn: m.model_sn,
             effort: m.effort, session_mode: m.session_mode, repo_rule_mode: m.repo_rule_mode, workdir: m.workdir,
             trust_level: m.trust_level, github_mode: m.github_mode, network_mode: m.network_mode, run_token_limit: m.run_token_limit,
             context_warn_percent: m.context_warn_percent, run_time_limit_min: m.run_time_limit_min, auto_retry_max: m.auto_retry_max,
@@ -234,7 +234,7 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ProfileNew>)
     let kind = b.kind.unwrap_or_else(|| "workspace".into());
     check(Some(&kind), None)?;
     let out = event::run(&db, async |tx| {
-        let out = Profile::from(p::ActiveModel { wid: Set(crate::WID), kind: Set(kind), ..Default::default() }.insert(tx).await?);
+        let out = Profile::from(p::ActiveModel { workspace_sn: Set(crate::WORKSPACE), kind: Set(kind), ..Default::default() }.insert(tx).await?);
         let ev = Ev::new(None, "profile", out.sn, "ProfileCreated", &out);
         Ok((out, vec![ev]))
     }).await?;

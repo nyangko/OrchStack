@@ -21,7 +21,7 @@ pub struct Model {
     pub github_number: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub github_url: Option<String>,
-    pub uid: Option<i64>,
+    pub user_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
     #[sea_orm(column_type = "Text")]
@@ -42,6 +42,8 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     SelfRef,
+    #[sea_orm(has_many = "super::tbl_map_issue_label::Entity")]
+    TblMapIssueLabel,
     #[sea_orm(has_many = "super::tbl_orch_proposal::Entity")]
     TblOrchProposal,
     #[sea_orm(
@@ -56,8 +58,8 @@ pub enum Relation {
     TblTask,
     #[sea_orm(
         belongs_to = "super::tbl_user::Entity",
-        from = "Column::Uid",
-        to = "super::tbl_user::Column::Uid",
+        from = "Column::UserSn",
+        to = "super::tbl_user::Column::Sn",
         on_update = "NoAction",
         on_delete = "SetNull"
     )]
@@ -67,6 +69,12 @@ pub enum Relation {
 impl Related<super::tbl_interaction::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblInteraction.def()
+    }
+}
+
+impl Related<super::tbl_map_issue_label::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblMapIssueLabel.def()
     }
 }
 

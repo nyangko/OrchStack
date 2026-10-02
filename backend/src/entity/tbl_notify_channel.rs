@@ -7,7 +7,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub sn: i64,
-    pub wid: i64,
+    pub workspace_sn: i64,
     #[sea_orm(column_type = "Text")]
     pub kind: String,
     #[sea_orm(column_type = "Text")]
@@ -28,7 +28,7 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::tbl_workspace::Entity",
-        from = "Column::Wid",
+        from = "Column::WorkspaceSn",
         to = "super::tbl_workspace::Column::Sn",
         on_update = "NoAction",
         on_delete = "Cascade"

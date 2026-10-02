@@ -93,7 +93,7 @@ async fn create(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
         let num = next_num(tx, sn).await?;
         let m = i::ActiveModel {
             project_sn: Set(sn), parent_sn: Set(b.parent_sn), num: Set(num), title: Set(b.title), body: Set(b.body),
-            uid: Set(Some(crate::UID)), ..Default::default()
+            user_sn: Set(Some(crate::USER)), ..Default::default()
         }.insert(tx).await?;
         let out = Issue::from(m);
         let ev = Ev::new(Some(sn), "issue", out.sn, "IssueCreated", &out);

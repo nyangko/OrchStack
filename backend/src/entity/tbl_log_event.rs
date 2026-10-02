@@ -7,7 +7,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub sn: i64,
-    pub wid: i64,
+    pub workspace_sn: i64,
     pub project_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
     pub aggregate_type: String,
@@ -24,7 +24,7 @@ pub struct Model {
     pub command_idx: i64,
     #[sea_orm(column_type = "Text")]
     pub actor_type: String,
-    pub uid: Option<i64>,
+    pub user_sn: Option<i64>,
     pub member_sn: Option<i64>,
     pub run_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
@@ -33,6 +33,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::tbl_interaction::Entity")]
+    TblInteraction,
     #[sea_orm(has_many = "super::tbl_log_activity::Entity")]
     TblLogActivity,
     #[sea_orm(
@@ -43,6 +45,10 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     TblMember,
+    #[sea_orm(has_many = "super::tbl_notification::Entity")]
+    TblNotification,
+    #[sea_orm(has_many = "super::tbl_orch_proposal::Entity")]
+    TblOrchProposal,
     #[sea_orm(
         belongs_to = "super::tbl_project::Entity",
         from = "Column::ProjectSn",
@@ -61,20 +67,26 @@ pub enum Relation {
     TblRun,
     #[sea_orm(
         belongs_to = "super::tbl_user::Entity",
-        from = "Column::Uid",
-        to = "super::tbl_user::Column::Uid",
+        from = "Column::UserSn",
+        to = "super::tbl_user::Column::Sn",
         on_update = "NoAction",
         on_delete = "SetNull"
     )]
     TblUser,
     #[sea_orm(
         belongs_to = "super::tbl_workspace::Entity",
-        from = "Column::Wid",
+        from = "Column::WorkspaceSn",
         to = "super::tbl_workspace::Column::Sn",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
     TblWorkspace,
+}
+
+impl Related<super::tbl_interaction::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblInteraction.def()
+    }
 }
 
 impl Related<super::tbl_log_activity::Entity> for Entity {
@@ -86,6 +98,18 @@ impl Related<super::tbl_log_activity::Entity> for Entity {
 impl Related<super::tbl_member::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblMember.def()
+    }
+}
+
+impl Related<super::tbl_notification::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblNotification.def()
+    }
+}
+
+impl Related<super::tbl_orch_proposal::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblOrchProposal.def()
     }
 }
 

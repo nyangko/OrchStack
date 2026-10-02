@@ -36,7 +36,7 @@ pub struct Model {
     pub pr_status: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub create_by: String,
-    pub uid: Option<i64>,
+    pub user_sn: Option<i64>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,
     #[sea_orm(column_type = "Text")]
@@ -99,8 +99,8 @@ pub enum Relation {
     TblTaskCriterion,
     #[sea_orm(
         belongs_to = "super::tbl_user::Entity",
-        from = "Column::Uid",
-        to = "super::tbl_user::Column::Uid",
+        from = "Column::UserSn",
+        to = "super::tbl_user::Column::Sn",
         on_update = "NoAction",
         on_delete = "SetNull"
     )]

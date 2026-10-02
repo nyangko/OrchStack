@@ -6,8 +6,8 @@
 --   tbl_<이름>        기본 테이블 (현재 상태)
 --   tbl_map_<a>_<b>   두 테이블을 잇는 연결 테이블
 --   tbl_log_<이름>    시간순으로 쌓이기만 하는 기록
---   기본 키           sn (INTEGER AUTOINCREMENT) · 사용자 테이블만 uid
---   참조 컬럼         <대상>_sn · 사용자 참조는 uid · 워크스페이스 참조는 wid
+--   기본 키           sn (INTEGER AUTOINCREMENT)
+--   참조 컬럼         <대상>_sn (사용자 = user_sn · 워크스페이스 = workspace_sn)
 --   열거값            status · kind · mode 는 CHECK 제약이 원본 (#9 상태 표 · 프론트 status.ts · 백엔드 전이 표는 이 값을 따른다)
 --   토큰 · 비용       모르면 NULL (0으로 위장하지 않는다 · #16) · 금액은 *_usd_micro INTEGER (1달러 = 1,000,000 · REAL 합산 오차 방지)
 --   시각              create_at / update_at · UTC 'YYYY-MM-DD HH:MM:SS'
@@ -23,7 +23,7 @@
 --
 -- 사용 방법 (#11)
 --   이 파일이 스키마 원본이다. 서버(backend)가 첫 실행 시 이 파일로 테이블을 만들고
---   기본 사용자(uid=1) · 워크스페이스(sn=1)를 넣는다. SeaORM migration은 쓰지 않는다.
+--   기본 사용자(sn=1) · 워크스페이스(sn=1)를 넣는다. SeaORM migration은 쓰지 않는다.
 --   Rust entity는 `sea-orm-cli generate entity`로 이 스키마에서 생성한다 (backend/src/entity).
 --   Alpha는 SQLite 전용이다 (AUTOINCREMENT · datetime('now') · 식 인덱스 사용). 다른 DB 이식은 범위 밖.
 --   상태 값 · 이벤트 구조는 #9 Core Domain Model · #10 Command → Event → Projection 기준.
@@ -37,9 +37,9 @@ PRAGMA foreign_keys = ON;
 -- 1. 사용자 · 워크스페이스
 -- =====================================================================
 
--- 사용자. Alpha는 로컬 1인 사용(uid = 1), 차후 가입 · 로그인 지원
+-- 사용자. Alpha는 로컬 1인 사용(sn = 1), 차후 가입 · 로그인 지원
 CREATE TABLE tbl_user (
-    uid             INTEGER PRIMARY KEY AUTOINCREMENT,              -- 사용자 번호
+    sn              INTEGER PRIMARY KEY AUTOINCREMENT,              -- 사용자 번호
     email           TEXT UNIQUE,                                    -- 로그인 이메일 (로그인 지원 전에는 NULL)
     password_hash   TEXT,                                           -- 비밀번호 해시 (원문 저장 금지)
     name            TEXT NOT NULL,                                  -- 표시 이름 (화면의 '나')
@@ -54,7 +54,7 @@ CREATE TABLE tbl_user (
 -- 워크스페이스. Settings › 일반 · 실행기 공통 설정 · 스킬 설치 정책 · 알림 시간대
 CREATE TABLE tbl_workspace (
     sn                       INTEGER PRIMARY KEY AUTOINCREMENT,     -- 워크스페이스 번호
-    uid                      INTEGER NOT NULL REFERENCES tbl_user(uid) ON DELETE RESTRICT,  -- 소유자
+    user_sn                      INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE RESTRICT,  -- 소유자
     name                     TEXT NOT NULL,                         -- 워크스페이스 이름 (예: OrchStack)
     default_repo             TEXT,                                  -- 기본 저장소 (예: orchstack/app)
     timezone                 TEXT NOT NULL DEFAULT 'Asia/Seoul',    -- 시간대 (리셋 시각 · 타이머 · 일일 요약 기준)
@@ -99,7 +99,7 @@ CREATE TABLE tbl_workspace (
 -- 실행기(CLI). 에이전트가 실제로 도는 프로그램 · Settings › 실행기
 CREATE TABLE tbl_runtime (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 실행기 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
     code             TEXT NOT NULL,                                 -- 식별 코드: codex(Codex CLI) | claude_code(Claude Code) | gemini(Gemini CLI) | opencode(OpenCode) | cursor(Cursor Agent) | kiro(Kiro CLI)
     name             TEXT NOT NULL,                                 -- 표시 이름 (예: Codex CLI)
     version          TEXT,                                          -- 설치된 버전 (예: 0.41)
@@ -111,14 +111,14 @@ CREATE TABLE tbl_runtime (
     detect_at        TEXT,                                          -- 마지막 감지 시각
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
-    UNIQUE (wid, code)
+    UNIQUE (workspace_sn, code)
 );
 
 -- 모델 연결. 모델을 부르는 경로 · Settings › 모델 연결 · 연결 추가
 CREATE TABLE tbl_connection (
     sn                   INTEGER PRIMARY KEY AUTOINCREMENT,         -- 연결 번호
-    wid         INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
-    uid                  INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,          -- 연결을 추가한 사용자
+    workspace_sn         INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    user_sn                  INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,          -- 연결을 추가한 사용자
     kind                 TEXT NOT NULL CHECK (kind IN ('subscription','plan','api_key','gateway','local')),  -- 종류: subscription(구독 · CLI 로그인 · 남은 비율로 한도 표시) | plan(코딩 도구 요금제 · 월 사용량) | api_key(API 키 · 사용한 만큼 과금) | gateway(OpenAI 호환 게이트웨이 · 비용 + 폴백 횟수) | local(로컬 모델 · 한도 없음)
     provider_code        TEXT NOT NULL,                             -- 제공자 코드: anthropic | openai | google | github_copilot | cursor | kimi | zai | omniroute | openrouter | vercel | ollama | lmstudio | openai_compatible(직접 입력) …
     provider_name        TEXT NOT NULL,                             -- 제공자 표시 이름 (예: Anthropic · Max)
@@ -211,7 +211,7 @@ CREATE TABLE tbl_map_runtime_connection (
 -- 스킬 소스. 스킬을 찾고 설치하는 곳 · Settings › 스킬 소스
 CREATE TABLE tbl_skill_source (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 소스 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
     kind             TEXT NOT NULL CHECK (kind IN ('skills_sh','github','local','marketplace','builtin')),  -- 종류: skills_sh(skills.sh 공개 디렉터리) | github(GitHub 저장소) | local(로컬 폴더) | marketplace(마켓플레이스) | builtin(기본 내장)
     name             TEXT NOT NULL,                                 -- 표시 이름 (예: orchstack/team-skills)
     location         TEXT,                                          -- 주소 또는 폴더 경로
@@ -225,7 +225,7 @@ CREATE TABLE tbl_skill_source (
 -- 스킬. 워크스페이스에 설치된 스킬 · Skills & MCP
 CREATE TABLE tbl_skill (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 스킬 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
     source_sn        INTEGER REFERENCES tbl_skill_source(sn) ON DELETE SET NULL,       -- 가져온 소스
     name             TEXT NOT NULL,                                 -- 스킬 이름 (예: svelte-ui)
     description      TEXT,                                          -- 설명
@@ -240,13 +240,13 @@ CREATE TABLE tbl_skill (
     install_at       TEXT NOT NULL DEFAULT (datetime('now')),       -- 설치 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (wid, name)
+    UNIQUE (workspace_sn, name)
 );
 
 -- MCP 서버. 에이전트에게 도구를 주는 서버 · Tools & MCP
 CREATE TABLE tbl_mcp (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- MCP 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
     name             TEXT NOT NULL,                                 -- 서버 이름 (예: playwright-mcp)
     description      TEXT,                                          -- 설명
     tool_count       INTEGER NOT NULL DEFAULT 0,                    -- 제공 도구 수
@@ -259,7 +259,7 @@ CREATE TABLE tbl_mcp (
     check_at         TEXT,                                          -- 마지막 점검 시각
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
-    UNIQUE (wid, name)
+    UNIQUE (workspace_sn, name)
 );
 
 
@@ -273,7 +273,7 @@ CREATE TABLE tbl_mcp (
 -- 에이전트 프로필. Harness · 권한 · 한도
 CREATE TABLE tbl_agent_profile (
     sn                    INTEGER PRIMARY KEY AUTOINCREMENT,        -- 프로필 번호
-    wid          INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    workspace_sn          INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     kind                  TEXT NOT NULL CHECK (kind IN ('workspace','template','member')),  -- 소유 종류: workspace(워크스페이스 기본값) | template(템플릿 버전) | member(멤버 · 템플릿 복사본)
     runtime_sn            INTEGER REFERENCES tbl_runtime(sn) ON DELETE SET NULL,       -- 실행기
     connection_sn         INTEGER REFERENCES tbl_connection(sn) ON DELETE SET NULL,    -- 연결
@@ -392,8 +392,8 @@ CREATE TABLE tbl_map_fallback (
 -- 템플릿. 역할별 에이전트 기본값 · Agents 탭
 CREATE TABLE tbl_template (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 템플릿 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 만든 사용자
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자
     name             TEXT NOT NULL,                                 -- 이름 (예: Frontend Developer)
     role_name        TEXT,                                          -- 역할 설명 (예: 프론트엔드 개발)
     category         TEXT NOT NULL DEFAULT 'dev' CHECK (category IN ('dev','verify','design_pm','orch')),  -- 분류: dev(개발) | verify(검증 · QA · 리뷰) | design_pm(디자인 · PM) | orch(Orch · 모든 팀)
@@ -417,7 +417,7 @@ CREATE TABLE tbl_template_revision (
     status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','live','archived')),  -- 상태: draft(초안 · 편집 중) | live(배포 중 · 새 멤버가 이 버전을 복사) | archived(지난 버전)
     note             TEXT,                                          -- 변경 요약
     author_type      TEXT NOT NULL DEFAULT 'user' CHECK (author_type IN ('user','orch')),  -- 작성자 종류: user(사용자) | orch(Orch 제안 채택)
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 작성한 사용자
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 작성한 사용자
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     publish_at       TEXT,                                          -- 게시 시각
     UNIQUE (template_sn, version)
@@ -426,7 +426,7 @@ CREATE TABLE tbl_template_revision (
 -- 팀. Teams 탭 · 팀 정책
 CREATE TABLE tbl_team (
     sn                    INTEGER PRIMARY KEY AUTOINCREMENT,        -- 팀 번호
-    wid          INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    workspace_sn          INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     name                  TEXT NOT NULL,                            -- 팀 이름 (예: Core Team)
     kind                  TEXT NOT NULL DEFAULT 'project' CHECK (kind IN ('orch','project')),  -- 종류: orch(오케스트레이터 · 모든 프로젝트 PM) | project(프로젝트 팀)
     daily_token_budget    INTEGER,                                  -- 하루 토큰 예산 (예: 200000)
@@ -480,7 +480,7 @@ CREATE TABLE tbl_map_connection_team (
 -- 프로젝트. 상단 프로젝트 탭 · 저장소 1개
 CREATE TABLE tbl_project (
     sn                 INTEGER PRIMARY KEY AUTOINCREMENT,           -- 프로젝트 번호
-    wid       INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    workspace_sn       INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     team_sn            INTEGER REFERENCES tbl_team(sn) ON DELETE SET NULL,             -- 맡은 팀
     name               TEXT NOT NULL,                               -- 이름 (예: OrchStack)
     repo_name          TEXT,                                        -- GitHub 저장소 (예: orchstack/app)
@@ -500,7 +500,7 @@ CREATE TABLE tbl_project (
 --   종류별로 역할 템플릿 · 멤버 프로필에 연결만 한다 (tbl_map_profile_preset). 도구 · 권한 정책은 여기 두지 않는다
 CREATE TABLE tbl_instruction_preset (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 프리셋 번호
-    wid              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    workspace_sn              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     project_sn       INTEGER REFERENCES tbl_project(sn) ON DELETE CASCADE,  -- 프로젝트 전용이면 지정 (NULL = 워크스페이스 전체)
     kind             TEXT NOT NULL CHECK (kind IN ('protocol','role','style','rule','report')),  -- 종류: protocol(내부 블록 규격 · 시스템 소유) | role(역할 · 책임 · 범위) | style(말투 · 출력 태도) | rule(공통 규칙 · 여러 개 연결) | report(태스크 보고서 사람 칸 작성법)
     preset_key       TEXT NOT NULL,                                 -- 식별 키 (예: frontend, token-economy)
@@ -513,10 +513,10 @@ CREATE TABLE tbl_instruction_preset (
     is_default       INTEGER NOT NULL DEFAULT 0,                    -- 새 역할 템플릿에 기본으로 연결
     copy_from_sn     INTEGER REFERENCES tbl_instruction_preset(sn) ON DELETE SET NULL,  -- 복제 원본
     status           TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),  -- 상태: active(사용 가능) | archived(보관 · 새로 연결 불가, 기존 연결은 유지)
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 만든 사용자 (기본 제공이면 NULL)
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자 (기본 제공이면 NULL)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
-    UNIQUE (wid, kind, preset_key)
+    UNIQUE (workspace_sn, kind, preset_key)
 );
 
 -- Instruction preset 버전. 수정할 때마다 새 버전 · 연결은 버전을 고정해서 쓴다
@@ -529,7 +529,7 @@ CREATE TABLE tbl_instruction_preset_version (
     language         TEXT NOT NULL DEFAULT 'en',                    -- 본문 언어 (en 권장 · 토큰 절약)
     source           TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('builtin','user','import','translated')),  -- 출처: builtin(기본 제공 · 앱 배포) | user(사용자 작성) | import(.md · 저장소 AGENTS.md 가져오기) | translated(저장 시 영어 변환)
     change_note      TEXT,                                          -- 변경 요약 (사람용)
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 작성한 사용자
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 작성한 사용자
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     UNIQUE (preset_sn, version)
 );
@@ -550,7 +550,7 @@ CREATE TABLE tbl_map_profile_preset (
 -- 보고서 양식. 시스템이 조립하는 화면 양식 (모델 호출 없음 · 0 tok) · Settings › 보고서 양식
 CREATE TABLE tbl_report_form (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 양식 번호
-    wid              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    workspace_sn              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     kind             TEXT NOT NULL CHECK (kind IN ('task_report','issue_report','pr_body','daily_summary')),  -- 종류: task_report(태스크 보고서) | issue_report(이슈 보고서 · 태스크 합산) | pr_body(PR 본문) | daily_summary(일일 요약 알림)
     form_key         TEXT NOT NULL,                                 -- 식별 키
     name             TEXT NOT NULL,                                 -- 표시 이름
@@ -561,7 +561,7 @@ CREATE TABLE tbl_report_form (
     is_default       INTEGER NOT NULL DEFAULT 0,                    -- 이 종류의 기본 양식
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (wid, kind, form_key)
+    UNIQUE (workspace_sn, kind, form_key)
 );
 
 -- 이슈. 설계 · 명세 단위 · 하위 이슈 가능
@@ -576,7 +576,7 @@ CREATE TABLE tbl_issue (
     source           TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','github','orch')),  -- 만든 경로: manual(사용자 작성) | github(GitHub 이슈 가져오기) | orch(Orch 작업 제안에서 생성)
     github_number    INTEGER,                                       -- 연결된 GitHub 이슈 번호
     github_url       TEXT,                                          -- GitHub 이슈 주소
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 만든 사용자 (Orch가 만들면 NULL)
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자 (Orch가 만들면 NULL)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
     close_at         TEXT,                                          -- 닫은 시각
@@ -605,7 +605,7 @@ CREATE TABLE tbl_task (
     pr_number         INTEGER,                                      -- PR 번호
     pr_status         TEXT CHECK (pr_status IN ('draft','open','merged','closed')),  -- PR 상태: draft(초안) | open(열림 · 리뷰 대기) | merged(병합) | closed(병합 없이 닫힘)
     create_by         TEXT NOT NULL DEFAULT 'user' CHECK (create_by IN ('user','orch')),  -- 만든 쪽: user(사용자) | orch(Orch)
-    uid               INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,             -- 만든 사용자
+    user_sn               INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,             -- 만든 사용자
     create_at         TEXT NOT NULL DEFAULT (datetime('now')),      -- 생성 시각
     update_at         TEXT NOT NULL DEFAULT (datetime('now')),      -- 수정 시각
     start_at          TEXT,                                         -- 작업 시작 시각
@@ -661,8 +661,8 @@ CREATE TABLE tbl_map_issue_label (
 -- 저장된 보기. Tasks 페이지의 필터 묶음 · 사용자 설정(조회 전용, domain 아님)
 CREATE TABLE tbl_task_view (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 보기 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
-    uid              INTEGER NOT NULL REFERENCES tbl_user(uid) ON DELETE CASCADE,     -- 만든 사용자
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 만든 사용자
     name             TEXT NOT NULL,                                 -- 보기 이름 (예: P0–P1 · 이번 주)
     filter_json      TEXT NOT NULL,                                 -- 필터 조건 JSON (프로젝트 · 담당 · 상태 · 우선순위 · 정렬)
     sort             INTEGER NOT NULL DEFAULT 0,                    -- 목록 순서
@@ -909,7 +909,7 @@ CREATE TABLE tbl_interaction (
     kind             TEXT NOT NULL CHECK (kind IN ('request_verification','request_review','completion_report','delegate')),  -- 종류: request_verification(검증 요청 · 예: 진 → 하린) | request_review(리뷰 요청 · → Reviewer) | completion_report(완료 보고 · → Orch) | delegate(위임 · Orch → 이슈)
     status           TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','live','done','cancelled')),  -- 상태: open(대기 · 상대가 아직 시작 안 함) | live(처리 중 · 연결선 강조 표시) | done(완료) | cancelled(취소)
     create_by        TEXT NOT NULL DEFAULT 'member' CHECK (create_by IN ('member','orch','user')),  -- 만든 쪽: member(멤버) | orch(Orch) | user(사용자 · 연결하기 메뉴)
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 만든 사용자
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 만든 사용자
     note             TEXT,                                          -- 요청 내용 (예: Task #130 QA 대기 해제 요청)
     event_sn         INTEGER REFERENCES tbl_log_event(sn) ON DELETE SET NULL,  -- 이 행을 만든 이벤트 (projection 재구축 · 중복 방지)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
@@ -920,7 +920,7 @@ CREATE TABLE tbl_interaction (
 CREATE TABLE tbl_diagram_node (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 위치 번호
     project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE, -- 프로젝트
-    uid              INTEGER NOT NULL REFERENCES tbl_user(uid) ON DELETE CASCADE,     -- 배치한 사용자 (사용자마다 따로)
+    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 배치한 사용자 (사용자마다 따로)
     node_type        TEXT NOT NULL CHECK (node_type IN ('project','issue','task','member','skill','mcp','tools')),  -- 노드 종류: project | issue | task | member | skill | mcp | tools (node_sn이 가리키는 테이블)
     node_sn          INTEGER NOT NULL,                              -- 노드 대상의 sn (node_type 테이블 기준 · 대상이 여러 테이블이라 FK 없음 → 태스크 · 멤버 삭제 시 앱에서 함께 정리)
     pos_x            INTEGER NOT NULL,                              -- X 좌표
@@ -928,21 +928,21 @@ CREATE TABLE tbl_diagram_node (
     is_collapsed     INTEGER NOT NULL DEFAULT 0,                    -- 접힘 여부
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (project_sn, uid, node_type, node_sn)
+    UNIQUE (project_sn, user_sn, node_type, node_sn)
 );
 
 -- 다이어그램 보기 설정. 배치 방식 · 확대 비율 · 표시 범위 · 사용자 화면 설정(조회 전용, domain 아님)
 CREATE TABLE tbl_diagram_view (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 보기 설정 번호
     project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE, -- 프로젝트
-    uid              INTEGER NOT NULL REFERENCES tbl_user(uid) ON DELETE CASCADE,     -- 사용자
+    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 사용자
     layout_mode      TEXT NOT NULL DEFAULT 'auto' CHECK (layout_mode IN ('auto','grid','manual')),  -- 배치: auto(자동 배치) | grid(격자 정렬) | manual(사용자가 옮긴 위치 유지)
     zoom_percent     INTEGER NOT NULL DEFAULT 100,                  -- 확대 비율(%)
     is_show_capability INTEGER NOT NULL DEFAULT 1,                  -- 스킬 · MCP · 도구 노드 표시
     is_show_done     INTEGER NOT NULL DEFAULT 0,                    -- 완료된 태스크 표시
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
-    UNIQUE (project_sn, uid)
+    UNIQUE (project_sn, user_sn)
 );
 
 
@@ -968,7 +968,7 @@ CREATE TABLE tbl_orch_proposal (
     streak_count     INTEGER NOT NULL DEFAULT 0,                    -- 연속 자동 진행 횟수 (예: 3 / 10)
     deadline_at      TEXT,                                          -- 자동 진행 예정 시각
     event_sn         INTEGER REFERENCES tbl_log_event(sn) ON DELETE SET NULL,  -- 이 제안을 만든 이벤트
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 처리한 사용자 (자동 진행이면 NULL)
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 처리한 사용자 (자동 진행이면 NULL)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     resolve_at       TEXT                                           -- 처리 시각
 );
@@ -984,7 +984,7 @@ CREATE TABLE tbl_decision (
     title             TEXT NOT NULL,                                -- 요약 제목
     status            TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','writing','answered','orch_decided','cancelled')),  -- 상태: pending(답변 대기 · 타이머 진행) | writing(사용자가 작성 중 · 타이머 멈춤) | answered(사용자가 답함) | orch_decided(시간 초과로 Orch가 대신 결정) | cancelled(취소)
     decide_by         TEXT CHECK (decide_by IN ('user','orch')),  -- 결정한 쪽: user(사용자) | orch(사용자 대신 Orch)
-    uid               INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,             -- 답한 사용자
+    user_sn               INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,             -- 답한 사용자
     orch_reason       TEXT,                                         -- Orch가 대신 결정한 근거
     is_timer_pause    INTEGER NOT NULL DEFAULT 0,                   -- 타이머 멈춤 (작성 중)
     deadline_at       TEXT,                                         -- 이 시각이 지나면 Orch가 결정
@@ -1034,7 +1034,7 @@ CREATE TABLE tbl_approval (
     detail           TEXT,                                          -- 상세 (예: 20분 초과 예상 · 남은 단계 2/5)
     status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','denied','expired')),  -- 상태: pending(승인 대기) | approved(승인) | denied(거부) | expired(시간 초과로 만료)
     deadline_at      TEXT,                                          -- 이 시각이 지나면 expired (Run은 그 자리에서 멈춘 채 · 알림)
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 처리한 사용자
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 처리한 사용자
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 요청 시각
     decide_at        TEXT                                           -- 처리 시각
 );
@@ -1044,7 +1044,7 @@ CREATE TABLE tbl_conversation (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 대화 번호
     project_sn       INTEGER NOT NULL REFERENCES tbl_project(sn) ON DELETE CASCADE,   -- 프로젝트
     member_sn        INTEGER NOT NULL REFERENCES tbl_member(sn) ON DELETE RESTRICT,    -- 대화 상대 (Orch 또는 멤버)
-    uid              INTEGER NOT NULL REFERENCES tbl_user(uid) ON DELETE CASCADE,     -- 대화한 사용자
+    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 대화한 사용자
     title            TEXT,                                          -- 대화 제목
     status           TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed')),  -- 상태: open(진행 중) | closed(종료)
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
@@ -1071,7 +1071,7 @@ CREATE TABLE tbl_attachment (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 첨부 번호
     owner_type       TEXT NOT NULL CHECK (owner_type IN ('message','decision_question','task')),  -- 붙인 곳: message(메시지) | decision_question(질문 답변) | task(태스크)
     owner_sn         INTEGER NOT NULL,                              -- 붙인 곳의 sn
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 올린 사용자
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 올린 사용자
     file_name        TEXT NOT NULL,                                 -- 파일 이름
     mime_type        TEXT,                                          -- 파일 형식 (예: image/png)
     file_size        INTEGER NOT NULL DEFAULT 0,                    -- 크기(바이트)
@@ -1087,7 +1087,7 @@ CREATE TABLE tbl_attachment (
 -- 알림 채널. 앱 · 데스크톱 · Telegram · 이메일
 CREATE TABLE tbl_notify_channel (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 채널 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
     kind             TEXT NOT NULL CHECK (kind IN ('app','desktop','telegram','email')),  -- 종류: app(앱 내) | desktop(데스크톱 알림) | telegram(Telegram) | email(이메일)
     status           TEXT NOT NULL DEFAULT 'off' CHECK (status IN ('on','allowed','connected','off')),  -- 상태: on(항상 켜짐 · 앱) | allowed(OS 권한 허용됨) | connected(연결됨) | off(설정 안 됨)
     target           TEXT,                                          -- 보낼 곳 (예: Telegram 채팅방 ID, 이메일 주소)
@@ -1095,13 +1095,13 @@ CREATE TABLE tbl_notify_channel (
     key_ref          TEXT,                                          -- 봇 토큰의 키체인 항목 이름
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 생성 시각
     update_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 수정 시각
-    UNIQUE (wid, kind)
+    UNIQUE (workspace_sn, kind)
 );
 
 -- 알림 규칙. 이벤트 × 채널 켬/끔 · 연결별로 따로 정할 수 있음
 CREATE TABLE tbl_notify_rule (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 규칙 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
     connection_sn    INTEGER REFERENCES tbl_connection(sn) ON DELETE SET NULL,         -- 특정 연결만의 규칙 (NULL = 워크스페이스 기본)
     event_code       TEXT NOT NULL CHECK (event_code IN ('decision_request','approval_request','orch_decided','run_failed','guard_stop','context_warn','quota_low','budget_80','budget_over','connection_error','fallback_used','pr','task_done','daily_summary')),  -- 이벤트: decision_request(결정 요청 L2+) | approval_request(승인 요청) | orch_decided(Orch가 대신 결정) | run_failed(Run 실패) | guard_stop(루프 가드 정지) | context_warn(컨텍스트 경고) | quota_low(구독 잔량 부족) | budget_80(예산 80% 도달) | budget_over(예산 초과) | connection_error(연결 오류 · 키 만료) | fallback_used(폴백 사용) | pr(PR 생성 · 병합) | task_done(태스크 완료) | daily_summary(일일 요약)
     channel_kind     TEXT NOT NULL CHECK (channel_kind IN ('app','desktop','telegram','email')),  -- 채널: app(앱 내) | desktop(데스크톱) | telegram(Telegram) | email(이메일)
@@ -1113,8 +1113,8 @@ CREATE TABLE tbl_notify_rule (
 -- 알림 목록. 상단 벨에 쌓이는 알림
 CREATE TABLE tbl_notification (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 알림 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
-    uid              INTEGER NOT NULL REFERENCES tbl_user(uid) ON DELETE CASCADE,     -- 받는 사용자
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    user_sn              INTEGER NOT NULL REFERENCES tbl_user(sn) ON DELETE CASCADE,     -- 받는 사용자
     event_code       TEXT NOT NULL CHECK (event_code IN ('decision_request','approval_request','orch_decided','run_failed','guard_stop','context_warn','quota_low','budget_80','budget_over','connection_error','fallback_used','pr','task_done','daily_summary')),  -- 이벤트 (tbl_notify_rule.event_code 와 같음)
     actor_type       TEXT NOT NULL DEFAULT 'system' CHECK (actor_type IN ('orch','member','system')),  -- 알린 쪽: orch(Orch) | member(멤버) | system(시스템)
     member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 알린 멤버
@@ -1139,7 +1139,7 @@ CREATE TABLE tbl_notification (
 --   @TASK · @REPORT · @ASK 블록 원문은 payload_json 에 저장 (모델에 다시 보내지 않음)
 CREATE TABLE tbl_log_event (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 이벤트 번호 (전역 순서 · 재연결 커서 · 쓰기는 워크스페이스당 1개 트랜잭션씩 직렬화해야 번호 순서 = 커밋 순서가 된다)
-    wid              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
+    workspace_sn              INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE,  -- 워크스페이스
     project_sn       INTEGER REFERENCES tbl_project(sn) ON DELETE CASCADE,  -- 프로젝트 (워크스페이스 전체 이벤트면 NULL)
     aggregate_type   TEXT NOT NULL CHECK (aggregate_type IN ('workspace','project','issue','task','run','session','profile','template','member','team','decision','approval','contract','connection','preset','message','proposal','skill')),  -- 대상 종류: workspace | project | issue | task | run | session | profile(에이전트 프로필 · 폴백 체인) | template | member | team | decision | approval | contract | connection | preset | message(Orch 대화 메시지) | proposal(Orch 제안) | skill
     aggregate_sn     INTEGER NOT NULL,                              -- 대상 번호 (aggregate_type 테이블의 sn · FK 없음 · 대상이 지워져도 기록은 남는다)
@@ -1150,7 +1150,7 @@ CREATE TABLE tbl_log_event (
     command_id       TEXT,                                          -- 이 이벤트를 만든 명령 ID (같은 명령 재전송 시 중복 방지)
     command_idx      INTEGER NOT NULL DEFAULT 0,                    -- 한 명령이 만든 이벤트 중 순서 (0부터 · 예: MoveTask → TaskMoved 0, AgentAssigned 1)
     actor_type       TEXT NOT NULL CHECK (actor_type IN ('user','orch','member','system')),  -- 발생시킨 쪽: user(사용자) | orch(Orch) | member(멤버) | system(시스템 · 규칙 엔진)
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,     -- 발생시킨 사용자
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,     -- 발생시킨 사용자
     member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,    -- 발생시킨 멤버
     run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,       -- 관련 Run
     create_at        TEXT NOT NULL DEFAULT (datetime('now')),       -- 발생 시각
@@ -1195,7 +1195,7 @@ CREATE TABLE tbl_log_activity (
     task_sn          INTEGER REFERENCES tbl_task(sn) ON DELETE SET NULL,               -- 관련 태스크
     run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,                -- 관련 Run
     actor_type       TEXT NOT NULL CHECK (actor_type IN ('user','orch','member','system')),  -- 한 쪽: user(사용자) | orch(Orch) | member(멤버) | system(시스템)
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 한 사용자
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 한 사용자
     member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 한 멤버
     target_member_sn INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 받은 멤버 (예: Orch → 진)
     kind             TEXT NOT NULL CHECK (kind IN ('TASK_INSTRUCTION','ASSIGN','RUN','TOOL_CALL','MESSAGE','TEST','REQUEST_VERIFICATION','REVIEW','DECISION','SYSTEM')),  -- 종류: TASK_INSTRUCTION(태스크 지시) | ASSIGN(배정) | RUN(Run 시작 · 종료) | TOOL_CALL(도구 호출) | MESSAGE(메시지) | TEST(테스트) | REQUEST_VERIFICATION(검증 요청) | REVIEW(리뷰 · 반려) | DECISION(결정) | SYSTEM(시스템 · 한도 경고 등)
@@ -1210,9 +1210,9 @@ CREATE TABLE tbl_log_activity (
 -- 감사 기록. 키 · 정책 · 연결 · 스킬 변경과 차단 내역
 CREATE TABLE tbl_log_audit (
     sn               INTEGER PRIMARY KEY AUTOINCREMENT,             -- 기록 번호
-    wid     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
+    workspace_sn     INTEGER NOT NULL REFERENCES tbl_workspace(sn) ON DELETE CASCADE, -- 워크스페이스
     actor_type       TEXT NOT NULL CHECK (actor_type IN ('user','orch','member','system')),  -- 한 쪽: user(사용자) | orch(Orch) | member(멤버) | system(시스템)
-    uid              INTEGER REFERENCES tbl_user(uid) ON DELETE SET NULL,              -- 한 사용자
+    user_sn              INTEGER REFERENCES tbl_user(sn) ON DELETE SET NULL,              -- 한 사용자
     member_sn        INTEGER REFERENCES tbl_member(sn) ON DELETE SET NULL,             -- 한 멤버 (차단된 멤버 포함)
     run_sn           INTEGER REFERENCES tbl_run(sn) ON DELETE SET NULL,                -- 관련 Run
     kind             TEXT NOT NULL CHECK (kind IN ('KEY','POLICY','CONNECTION','INSTALL','UPDATE','BLOCK')),  -- 종류: KEY(키 추가 · 삭제) | POLICY(권한 · 정책 변경) | CONNECTION(연결 변경) | INSTALL(스킬 · MCP 설치) | UPDATE(업데이트) | BLOCK(차단된 동작)
@@ -1226,7 +1226,7 @@ CREATE TABLE tbl_log_audit (
 -- 11. 인덱스 (목록 · 필터에 자주 쓰는 조회)
 -- =====================================================================
 
-CREATE INDEX idx_connection_workspace   ON tbl_connection (wid, kind);
+CREATE INDEX idx_connection_workspace   ON tbl_connection (workspace_sn, kind);
 CREATE INDEX idx_log_quota_connection   ON tbl_log_connection_quota (connection_sn, period, create_at);
 CREATE INDEX idx_member_team            ON tbl_member (team_sn);
 CREATE INDEX idx_issue_project          ON tbl_issue (project_sn, status);
@@ -1243,7 +1243,7 @@ CREATE INDEX idx_approval_status        ON tbl_approval (project_sn, status);
 CREATE INDEX idx_proposal_status        ON tbl_orch_proposal (project_sn, status);
 CREATE INDEX idx_message_conversation   ON tbl_message (conversation_sn, create_at);
 CREATE INDEX idx_attachment_owner       ON tbl_attachment (owner_type, owner_sn);
-CREATE INDEX idx_notification_user      ON tbl_notification (uid, is_read, create_at);
+CREATE INDEX idx_notification_user      ON tbl_notification (user_sn, is_read, create_at);
 CREATE INDEX idx_notification_ref       ON tbl_notification (ref_type, ref_sn);                  -- 대상 처리 시(판단 요청 답변 등) 확인 필요 알림 해제
 CREATE INDEX idx_log_run_run            ON tbl_log_run (run_sn, create_at);
 CREATE INDEX idx_log_token_run          ON tbl_log_token (run_sn);
@@ -1259,7 +1259,7 @@ CREATE INDEX idx_log_contract          ON tbl_log_contract (contract_sn, version
 CREATE INDEX idx_map_task_contract     ON tbl_map_task_contract (contract_sn, role);
 CREATE INDEX idx_preset_version        ON tbl_instruction_preset_version (preset_sn, version);
 CREATE INDEX idx_map_profile_preset    ON tbl_map_profile_preset (preset_sn);
-CREATE INDEX idx_log_audit_workspace    ON tbl_log_audit (wid, create_at);
+CREATE INDEX idx_log_audit_workspace    ON tbl_log_audit (workspace_sn, create_at);
 
 -- 외래 키 조회 · CASCADE 삭제용 (SQLite는 FK 인덱스를 자동으로 만들지 않음)
 CREATE INDEX idx_task_dependency_depend ON tbl_map_task_dependency (depend_task_sn);
@@ -1294,7 +1294,7 @@ CREATE INDEX idx_template_revision      ON tbl_template_revision (template_sn);
 
 CREATE UNIQUE INDEX ux_orch_policy      ON tbl_orch_policy (team_sn, COALESCE(project_sn, 0));  -- 팀 기본(NULL) 1개 · 프로젝트별 1개
 CREATE UNIQUE INDEX ux_session_num      ON tbl_session (member_sn, num);                     -- 멤버별 세션 번호
-CREATE UNIQUE INDEX ux_notify_rule      ON tbl_notify_rule (wid, COALESCE(connection_sn, 0), event_code, channel_kind);
+CREATE UNIQUE INDEX ux_notify_rule      ON tbl_notify_rule (workspace_sn, COALESCE(connection_sn, 0), event_code, channel_kind);
 CREATE UNIQUE INDEX ux_fallback_sort    ON tbl_map_fallback (profile_sn, runtime_sn, sort);  -- 실행기 안에서 순서 겹침 금지
 CREATE UNIQUE INDEX ux_run_child        ON tbl_run (parent_run_sn, child_seq);        -- 리드 Run 안 하위 순번 (NULL 여러 개 허용)
 CREATE UNIQUE INDEX ux_event_command     ON tbl_log_event (command_id, command_idx);             -- NULL은 여러 개 허용 · 같은 명령 재전송은 첫 이벤트에서 충돌
@@ -1304,50 +1304,50 @@ CREATE INDEX idx_log_event_project      ON tbl_log_event (project_sn, sn);
 CREATE INDEX idx_fk_agent_profile_connection_sn ON tbl_agent_profile (connection_sn);
 CREATE INDEX idx_fk_agent_profile_model_sn ON tbl_agent_profile (model_sn);
 CREATE INDEX idx_fk_agent_profile_runtime_sn ON tbl_agent_profile (runtime_sn);
-CREATE INDEX idx_fk_agent_profile_wid ON tbl_agent_profile (wid);
+CREATE INDEX idx_fk_agent_profile_workspace_sn ON tbl_agent_profile (workspace_sn);
 CREATE INDEX idx_fk_approval_member_sn ON tbl_approval (member_sn);
 CREATE INDEX idx_fk_approval_rule_sn ON tbl_approval (rule_sn);
 CREATE INDEX idx_fk_approval_run_sn ON tbl_approval (run_sn);
 CREATE INDEX idx_fk_approval_task_sn ON tbl_approval (task_sn);
-CREATE INDEX idx_fk_approval_uid ON tbl_approval (uid);
-CREATE INDEX idx_fk_attachment_uid ON tbl_attachment (uid);
+CREATE INDEX idx_fk_approval_user_sn ON tbl_approval (user_sn);
+CREATE INDEX idx_fk_attachment_user_sn ON tbl_attachment (user_sn);
 CREATE INDEX idx_fk_connection_runtime_sn ON tbl_connection (runtime_sn);
-CREATE INDEX idx_fk_connection_uid ON tbl_connection (uid);
+CREATE INDEX idx_fk_connection_user_sn ON tbl_connection (user_sn);
 CREATE INDEX idx_fk_context_manifest_session_sn ON tbl_context_manifest (session_sn);
 CREATE INDEX idx_fk_contract_owner_task_sn ON tbl_contract (owner_task_sn);
 CREATE INDEX idx_fk_contract_update_run_sn ON tbl_contract (update_run_sn);
 CREATE INDEX idx_fk_conversation_member_sn ON tbl_conversation (member_sn);
 CREATE INDEX idx_fk_conversation_project_sn ON tbl_conversation (project_sn);
-CREATE INDEX idx_fk_conversation_uid ON tbl_conversation (uid);
+CREATE INDEX idx_fk_conversation_user_sn ON tbl_conversation (user_sn);
 CREATE INDEX idx_fk_decision_member_sn ON tbl_decision (member_sn);
 CREATE INDEX idx_fk_decision_run_sn ON tbl_decision (run_sn);
 CREATE INDEX idx_fk_decision_task_sn ON tbl_decision (task_sn);
-CREATE INDEX idx_fk_decision_uid ON tbl_decision (uid);
-CREATE INDEX idx_fk_diagram_node_uid ON tbl_diagram_node (uid);
-CREATE INDEX idx_fk_diagram_view_uid ON tbl_diagram_view (uid);
+CREATE INDEX idx_fk_decision_user_sn ON tbl_decision (user_sn);
+CREATE INDEX idx_fk_diagram_node_user_sn ON tbl_diagram_node (user_sn);
+CREATE INDEX idx_fk_diagram_view_user_sn ON tbl_diagram_view (user_sn);
 CREATE INDEX idx_fk_instruction_preset_copy_from_sn ON tbl_instruction_preset (copy_from_sn);
 CREATE INDEX idx_fk_instruction_preset_project_sn ON tbl_instruction_preset (project_sn);
-CREATE INDEX idx_fk_instruction_preset_uid ON tbl_instruction_preset (uid);
-CREATE INDEX idx_fk_instruction_preset_version_uid ON tbl_instruction_preset_version (uid);
+CREATE INDEX idx_fk_instruction_preset_user_sn ON tbl_instruction_preset (user_sn);
+CREATE INDEX idx_fk_instruction_preset_version_user_sn ON tbl_instruction_preset_version (user_sn);
 CREATE INDEX idx_fk_interaction_from_member_sn ON tbl_interaction (from_member_sn);
 CREATE INDEX idx_fk_interaction_issue_sn ON tbl_interaction (issue_sn);
 CREATE INDEX idx_fk_interaction_to_member_sn ON tbl_interaction (to_member_sn);
-CREATE INDEX idx_fk_interaction_uid ON tbl_interaction (uid);
-CREATE INDEX idx_fk_issue_uid ON tbl_issue (uid);
+CREATE INDEX idx_fk_interaction_user_sn ON tbl_interaction (user_sn);
+CREATE INDEX idx_fk_issue_user_sn ON tbl_issue (user_sn);
 CREATE INDEX idx_fk_log_activity_event_sn ON tbl_log_activity (event_sn);
 CREATE INDEX idx_fk_log_activity_project_sn ON tbl_log_activity (project_sn);
 CREATE INDEX idx_fk_log_activity_run_sn ON tbl_log_activity (run_sn);
 CREATE INDEX idx_fk_log_activity_target_member_sn ON tbl_log_activity (target_member_sn);
 CREATE INDEX idx_fk_log_activity_team_sn ON tbl_log_activity (team_sn);
-CREATE INDEX idx_fk_log_activity_uid ON tbl_log_activity (uid);
+CREATE INDEX idx_fk_log_activity_user_sn ON tbl_log_activity (user_sn);
 CREATE INDEX idx_fk_log_audit_member_sn ON tbl_log_audit (member_sn);
 CREATE INDEX idx_fk_log_audit_run_sn ON tbl_log_audit (run_sn);
-CREATE INDEX idx_fk_log_audit_uid ON tbl_log_audit (uid);
+CREATE INDEX idx_fk_log_audit_user_sn ON tbl_log_audit (user_sn);
 CREATE INDEX idx_fk_log_contract_run_sn ON tbl_log_contract (run_sn);
 CREATE INDEX idx_fk_log_event_member_sn ON tbl_log_event (member_sn);
 CREATE INDEX idx_fk_log_event_run_sn ON tbl_log_event (run_sn);
-CREATE INDEX idx_fk_log_event_uid ON tbl_log_event (uid);
-CREATE INDEX idx_fk_log_event_wid ON tbl_log_event (wid);
+CREATE INDEX idx_fk_log_event_user_sn ON tbl_log_event (user_sn);
+CREATE INDEX idx_fk_log_event_workspace_sn ON tbl_log_event (workspace_sn);
 CREATE INDEX idx_fk_log_run_session_sn ON tbl_log_run (session_sn);
 CREATE INDEX idx_fk_log_token_connection_sn ON tbl_log_token (connection_sn);
 CREATE INDEX idx_fk_log_token_manifest_sn ON tbl_log_token (manifest_sn);
@@ -1361,7 +1361,7 @@ CREATE INDEX idx_fk_message_member_sn ON tbl_message (member_sn);
 CREATE INDEX idx_fk_message_run_sn ON tbl_message (run_sn);
 CREATE INDEX idx_fk_message_task_sn ON tbl_message (task_sn);
 CREATE INDEX idx_fk_notification_member_sn ON tbl_notification (member_sn);
-CREATE INDEX idx_fk_notification_wid ON tbl_notification (wid);
+CREATE INDEX idx_fk_notification_workspace_sn ON tbl_notification (workspace_sn);
 CREATE INDEX idx_fk_notify_rule_connection_sn ON tbl_notify_rule (connection_sn);
 CREATE INDEX idx_fk_orch_policy_project_sn ON tbl_orch_policy (project_sn);
 CREATE INDEX idx_fk_orch_proposal_guard_sn ON tbl_orch_proposal (guard_sn);
@@ -1369,9 +1369,9 @@ CREATE INDEX idx_fk_orch_proposal_issue_sn ON tbl_orch_proposal (issue_sn);
 CREATE INDEX idx_fk_orch_proposal_member_sn ON tbl_orch_proposal (member_sn);
 CREATE INDEX idx_fk_orch_proposal_run_sn ON tbl_orch_proposal (run_sn);
 CREATE INDEX idx_fk_orch_proposal_task_sn ON tbl_orch_proposal (task_sn);
-CREATE INDEX idx_fk_orch_proposal_uid ON tbl_orch_proposal (uid);
+CREATE INDEX idx_fk_orch_proposal_user_sn ON tbl_orch_proposal (user_sn);
 CREATE INDEX idx_fk_project_team_sn ON tbl_project (team_sn);
-CREATE INDEX idx_fk_project_wid ON tbl_project (wid);
+CREATE INDEX idx_fk_project_workspace_sn ON tbl_project (workspace_sn);
 CREATE INDEX idx_fk_report_item_task_sn ON tbl_report_item (task_sn);
 CREATE INDEX idx_fk_report_item_contract_sn ON tbl_report_item (contract_sn);
 CREATE INDEX idx_fk_review_member_sn ON tbl_review (member_sn);
@@ -1384,13 +1384,13 @@ CREATE INDEX idx_fk_notification_event_sn ON tbl_notification (event_sn);
 CREATE INDEX idx_fk_orch_proposal_event_sn ON tbl_orch_proposal (event_sn);
 CREATE INDEX idx_fk_report_item_criterion_sn ON tbl_report_item (criterion_sn);
 CREATE INDEX idx_fk_skill_source_sn ON tbl_skill (source_sn);
-CREATE INDEX idx_fk_skill_source_wid ON tbl_skill_source (wid);
-CREATE INDEX idx_fk_task_uid ON tbl_task (uid);
-CREATE INDEX idx_fk_task_view_uid ON tbl_task_view (uid);
-CREATE INDEX idx_fk_task_view_wid ON tbl_task_view (wid);
-CREATE INDEX idx_fk_team_wid ON tbl_team (wid);
-CREATE INDEX idx_fk_template_uid ON tbl_template (uid);
-CREATE INDEX idx_fk_template_wid ON tbl_template (wid);
+CREATE INDEX idx_fk_skill_source_workspace_sn ON tbl_skill_source (workspace_sn);
+CREATE INDEX idx_fk_task_user_sn ON tbl_task (user_sn);
+CREATE INDEX idx_fk_task_view_user_sn ON tbl_task_view (user_sn);
+CREATE INDEX idx_fk_task_view_workspace_sn ON tbl_task_view (workspace_sn);
+CREATE INDEX idx_fk_team_workspace_sn ON tbl_team (workspace_sn);
+CREATE INDEX idx_fk_template_user_sn ON tbl_template (user_sn);
+CREATE INDEX idx_fk_template_workspace_sn ON tbl_template (workspace_sn);
 CREATE INDEX idx_fk_template_revision_profile_sn ON tbl_template_revision (profile_sn);
-CREATE INDEX idx_fk_template_revision_uid ON tbl_template_revision (uid);
-CREATE INDEX idx_fk_workspace_uid ON tbl_workspace (uid);
+CREATE INDEX idx_fk_template_revision_user_sn ON tbl_template_revision (user_sn);
+CREATE INDEX idx_fk_workspace_user_sn ON tbl_workspace (user_sn);

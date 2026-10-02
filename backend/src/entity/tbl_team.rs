@@ -7,7 +7,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub sn: i64,
-    pub wid: i64,
+    pub workspace_sn: i64,
     #[sea_orm(column_type = "Text")]
     pub name: String,
     #[sea_orm(column_type = "Text")]
@@ -15,7 +15,9 @@ pub struct Model {
     pub daily_token_budget: Option<i64>,
     pub context_warn_percent: i64,
     pub max_concurrent_run: i64,
+    #[sea_orm(column_type = "Text")]
     pub spawn_mode: String,
+    #[sea_orm(column_type = "Text")]
     pub spawn_allow: String,
     pub max_child_run: i64,
     pub is_review_required: i64,
@@ -46,7 +48,7 @@ pub enum Relation {
     TblProject,
     #[sea_orm(
         belongs_to = "super::tbl_workspace::Entity",
-        from = "Column::Wid",
+        from = "Column::WorkspaceSn",
         to = "super::tbl_workspace::Column::Sn",
         on_update = "NoAction",
         on_delete = "Cascade"

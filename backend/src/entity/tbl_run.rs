@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, serde :: Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, serde :: Serialize)]
 #[sea_orm(table_name = "tbl_run")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -16,11 +16,17 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub start_by: String,
     pub retry_run_sn: Option<i64>,
+    #[sea_orm(unique_key = "ux_run_child")]
     pub parent_run_sn: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
     pub spawn_mode: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
     pub tier: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
     pub brief: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
     pub kind: Option<String>,
+    #[sea_orm(unique_key = "ux_run_child")]
     pub child_seq: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub paths: Option<String>,
@@ -42,7 +48,9 @@ pub struct Model {
     pub fail_detail: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub branch: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
     pub workdir: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
     pub workdir_clean_at: Option<String>,
     pub token_input: Option<i64>,
     pub token_cache_read: Option<i64>,
@@ -115,12 +123,28 @@ pub enum Relation {
     TblReview,
     #[sea_orm(
         belongs_to = "Entity",
+        from = "Column::WaitRunSn",
+        to = "Column::Sn",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    SelfRef3,
+    #[sea_orm(
+        belongs_to = "Entity",
+        from = "Column::ParentRunSn",
+        to = "Column::Sn",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    SelfRef2,
+    #[sea_orm(
+        belongs_to = "Entity",
         from = "Column::RetryRunSn",
         to = "Column::Sn",
         on_update = "NoAction",
         on_delete = "SetNull"
     )]
-    SelfRef,
+    SelfRef1,
     #[sea_orm(has_many = "super::tbl_run_file::Entity")]
     TblRunFile,
     #[sea_orm(has_many = "super::tbl_run_step::Entity")]

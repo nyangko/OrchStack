@@ -18,7 +18,7 @@ pub struct Model {
     pub status: String,
     #[sea_orm(column_type = "Text")]
     pub create_by: String,
-    pub uid: Option<i64>,
+    pub user_sn: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub note: Option<String>,
     pub event_sn: Option<i64>,
@@ -38,6 +38,14 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     TblIssue,
+    #[sea_orm(
+        belongs_to = "super::tbl_log_event::Entity",
+        from = "Column::EventSn",
+        to = "super::tbl_log_event::Column::Sn",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    TblLogEvent,
     #[sea_orm(
         belongs_to = "super::tbl_member::Entity",
         from = "Column::ToMemberSn",
@@ -72,8 +80,8 @@ pub enum Relation {
     TblTask,
     #[sea_orm(
         belongs_to = "super::tbl_user::Entity",
-        from = "Column::Uid",
-        to = "super::tbl_user::Column::Uid",
+        from = "Column::UserSn",
+        to = "super::tbl_user::Column::Sn",
         on_update = "NoAction",
         on_delete = "SetNull"
     )]
@@ -83,6 +91,12 @@ pub enum Relation {
 impl Related<super::tbl_issue::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblIssue.def()
+    }
+}
+
+impl Related<super::tbl_log_event::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblLogEvent.def()
     }
 }
 

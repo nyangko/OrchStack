@@ -7,8 +7,8 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub sn: i64,
-    pub wid: i64,
-    pub uid: i64,
+    pub workspace_sn: i64,
+    pub user_sn: i64,
     #[sea_orm(column_type = "Text")]
     pub event_code: String,
     #[sea_orm(column_type = "Text")]
@@ -33,6 +33,14 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
+        belongs_to = "super::tbl_log_event::Entity",
+        from = "Column::EventSn",
+        to = "super::tbl_log_event::Column::Sn",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    TblLogEvent,
+    #[sea_orm(
         belongs_to = "super::tbl_member::Entity",
         from = "Column::MemberSn",
         to = "super::tbl_member::Column::Sn",
@@ -42,20 +50,26 @@ pub enum Relation {
     TblMember,
     #[sea_orm(
         belongs_to = "super::tbl_user::Entity",
-        from = "Column::Uid",
-        to = "super::tbl_user::Column::Uid",
+        from = "Column::UserSn",
+        to = "super::tbl_user::Column::Sn",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
     TblUser,
     #[sea_orm(
         belongs_to = "super::tbl_workspace::Entity",
-        from = "Column::Wid",
+        from = "Column::WorkspaceSn",
         to = "super::tbl_workspace::Column::Sn",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
     TblWorkspace,
+}
+
+impl Related<super::tbl_log_event::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblLogEvent.def()
+    }
 }
 
 impl Related<super::tbl_member::Entity> for Entity {

@@ -18,7 +18,7 @@ pub struct Model {
     pub status: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub decide_by: Option<String>,
-    pub uid: Option<i64>,
+    pub user_sn: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub orch_reason: Option<String>,
     pub is_timer_pause: i64,
@@ -69,8 +69,8 @@ pub enum Relation {
     TblTask,
     #[sea_orm(
         belongs_to = "super::tbl_user::Entity",
-        from = "Column::Uid",
-        to = "super::tbl_user::Column::Uid",
+        from = "Column::UserSn",
+        to = "super::tbl_user::Column::Sn",
         on_update = "NoAction",
         on_delete = "SetNull"
     )]

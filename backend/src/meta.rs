@@ -200,7 +200,7 @@ async fn labels(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Ve
 /// 저장 보기 목록 (sort → 번호순)
 #[utoipa::path(operation_id = "meta_views", get, path = "/task-views", responses((status = 200, body = Vec<View>), (status = "default", body = ErrorBody)))]
 async fn views(State(db): State<DatabaseConnection>) -> Res<Json<Vec<View>>> {
-    Ok(Json(tv::Entity::find().filter(tv::Column::Uid.eq(crate::UID)).order_by_asc(tv::Column::Sort).order_by_asc(tv::Column::Sn).all(&db).await?.into_iter()
+    Ok(Json(tv::Entity::find().filter(tv::Column::UserSn.eq(crate::USER)).order_by_asc(tv::Column::Sort).order_by_asc(tv::Column::Sn).all(&db).await?.into_iter()
         .map(|m| View { sn: Some(m.sn), name: m.name, filter: serde_json::from_str(&m.filter_json).unwrap_or_default(), sort: m.sort }).collect()))
 }
 
@@ -212,10 +212,10 @@ async fn save_view(State(db): State<DatabaseConnection>, Body(b): Body<View>) ->
     }
     let out = event::run(&db, async |tx| {
         let m = tv::ActiveModel {
-            wid: Set(crate::WID), uid: Set(crate::UID), name: Set(b.name.clone()), filter_json: Set(b.filter.to_string()), sort: Set(b.sort), ..Default::default()
+            workspace_sn: Set(crate::WORKSPACE), user_sn: Set(crate::USER), name: Set(b.name.clone()), filter_json: Set(b.filter.to_string()), sort: Set(b.sort), ..Default::default()
         }.insert(tx).await?;
         let out = View { sn: Some(m.sn), name: m.name, filter: b.filter.clone(), sort: m.sort };
-        Ok((out, vec![Ev::new(None, "workspace", crate::WID, "TaskViewSaved", &json!({ "view_sn": m.sn, "name": b.name }))]))
+        Ok((out, vec![Ev::new(None, "workspace", crate::WORKSPACE, "TaskViewSaved", &json!({ "view_sn": m.sn, "name": b.name }))]))
     }).await?;
     Ok((StatusCode::CREATED, Json(out)))
 }
@@ -224,10 +224,10 @@ async fn save_view(State(db): State<DatabaseConnection>, Body(b): Body<View>) ->
 #[utoipa::path(operation_id = "meta_remove_view", delete, path = "/task-views/{sn}", params(("sn" = i64, Path, description = "보기 번호")), responses((status = 204, description = "삭제됨"), (status = "default", body = ErrorBody)))]
 async fn remove_view(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<StatusCode> {
     event::run(&db, async |tx| {
-        if tv::Entity::delete_many().filter(tv::Column::Sn.eq(sn)).filter(tv::Column::Uid.eq(crate::UID)).exec(tx).await?.rows_affected == 0 {
+        if tv::Entity::delete_many().filter(tv::Column::Sn.eq(sn)).filter(tv::Column::UserSn.eq(crate::USER)).exec(tx).await?.rows_affected == 0 {
             return Err(Error::not_found());
         }
-        Ok(((), vec![Ev::new(None, "workspace", crate::WID, "TaskViewDeleted", &json!({ "view_sn": sn }))]))
+        Ok(((), vec![Ev::new(None, "workspace", crate::WORKSPACE, "TaskViewDeleted", &json!({ "view_sn": sn }))]))
     }).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -236,10 +236,10 @@ async fn remove_view(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<St
 #[utoipa::path(operation_id = "meta_diagram", get, path = "/projects/{sn}/diagram", params(("sn" = i64, Path, description = "프로젝트 번호")), responses((status = 200, body = Diagram), (status = "default", body = ErrorBody)))]
 async fn diagram(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Diagram>> {
     pj::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
-    let view = dv::Entity::find().filter(dv::Column::ProjectSn.eq(sn)).filter(dv::Column::Uid.eq(crate::UID)).one(&db).await?
+    let view = dv::Entity::find().filter(dv::Column::ProjectSn.eq(sn)).filter(dv::Column::UserSn.eq(crate::USER)).one(&db).await?
         .map_or(DiagramView { layout_mode: "auto".into(), zoom_percent: 100, is_show_capability: 1, is_show_done: 0 },
             |m| DiagramView { layout_mode: m.layout_mode, zoom_percent: m.zoom_percent, is_show_capability: m.is_show_capability, is_show_done: m.is_show_done });
-    let nodes = dn::Entity::find().filter(dn::Column::ProjectSn.eq(sn)).filter(dn::Column::Uid.eq(crate::UID)).order_by_asc(dn::Column::Sn).all(&db).await?.into_iter()
+    let nodes = dn::Entity::find().filter(dn::Column::ProjectSn.eq(sn)).filter(dn::Column::UserSn.eq(crate::USER)).order_by_asc(dn::Column::Sn).all(&db).await?.into_iter()
         .map(|m| Node { node_type: m.node_type, node_sn: m.node_sn, pos_x: m.pos_x, pos_y: m.pos_y, is_collapsed: m.is_collapsed }).collect();
     Ok(Json(Diagram { view, nodes }))
 }
@@ -259,15 +259,15 @@ async fn set_diagram(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): 
     pj::Entity::find_by_id(sn).one(&db).await?.ok_or_else(Error::not_found)?;
     // 이벤트 0개 — 쓰기 직렬화 락 · 트랜잭션만 쓴다
     event::run(&db, async |tx| {
-        dv::Entity::delete_many().filter(dv::Column::ProjectSn.eq(sn)).filter(dv::Column::Uid.eq(crate::UID)).exec(tx).await?;
+        dv::Entity::delete_many().filter(dv::Column::ProjectSn.eq(sn)).filter(dv::Column::UserSn.eq(crate::USER)).exec(tx).await?;
         dv::ActiveModel {
-            project_sn: Set(sn), uid: Set(crate::UID), layout_mode: Set(v.layout_mode.clone()), zoom_percent: Set(v.zoom_percent),
+            project_sn: Set(sn), user_sn: Set(crate::USER), layout_mode: Set(v.layout_mode.clone()), zoom_percent: Set(v.zoom_percent),
             is_show_capability: Set(v.is_show_capability), is_show_done: Set(v.is_show_done), ..Default::default()
         }.insert(tx).await?;
-        dn::Entity::delete_many().filter(dn::Column::ProjectSn.eq(sn)).filter(dn::Column::Uid.eq(crate::UID)).exec(tx).await?;
+        dn::Entity::delete_many().filter(dn::Column::ProjectSn.eq(sn)).filter(dn::Column::UserSn.eq(crate::USER)).exec(tx).await?;
         for n in &b.nodes {
             dn::ActiveModel {
-                project_sn: Set(sn), uid: Set(crate::UID), node_type: Set(n.node_type.clone()), node_sn: Set(n.node_sn), pos_x: Set(n.pos_x), pos_y: Set(n.pos_y),
+                project_sn: Set(sn), user_sn: Set(crate::USER), node_type: Set(n.node_type.clone()), node_sn: Set(n.node_sn), pos_x: Set(n.pos_x), pos_y: Set(n.pos_y),
                 is_collapsed: Set(n.is_collapsed), ..Default::default()
             }.insert(tx).await?;
         }

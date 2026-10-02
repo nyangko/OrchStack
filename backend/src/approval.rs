@@ -37,7 +37,7 @@ pub struct Approval {
     /// pending | approved | denied | expired
     status: String,
     deadline_at: Option<String>,
-    uid: Option<i64>,
+    user_sn: Option<i64>,
     create_at: String,
     decide_at: Option<String>,
 }
@@ -46,7 +46,7 @@ impl From<a::Model> for Approval {
     fn from(m: a::Model) -> Self {
         Self {
             sn: m.sn, project_sn: m.project_sn, task_sn: m.task_sn, run_sn: m.run_sn, member_sn: m.member_sn, rule_sn: m.rule_sn,
-            action_code: m.action_code, title: m.title, detail: m.detail, status: m.status, deadline_at: m.deadline_at, uid: m.uid,
+            action_code: m.action_code, title: m.title, detail: m.detail, status: m.status, deadline_at: m.deadline_at, user_sn: m.user_sn,
             create_at: m.create_at, decide_at: m.decide_at,
         }
     }
@@ -96,7 +96,7 @@ async fn decide(db: &DatabaseConnection, sn: i64, to: &'static str, kind: &'stat
         if !MOVES.contains(&(cur.status.as_str(), to)) {
             return Err(Error::conflict(format!("cannot move approval {} -> {to}", cur.status)));
         }
-        Tbl::update_many().filter(a::Column::Sn.eq(sn)).col_expr(a::Column::Status, to.into()).col_expr(a::Column::Uid, crate::UID.into())
+        Tbl::update_many().filter(a::Column::Sn.eq(sn)).col_expr(a::Column::Status, to.into()).col_expr(a::Column::UserSn, crate::USER.into())
             .col_expr(a::Column::DecideAt, Expr::cust("datetime('now')")).exec(tx).await?;
         let out = get(tx, sn).await?;
         Ok((out, vec![Ev::new(Some(cur.project_sn), "approval", sn, kind, &json!({ "task_sn": cur.task_sn, "action_code": cur.action_code }))]))

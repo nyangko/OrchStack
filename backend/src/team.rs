@@ -189,7 +189,7 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<TeamNew>) ->
         return Err(Error::invalid(format!("kind must be one of {KINDS:?}")));
     }
     let out = event::run(&db, async |tx| {
-        let m = tm::ActiveModel { wid: Set(crate::WID), name: Set(b.name), kind: b.kind.map_or(NotSet, Set), ..Default::default() };
+        let m = tm::ActiveModel { workspace_sn: Set(crate::WORKSPACE), name: Set(b.name), kind: b.kind.map_or(NotSet, Set), ..Default::default() };
         let out = Team::from(m.insert(tx).await?);
         let ev = Ev::new(None, "team", out.sn, "TeamCreated", &out);
         Ok((out, vec![ev]))
@@ -289,7 +289,7 @@ async fn add(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<Mem
             None => {
                 let role = b.role_name.ok_or_else(|| Error::invalid("role_name is required without template_sn".into()))?;
                 // 빈 캐릭터: DB 기본값 프로필
-                m.profile_sn = Set(ap::ActiveModel { wid: Set(crate::WID), kind: Set("member".into()), ..Default::default() }.insert(tx).await?.sn);
+                m.profile_sn = Set(ap::ActiveModel { workspace_sn: Set(crate::WORKSPACE), kind: Set("member".into()), ..Default::default() }.insert(tx).await?.sn);
                 role
             }
         };

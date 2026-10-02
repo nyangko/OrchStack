@@ -219,7 +219,7 @@ async fn create(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
         let num = next_num(tx, issue.project_sn).await?;
         let m = t::ActiveModel {
             project_sn: Set(issue.project_sn), issue_sn: Set(Some(sn)), num: Set(num), title: Set(b.title), description: Set(b.description),
-            priority: priority.map_or(sea_orm::ActiveValue::NotSet, Set), uid: Set(Some(crate::UID)), ..Default::default()
+            priority: priority.map_or(sea_orm::ActiveValue::NotSet, Set), user_sn: Set(Some(crate::USER)), ..Default::default()
         }.insert(tx).await?;
         let out = Task::from(m);
         let ev = Ev::new(Some(out.project_sn), "task", out.sn, "TaskCreated", &out);

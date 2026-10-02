@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, serde :: Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, serde :: Serialize)]
 #[sea_orm(table_name = "tbl_log_token")]
 pub struct Model {
     #[sea_orm(primary_key)]

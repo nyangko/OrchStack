@@ -240,7 +240,7 @@ async fn append(tx: &DatabaseTransaction, project_sn: i64, m: ms::ActiveModel) -
         Some(c) => c.sn,
         None => {
             let orch = orch_of(tx, project_sn).await?.ok_or_else(|| Error::conflict("project team has no Orch member".into()))?;
-            cv::ActiveModel { project_sn: Set(project_sn), member_sn: Set(orch), uid: Set(crate::UID), ..Default::default() }.insert(tx).await?.sn
+            cv::ActiveModel { project_sn: Set(project_sn), member_sn: Set(orch), user_sn: Set(crate::USER), ..Default::default() }.insert(tx).await?.sn
         }
     };
     cv::Entity::update_many().filter(cv::Column::Sn.eq(conv)).col_expr(cv::Column::UpdateAt, Expr::cust("datetime('now')")).exec(tx).await?;
@@ -366,7 +366,7 @@ async fn proceed(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<P
         let mut evs = Vec::new();
         let num = next_num(tx, ps).await?;
         let im = i::ActiveModel {
-            project_sn: Set(ps), num: Set(num), title: Set(plan.issue.title.clone()), body: Set(plan.issue.body.clone()), uid: Set(Some(crate::UID)), ..Default::default()
+            project_sn: Set(ps), num: Set(num), title: Set(plan.issue.title.clone()), body: Set(plan.issue.body.clone()), user_sn: Set(Some(crate::USER)), ..Default::default()
         }.insert(tx).await?;
         let (issue_sn, issue) = (im.sn, Issue::from(im));
         evs.push(Ev::new(Some(ps), "issue", issue_sn, "IssueCreated", &issue));
@@ -375,7 +375,7 @@ async fn proceed(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<P
             let num = next_num(tx, ps).await?;
             let tm = t::ActiveModel {
                 project_sn: Set(ps), issue_sn: Set(Some(issue_sn)), num: Set(num), title: Set(x.title.clone()), description: Set(x.description.clone()),
-                member_sn: Set(x.member_sn), assign_by: Set(x.member_sn.map(|_| "orch_auto".into())), uid: Set(Some(crate::UID)), ..Default::default()
+                member_sn: Set(x.member_sn), assign_by: Set(x.member_sn.map(|_| "orch_auto".into())), user_sn: Set(Some(crate::USER)), ..Default::default()
             }.insert(tx).await?;
             let (task_sn, task) = (tm.sn, Task::from(tm));
             evs.push(Ev::new(Some(ps), "task", task_sn, "TaskCreated", &task));
@@ -448,7 +448,7 @@ async fn instruct(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Bod
             return Err(Error::conflict(format!("run is {}", run.status)));
         }
         let a = la::ActiveModel {
-            project_sn: Set(Some(run.project_sn)), task_sn: Set(Some(run.task_sn)), run_sn: Set(Some(sn)), actor_type: Set("user".into()), uid: Set(Some(crate::UID)),
+            project_sn: Set(Some(run.project_sn)), task_sn: Set(Some(run.task_sn)), run_sn: Set(Some(sn)), actor_type: Set("user".into()), user_sn: Set(Some(crate::USER)),
             target_member_sn: Set(Some(run.member_sn)), kind: Set("TASK_INSTRUCTION".into()), title: Set(b.text.clone()), ..Default::default()
         }.insert(tx).await?;
         let out = Instruction { activity_sn: a.sn, run_sn: sn, member_sn: run.member_sn, text: b.text.clone(), create_at: a.create_at };

@@ -59,6 +59,14 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     TblTask1,
+    #[sea_orm(
+        belongs_to = "super::tbl_task_criterion::Entity",
+        from = "Column::CriterionSn",
+        to = "super::tbl_task_criterion::Column::Sn",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    TblTaskCriterion,
 }
 
 impl Related<super::tbl_contract::Entity> for Entity {
@@ -70,6 +78,12 @@ impl Related<super::tbl_contract::Entity> for Entity {
 impl Related<super::tbl_run::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TblRun.def()
+    }
+}
+
+impl Related<super::tbl_task_criterion::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblTaskCriterion.def()
     }
 }
 

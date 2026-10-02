@@ -349,7 +349,7 @@ async fn settle(tx: &DatabaseTransaction, cur: &op::Model, to: &str, user: bool,
     let mut q = op::Entity::update_many().filter(op::Column::Sn.eq(cur.sn)).filter(op::Column::Status.eq("proposed")).col_expr(op::Column::Status, to.to_owned().into())
         .col_expr(op::Column::StreakCount, streak.into()).col_expr(op::Column::Reason, reason.into()).col_expr(op::Column::ResolveAt, Expr::cust("datetime('now')"));
     if user {
-        q = q.col_expr(op::Column::Uid, crate::UID.into());
+        q = q.col_expr(op::Column::UserSn, crate::USER.into());
     }
     if q.exec(tx).await?.rows_affected == 0 {
         return Err(Error::conflict(format!("proposal {} is not proposed", cur.sn)));

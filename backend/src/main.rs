@@ -40,8 +40,8 @@ use serde_json::{Value, json};
 const SCHEMA: &str = include_str!("../../data/sqlite.sql");
 
 // Alpha는 로컬 1인 사용: 사용자 1 · 워크스페이스 1 고정
-const UID: i64 = 1;
-const WID: i64 = 1;
+const USER: i64 = 1;
+const WORKSPACE: i64 = 1;
 
 /// 연결 후 테이블이 없으면 data/sqlite.sql로 만들고 기본 사용자 · 워크스페이스를 넣는다
 async fn connect(opt: ConnectOptions) -> Result<DatabaseConnection, DbErr> {
@@ -52,8 +52,8 @@ async fn connect(opt: ConnectOptions) -> Result<DatabaseConnection, DbErr> {
         let tx = db.begin().await?;
         tx.execute_unprepared(SCHEMA).await?;
         tx.execute_unprepared(&format!(
-            "INSERT INTO tbl_user (uid, name) VALUES ({UID}, 'Me'); \
-             INSERT INTO tbl_workspace (sn, uid, name) VALUES ({WID}, {UID}, 'OrchStack');"
+            "INSERT INTO tbl_user (sn, name) VALUES ({USER}, 'Me'); \
+             INSERT INTO tbl_workspace (sn, user_sn, name) VALUES ({WORKSPACE}, {USER}, 'OrchStack');"
         ))
         .await?;
         tx.commit().await?;
@@ -151,9 +151,9 @@ mod tests {
     async fn project() {
         let app = setup().await;
 
-        // 생성: 시드 워크스페이스(wid=1)에 붙고, DB 기본값(default_branch = 'main')이 채워진다
+        // 생성: 시드 워크스페이스(workspace_sn=1)에 붙고, DB 기본값(default_branch = 'main')이 채워진다
         let (st, p) = call(&app, "POST", "/projects", Some(json!({"name": "OrchStack"}))).await;
-        assert_eq!((st, p["default_branch"].as_str(), p["wid"].as_i64()), (StatusCode::CREATED, Some("main"), Some(1)));
+        assert_eq!((st, p["default_branch"].as_str(), p["workspace_sn"].as_i64()), (StatusCode::CREATED, Some("main"), Some(1)));
         let sn = p["sn"].as_i64().unwrap();
 
         // 목록 · 수정 · 조회 · 삭제 후 404
@@ -248,7 +248,7 @@ mod tests {
         let (_, t) = call(app, "POST", &format!("/issues/{}/tasks", i["sn"]), Some(json!({"title": "T"}))).await;
         if assign {
             db.execute_unprepared(
-                "INSERT INTO tbl_agent_profile (wid, kind) VALUES (1, 'workspace'); INSERT INTO tbl_team (wid, name) VALUES (1, 'T'); \
+                "INSERT INTO tbl_agent_profile (workspace_sn, kind) VALUES (1, 'workspace'); INSERT INTO tbl_team (workspace_sn, name) VALUES (1, 'T'); \
                  INSERT INTO tbl_member (team_sn, profile_sn, name, role_name) VALUES (1, 1, 'm', 'Dev'); UPDATE tbl_task SET member_sn = 1;",
             ).await.unwrap();
         }
@@ -263,12 +263,12 @@ mod tests {
             .all(db).await.unwrap().into_iter().map(|r| (r.event_type, r.seq)).collect()
     }
 
-    /// 대상 번호가 sn인 이벤트(kind)의 (actor_type, member_sn, uid)
+    /// 대상 번호가 sn인 이벤트(kind)의 (actor_type, member_sn, user_sn)
     async fn actor(db: &DatabaseConnection, kind: &str, sn: i64) -> (String, Option<i64>, Option<i64>) {
         use crate::entity::tbl_log_event as ev;
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
         let e = ev::Entity::find().filter(ev::Column::EventType.eq(kind)).filter(ev::Column::AggregateSn.eq(sn)).one(db).await.unwrap().unwrap();
-        (e.actor_type, e.member_sn, e.uid)
+        (e.actor_type, e.member_sn, e.user_sn)
     }
 
     /// StartRun → Review → Approve: 이벤트 3행(seq 1·2·3)이 쌓이고 태스크는 최종 done
@@ -308,7 +308,7 @@ mod tests {
         let ts = task_of(&app, &db, false).await;
         assert_eq!(call(&app, "POST", &format!("/tasks/{ts}/runs"), None).await.0, StatusCode::CONFLICT);
         db.execute_unprepared(
-            "INSERT INTO tbl_agent_profile (wid, kind) VALUES (1, 'workspace'); INSERT INTO tbl_team (wid, name) VALUES (1, 'T'); \
+            "INSERT INTO tbl_agent_profile (workspace_sn, kind) VALUES (1, 'workspace'); INSERT INTO tbl_team (workspace_sn, name) VALUES (1, 'T'); \
              INSERT INTO tbl_member (team_sn, profile_sn, name, role_name) VALUES (1, 1, 'm', 'Dev'); UPDATE tbl_task SET member_sn = 1;",
         ).await.unwrap();
 
@@ -384,8 +384,8 @@ mod tests {
         assert_eq!(call(&app, "GET", "/profiles?kind=member", None).await.1.as_array().unwrap().len(), 0);
         // 폴백 체인: 같은 연결을 등급별 모델로 두 번 · 배열 순서 = sort · 모르는 tier · 없는 연결은 422
         db.execute_unprepared(
-            "INSERT INTO tbl_runtime (sn, wid, code, name) VALUES (1, 1, 'claude_code', 'Claude Code'); \
-             INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'max');",
+            "INSERT INTO tbl_runtime (sn, workspace_sn, code, name) VALUES (1, 1, 'claude_code', 'Claude Code'); \
+             INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'max');",
         ).await.unwrap();
         let fbs = format!("/profiles/{ps}/fallbacks");
         let chain = json!([{"runtime_sn": 1, "connection_sn": 1, "tier": "S"}, {"runtime_sn": 1, "connection_sn": 1, "tier": null}]);
@@ -407,11 +407,11 @@ mod tests {
 
         // 템플릿(live v2 · 도구 정책 1개)과 draft 템플릿은 SQL로 넣는다 (템플릿 편집은 이 Task 범위 밖)
         db.execute_unprepared(
-            "INSERT INTO tbl_agent_profile (sn, wid, kind, effort) VALUES (10, 1, 'template', 'high'); \
+            "INSERT INTO tbl_agent_profile (sn, workspace_sn, kind, effort) VALUES (10, 1, 'template', 'high'); \
              INSERT INTO tbl_profile_tool (profile_sn, tool_code, policy) VALUES (10, 'shell', 'approval'); \
-             INSERT INTO tbl_template (sn, wid, name, role_name, icon, color) VALUES (1, 1, 'Frontend', 'Frontend Developer', 'monitor', 'role-frontend'); \
+             INSERT INTO tbl_template (sn, workspace_sn, name, role_name, icon, color) VALUES (1, 1, 'Frontend', 'Frontend Developer', 'monitor', 'role-frontend'); \
              INSERT INTO tbl_template_revision (template_sn, profile_sn, version, status) VALUES (1, 10, 2, 'live'); \
-             INSERT INTO tbl_template (sn, wid, name, status) VALUES (2, 1, 'Draft', 'draft');",
+             INSERT INTO tbl_template (sn, workspace_sn, name, status) VALUES (2, 1, 'Draft', 'draft');",
         ).await.unwrap();
         assert_eq!(call(&app, "GET", "/templates", None).await.1.as_array().unwrap().len(), 2);
         assert_eq!(call(&app, "GET", "/templates/1", None).await.1["role_name"], "Frontend Developer");
@@ -504,7 +504,7 @@ mod tests {
     async fn setting() {
         let db = mem().await;
         let app = app(db.clone());
-        db.execute_unprepared("INSERT INTO tbl_runtime (sn, wid, code, name, sort) VALUES (1, 1, 'codex', 'Codex CLI', 1), (2, 1, 'claude_code', 'Claude Code', 0);").await.unwrap();
+        db.execute_unprepared("INSERT INTO tbl_runtime (sn, workspace_sn, code, name, sort) VALUES (1, 1, 'codex', 'Codex CLI', 1), (2, 1, 'claude_code', 'Claude Code', 0);").await.unwrap();
         let v = call(&app, "GET", "/runtimes", None).await.1;
         assert_eq!((v[0]["code"].as_str(), v[1]["code"].as_str()), (Some("claude_code"), Some("codex")));
 
@@ -548,11 +548,11 @@ mod tests {
         let w = call(&app, "GET", "/workspace", None).await.1;
         assert_eq!((w["timezone"].as_str(), w["default_repo"].as_str(), w["is_onboarded"].as_i64()), (Some("UTC"), Some("orchstack/app"), Some(1)));
         assert_eq!(call(&app, "PATCH", "/workspace", Some(json!({"theme": "blue"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(events(&db, "workspace", WID).await.len(), 1);
+        assert_eq!(events(&db, "workspace", WORKSPACE).await.len(), 1);
 
         // 프리셋: 종류 필터 · 버전 최신순 · 없는 프리셋 404
         db.execute_unprepared(
-            "INSERT INTO tbl_instruction_preset (sn, wid, kind, preset_key, name, version, limit_tok, is_builtin) VALUES (1, 1, 'role', 'frontend', 'Frontend', 2, 400, 1), (2, 1, 'style', 'terse', 'Terse', 1, 200, 1); \
+            "INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, version, limit_tok, is_builtin) VALUES (1, 1, 'role', 'frontend', 'Frontend', 2, 400, 1), (2, 1, 'style', 'terse', 'Terse', 1, 200, 1); \
              INSERT INTO tbl_instruction_preset_version (preset_sn, version, content, source) VALUES (1, 1, 'v1', 'builtin'), (1, 2, 'v2', 'user');",
         ).await.unwrap();
         let v = call(&app, "GET", "/presets?kind=role", None).await.1;
@@ -617,7 +617,7 @@ mod tests {
         approval::create(&db, an("run_extend")).await.unwrap();
         assert_eq!(call(&app, "GET", "/approvals?status=pending&project_sn=1", None).await.1.as_array().unwrap().len(), 2);
         let (st, a) = call(&app, "POST", "/approvals/1/approve", None).await;
-        assert_eq!((st, a["status"].as_str(), a["uid"].as_i64(), a["decide_at"].is_string()), (StatusCode::OK, Some("approved"), Some(UID), true));
+        assert_eq!((st, a["status"].as_str(), a["user_sn"].as_i64(), a["decide_at"].is_string()), (StatusCode::OK, Some("approved"), Some(USER), true));
         assert_eq!(call(&app, "POST", "/approvals/2/deny", None).await.1["status"], "denied");
         assert_eq!(call(&app, "POST", "/approvals/1/deny", None).await.0, StatusCode::CONFLICT);
         assert_eq!(call(&app, "GET", "/approvals?status=pending", None).await.1.as_array().unwrap().len(), 0);
@@ -630,12 +630,12 @@ mod tests {
         let db = mem().await;
         let app = app(db.clone());
         db.execute_unprepared(
-            "INSERT INTO tbl_skill_source (sn, wid, kind, name, sort) VALUES (1, 1, 'github', 'team', 1), (2, 1, 'builtin', 'base', 0); \
-             INSERT INTO tbl_skill (sn, wid, source_sn, name, scan_status) VALUES (1, 1, 1, 'svelte-ui', 'passed'), (2, 1, 1, 'bad', 'failed'), (3, 1, 2, 'new', 'pending'); \
-             INSERT INTO tbl_mcp (sn, wid, name, install_status) VALUES (1, 1, 'playwright', 'installed'); \
-             INSERT INTO tbl_agent_profile (sn, wid, kind) VALUES (1, 1, 'member'), (2, 1, 'template'); \
-             INSERT INTO tbl_team (sn, wid, name) VALUES (1, 1, 'T'); INSERT INTO tbl_member (team_sn, profile_sn, name, role_name) VALUES (1, 1, '진', 'Dev'); \
-             INSERT INTO tbl_template (sn, wid, name) VALUES (1, 1, 'Frontend'); INSERT INTO tbl_template_revision (template_sn, profile_sn, version, status) VALUES (1, 2, 1, 'live'); \
+            "INSERT INTO tbl_skill_source (sn, workspace_sn, kind, name, sort) VALUES (1, 1, 'github', 'team', 1), (2, 1, 'builtin', 'base', 0); \
+             INSERT INTO tbl_skill (sn, workspace_sn, source_sn, name, scan_status) VALUES (1, 1, 1, 'svelte-ui', 'passed'), (2, 1, 1, 'bad', 'failed'), (3, 1, 2, 'new', 'pending'); \
+             INSERT INTO tbl_mcp (sn, workspace_sn, name, install_status) VALUES (1, 1, 'playwright', 'installed'); \
+             INSERT INTO tbl_agent_profile (sn, workspace_sn, kind) VALUES (1, 1, 'member'), (2, 1, 'template'); \
+             INSERT INTO tbl_team (sn, workspace_sn, name) VALUES (1, 1, 'T'); INSERT INTO tbl_member (team_sn, profile_sn, name, role_name) VALUES (1, 1, '진', 'Dev'); \
+             INSERT INTO tbl_template (sn, workspace_sn, name) VALUES (1, 1, 'Frontend'); INSERT INTO tbl_template_revision (template_sn, profile_sn, version, status) VALUES (1, 2, 1, 'live'); \
              INSERT INTO tbl_map_profile_mcp (profile_sn, mcp_sn, access_mode) VALUES (1, 1, 'installed');",
         ).await.unwrap();
         let v = call(&app, "GET", "/skill-sources", None).await.1;
@@ -710,10 +710,10 @@ mod tests {
         for bad in [json!([rule, rule]), json!([{"event_code": "x", "channel_kind": "app", "is_enabled": 1}]), json!([{"event_code": "pr", "channel_kind": "sms", "is_enabled": 1}])] {
             assert_eq!(call(&app, "PUT", "/notify/rules", Some(bad)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
         }
-        assert_eq!(events(&db, "workspace", WID).await, [("NotifyRulesUpdated".into(), 1)]);
+        assert_eq!(events(&db, "workspace", WORKSPACE).await, [("NotifyRulesUpdated".into(), 1)]);
 
         // 채널 · 테스트: key_ref 없음, app 항상 준비, off 채널은 준비 안 됨
-        db.execute_unprepared("INSERT INTO tbl_notify_channel (wid, kind, status, key_ref) VALUES (1, 'telegram', 'connected', 'orch.tg'), (1, 'email', 'off', NULL);").await.unwrap();
+        db.execute_unprepared("INSERT INTO tbl_notify_channel (workspace_sn, kind, status, key_ref) VALUES (1, 'telegram', 'connected', 'orch.tg'), (1, 'email', 'off', NULL);").await.unwrap();
         let v = call(&app, "GET", "/notify/channels", None).await.1;
         assert_eq!((v.as_array().unwrap().len(), v[0].get("key_ref")), (2, None));
         for (k, ready) in [("app", true), ("telegram", true), ("email", false), ("desktop", false)] {
@@ -730,7 +730,7 @@ mod tests {
         }
 
         // 감사 로그: 최신순 · 종류 · limit · 모르는 종류 422
-        db.execute_unprepared("INSERT INTO tbl_log_audit (wid, actor_type, kind, title) VALUES (1, 'user', 'KEY', 'k'), (1, 'member', 'BLOCK', 'git reset'), (1, 'user', 'BLOCK', 'git stash');").await.unwrap();
+        db.execute_unprepared("INSERT INTO tbl_log_audit (workspace_sn, actor_type, kind, title) VALUES (1, 'user', 'KEY', 'k'), (1, 'member', 'BLOCK', 'git reset'), (1, 'user', 'BLOCK', 'git stash');").await.unwrap();
         let v = call(&app, "GET", "/audit?kind=BLOCK&limit=1", None).await.1;
         assert_eq!((v.as_array().unwrap().len(), v[0]["title"].as_str()), (1, Some("git stash")));
         assert_eq!(call(&app, "GET", "/audit", None).await.1.as_array().unwrap().len(), 3);
@@ -834,7 +834,7 @@ mod tests {
         let lead = call(&app, "POST", &format!("/tasks/{ts}/runs"), None).await.1["sn"].as_i64().unwrap();
         // 하위: 2 runner 실패 → 3 runner 재시도(2의 재시도) · 4 runner 토큰 기록 없음 · 5 sub(runner 합계에서 빠짐)
         db.execute_unprepared(&format!(
-            "INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name) VALUES (1, 1, 'api_key', 'openai', 'OpenAI', 'work'), (2, 1, 'subscription', 'anthropic', 'Anthropic', 'max'); \
+            "INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name) VALUES (1, 1, 'api_key', 'openai', 'OpenAI', 'work'), (2, 1, 'subscription', 'anthropic', 'Anthropic', 'max'); \
              INSERT INTO tbl_run (sn, project_sn, task_sn, member_sn, num, status, start_by, parent_run_sn, spawn_mode, tier, kind, child_seq, paths, retry_run_sn) VALUES \
                (2, 1, {ts}, 1, 2, 'failed', 'lead', {lead}, 'runner', 'S', 'test', 1, '[{{\"path\":\"src/a\",\"source\":\"brief\",\"at\":null}}]', NULL), \
                (3, 1, {ts}, 1, 3, 'completed', 'retry', {lead}, 'runner', 'S', 'test', 2, NULL, 2), \
@@ -867,7 +867,7 @@ mod tests {
         assert_eq!(call(&app, "GET", "/teams/99/stats", None).await.0, StatusCode::NOT_FOUND);
 
         // 팀 한도: 프로필 연결(1) + 폴백(2) → 연결별 한도 · 가장 적게 남은 비율
-        db.execute_unprepared("UPDATE tbl_agent_profile SET connection_sn = 1 WHERE sn = 1; INSERT INTO tbl_runtime (sn, wid, code, name) VALUES (1, 1, 'codex', 'Codex'); \
+        db.execute_unprepared("UPDATE tbl_agent_profile SET connection_sn = 1 WHERE sn = 1; INSERT INTO tbl_runtime (sn, workspace_sn, code, name) VALUES (1, 1, 'codex', 'Codex'); \
             INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort) VALUES (1, 1, 2, 1); \
             INSERT INTO tbl_connection_quota (connection_sn, period, unit, used_value, remain_percent) VALUES (2, '5h', 'percent', 70, 30), (2, 'week', 'percent', 88, 12);").await.unwrap();
         let v = call(&app, "GET", "/teams/1/quota", None).await.1;
@@ -1145,8 +1145,8 @@ mod tests {
 
         // fallback: 연결 1(error) → 체인의 연결 2. 제안 → 실행 → 연결 교체 + FallbackUsed + 알림
         db.execute_unprepared(
-            "INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name, status) VALUES (1, 1, 'api_key', 'openai', 'OpenAI', 'bad', 'error'), (2, 1, 'api_key', 'openai', 'OpenAI', 'good', 'connected'); \
-             INSERT INTO tbl_runtime (sn, wid, code, name) VALUES (1, 1, 'codex', 'Codex'); \
+            "INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name, status) VALUES (1, 1, 'api_key', 'openai', 'OpenAI', 'bad', 'error'), (2, 1, 'api_key', 'openai', 'OpenAI', 'good', 'connected'); \
+             INSERT INTO tbl_runtime (sn, workspace_sn, code, name) VALUES (1, 1, 'codex', 'Codex'); \
              INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort) VALUES (1, 1, 1, 1), (1, 1, 2, 2);",
         ).await.unwrap();
         let b = 2;
@@ -1234,12 +1234,12 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
         let db = mem().await;
         db.execute_unprepared(&format!("
-            INSERT INTO tbl_team (sn, wid, name) VALUES (1, 1, 'T');
-            INSERT INTO tbl_runtime (sn, wid, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{1}');
-            INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c');
-            INSERT INTO tbl_agent_profile (sn, wid, kind, runtime_sn, connection_sn) VALUES (1, 1, 'member', 1, 1);
+            INSERT INTO tbl_team (sn, workspace_sn, name) VALUES (1, 1, 'T');
+            INSERT INTO tbl_runtime (sn, workspace_sn, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{1}');
+            INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c');
+            INSERT INTO tbl_agent_profile (sn, workspace_sn, kind, runtime_sn, connection_sn) VALUES (1, 1, 'member', 1, 1);
             INSERT INTO tbl_member (sn, team_sn, profile_sn, name, role_name) VALUES (1, 1, 1, 'm', 'dev');
-            INSERT INTO tbl_project (sn, wid, team_sn, name, repo_path) VALUES (1, 1, 1, 'p', '{0}');
+            INSERT INTO tbl_project (sn, workspace_sn, team_sn, name, repo_path) VALUES (1, 1, 1, 'p', '{0}');
             INSERT INTO tbl_issue (sn, project_sn, num, title) VALUES (1, 1, 1, 'I');
             INSERT INTO tbl_task (sn, project_sn, issue_sn, num, title, description, member_sn) VALUES (1, 1, 1, 2, 'Login', 'desc a', 1), (2, 1, 1, 3, 'Logout', NULL, 1);
             INSERT INTO tbl_task_criterion (task_sn, content, is_done, sort) VALUES (1, 'works', 0, 1), (1, 'errors', 1, 2);
@@ -1248,7 +1248,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
             INSERT INTO tbl_map_task_dependency (task_sn, depend_task_sn) VALUES (1, 2);
             INSERT INTO tbl_profile_path (profile_sn, kind, pattern, sort) VALUES (1, 'include', 'src/**', 1), (1, 'exclude', '**/.env*', 2);
             INSERT INTO tbl_profile_file (profile_sn, path, content, sort) VALUES (1, 'rules/a11y.md', 'A11Y-FILE', 1);
-            INSERT INTO tbl_instruction_preset (sn, wid, kind, preset_key, name, limit_tok) VALUES (1, 1, 'protocol', 'p', 'P', 500), (2, 1, 'rule', 'r', 'R', 500), (3, 1, 'role', 'd', 'D', 500);
+            INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, limit_tok) VALUES (1, 1, 'protocol', 'p', 'P', 500), (2, 1, 'rule', 'r', 'R', 500), (3, 1, 'role', 'd', 'D', 500);
             INSERT INTO tbl_instruction_preset_version (preset_sn, version, content, token_count) VALUES (1, 1, 'P-PROTO v1', 5), (2, 1, '- keep small', 0), (3, 1, '# Role: Dev', 5);
             INSERT INTO tbl_map_profile_preset (profile_sn, preset_sn, pinned_version, sort) VALUES (1, 3, 1, 0), (1, 1, 1, 1), (1, 2, 1, 2);
             INSERT INTO tbl_run (sn, project_sn, task_sn, member_sn, num, status) VALUES (1, 1, 1, 1, 1, 'queued'), (2, 1, 2, 1, 2, 'queued');",
@@ -1548,7 +1548,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         assert_eq!(call(&app, "POST", "/presets", Some(json!({"kind": "role", "preset_key": "qa", "name": "QA2", "limit_tok": 100, "content": "x"}))).await.0, StatusCode::CONFLICT);
 
         // 기본 제공은 수정 409 → 복제하면 새 프리셋(본문 · 상한 이어받음)
-        db.execute_unprepared("INSERT INTO tbl_instruction_preset (sn, wid, kind, preset_key, name, version, limit_tok, is_builtin) VALUES (90, 1, 'style', 'terse', 'Terse', 1, 50, 1); \
+        db.execute_unprepared("INSERT INTO tbl_instruction_preset (sn, workspace_sn, kind, preset_key, name, version, limit_tok, is_builtin) VALUES (90, 1, 'style', 'terse', 'Terse', 1, 50, 1); \
             INSERT INTO tbl_instruction_preset_version (preset_sn, version, content) VALUES (90, 1, 'Be terse.');").await.unwrap();
         assert_eq!(call(&app, "PUT", "/presets/90", Some(json!({"content": "x"}))).await.0, StatusCode::CONFLICT);
         let (st, c) = call(&app, "POST", "/presets", Some(json!({"preset_key": "terse2", "name": "Terse 2", "copy_from_sn": 90}))).await;
@@ -1565,7 +1565,7 @@ printf '{{"type":"result","is_error":false,"result":"all done","usage":{{"input_
         assert_eq!(call(&app, "POST", "/presets/import", Some(json!({"markdown": "---\nkind: role\nkey: z\n---\nbody"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
 
         // 보고서 양식: 잠긴 칸을 지우면 422 · 고치면 버전 +1
-        db.execute_unprepared("INSERT INTO tbl_report_form (wid, kind, form_key, name, body, locked_json, is_default) VALUES (1, 'task_report', 'task-report', '태스크 보고서', \
+        db.execute_unprepared("INSERT INTO tbl_report_form (workspace_sn, kind, form_key, name, body, locked_json, is_default) VALUES (1, 'task_report', 'task-report', '태스크 보고서', \
             '#{{task.num}} {{task.title}} [{{status.label}}]\n[[result]]\n{{#each area}}- {{key}}: {{value}}\n{{/each}}통과: {{tests.passed_summary}} / 미확인: [[unverified]]{{#if pr}} · PR #{{pr.num}}{{/if}} / {{run.tokens}} tok', \
             '[\"unverified\",\"tests.passed_summary\"]', 1);").await.unwrap();
         assert_eq!(call(&app, "GET", "/report-forms", None).await.1.as_array().unwrap().len(), 1);

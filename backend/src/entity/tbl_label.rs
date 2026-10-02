@@ -18,6 +18,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::tbl_map_issue_label::Entity")]
+    TblMapIssueLabel,
     #[sea_orm(has_many = "super::tbl_map_task_label::Entity")]
     TblMapTaskLabel,
     #[sea_orm(
@@ -28,6 +30,12 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     TblProject,
+}
+
+impl Related<super::tbl_map_issue_label::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TblMapIssueLabel.def()
+    }
 }
 
 impl Related<super::tbl_map_task_label::Entity> for Entity {

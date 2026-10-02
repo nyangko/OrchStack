@@ -18,6 +18,7 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub switch_rule: Option<String>,
     pub max_level: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
     pub tier: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub create_at: String,

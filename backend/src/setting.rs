@@ -1,4 +1,4 @@
-//! 설정: 워크스페이스(tbl_workspace sn=WID) 조회 · 수정, 보안 기본값(workspace 프로필), 실행기 목록, Instruction preset 목록 · 버전 조회 (편집은 preset.rs)
+//! 설정: 워크스페이스(tbl_workspace sn=WORKSPACE) 조회 · 수정, 보안 기본값(workspace 프로필), 실행기 목록, Instruction preset 목록 · 버전 조회 (편집은 preset.rs)
 use crate::{entity::{tbl_agent_profile as ap, tbl_instruction_preset as ip, tbl_instruction_preset_version as iv, tbl_profile_guard as pg, tbl_profile_rule as pr, tbl_runtime as rt, tbl_workspace as ws},
     error::{Body, Error, ErrorBody, Res, Sn}, event::{self, Ev}};
 use axum::{Json, extract::{Query, State}};
@@ -228,7 +228,7 @@ impl From<iv::Model> for PresetVersion {
 
 /// 워크스페이스 읽기 (시드가 없으면 404)
 async fn get(db: &impl ConnectionTrait) -> Res<Workspace> {
-    ws::Entity::find_by_id(crate::WID).one(db).await?.map(Workspace::from).ok_or_else(Error::not_found)
+    ws::Entity::find_by_id(crate::WORKSPACE).one(db).await?.map(Workspace::from).ok_or_else(Error::not_found)
 }
 
 /// 워크스페이스 일반 설정 조회
@@ -249,7 +249,7 @@ async fn edit(State(db): State<DatabaseConnection>, Body(b): Body<WorkspacePatch
     }
     let out = event::run(&db, async |tx| {
         use ws::Column as C;
-        let mut u = ws::Entity::update_many().filter(C::Sn.eq(crate::WID)).col_expr(C::UpdateAt, Expr::cust("datetime('now')"));
+        let mut u = ws::Entity::update_many().filter(C::Sn.eq(crate::WORKSPACE)).col_expr(C::UpdateAt, Expr::cust("datetime('now')"));
         if let Some(v) = &b.name { u = u.col_expr(C::Name, v.clone().into()); }
         if let Some(v) = &b.default_repo { u = u.col_expr(C::DefaultRepo, v.clone().into()); }
         if let Some(v) = &b.timezone { u = u.col_expr(C::Timezone, v.clone().into()); }
@@ -268,7 +268,7 @@ async fn edit(State(db): State<DatabaseConnection>, Body(b): Body<WorkspacePatch
             return Err(Error::not_found());
         }
         let out = get(tx).await?;
-        Ok((out, vec![Ev::new(None, "workspace", crate::WID, "WorkspaceUpdated", &b)]))
+        Ok((out, vec![Ev::new(None, "workspace", crate::WORKSPACE, "WorkspaceUpdated", &b)]))
     }).await?;
     Ok(Json(out))
 }
@@ -301,7 +301,7 @@ async fn base(db: &impl ConnectionTrait) -> Res<Option<ap::Model>> {
 
 /// 보안 기본값 읽기. 기본 프로필이 아직 없으면 Trust 3 · 규칙 · 가드 없음
 async fn security(db: &impl ConnectionTrait) -> Res<SecurityProfile> {
-    let w = ws::Entity::find_by_id(crate::WID).one(db).await?.ok_or_else(Error::not_found)?;
+    let w = ws::Entity::find_by_id(crate::WORKSPACE).one(db).await?.ok_or_else(Error::not_found)?;
     let p = base(db).await?;
     let sn = p.as_ref().map_or(0, |p| p.sn);
     let rules = pr::Entity::find().filter(pr::Column::ProfileSn.eq(sn)).order_by_asc(pr::Column::Sort).order_by_asc(pr::Column::Sn).all(db).await?.into_iter()
@@ -332,7 +332,7 @@ async fn set_profile(State(db): State<DatabaseConnection>, Body(b): Body<Securit
     let out = event::run(&db, async |tx| {
         let sn = match base(tx).await? {
             Some(p) => p.sn,
-            None => ap::ActiveModel { wid: Set(crate::WID), kind: Set("workspace".into()), ..Default::default() }.insert(tx).await?.sn,
+            None => ap::ActiveModel { workspace_sn: Set(crate::WORKSPACE), kind: Set("workspace".into()), ..Default::default() }.insert(tx).await?.sn,
         };
         ap::Entity::update_many().filter(ap::Column::Sn.eq(sn)).col_expr(ap::Column::TrustLevel, b.trust_level.into()).exec(tx).await?;
         pr::Entity::delete_many().filter(pr::Column::ProfileSn.eq(sn)).exec(tx).await?;
@@ -348,13 +348,13 @@ async fn set_profile(State(db): State<DatabaseConnection>, Body(b): Body<Securit
                 profile_sn: Set(sn), name: Set(g.name.trim().into()), stage: Set(g.stage.clone()), pattern: Set(g.pattern.clone()), is_enabled: Set(g.is_enabled), sort: Set(i as i64), ..Default::default()
             }.insert(tx).await?;
         }
-        ws::Entity::update_many().filter(ws::Column::Sn.eq(crate::WID)).col_expr(ws::Column::GithubMode, b.github_mode.clone().into())
+        ws::Entity::update_many().filter(ws::Column::Sn.eq(crate::WORKSPACE)).col_expr(ws::Column::GithubMode, b.github_mode.clone().into())
             .col_expr(ws::Column::GithubAccount, b.github_account.clone().into()).col_expr(ws::Column::GithubRepoScope, b.github_repo_scope.clone().into())
             .col_expr(ws::Column::UpdateAt, Expr::cust("datetime('now')")).exec(tx).await?;
         let out = security(tx).await?;
         let evs = vec![
             Ev::new(None, "profile", sn, "ProfileUpdated", &serde_json::json!({ "trust_level": b.trust_level, "rules": b.rules.len(), "guards": b.guards.len() })),
-            Ev::new(None, "workspace", crate::WID, "WorkspaceUpdated", &serde_json::json!({ "github_mode": b.github_mode, "github_account": b.github_account, "github_repo_scope": b.github_repo_scope })),
+            Ev::new(None, "workspace", crate::WORKSPACE, "WorkspaceUpdated", &serde_json::json!({ "github_mode": b.github_mode, "github_account": b.github_account, "github_repo_scope": b.github_repo_scope })),
         ];
         Ok((out, evs))
     }).await?;

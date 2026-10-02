@@ -17,7 +17,7 @@ pub fn routes() -> OpenApiRouter<DatabaseConnection> {
 #[derive(Serialize, ToSchema)]
 pub struct Project {
     sn: i64,
-    wid: i64,
+    workspace_sn: i64,
     team_sn: Option<i64>,
     name: String,
     repo_name: Option<String>,
@@ -36,7 +36,7 @@ pub struct Project {
 impl From<p::Model> for Project {
     fn from(m: p::Model) -> Self {
         Self {
-            sn: m.sn, wid: m.wid, team_sn: m.team_sn, name: m.name, repo_name: m.repo_name, repo_path: m.repo_path,
+            sn: m.sn, workspace_sn: m.workspace_sn, team_sn: m.team_sn, name: m.name, repo_name: m.repo_name, repo_path: m.repo_path,
             default_branch: m.default_branch, next_num: m.next_num, is_github_import: m.is_github_import,
             import_label: m.import_label, status: m.status, sort: m.sort, create_at: m.create_at, update_at: m.update_at,
         }
@@ -80,7 +80,7 @@ async fn read(State(db): State<DatabaseConnection>, Sn(sn): Sn) -> Res<Json<Proj
 #[utoipa::path(operation_id = "project_create", post, path = "/projects", request_body = ProjectNew, responses((status = 201, body = Project), (status = "default", body = ErrorBody)))]
 async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ProjectNew>) -> Res<(StatusCode, Json<Project>)> {
     let m = p::ActiveModel {
-        wid: Set(crate::WID),
+        workspace_sn: Set(crate::WORKSPACE),
         name: Set(b.name),
         team_sn: Set(b.team_sn),
         repo_name: Set(b.repo_name),

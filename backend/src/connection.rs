@@ -182,7 +182,7 @@ async fn create(State(db): State<DatabaseConnection>, Body(b): Body<ConnectionNe
     check(Some(&b.kind), b.login_method.as_deref(), b.scope.as_deref(), b.budget_warn_percent)?;
     let out = event::run(&db, async |tx| {
         let m = c::ActiveModel {
-            wid: Set(crate::WID), uid: Set(Some(crate::UID)), kind: Set(b.kind), provider_code: Set(b.provider_code), provider_name: Set(b.provider_name),
+            workspace_sn: Set(crate::WORKSPACE), user_sn: Set(Some(crate::USER)), kind: Set(b.kind), provider_code: Set(b.provider_code), provider_name: Set(b.provider_name),
             name: Set(b.name), account_label: Set(b.account_label), plan_name: Set(b.plan_name), runtime_sn: Set(b.runtime_sn),
             login_method: Set(b.login_method), base_url: Set(b.base_url), key_ref: Set(b.key_ref), key_hint: Set(b.key_hint),
             monthly_budget_usd_micro: Set(b.monthly_budget_usd_micro), monthly_fee_usd_micro: Set(b.monthly_fee_usd_micro), budget_warn_percent: b.budget_warn_percent.map_or(NotSet, Set),

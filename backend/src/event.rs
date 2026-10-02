@@ -55,7 +55,7 @@ pub async fn run_as<T>(db: &DatabaseConnection, actor: &str, member_sn: Option<i
         let seq = e::Entity::find().filter(e::Column::AggregateType.eq(ev.agg)).filter(e::Column::AggregateSn.eq(ev.sn))
             .order_by_desc(e::Column::Seq).one(&tx).await?.map_or(1, |m| m.seq + 1);
         let m = e::ActiveModel {
-            wid: Set(crate::WID),
+            workspace_sn: Set(crate::WORKSPACE),
             project_sn: Set(ev.project_sn),
             aggregate_type: Set(ev.agg.into()),
             aggregate_sn: Set(ev.sn),
@@ -64,7 +64,7 @@ pub async fn run_as<T>(db: &DatabaseConnection, actor: &str, member_sn: Option<i
             payload_json: Set(ev.payload.to_string()),
             command_idx: Set(idx as i64),
             actor_type: Set(actor.into()),
-            uid: Set((actor == "user").then_some(crate::UID)),
+            user_sn: Set((actor == "user").then_some(crate::USER)),
             member_sn: Set(member_sn),
             ..Default::default()
         }.insert(&tx).await?;

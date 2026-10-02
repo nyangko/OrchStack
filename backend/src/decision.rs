@@ -251,7 +251,7 @@ async fn answer(State(db): State<DatabaseConnection>, Sn(sn): Sn, Body(b): Body<
             q::Entity::update_many().filter(q::Column::Sn.eq(a.question_sn)).col_expr(q::Column::AnswerText, a.text.clone().into())
                 .col_expr(q::Column::IsDelegate, i64::from(a.delegate).into()).col_expr(q::Column::AnswerAt, Expr::cust("datetime('now')")).exec(tx).await?;
         }
-        Tbl::update_many().filter(d::Column::Sn.eq(sn)).col_expr(d::Column::DecideBy, "user".into()).col_expr(d::Column::Uid, crate::UID.into())
+        Tbl::update_many().filter(d::Column::Sn.eq(sn)).col_expr(d::Column::DecideBy, "user".into()).col_expr(d::Column::UserSn, crate::USER.into())
             .col_expr(d::Column::IsTimerPause, 0.into()).col_expr(d::Column::IsReviewNeeded, i64::from(b.review_needed).into())
             .col_expr(d::Column::DecideAt, Expr::cust("datetime('now')")).exec(tx).await?;
         let out = get(tx, sn).await?;

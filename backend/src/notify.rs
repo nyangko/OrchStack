@@ -77,7 +77,7 @@ pub async fn project(tx: &DatabaseTransaction, ev: &e::Model) -> Res<()> {
         return Ok(());
     }
     n::ActiveModel {
-        wid: Set(crate::WID), uid: Set(crate::UID), event_code: Set(code.into()), actor_type: Set(if ev.actor_type == "user" { "system".into() } else { ev.actor_type.clone() }), member_sn: Set(ev.member_sn),
+        workspace_sn: Set(crate::WORKSPACE), user_sn: Set(crate::USER), event_code: Set(code.into()), actor_type: Set(if ev.actor_type == "user" { "system".into() } else { ev.actor_type.clone() }), member_sn: Set(ev.member_sn),
         title: Set(title), body: Set(body), ref_type: Set(Some(ref_type.into())), ref_sn: Set(Some(ref_sn)), is_action: Set(action),
         event_sn: Set(Some(ev.sn)), ..Default::default()
     }.insert(tx).await?;
@@ -185,7 +185,7 @@ struct Audit {
     sn: i64,
     /// user | orch | member | system
     actor_type: String,
-    uid: Option<i64>,
+    user_sn: Option<i64>,
     member_sn: Option<i64>,
     run_sn: Option<i64>,
     kind: String,
@@ -197,7 +197,7 @@ struct Audit {
 /// 알림 목록 (최신순 · 최대 200). 탭 · after로 거르고 묶음은 서버가 정한다
 #[utoipa::path(operation_id = "notify_list", get, path = "/notifications", params(ListQuery), responses((status = 200, body = Vec<Notice>), (status = "default", body = ErrorBody)))]
 async fn list(State(db): State<DatabaseConnection>, Query(q): Query<ListQuery>) -> Res<Json<Vec<Notice>>> {
-    let mut f = n::Entity::find().filter(n::Column::Uid.eq(crate::UID));
+    let mut f = n::Entity::find().filter(n::Column::UserSn.eq(crate::USER));
     f = match q.tab.as_deref().unwrap_or("all") {
         "all" => f,
         "need" => f.filter(n::Column::IsAction.eq(1)),
@@ -232,7 +232,7 @@ async fn list(State(db): State<DatabaseConnection>, Query(q): Query<ListQuery>) 
 /// 읽음 처리 (전체 또는 sns). UI 상태라 이벤트를 남기지 않는다 (#86)
 #[utoipa::path(operation_id = "notify_read", post, path = "/notifications/read", request_body = ReadBody, responses((status = 200, body = ReadOut), (status = "default", body = ErrorBody)))]
 async fn read(State(db): State<DatabaseConnection>, Body(b): Body<ReadBody>) -> Res<Json<ReadOut>> {
-    let mut u = n::Entity::update_many().filter(n::Column::Uid.eq(crate::UID)).filter(n::Column::IsRead.eq(0))
+    let mut u = n::Entity::update_many().filter(n::Column::UserSn.eq(crate::USER)).filter(n::Column::IsRead.eq(0))
         .col_expr(n::Column::IsRead, 1.into()).col_expr(n::Column::ReadAt, Expr::cust("datetime('now')"));
     if let Some(sns) = b.sns { u = u.filter(n::Column::Sn.is_in(sns)); }
     Ok(Json(ReadOut { updated: u.exec(&db).await?.rows_affected }))
@@ -255,14 +255,14 @@ async fn set_rules(State(db): State<DatabaseConnection>, Body(b): Body<Vec<Rule>
         return Err(Error::invalid(format!("event_code in {CODES:?}, channel_kind in {CHANNELS:?}, is_enabled 0/1, no duplicate cell")));
     }
     event::run(&db, async |tx| {
-        nr::Entity::delete_many().filter(nr::Column::Wid.eq(crate::WID)).exec(tx).await?;
+        nr::Entity::delete_many().filter(nr::Column::WorkspaceSn.eq(crate::WORKSPACE)).exec(tx).await?;
         for x in &b {
             nr::ActiveModel {
-                wid: Set(crate::WID), connection_sn: Set(x.connection_sn), event_code: Set(x.event_code.clone()), channel_kind: Set(x.channel_kind.clone()),
+                workspace_sn: Set(crate::WORKSPACE), connection_sn: Set(x.connection_sn), event_code: Set(x.event_code.clone()), channel_kind: Set(x.channel_kind.clone()),
                 is_enabled: Set(x.is_enabled), ..Default::default()
             }.insert(tx).await?;
         }
-        Ok(((), vec![Ev::new(None, "workspace", crate::WID, "NotifyRulesUpdated", &json!({ "count": b.len() }))]))
+        Ok(((), vec![Ev::new(None, "workspace", crate::WORKSPACE, "NotifyRulesUpdated", &json!({ "count": b.len() }))]))
     }).await?;
     Ok(Json(b))
 }
@@ -295,6 +295,6 @@ async fn audit(State(db): State<DatabaseConnection>, Query(q): Query<AuditQuery>
         f = f.filter(au::Column::Kind.eq(k));
     }
     Ok(Json(f.order_by_desc(au::Column::Sn).limit(q.limit.unwrap_or(100).min(1000)).all(&db).await?.into_iter().map(|m| Audit {
-        sn: m.sn, actor_type: m.actor_type, uid: m.uid, member_sn: m.member_sn, run_sn: m.run_sn, kind: m.kind, title: m.title, detail: m.detail, create_at: m.create_at,
+        sn: m.sn, actor_type: m.actor_type, user_sn: m.user_sn, member_sn: m.member_sn, run_sn: m.run_sn, kind: m.kind, title: m.title, detail: m.detail, create_at: m.create_at,
     }).collect()))
 }

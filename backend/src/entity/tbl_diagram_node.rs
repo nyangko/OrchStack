@@ -8,7 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub sn: i64,
     pub project_sn: i64,
-    pub uid: i64,
+    pub user_sn: i64,
     #[sea_orm(column_type = "Text")]
     pub node_type: String,
     pub node_sn: i64,
@@ -33,8 +33,8 @@ pub enum Relation {
     TblProject,
     #[sea_orm(
         belongs_to = "super::tbl_user::Entity",
-        from = "Column::Uid",
-        to = "super::tbl_user::Column::Uid",
+        from = "Column::UserSn",
+        to = "super::tbl_user::Column::Sn",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]

@@ -338,7 +338,7 @@ pub async fn go(db: &DatabaseConnection, sn: i64, mut cancel: watch::Receiver<bo
     // 먼저 starting으로 잡는다 (같은 Run을 두 번 띄우지 않게)
     run::run_to(db, sn, "starting").await?;
     let project = tbl_project::Entity::find_by_id(m.project_sn).one(db).await?.ok_or_else(Error::not_found)?;
-    let ws = tbl_workspace::Entity::find_by_id(project.wid).one(db).await?.ok_or_else(Error::not_found)?;
+    let ws = tbl_workspace::Entity::find_by_id(project.workspace_sn).one(db).await?.ok_or_else(Error::not_found)?;
     // 도구 정책은 리드 프로필을 따른다 (하위 Run의 member_sn = 리드 멤버)
     let profile = tbl_member::Entity::find_by_id(m.member_sn).one(db).await?.ok_or_else(Error::not_found)?.profile_sn;
     let prof = ap::Entity::find_by_id(profile).one(db).await?.ok_or_else(Error::not_found)?;
@@ -530,13 +530,13 @@ printf '%s\n' '{{"type":"result","is_error":false,"result":"done.\n@REPORT v1\ni
         opt.max_connections(1);
         let db = crate::connect(opt).await.unwrap();
         db.execute_unprepared(&format!("
-            INSERT INTO tbl_team (sn, wid, name) VALUES (1, 1, 't');
-            INSERT INTO tbl_agent_profile (sn, wid, kind) VALUES (1, 1, 'member');
+            INSERT INTO tbl_team (sn, workspace_sn, name) VALUES (1, 1, 't');
+            INSERT INTO tbl_agent_profile (sn, workspace_sn, kind) VALUES (1, 1, 'member');
             INSERT INTO tbl_member (sn, team_sn, profile_sn, name, role_name) VALUES (1, 1, 1, 'm', 'dev');
-            INSERT INTO tbl_project (sn, wid, team_sn, name, repo_path) VALUES (1, 1, 1, 'p', '{0}');
+            INSERT INTO tbl_project (sn, workspace_sn, team_sn, name, repo_path) VALUES (1, 1, 1, 'p', '{0}');
             INSERT INTO tbl_task (sn, project_sn, num, title, member_sn, status) VALUES (1, 1, 1, 't', 1, 'in_progress');
-            INSERT INTO tbl_runtime (sn, wid, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{1}');
-            INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c');
+            INSERT INTO tbl_runtime (sn, workspace_sn, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{1}');
+            INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c');
             INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort, tier) VALUES (1, 1, 1, 1, 'L'), (1, 1, 1, 2, 'M');
             INSERT INTO tbl_run (sn, project_sn, task_sn, member_sn, num, status) VALUES (1, 1, 1, 1, 1, 'running');",
             dir.display(), bin.display())).await.unwrap();
@@ -591,13 +591,13 @@ printf '{"type":"result","is_error":false,"result":"%s","usage":{"input_tokens":
         opt.max_connections(1);
         let db = crate::connect(opt).await.unwrap();
         db.execute_unprepared(&format!("
-            INSERT INTO tbl_team (sn, wid, name) VALUES (1, 1, 't');
-            INSERT INTO tbl_agent_profile (sn, wid, kind) VALUES (1, 1, 'member');
+            INSERT INTO tbl_team (sn, workspace_sn, name) VALUES (1, 1, 't');
+            INSERT INTO tbl_agent_profile (sn, workspace_sn, kind) VALUES (1, 1, 'member');
             INSERT INTO tbl_member (sn, team_sn, profile_sn, name, role_name) VALUES (1, 1, 1, 'm', 'dev');
-            INSERT INTO tbl_project (sn, wid, team_sn, name, repo_path) VALUES (1, 1, 1, 'p', '{0}');
+            INSERT INTO tbl_project (sn, workspace_sn, team_sn, name, repo_path) VALUES (1, 1, 1, 'p', '{0}');
             INSERT INTO tbl_task (sn, project_sn, num, title, member_sn, status) VALUES (1, 1, 1, 't', 1, 'in_progress');
-            INSERT INTO tbl_runtime (sn, wid, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{1}');
-            INSERT INTO tbl_connection (sn, wid, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c');
+            INSERT INTO tbl_runtime (sn, workspace_sn, code, name, bin_path) VALUES (1, 1, 'claude_code', 'Claude Code', '{1}');
+            INSERT INTO tbl_connection (sn, workspace_sn, kind, provider_code, provider_name, name) VALUES (1, 1, 'subscription', 'anthropic', 'Anthropic', 'c');
             INSERT INTO tbl_map_fallback (profile_sn, runtime_sn, connection_sn, sort) VALUES (1, 1, 1, 1);
             INSERT INTO tbl_run (sn, project_sn, task_sn, member_sn, num, status) VALUES (1, 1, 1, 1, 1, 'running');",
             dir.display(), bin.display())).await.unwrap();
