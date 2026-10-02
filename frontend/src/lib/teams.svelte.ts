@@ -128,7 +128,8 @@ export function putDraft(t: Template, files: MdFile[], who: string, note: string
 /// 불러오기 상태 — 목데이터 모드면 처음부터 ready.
 export const teamsLoad = $state({ state: (useMock ? "ready" : "idle") as "idle" | "loading" | "ready" | "error" });
 
-const emptyStats: Team["stats"] = { open: 0, openNote: "—", done: 0, doneDelta: "", doneNote: "—", doneTrend: [], tokenTrend: [], cycle: "—", cycleDelta: "", cycleTrend: [] };
+/// 집계 전 팀 통계 (새 팀 · 서버에 아직 없는 값).
+export const emptyStats: Team["stats"] = { open: 0, openNote: "—", done: 0, doneDelta: "", doneNote: "—", doneTrend: [], tokenTrend: [], cycle: "—", cycleDelta: "", cycleTrend: [] };
 const memberStatus = (s: string): TeamMember["status"] => (s === "running" || s === "waiting" ? s : "idle");
 
 function memberView(m: ApiMember): TeamMember {

@@ -58,7 +58,13 @@
 	import MessageCircle from '@lucide/svelte/icons/message-circle';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '$lib/components/ui/empty';
-	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from '$lib/components/ui/dialog';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '$lib/components/ui/dialog';
+	import { FieldRow } from '$lib/components/ui/field';
+	import Archive from '@lucide/svelte/icons/archive';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import Users from '@lucide/svelte/icons/users';
+	import { toast } from 'svelte-sonner';
+	import { api, failureOf } from '$lib/api/client';
 	import { goto } from '$app/navigation';
 	import { MdEditor, estimateTokens, type MdFile } from '$lib/components/orch/md-editor';
 	import Upload from '@lucide/svelte/icons/upload';
@@ -137,7 +143,51 @@
 	const tokens = $derived(team.members.reduce((s, m) => s + m.tokens, 0));
 	const running = $derived(count('running'));
 	const hottest = $derived(team.members.reduce((a, b) => (b.context > a.context ? b : a)));
-	const hot = $derived(hottest.context >= teamPolicy.contextWarn);
+	// 팀 정책 (.pen 팀 설정) — 목데이터는 화면 상태로 고친다. repo는 범위 · 권한으로 나눠 둔다.
+	const repoPerms = { read: '읽기만', branch: '브랜치', push: 'push' } as const;
+	type RepoPerm = keyof typeof repoPerms;
+	let tp = $state({ ...teamPolicy, reviewOn: true, repoScope: teamPolicy.repo.split(' · ')[0], repoPerm: (teamPolicy.repo.split(' · ')[1] ?? 'branch') as RepoPerm });
+	const hot = $derived(hottest.context >= tp.contextWarn);
+	/// 팀 설정 (.pen Teams · 팀 설정) — 헤더 '팀 편집' · 팀 정책 카드 '편집'이 같은 창을 연다.
+	let teamEdit = $state<{ name: string; desc: string; tokenBudget: number; contextWarn: number; maxRuns: number; reviewOn: boolean; review: string; repoScope: string; repoPerm: RepoPerm }>();
+	let teamSaving = $state(false);
+	let confirmDelete = $state(false);
+	function editTeam() {
+		confirmDelete = false;
+		teamEdit = { name: team.name, desc: team.desc, tokenBudget: tp.tokenBudget, contextWarn: tp.contextWarn, maxRuns: tp.maxRuns, reviewOn: tp.reviewOn, review: tp.review, repoScope: tp.repoScope, repoPerm: tp.repoPerm };
+	}
+	/// 저장 — 서버 모드는 PATCH /teams/{sn} (이름 · 한도 · 리뷰 · 저장소). 실패하면 창을 그대로 둔다.
+	async function saveTeam() {
+		const e = teamEdit;
+		if (!e || !e.name.trim()) return;
+		if (!useMock) {
+			teamSaving = true;
+			const res = await api
+				.PATCH('/teams/{sn}', { params: { path: { sn: team.sn } }, body: { name: e.name.trim(), daily_token_budget: e.tokenBudget * 1000, context_warn_percent: e.contextWarn, max_concurrent_run: e.maxRuns, is_review_required: e.reviewOn ? 1 : 0, review_stage: e.review === 'PR 병합 전' ? 'before_merge' : 'before_done', repo_scope: e.repoScope, repo_permission: e.repoPerm } })
+				.catch(() => undefined);
+			teamSaving = false;
+			if (!res || res.error) return;
+		}
+		team.name = e.name.trim();
+		team.desc = e.desc;
+		Object.assign(tp, { tokenBudget: e.tokenBudget, contextWarn: e.contextWarn, maxRuns: e.maxRuns, reviewOn: e.reviewOn, review: e.review, repoScope: e.repoScope, repoPerm: e.repoPerm });
+		teamEdit = undefined;
+		toast.success(`${team.name} 설정을 저장했어요`);
+	}
+	/// 보관(목데이터: 목록에서 뺌) · 삭제(한 번 더 눌러 확정). 서버 삭제가 막히면(Run 기록 · 409) 문구로 알린다.
+	async function removeTeam(kind: 'archive' | 'delete') {
+		if (kind === 'delete' && !confirmDelete) return void (confirmDelete = true);
+		const name = team.name;
+		if (!useMock && kind === 'delete') {
+			const res = await api.DELETE('/teams/{sn}', { params: { path: { sn: team.sn } } }).catch(() => undefined);
+			if (!res) return;
+			if (res.error) return void toast.warning(failureOf(res.error, res.response).message);
+		}
+		store.crew = store.crew.filter((t) => t.sn !== team.sn);
+		teamEdit = undefined;
+		toast.success(kind === 'archive' ? `${name} 팀을 보관했어요` : `${name} 팀을 삭제했어요`);
+		goto('/teams', { replaceState: true });
+	}
 	const cool = $derived(team.members.filter((m) => m.context < 50).length);
 
 	const weekOf = (m: TeamMember) => accounts.find((a) => a.runtime === m.runtime)?.week ?? 100;
@@ -456,14 +506,14 @@
 					</div>
 					<p class="max-w-160 text-body text-muted-foreground">{team.desc}</p>
 				</div>
-				<Button variant="outline" size="sm" class="text-body"><Pencil class="size-3.5" />팀 편집</Button>
+				<Button variant="outline" size="sm" class="text-body" onclick={editTeam}><Pencil class="size-3.5" />팀 편집</Button>
 				<Button size="sm" class="text-body" onclick={() => startAdd()}><UserPlus class="size-3.5" />멤버 추가</Button>
 			</div>
 			<div class="card flex rounded-lg">
 				{@render kpi('멤버', String(team.members.length), `${running} running · ${count('waiting')} waiting · ${count('idle')} idle`)}
 				{@render kpi('열린 태스크', String(team.stats.open), team.stats.openNote)}
 				{@render kpi('이번 주 완료', String(team.stats.done), team.stats.doneNote, team.stats.doneDelta, team.stats.doneTrend)}
-				{@render kpi('오늘 토큰', k(tokens), `예산 ${teamPolicy.tokenBudget}K · ${Math.round((tokens / teamPolicy.tokenBudget) * 100)}%`, undefined, team.stats.tokenTrend)}
+				{@render kpi('오늘 토큰', k(tokens), `예산 ${tp.tokenBudget}K · ${Math.round((tokens / tp.tokenBudget) * 100)}%`, undefined, team.stats.tokenTrend)}
 				{@render kpi('평균 사이클', team.stats.cycle, 'Task 생성 → Done', team.stats.cycleDelta, team.stats.cycleTrend)}
 			</div>
 		</header>
@@ -509,7 +559,7 @@
 							{#each members as m (m.sn)}
 								{@const st = states[m.status]}
 								{@const week = weekOf(m)}
-								{@const full = m.context >= teamPolicy.contextWarn}
+								{@const full = m.context >= tp.contextWarn}
 								<TableRow class="h-15 cursor-pointer" onclick={() => openMember(m.sn)}>
 									<TableCell class="pl-4">
 										<span class="flex items-center gap-2.5">
@@ -662,42 +712,42 @@
 				<Card size="sm">
 					<CardHeader>
 						<CardTitle>팀 정책</CardTitle>
-						<CardAction><Button variant="link" size="xs">편집</Button></CardAction>
+						<CardAction><Button variant="link" size="xs" onclick={editTeam}>편집</Button></CardAction>
 					</CardHeader>
 					<CardContent class="gap-1">
 						<div class="value-line">
 							<Terminal class="size-3.5 text-muted-foreground" />
 							<span class="flex-1 text-muted-foreground">기본 Runtime</span>
-							<span class="font-medium">{teamPolicy.runtime}</span>
+							<span class="font-medium">{tp.runtime}</span>
 						</div>
-						<LimitRow icon={Coins} label="오늘 토큰 예산" used={k(tokens)} max="/ {teamPolicy.tokenBudget}K" value={(tokens / teamPolicy.tokenBudget) * 100} />
+						<LimitRow icon={Coins} label="오늘 토큰 예산" used={k(tokens)} max="/ {tp.tokenBudget}K" value={(tokens / tp.tokenBudget) * 100} />
 						<LimitRow
 							icon={Layers}
-							label="Context 경고 · {teamPolicy.contextWarn}%"
+							label="Context 경고 · {tp.contextWarn}%"
 							used="{hottest.context}%"
 							max="/ 100%"
 							value={hottest.context}
 							note={hot ? `${hottest.name} ${hottest.context}% 초과 · 나머지 ${cool}명 50% 미만` : undefined}
 							warn={hot}
-							mark={teamPolicy.contextWarn}
+							mark={tp.contextWarn}
 						/>
 						<LimitRow
 							icon={Play}
 							label="동시 실행"
 							used={String(running)}
-							max="/ {teamPolicy.maxRuns} Run"
-							value={(running / teamPolicy.maxRuns) * 100}
-							note={running < teamPolicy.maxRuns ? `${teamPolicy.maxRuns - running}개 여유` : '가득 참'}
+							max="/ {tp.maxRuns} Run"
+							value={(running / tp.maxRuns) * 100}
+							note={running < tp.maxRuns ? `${tp.maxRuns - running}개 여유` : '가득 참'}
 						/>
 						<div class="value-line">
 							<ShieldCheck class="size-3.5 text-muted-foreground" />
 							<span class="flex-1 text-muted-foreground">Review 필수</span>
-							<Pill class="bg-review-soft text-status-review"><GitMerge />{teamPolicy.review}</Pill>
+							{#if tp.reviewOn}<Pill class="bg-review-soft text-status-review"><GitMerge />{tp.review}</Pill>{:else}<span class="text-muted-foreground">끔</span>{/if}
 						</div>
 						<div class="value-line">
 							<GitBranch class="size-3.5 text-muted-foreground" />
 							<span class="flex-1 text-muted-foreground">Repo 권한</span>
-							<span class="font-mono font-medium">{teamPolicy.repo}</span>
+							<span class="font-mono font-medium">{tp.repoScope} · {tp.repoPerm}</span>
 						</div>
 					</CardContent>
 				</Card>
@@ -1507,6 +1557,69 @@
 		{/if}
 	</SheetContent>
 </Sheet>
+
+<!-- 팀 설정 (.pen Teams · 팀 설정) -->
+<Dialog bind:open={() => teamEdit !== undefined, (v) => !v && (teamEdit = undefined)}>
+	<DialogContent size="md" tall>
+		{#if teamEdit}
+			{@const e = teamEdit}
+			<DialogHeader icon={Users}>
+				<DialogTitle>팀 설정 · {team.name}</DialogTitle>
+				<DialogDescription>이름 · 실행 한도 · 리뷰 · 저장소. Orch 진행 방식은 ‘정책 편집’에서 정해요.</DialogDescription>
+			</DialogHeader>
+			<DialogBody class="gap-6">
+				<section class="flex flex-col">
+					{@render heading('1 · 기본 정보', '')}
+					<FieldRow label="이름" as="label" error={e.name.trim() ? undefined : '이름을 입력하세요'}><Input bind:value={e.name} /></FieldRow>
+					<FieldRow label="설명" hint="팀 목록 · 헤더에 보여요" as="label"><Input bind:value={e.desc} /></FieldRow>
+					<FieldRow label="연결된 프로젝트" hint="프로젝트 화면에서 바꿔요">
+						{#if team.project}<Pill class="w-fit">{team.project}</Pill>{:else}<span class="text-xs text-muted-foreground">없음</span>{/if}
+					</FieldRow>
+				</section>
+				<section class="flex flex-col">
+					{@render heading('2 · 실행 한도', '넘으면 Orch가 다음 태스크를 기다리게 해요')}
+					<FieldRow label="오늘 토큰 예산" hint="팀 전체 · 0시에 초기화 · K 단위" as="label"><Input type="number" min="1" bind:value={e.tokenBudget} /></FieldRow>
+					<FieldRow label="Context 경고" hint="넘으면 요약 · 새 세션 제안">
+						<Segmented aria-label="Context 경고" options={[70, 80, 90].map((v) => ({ value: String(v), label: `${v}%` }))} bind:value={() => String(e.contextWarn), (v) => (e.contextWarn = Number(v))} />
+					</FieldRow>
+					<FieldRow label="동시 실행" hint="팀 전체 Run 수">
+						<Segmented aria-label="동시 실행" options={[1, 2, 3, 4].map((v) => ({ value: String(v), label: `${v} Run` }))} bind:value={() => String(e.maxRuns), (v) => (e.maxRuns = Number(v))} />
+					</FieldRow>
+				</section>
+				<section class="flex flex-col">
+					{@render heading('3 · 리뷰 · 저장소', '에이전트가 만든 변경을 누가 · 언제 확인하고, 어디까지 쓸 수 있는지')}
+					<FieldRow label="Review 필수" hint="켜면 리뷰어 통과 전 병합 · 완료 안 됨">
+						<span class="flex items-center gap-3">
+							<Switch bind:checked={e.reviewOn} aria-label="Review 필수" />
+							{#if e.reviewOn}<Segmented aria-label="리뷰 단계" options={['PR 병합 전', '완료 처리 전'].map((v) => ({ value: v, label: v }))} bind:value={() => e.review, (v) => (e.review = v ?? e.review)} />{/if}
+						</span>
+					</FieldRow>
+					<FieldRow label="Repo 범위" hint="이 팀이 손댈 수 있는 저장소" as="label"><Input class="font-mono" bind:value={e.repoScope} /></FieldRow>
+					<FieldRow label="Repo 권한" hint="read · 브랜치 만들기 · push까지">
+						<Segmented aria-label="Repo 권한" options={(Object.keys(repoPerms) as RepoPerm[]).map((v) => ({ value: v, label: repoPerms[v] }))} bind:value={() => e.repoPerm, (v) => (e.repoPerm = (v ?? e.repoPerm) as RepoPerm)} />
+					</FieldRow>
+				</section>
+				<section class="flex flex-col gap-3">
+					{@render heading('4 · 위험 구역', '')}
+					<div class="flex flex-col rounded-md border border-destructive">
+						<div class="flex items-center gap-3 border-b px-3.5 py-3">
+							<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">팀 보관</span><span class="text-caption text-muted-foreground">멤버와 기록은 남고, 새 배정 · 실행이 멈춰요.{useMock ? '' : ' 서버 보관 API 전에는 쓸 수 없어요.'}</span></span>
+							<Button variant="outline" size="sm" disabled={!useMock} onclick={() => removeTeam('archive')}><Archive />보관</Button>
+						</div>
+						<div class="flex items-center gap-3 px-3.5 py-3">
+							<span class="flex flex-1 flex-col gap-0.5"><span class="text-xs font-semibold">팀 삭제</span><span class="text-caption text-muted-foreground">멤버 프로필도 지워져요. Run 기록이 있는 멤버가 있으면 삭제 대신 보관만 돼요.</span></span>
+							<Button variant="destructive" size="sm" onclick={() => removeTeam('delete')}><Trash2 />{confirmDelete ? '한 번 더 누르면 삭제' : '팀 삭제'}</Button>
+						</div>
+					</div>
+				</section>
+			</DialogBody>
+			<DialogFooter note="저장하면 다음 Run부터 적용돼요 · 진행 중 Run은 그대로">
+				<Button variant="ghost" size="sm" onclick={() => (teamEdit = undefined)}>취소</Button>
+				<Button size="sm" disabled={!e.name.trim() || teamSaving} onclick={saveTeam}>{#if teamSaving}<LoaderCircle class="animate-spin" />{/if}저장</Button>
+			</DialogFooter>
+		{/if}
+	</DialogContent>
+</Dialog>
 
 <!-- Orch 진행 정책 편집 (.pen Team Settings · Orch 진행) -->
 <Dialog bind:open={() => draft !== undefined, (v) => !v && (draft = undefined)}>
