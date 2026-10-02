@@ -86,7 +86,11 @@
 	import type { ApiRun } from '$lib/api/types';
 	import { ago } from '$lib/time';
 	import { project as wb, openProject, closeProject, viewTasks, viewIssues, viewAgents, moveTask, runsOf, stopRun } from '$lib/project.svelte';
-	import { SvelteFlow, Background, BackgroundVariant, Controls, Panel, MarkerType, type Node, type Edge } from '@xyflow/svelte';
+	import { SvelteFlow, SvelteFlowProvider, Background, BackgroundVariant, Panel, MarkerType, type Node, type Edge } from '@xyflow/svelte';
+	import DiagramToolbar from '$lib/components/orch/diagram/diagram-toolbar.svelte';
+	import Spline from '@lucide/svelte/icons/spline';
+	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+	import Maximize from '@lucide/svelte/icons/maximize';
 	import '@xyflow/svelte/dist/style.css';
 	import DiagramNode, { DIAGRAM_DRAG, type DiagramDrag, type DiagramNodeData } from '$lib/components/orch/diagram/diagram-node.svelte';
 	import type { MenuEntry } from '$lib/components/ui/dropdown-menu';
@@ -503,6 +507,74 @@
 		});
 	});
 
+	// ── 캔버스 도구 (.pen ViewHeader · Canvas Tools · ContextMenu / Canvas) ─────────
+	let toolbar = $state<ReturnType<typeof DiagramToolbar>>();
+	let grid = $state(false);
+	/// Auto Layout — 기본 배치로 되돌린다 (노드 · 연결선은 그대로).
+	function autoLayout() {
+		const pos = new Map((useMock ? mockNodes() : liveNodes()).map((n) => [n.id, n.position]));
+		nodes = nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }));
+	}
+	/// Grid Layout 켜기 · 끄기 — 켜면 노드를 20px 격자(점 배경 간격)에 붙이고, 옮길 때도 격자에 붙인다.
+	function gridLayout() {
+		grid = !grid;
+		if (grid) nodes = nodes.map((n) => ({ ...n, position: { x: Math.round(n.position.x / 20) * 20, y: Math.round(n.position.y / 20) * 20 } }));
+	}
+	/// 빈 캔버스 우클릭 메뉴 위치 (화면 좌표).
+	let paneMenu = $state<{ x: number; y: number }>();
+	const canvasMenu: MenuEntry[] = [
+		{ label: 'New Task', icon: SquarePen, shortcut: 'N', onSelect: () => newTask() },
+		{ label: 'New Issue', icon: CircleDot, onSelect: () => askPm('새 이슈') },
+		'sep',
+		{ label: 'Auto Layout', icon: Sparkles, onSelect: () => toolbar?.auto() },
+		{ label: 'Grid Layout', icon: LayoutGrid, onSelect: gridLayout },
+		{ label: 'Fit View', icon: Maximize, onSelect: () => toolbar?.fit() }
+	];
+
+	// ── 연결 모드 (.pen ContextMenu / 연결하기 · Hint · 연결 모드) — 태스크 메뉴에서 종류를 고르고 대상 노드를 누른다 ─────────
+	// 목데이터: 의존 · 배정은 태스크 값과 연결선을, 검증 · 리뷰 요청은 연결선만 바꾼다. 서버 저장은 API 단계(#92).
+	type LinkKind = 'dep' | 'assign' | 'verify' | 'review';
+	const linkKinds: Record<LinkKind, string> = { dep: '의존 관계', assign: '멤버에게 배정', verify: '검증 요청', review: '리뷰 요청' };
+	let linking = $state<{ from: number; kind: LinkKind }>();
+	function startLink(from: number, kind: LinkKind) {
+		if (view.value !== 'diagram') setView('diagram');
+		detail = false;
+		// 메뉴 항목을 누른 클릭이 아래 노드까지 내려가 바로 연결되지 않게, 클릭이 끝난 뒤 켠다
+		setTimeout(() => (linking = { from, kind }), 50);
+	}
+	/// 대상 노드를 눌렀다. 맞지 않는 노드면 안내만 하고 연결 모드를 유지한다.
+	function finishLink(nodeId: string) {
+		const l = linking!;
+		if (l.kind === 'dep') {
+			if (!nodeId.startsWith('task-')) return void toast('먼저 끝나야 할 태스크 노드를 눌러 주세요');
+			const n = Number(nodeId.slice(5));
+			if (n === l.from) return void toast('같은 태스크끼리는 연결할 수 없어요');
+			const d = detailOf(l.from);
+			if (!d.deps.some((x) => x.kind === 'depends' && x.num === n)) d.deps.push({ kind: 'depends', num: n });
+			const o = detailOf(n);
+			if (!o.deps.some((x) => x.kind === 'blocks' && x.num === l.from)) o.deps.push({ kind: 'blocks', num: l.from });
+			const id = `e-dep-${n}-${l.from}`;
+			edges = [...edges.filter((e) => e.id !== id), link(id, nodeId, `task-${l.from}`, 'waits', '먼저', ['b', 't'], true)];
+			toast(`#${l.from}은 #${n}이 끝난 뒤 시작해요`);
+		} else {
+			if (!nodeId.startsWith('agent-')) return void toast('에이전트 노드를 눌러 주세요');
+			const sn = Number(nodeId.slice(6));
+			if (l.kind === 'assign') {
+				task(l.from).agent = sn;
+				edges = [...edges.filter((e) => !(e.source === `task-${l.from}` && e.target.startsWith('agent-'))), link(`e-${l.from}`, `task-${l.from}`, nodeId, 'assigned')];
+				toast(`#${l.from}을 ${agentName(sn)}에게 맡겼어요`);
+			} else {
+				const owner = task(l.from).agent;
+				const src = owner !== undefined ? `agent-${owner}` : `task-${l.from}`;
+				if (src === nodeId) return void toast('담당자 자신에게는 요청할 수 없어요');
+				const id = `e-${l.kind}-${l.from}-${sn}`;
+				edges = [...edges.filter((e) => e.id !== id), link(id, src, nodeId, 'idle', linkKinds[l.kind], ['b', 't'])];
+				toast(`#${l.from} ${linkKinds[l.kind]} → ${agentName(sn)}`);
+			}
+		}
+		linking = undefined;
+	}
+
 	// Ops — Activity 외 탭은 실행기 연동(#13) 후 채운다. 라벨은 i18n 도입 시 교체.
 	const opsTabs = [
 		['activity', 'Activity'],
@@ -537,6 +609,15 @@
 			'sep',
 			{ label: 'Change Priority', icon: Flag, sub: priorityOrder.map((p) => ({ label: `${p} ${priorities[p].label}`, icon: priorities[p].icon, tone: priorities[p].text, checked: t.priority === p, onSelect: () => (task(num).priority = p) })) },
 			{ label: 'Add Dependency', icon: Link2Icon, onSelect: () => editTask(num) },
+			{
+				label: '연결하기…', icon: Spline, subLabel: `연결 종류 · #${num} ${t.title}`,
+				sub: [
+					{ label: '의존 관계 · 먼저 끝나야 함', icon: Link2Icon, onSelect: () => startLink(num, 'dep') },
+					{ label: '멤버에게 배정', icon: UserPlus, onSelect: () => startLink(num, 'assign') },
+					{ label: '검증 요청', icon: CircleCheck, onSelect: () => startLink(num, 'verify') },
+					{ label: '리뷰 요청', icon: Eye, onSelect: () => startLink(num, 'review') }
+				]
+			},
 			'sep',
 			{ label: 'Open Details', icon: PanelRight, shortcut: '↵', onSelect: () => open(num) }
 		];
@@ -850,6 +931,7 @@
 		const layer = e.target instanceof HTMLElement && e.target.closest('[data-slot$="-content"], [role="menu"], [role="listbox"], [cmdk-root]') !== null;
 		if (e.key === 'Escape') {
 			if (layer || e.defaultPrevented) return;
+			if (linking) return void (linking = undefined);
 			if (quick) return void (quick = undefined);
 			detail = false;
 			inspect = undefined;
@@ -1129,6 +1211,7 @@
 		{/if}
 
 		<main class="flex min-w-0 flex-1 flex-col">
+		<SvelteFlowProvider>
 			<!-- 뷰 머리글 (.pen Workbench/ViewHeader) -->
 			<header class="flex h-12 shrink-0 items-center gap-3 border-b bg-background px-4">
 				{#if !leftOpen}
@@ -1151,6 +1234,9 @@
 					{#if wb.state === 'error'}
 						<Button variant="outline" size="xs" onclick={() => (closeProject(), void openProject(Number(page.params.project)))}>다시 시도</Button>
 					{/if}
+				{/if}
+				{#if view.value === 'diagram'}
+					<DiagramToolbar bind:this={toolbar} {grid} onauto={autoLayout} ongrid={gridLayout} />
 				{/if}
 				{#if !dockOpen}
 					<Button variant="ghost" size="icon-sm" aria-label="PM Dock 펼치기" onclick={() => (dockOpen = true)}><PanelRightOpen /></Button>
@@ -1309,7 +1395,15 @@
 						initialViewport={{ x: 24, y: 24, zoom: 0.85 }}
 						minZoom={0.3}
 						nodesConnectable={false}
+						snapGrid={grid ? [20, 20] : undefined}
+						onpaneclick={() => (linking = undefined)}
+						onpanecontextmenu={({ event }) => {
+							event.preventDefault();
+							linking = undefined;
+							paneMenu = { x: event.clientX, y: event.clientY };
+						}}
 						onnodeclick={({ node }) => {
+							if (linking) return finishLink(node.id);
 							if (node.id.startsWith('task-')) open(Number(node.id.slice(5)));
 							else if (node.id.startsWith('issue-')) openIssue(Number(node.id.slice(6)));
 							else if (node.id.startsWith('agent-')) openAgent(Number(node.id.slice(6)));
@@ -1319,7 +1413,13 @@
 					>
 						<!-- canvas-grid 토큰은 canvas 배경과 거의 같아 점이 안 보인다 → 한 단계 진한 input 색 -->
 						<Background variant={BackgroundVariant.Dots} gap={20} size={1.5} patternColor="var(--input)" />
-						<Controls position="bottom-right" showLock={false} />
+						{#if linking}
+							<Panel position="top-center">
+								<p class="flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-background shadow-md" role="status">
+									<Spline class="size-3.5" />연결 모드 · #{linking.from}에서 {linkKinds[linking.kind]} → 대상 노드 클릭 · Esc 취소
+								</p>
+							</Panel>
+						{/if}
 						<Panel position="bottom-left">
 							<div class="card flex items-center gap-3 px-2.5 py-1.5 text-xs text-muted-foreground rounded-md" aria-label="연결선 범례">
 								{#each [['contains', 'bg-input', 'h-0.5'], ['delegate', 'bg-primary', 'h-0.5'], ['assigned', 'bg-node-agent', 'h-0.5'], ['interaction (idle)', 'bg-status-review', 'h-0.5'], ['live event', 'bg-primary', 'h-1'], ['spawn', 'bg-node-agent', 'h-0.5'], ['queued · waits', 'bg-subtle-foreground', 'h-0.5']] as [l, bg, h] (l)}
@@ -1328,6 +1428,17 @@
 							</div>
 						</Panel>
 					</SvelteFlow>
+					{#if paneMenu}
+						{@const at = paneMenu}
+						<!-- .pen ContextMenu / Canvas — 빈 캔버스 우클릭 자리에 연다 -->
+						<DropdownMenu open onOpenChange={(o) => !o && (paneMenu = undefined)}>
+							<DropdownMenuContent customAnchor={{ getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0) }} side="bottom" align="start" sideOffset={2} class="w-52">
+								<DropdownMenuLabel>Canvas</DropdownMenuLabel>
+								<DropdownMenuSeparator />
+								<DropdownMenuEntries entries={canvasMenu} />
+							</DropdownMenuContent>
+						</DropdownMenu>
+					{/if}
 				{:else if view.value === 'issues'}
 					<Table class="bg-background">
 						<TableHeader class="bg-muted">
@@ -1907,6 +2018,7 @@
 					{/if}
 				</Tabs>
 			</section>
+		</SvelteFlowProvider>
 		</main>
 
 		<!-- 우측 PM Dock (.pen ProjectPMChatDock) — 메시지 종류 · 결정 패널은 #58 -->

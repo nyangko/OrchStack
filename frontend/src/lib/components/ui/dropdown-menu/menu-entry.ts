@@ -12,5 +12,7 @@ export type MenuEntry =
 			shortcut?: string;
 			disabled?: boolean;
 			onSelect?: () => void;
-			sub?: { label: string; icon?: Component; tone?: string; checked?: boolean; onSelect: () => void }[];
+			sub?: { label: string; icon?: Component; tone?: string; checked?: boolean; shortcut?: string; onSelect: () => void }[];
+			/** 하위 메뉴 머리 (예: "연결 종류 · #130 QA"). */
+			subLabel?: string;
 	  };

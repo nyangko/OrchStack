@@ -3,6 +3,7 @@
 	import Check from "@lucide/svelte/icons/check";
 	import Item from "./context-menu-item.svelte";
 	import Separator from "./context-menu-separator.svelte";
+	import Label from "./context-menu-label.svelte";
 	import Shortcut from "./context-menu-shortcut.svelte";
 	import Sub from "./context-menu-sub.svelte";
 	import SubTrigger from "./context-menu-sub-trigger.svelte";
@@ -19,8 +20,9 @@
 		<Sub>
 			<SubTrigger disabled={m.disabled}>{#if m.icon}<m.icon class="text-muted-foreground" />{/if}{m.label}</SubTrigger>
 			<SubContent class={subClass}>
+				{#if m.subLabel}<Label class="truncate">{m.subLabel}</Label><Separator />{/if}
 				{#each m.sub as x (x.label)}
-					<Item onSelect={x.onSelect}>{#if x.icon}<x.icon class={x.tone} />{/if}<span class="flex-1">{x.label}</span>{#if x.checked}<Check />{/if}</Item>
+					<Item onSelect={x.onSelect}>{#if x.icon}<x.icon class={x.tone} />{/if}<span class="flex-1">{x.label}</span>{#if x.checked}<Check />{/if}{#if x.shortcut}<Shortcut>{x.shortcut}</Shortcut>{/if}</Item>
 				{/each}
 			</SubContent>
 		</Sub>

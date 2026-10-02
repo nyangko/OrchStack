@@ -47,6 +47,7 @@
 	import Inbox from "@lucide/svelte/icons/inbox";
 	import UserPlus from "@lucide/svelte/icons/user-plus";
 	import { getContext } from "svelte";
+	import { mergeProps } from "bits-ui";
 	import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
 	import Ellipsis from "@lucide/svelte/icons/ellipsis";
 	import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuEntries } from "$lib/components/ui/dropdown-menu";
@@ -112,8 +113,8 @@
 			<DropdownMenu>
 				<DropdownMenuTrigger>
 					{#snippet child({ props })}
-						<!-- nodrag: 메뉴 버튼을 눌러도 노드가 끌리지 않게 (xyflow) -->
-						<Button {...props} variant="ghost" size="icon-xs" class="nodrag -my-1" aria-label="{data.ref} 메뉴"><Ellipsis /></Button>
+						<!-- nodrag: 메뉴 버튼을 눌러도 노드가 끌리지 않게 (xyflow). 클릭은 노드까지 올리지 않는다 — 상세가 같이 열리지 않게 -->
+						<Button {...mergeProps(props, { onclick: (e: MouseEvent) => e.stopPropagation() })} variant="ghost" size="icon-xs" class="nodrag -my-1" aria-label="{data.ref} 메뉴"><Ellipsis /></Button>
 					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="start" class="w-56">
