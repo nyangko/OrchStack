@@ -10,6 +10,7 @@ mod error; // 공통 에러 응답
 mod event; // 명령 실행 틀 (상태 변경 + 이벤트 append + 발행)
 mod exec; // 실행기: Claude Code · Codex CLI 비대화형 실행 (#13)
 mod issue; // /issues CRUD
+mod orch; // PM Dock: /projects/{sn}/conversation · messages · /messages/* · /proposals · /runs/{sn}/instruct
 mod notify; // /notifications · /notify/* · /audit + 이벤트 → 알림 projection
 mod project; // /projects CRUD
 mod run; // /runs · Run 명령 · 실행기용 전이 함수
@@ -61,7 +62,7 @@ struct Doc;
 
 /// 라우터 + OpenAPI 문서. DB 없이도 만들 수 있다 (`openapi` 명령이 문서만 뽑을 때 쓴다)
 fn api() -> (Router<DatabaseConnection>, utoipa::openapi::OpenApi) {
-    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).split_for_parts()
+    OpenApiRouter::with_openapi(Doc::openapi()).routes(routes!(health)).merge(project::routes()).merge(issue::routes()).merge(task::routes()).merge(run::routes()).merge(agent::routes()).merge(team::routes()).merge(connection::routes()).merge(setting::routes()).merge(stream::routes()).merge(decision::routes()).merge(approval::routes()).merge(skill::routes()).merge(notify::routes()).merge(orch::routes()).split_for_parts()
 }
 
 /// 전체 라우터 (`/openapi.json` 포함). 테스트에서도 같은 라우터를 쓰려고 main에서 분리했다
@@ -719,11 +720,78 @@ mod tests {
         assert_eq!(call(&app, "GET", "/audit?kind=x", None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
     }
 
+    /// B-11: Orch 없으면 409 → 대화 열기 · 메시지 저장, 작업 제안 수정 · 진행(이슈 · 태스크 생성 · 배정 · 결과 카드 · 이벤트) · 재진행 409 · 취소,
+    /// Orch 제안 처리(proceed · edit · cancel), 실행 중 지시(활동 기록 · 끝난 Run 409)
+    #[tokio::test]
+    async fn orch() {
+        use crate::orch::{self, Plan, PlanIssue, PlanTask, ProposalNew};
+        let db = mem().await;
+        let app = app(db.clone());
+        let ts = task_of(&app, &db, true).await; // 프로젝트 1 · 팀 1 · 멤버 1(m)
+        let v = call(&app, "GET", "/projects/1/conversation", None).await.1;
+        assert_eq!((v["conversation_sn"].is_null(), v["member_sn"].is_null(), v["messages"].as_array().unwrap().len()), (true, true, 0));
+        assert_eq!(call(&app, "POST", "/projects/1/messages", Some(json!({"content": "hi"}))).await.0, StatusCode::CONFLICT); // 팀 · Orch 없음
+        db.execute_unprepared("UPDATE tbl_project SET team_sn = 1; INSERT INTO tbl_member (team_sn, profile_sn, name, role_name, is_orch) VALUES (1, 1, 'Orch', 'PM', 1);").await.unwrap();
+
+        // 메시지: 대화를 열고 저장 · 빈 본문 422 · 없는 프로젝트 404
+        let (st, m) = call(&app, "POST", "/projects/1/messages", Some(json!({"content": "로그인 개선해줘", "task_sn": ts}))).await;
+        assert_eq!((st, m["sender_type"].as_str(), m["kind"].as_str(), m["task_sn"].as_i64()), (StatusCode::CREATED, Some("user"), Some("text"), Some(ts)));
+        assert_eq!(call(&app, "POST", "/projects/1/messages", Some(json!({"content": " "}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", "/projects/99/messages", Some(json!({"content": "x"}))).await.0, StatusCode::NOT_FOUND);
+
+        // 작업 제안: Orch가 올림 → 수정 → 진행 = 이슈 1 · 태스크 2(첫째는 멤버 1에게 orch_auto 배정) · 결과 카드
+        let plan = |n: usize| Plan { issue: PlanIssue { title: "Authentication 개선".into(), body: None },
+            tasks: (0..n).map(|k| PlanTask { title: format!("T{k}"), description: None, member_sn: (k == 0).then_some(1) }).collect() };
+        orch::propose(&db, 1, Some("이렇게 나눌게요".into()), plan(1)).await.unwrap();
+        let ws = call(&app, "GET", "/projects/1/conversation", None).await.1["messages"][1]["sn"].as_i64().unwrap();
+        assert_eq!(call(&app, "PATCH", &format!("/messages/{ws}"), Some(json!({"issue": {"title": ""}, "tasks": []}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        let (st, e) = call(&app, "PATCH", &format!("/messages/{ws}"), Some(serde_json::to_value(plan(2)).unwrap())).await;
+        assert_eq!((st, e["payload"]["tasks"].as_array().unwrap().len()), (StatusCode::OK, 2));
+        let (st, p) = call(&app, "POST", &format!("/messages/{ws}/proceed"), None).await;
+        assert_eq!((st, p["issue"]["title"].as_str(), p["tasks"].as_array().unwrap().len(), p["result"]["kind"].as_str()), (StatusCode::OK, Some("Authentication 개선"), 2, Some("command_result")));
+        assert_eq!((p["tasks"][0]["member_sn"].as_i64(), p["tasks"][0]["assign_by"].as_str(), p["tasks"][1]["member_sn"].as_i64()), (Some(1), Some("orch_auto"), None));
+        assert_eq!(call(&app, "GET", &format!("/issues/{}/tasks", p["issue"]["sn"]), None).await.1.as_array().unwrap().len(), 2);
+        let c = call(&app, "GET", "/projects/1/conversation", None).await.1;
+        assert_eq!((c["messages"].as_array().unwrap().len(), c["messages"][1]["proposal_status"].as_str()), (3, Some("proceeded")));
+        assert_eq!(call(&app, "POST", &format!("/messages/{ws}/proceed"), None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", &format!("/messages/{ws}/cancel"), None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "PATCH", &format!("/messages/{}", m["sn"]), Some(serde_json::to_value(plan(1)).unwrap())).await.0, StatusCode::CONFLICT); // 일반 메시지
+        let kinds: Vec<String> = events(&db, "project", 1).await.into_iter().map(|e| e.0).collect();
+        assert_eq!(kinds, ["MessagePosted", "MessagePosted", "ProposalEdited", "ProposalProceeded"]);
+        orch::propose(&db, 1, None, plan(1)).await.unwrap();
+        let ws2 = call(&app, "GET", "/projects/1/conversation", None).await.1["messages"][3]["sn"].as_i64().unwrap();
+        assert_eq!(call(&app, "POST", &format!("/messages/{ws2}/cancel"), None).await.1["proposal_status"], "cancelled");
+
+        // Orch 제안: 목록 · edit은 선택지 필요 · 처리 후 다시 처리 409 · 모르는 동작 404
+        let pn = |kind: &str| ProposalNew { project_sn: 1, issue_sn: None, task_sn: Some(ts), run_sn: None, member_sn: Some(1), kind: kind.into(), level: 1,
+            title: "#130 QA를 하린에게 배정".into(), reason: None, options: Some(vec!["Todo로 보내고 대기".into()]), streak_count: 3, deadline_at: None, event_sn: None };
+        orch::suggest(&db, pn("assign")).await.unwrap();
+        orch::suggest(&db, pn("next_issue")).await.unwrap();
+        assert!(orch::suggest(&db, pn("x")).await.is_err());
+        let v = call(&app, "GET", "/proposals?project_sn=1&status=proposed", None).await.1;
+        assert_eq!((v.as_array().unwrap().len(), v[1]["options"][0].as_str()), (2, Some("Todo로 보내고 대기")));
+        assert_eq!(call(&app, "POST", "/proposals/1/edit", Some(json!({}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "POST", "/proposals/1/edit", Some(json!({"option": "Todo로 보내고 대기"}))).await.1["status"], "changed");
+        assert_eq!(call(&app, "POST", "/proposals/2/proceed", None).await.1["status"], "user_done");
+        assert_eq!(call(&app, "POST", "/proposals/2/cancel", None).await.0, StatusCode::CONFLICT);
+        assert_eq!(call(&app, "POST", "/proposals/2/zzz", None).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(call(&app, "GET", "/proposals?status=proposed", None).await.1.as_array().unwrap().len(), 0);
+
+        // 실행 중 지시: 활동 기록 + 이벤트, 끝난 Run 409 · 빈 지시 422
+        let rs = call(&app, "POST", &format!("/tasks/{ts}/runs"), None).await.1["sn"].as_i64().unwrap();
+        let (st, i) = call(&app, "POST", &format!("/runs/{rs}/instruct"), Some(json!({"text": "테스트 먼저 돌려"}))).await;
+        assert_eq!((st, i["member_sn"].as_i64(), i["text"].as_str()), (StatusCode::CREATED, Some(1), Some("테스트 먼저 돌려")));
+        assert_eq!(events(&db, "run", rs).await.last().unwrap().0, "InstructionSent");
+        assert_eq!(call(&app, "POST", &format!("/runs/{rs}/instruct"), Some(json!({"text": ""}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        call(&app, "POST", &format!("/runs/{rs}/stop"), None).await;
+        assert_eq!(call(&app, "POST", &format!("/runs/{rs}/instruct"), Some(json!({"text": "x"}))).await.0, StatusCode::CONFLICT);
+    }
+
     #[tokio::test]
     async fn openapi() {
         let (st, v) = call(&setup().await, "GET", "/openapi.json", None).await;
         assert_eq!(st, StatusCode::OK);
-        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit"] {
+        for path in ["/health", "/projects", "/projects/{sn}", "/projects/{sn}/issues", "/issues/{sn}", "/issues/{sn}/tasks", "/projects/{sn}/tasks", "/tasks/{sn}", "/tasks/{sn}/move", "/tasks/{sn}/runs", "/runs/{sn}", "/runs/{sn}/sessions", "/runs/{sn}/stop", "/runs/{sn}/retry", "/runs/{sn}/review", "/runs/{sn}/approve", "/runs/{sn}/reject", "/tasks/{sn}/assign", "/profiles", "/profiles/{sn}", "/profiles/{sn}/caps", "/profiles/{sn}/fallbacks", "/profiles/{sn}/commands", "/templates", "/templates/{sn}", "/teams", "/teams/{sn}", "/teams/{sn}/members", "/members/{sn}", "/connections", "/connections/{sn}", "/connections/{sn}/quotas", "/runtimes", "/workspace", "/presets", "/presets/{sn}/versions", "/decisions", "/decisions/{sn}", "/decisions/{sn}/answer", "/decisions/{sn}/writing", "/approvals", "/approvals/{sn}/approve", "/approvals/{sn}/deny", "/skill-sources", "/skills", "/skills/{sn}", "/skills/{sn}/usage", "/mcps", "/mcps/{sn}", "/mcps/{sn}/usage", "/profiles/{sn}/skills", "/notifications", "/notifications/read", "/notify/rules", "/notify/channels", "/notify/test", "/audit", "/projects/{sn}/conversation", "/projects/{sn}/messages", "/messages/{sn}", "/messages/{sn}/proceed", "/messages/{sn}/cancel", "/proposals", "/proposals/{sn}/{action}", "/runs/{sn}/instruct"] {
             assert!(v["paths"][path].is_object(), "{path}");
         }
         assert!(v["components"]["schemas"]["ErrorBody"].is_object());
